@@ -1,7 +1,5 @@
-# pylsb [![Python package](https://github.com/pitt-rnel/pylsb/actions/workflows/python-package.yml/badge.svg)](https://github.com/pitt-rnel/pylsb/actions/workflows/python-package.yml)
-LabSwitchboard client written in python with no external dependencies. Based on and compatible with [Dragonfly Messaging](https://github.com/dragonfly-msg/dragonfly)
-
-**This project is under active development and experimentation. Do not use in production until a stable release has been issued.**
+# pyrtma [![Python package](https://github.com/pitt-rnel/pyrtma/actions/workflows/python-package.yml/badge.svg)](https://github.com/pitt-rnel/pyrtma/actions/workflows/python-package.yml)
+RTMA/Dragonfly client written in python with no external dependencies. Based on and compatible with [Dragonfly Messaging](https://github.com/pitt-rnel/rnel_dragonfly)
 
 ## Install
 From root directory of the repo:
@@ -16,7 +14,7 @@ $ python manager.py -a "127.0.0.1"
 
 Create a module:
 ```python
-from pylsb.client import Client
+from pyrtma.client import Client
 
 mod = Client()
 mod.Connect('127.0.0.1:7111')
@@ -36,11 +34,11 @@ $ python example.py --sub
 
 Bench testing utility: 
 ```shell
-$ python testing/pylsb_bench.py -h
-usage: pylsb_bench.py [-h] [-ms MSG_SIZE] [-n NUM_MSGS] [-np NUM_PUBLISHERS]
+$ python testing/pyrtma_bench.py -h
+usage: pyrtma_bench.py [-h] [-ms MSG_SIZE] [-n NUM_MSGS] [-np NUM_PUBLISHERS]
                      [-ns NUM_SUBSCRIBERS] [-s SERVER]
 
-lsbClient bench test utility
+pyrtma Client bench test utility
 
 optional arguments:
   -h, --help           show this help message and exit
@@ -48,6 +46,6 @@ optional arguments:
   -n NUM_MSGS          Number of messages.
   -np NUM_PUBLISHERS   Number of concurrent publishers.
   -ns NUM_SUBSCRIBERS  Number of concurrent subscribers.
-  -s SERVER            LSB message manager ip address (default:
+  -s SERVER            RTMA message manager ip address (default:
                        127.0.0.1:7111)
 ```

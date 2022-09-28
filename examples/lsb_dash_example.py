@@ -1,5 +1,5 @@
 from dash import Dash, dcc, html, Input, Output, State
-import pylsb, ctypes, threading, time, sys
+import pyrtma, ctypes, threading, time, sys
 from queue import Queue
 
 
@@ -7,8 +7,8 @@ from queue import Queue
 MT_USER_MESSAGE = 1234
 
 # Create a user defined message from a ctypes.Structure or basic ctypes
-@pylsb.msg_def
-class USER_MESSAGE(pylsb.MessageData):
+@pyrtma.msg_def
+class USER_MESSAGE(pyrtma.MessageData):
     _fields_ = [
         ("str", ctypes.c_byte * 64),
         ("val", ctypes.c_double),
@@ -20,7 +20,7 @@ class USER_MESSAGE(pylsb.MessageData):
 
 
 # instantiate client globally
-mod = pylsb.Client()
+mod = pyrtma.Client()
 
 app = Dash(
     __name__,

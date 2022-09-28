@@ -5,7 +5,7 @@ import multiprocessing
 
 sys.path.append("../")
 
-from pylsb import *
+from pyrtma import *
 
 
 def publisher_loop(
@@ -41,7 +41,7 @@ def publisher_loop(
                 num_subscribers_ready += 1
 
     # Create TEST message with dummy data
-    test_msg = create_test_msg(msg_size)()  # msg = pylsb.Message("TEST")
+    test_msg = create_test_msg(msg_size)()  # msg = pyrtma.Message("TEST")
     if msg_size > 0:
         test_msg.data[:] = list(range(msg_size))
 

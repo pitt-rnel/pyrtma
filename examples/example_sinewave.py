@@ -2,7 +2,7 @@ import sys, ctypes, time, math
 
 sys.path.append("../")
 
-import pylsb
+import pyrtma
 
 # Choose a unique message type id number
 MT_SINE_TEST_MSG = 9000
@@ -10,33 +10,33 @@ MT_SINE_STOP = 9001
 MT_SINE_START = 9002
 
 # Create a user defined message from a ctypes.Structure or basic ctypes
-@pylsb.msg_def
-class SINE_TEST_MSG(pylsb.MessageData):
+@pyrtma.msg_def
+class SINE_TEST_MSG(pyrtma.MessageData):
     _fields_ = [("time", ctypes.c_double), ("value", ctypes.c_double)]
 
     type_id: int = MT_SINE_TEST_MSG
     type_name: str = "SINE_TEST_MSG"
 
 
-@pylsb.msg_def
-class SINE_STOP(pylsb.MessageData):
+@pyrtma.msg_def
+class SINE_STOP(pyrtma.MessageData):
     type_id: int = MT_SINE_STOP
     type_name: str = "SINE_STOP"
 
 
-@pylsb.msg_def
-class SINE_START(pylsb.MessageData):
+@pyrtma.msg_def
+class SINE_START(pyrtma.MessageData):
     type_id: int = MT_SINE_START
     type_name: str = "SINE_START"
 
 
 def publisher(server="127.0.0.1:7111", timecode=False):
     # Setup Client
-    mod = pylsb.Client(timecode=timecode)
+    mod = pyrtma.Client(timecode=timecode)
     mod.connect(server_name=server)
 
     # Select the messages to receive
-    mod.subscribe([MT_SINE_STOP, MT_SINE_START, pylsb.MT_EXIT])
+    mod.subscribe([MT_SINE_STOP, MT_SINE_START, pyrtma.MT_EXIT])
 
     # Build a packet to send
     sin_msg = SINE_TEST_MSG()
@@ -74,18 +74,18 @@ def publisher(server="127.0.0.1:7111", timecode=False):
                     break
             time.sleep(0.02)
         except KeyboardInterrupt:
-            mod.send_signal(pylsb.MT_EXIT)
+            mod.send_signal(pyrtma.MT_EXIT)
             print("Goodbye")
             break
 
 
 def subscriber(server="127.0.0.1:7111", timecode=False):
     # Setup Client
-    mod = pylsb.Client(timecode=timecode)
+    mod = pyrtma.Client(timecode=timecode)
     mod.connect(server_name=server)
 
     # Select the messages to receive
-    mod.subscribe([MT_SINE_TEST_MSG, pylsb.MT_EXIT])
+    mod.subscribe([MT_SINE_TEST_MSG, pyrtma.MT_EXIT])
 
     print("Waiting for packets...")
     while True:
@@ -123,10 +123,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.pub:
-        print("pylsb Publisher")
+        print("pyrtma Publisher")
         publisher(args.server, timecode=args.timecode)
     elif args.sub:
-        print("pylsb Subscriber")
+        print("pyrtma Subscriber")
         subscriber(args.server, timecode=args.timecode)
     else:
         print("Unknown input")

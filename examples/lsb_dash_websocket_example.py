@@ -9,14 +9,14 @@ from dash_extensions.enrich import (
     callback_context,
 )
 from dash_extensions import WebSocket
-import pylsb, ctypes, threading, time, sys
+import pyrtma, ctypes, threading, time, sys
 
 # Choose a unique message type id number
 MT_SINE_STOP = 9001
 MT_SINE_START = 9002
 
 # instantiate client globally
-mod = pylsb.Client()
+mod = pyrtma.Client()
 
 
 def send_lsb_signal(MT: int):

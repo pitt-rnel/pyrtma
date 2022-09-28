@@ -4,9 +4,9 @@ import threading
 import time
 import unittest
 
-from pylsb import msg_def
-from pylsb.client import Client
-from pylsb.manager import MessageManager
+from pyrtma import msg_def
+from pyrtma.client import Client
+from pyrtma.manager import MessageManager
 
 # Choose a unique message type id number
 MT_TEST_MESSAGE = 1234

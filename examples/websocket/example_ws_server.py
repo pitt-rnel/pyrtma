@@ -4,14 +4,14 @@ import asyncio, websockets, json, ctypes, sys
 
 sys.path.append("../../")
 
-import pylsb
+import pyrtma
 
 # Choose a unique message type id number
 MT_SINE_TEST_MSG = 9000
 
 # Create a user defined message from a ctypes.Structure or basic ctypes
-@pylsb.msg_def
-class SINE_TEST_MSG(pylsb.MessageData):
+@pyrtma.msg_def
+class SINE_TEST_MSG(pyrtma.MessageData):
     _fields_ = [("time", ctypes.c_double), ("value", ctypes.c_double)]
 
     type_id: int = MT_SINE_TEST_MSG
@@ -22,7 +22,7 @@ async def lsb_ws(websocket):
     print("starting lsb_ws coroutine")
     # Setup Client
     try:
-        mod = pylsb.Client()
+        mod = pyrtma.Client()
         mod.connect()  # this should ideally be an "await" statement
 
         # Select the messages to receive

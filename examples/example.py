@@ -3,14 +3,14 @@ import ctypes
 
 sys.path.append("../")
 
-import pylsb
+import pyrtma
 
 # Choose a unique message type id number
 MT_USER_MESSAGE = 1234
 
 # Create a user defined message from a ctypes.Structure or basic ctypes
-@pylsb.msg_def
-class USER_MESSAGE(pylsb.MessageData):
+@pyrtma.msg_def
+class USER_MESSAGE(pyrtma.MessageData):
     _fields_ = [
         ("str", ctypes.c_byte * 64),
         ("val", ctypes.c_double),
@@ -23,7 +23,7 @@ class USER_MESSAGE(pylsb.MessageData):
 
 def publisher(server="127.0.0.1:7111", timecode=False):
     # Setup Client
-    mod = pylsb.Client(timecode=timecode)
+    mod = pyrtma.Client(timecode=timecode)
     mod.connect(server_name=server)
 
     # Build a packet to send
@@ -40,18 +40,18 @@ def publisher(server="127.0.0.1:7111", timecode=False):
             mod.send_message(msg)
             print("Sent a packet")
         else:
-            mod.send_signal(pylsb.MT_EXIT)
+            mod.send_signal(pyrtma.MT_EXIT)
             print("Goodbye")
             break
 
 
 def subscriber(server="127.0.0.1:7111", timecode=False):
     # Setup Client
-    mod = pylsb.Client(timecode=timecode)
+    mod = pyrtma.Client(timecode=timecode)
     mod.connect(server_name=server)
 
     # Select the messages to receive
-    mod.subscribe([MT_USER_MESSAGE, pylsb.MT_EXIT])
+    mod.subscribe([MT_USER_MESSAGE, pyrtma.MT_EXIT])
 
     print("Waiting for packets...")
     while True:
@@ -91,10 +91,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.pub:
-        print("pylsb Publisher")
+        print("pyrtma Publisher")
         publisher(args.server, timecode=args.timecode)
     elif args.sub:
-        print("pylsb Subscriber")
+        print("pyrtma Subscriber")
         subscriber(args.server, timecode=args.timecode)
     else:
         print("Unknown input")
