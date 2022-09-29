@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyrtma"
+version = "1.0.0"
+authors = [
+  { name="David Weir", email="dmw109@pitt.edu" },
+  { name="Jeff Weiss", email="jmw182@pitt.edu" },
+  { name="Tyler Madonna", email="tjm159@pitt.edu" },
+  { name="Tyler Simpson", email="tws21@pitt.edu" },
+]
+description = "A Python client for RTMA/Dragonfly"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/pitt-rnel/pyrtma"
+"Bug Tracker" = "https://github.com/pitt-rnel/pyrtma/issues"
