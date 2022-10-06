@@ -188,7 +188,7 @@ class Message:
         )
 
 
-# START OF LSB INTERNAL MESSAGE DEFINITIONS
+# START OF RTMA INTERNAL MESSAGE DEFINITIONS
 @core_def
 class EXIT(MessageData):
     type_id: ClassVar[int] = MT_EXIT
@@ -301,5 +301,5 @@ class TIMING_MESSAGE(MessageData):
 
 
 def AddMessage(msg_type_id: int, msg_cls: Type[MessageData]):
-    """Add a user message definition to the LSB module"""
+    """Add a user message definition to the RTMA module"""
     msg_defs.maps[1][msg_type_id] = msg_cls

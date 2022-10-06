@@ -19,20 +19,20 @@ MT_SINE_START = 9002
 mod = pyrtma.Client()
 
 
-def send_lsb_signal(MT: int):
+def send_rtma_signal(MT: int):
     try:
         if not mod.connected:
             mod.connect()
         mod.send_signal(MT)
     except:
-        print("Error sending LSB signal")
+        print("Error sending rtma signal")
 
 
 # Create example app.
 app = DashProxy(
     __name__,
     transforms=[NoOutputTransform()],
-    title="LSB Dash Websocket Example",
+    title="rtma Dash Websocket Example",
     external_stylesheets=["https://codepen.io/chriddyp/pen/bWLwgP.css"],
 )
 
@@ -111,9 +111,9 @@ app.clientside_callback(
 def start_callback(start, pause):
     button_clicked = callback_context.triggered_id
     if button_clicked == "start-button" and start:
-        send_lsb_signal(MT_SINE_START)
+        send_rtma_signal(MT_SINE_START)
     elif button_clicked == "pause-button" and pause:
-        send_lsb_signal(MT_SINE_STOP)
+        send_rtma_signal(MT_SINE_STOP)
 
 
 if __name__ == "__main__":

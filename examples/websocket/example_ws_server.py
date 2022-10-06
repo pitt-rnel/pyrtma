@@ -18,8 +18,8 @@ class SINE_TEST_MSG(pyrtma.MessageData):
     type_name: str = "SINE_TEST_MSG"
 
 
-async def lsb_ws(websocket):
-    print("starting lsb_ws coroutine")
+async def rtma_ws(websocket):
+    print("starting rtma_ws coroutine")
     # Setup Client
     try:
         mod = pyrtma.Client()
@@ -50,7 +50,7 @@ async def lsb_ws(websocket):
 
 async def main():
     print("starting main")
-    async with websockets.serve(lsb_ws, "localhost", 5678):
+    async with websockets.serve(rtma_ws, "localhost", 5678):
         await asyncio.Future()  # run forever
 
 

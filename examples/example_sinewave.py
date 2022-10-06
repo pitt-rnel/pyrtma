@@ -107,7 +107,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--server", default="127.0.0.1:7111", help="LSB Message Manager ip address."
+        "--server", default="127.0.0.1:7111", help="RTMA Message Manager ip address."
     )
     parser.add_argument(
         "-t", "--timecode", action="store_true", help="Use timecode in message header"
