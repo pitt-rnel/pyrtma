@@ -1,51 +1,109 @@
 # pyrtma [![Python package](https://github.com/pitt-rnel/pyrtma/actions/workflows/python-package.yml/badge.svg)](https://github.com/pitt-rnel/pyrtma/actions/workflows/python-package.yml)
+
 RTMA/Dragonfly client written in python with no external dependencies. Based on and compatible with [Dragonfly Messaging](https://github.com/pitt-rnel/rnel_dragonfly)
 
 ## Installation
+
 pyrtma is [available on PyPI](https://pypi.org/project/pyrtma/)
 ```shell
 $ pip install pyrtma
 ```
+
 ## Usage
 
 ### Launch Manager
+
 ```shell
 $ python -m pyrtma.manager -a "127.0.0.1"
 ```
 
-### Create a message in message.py
+### Create a message in message.h
+
+The recommended way of creating messages is to define them in a C header file (.h file).
+
+```c
+// message.h
+
+// Module IDs
+#define MID_PERSON_MESSAGE 555
+
+// Message IDs
+#define MT_PERSON_MESSAGE 1234
+#define MT_ANOTHER_EXAMPLE 5678
+
+// We can define other constants as well
+#define STR_SIZE 32 
+
+
+// Message definitions
+typedef struct {
+	char name[STR_SIZE];
+	int age;
+} MDF_PERSON_MESSAGE;
+
+typedef struct {
+	char value_str[STR_SIZE];
+	int value_int;
+    float value_float;
+    double value_double
+} MDF_ANOTHER_EXAMPLE;
+```
+
+Run the following command to compile the header file into Python types and files. This will output a message.py file.
+
+```shell
+$ python -m pyrtma.compile -i message.h -o message.py
+```
 
 ```python
+# message.py
 import ctypes
 import pyrtma
+from pyrtma.constants import *
 
+# User Constants: message.h
+STR_SIZE = 32
+
+# User Message IDs: message.h
 MT_PERSON_MESSAGE = 1234
+MT_ANOTHER_EXAMPLE = 5678
+
+# User Module IDs: message.h
+MID_PERSON_MESSAGE = 555
+
+# User Type Definitions: message.h
+# User Message Definitions: message.h
 
 
 @pyrtma.msg_def
-class PERSON_MESSAGE(pyrtma.MessageData):
+class MDF_PERSON_MESSAGE(pyrtma.MessageData):
+    _pack_ = True
     _fields_ = [
-        ("name", ctypes.c_byte * 32),  # String data type (32 bits)
-        ("age", ctypes.c_uint32),  # Unsigned integer (32 bits)
+        ("name", ctypes.c_char * STR_SIZE),
+        ("age", ctypes.c_long)
     ]
+    type_id = MT_PERSON_MESSAGE
+    type_name = "PERSON_MESSAGE"
 
-    type_id: int = MT_PERSON_MESSAGE
-    type_name: str = "PERSON_MESSAGE"
 
-    def read_str(self, field: str) -> str:
-        """Helper function for reading strings"""
-        ctype = getattr(self, field)
-        return bytearray(ctype).decode()
 
-    def write_str(self, field: str, value: str):
-        """Helper function for writing strings"""
-        byte_value = value.encode()
-        attr = getattr(self, field)
-        attr[: len(byte_value)] = byte_value
+@pyrtma.msg_def
+class MDF_ANOTHER_EXAMPLE(pyrtma.MessageData):
+    _pack_ = True
+    _fields_ = [
+        ("value_str", ctypes.c_char * STR_SIZE),
+        ("value_int", ctypes.c_long),
+        ("value_float", ctypes.c_float),
+        ("value_double", ctypes.c_double)
+    ]
+    type_id = MT_ANOTHER_EXAMPLE
+    type_name = "ANOTHER_EXAMPLE"
 ```
+*Note: Messages can also be defined in a Python file without the compile step*
 
 ### Create a publisher module in publisher.py
 ```python
+# publisher.py
 import message
 import pyrtma
 import time
@@ -56,8 +114,8 @@ mod = pyrtma.Client()
 mod.connect(server_name="127.0.0.1:7111")
 
 # Create an instance of the person message and populate with data
-msg = message.PERSON_MESSAGE()
-msg.write_str("name", "Alice")  # use our helper function
+msg = message.MDF_PERSON_MESSAGE()
+msg.name = "Alice".encode()  # String must be encoded to bytes
 msg.age = 42
 
 # Send the person message every second
@@ -67,8 +125,10 @@ while True:
     time.sleep(1)
 ```
 
-Create a subscriber module in subscriber.py
+### Create a subscriber module in subscriber.py
+
 ```python
+# subscriber.py
 import message
 import pyrtma
 
@@ -89,8 +149,9 @@ while True:
 
             # Find out what kind of message we received
             # We can check the message id
-            if msg.type_id == message.PERSON_MESSAGE.type_id:
-                name = msg.data.read_str("name")  # use our helper function
+            if msg.type_id == message.MDF_PERSON_MESSAGE.type_id:
+                name_raw = msg.data.name  # Strings must be decoded
+                name = bytearray(name_raw).decode()
                 age = msg.data.age
                 print(f"Hello my name is {name} and I am {age} years old")
 
