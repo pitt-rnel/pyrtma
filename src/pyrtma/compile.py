@@ -314,10 +314,15 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "-i, -I", nargs="*", dest="include_files", help="Files to parse",
+        "-i, -I",
+        nargs="*",
+        dest="include_files",
+        help="Files to parse",
     )
     parser.add_argument(
-        "-o, -O", dest="output_file", help="Output python file",
+        "-o, -O",
+        dest="output_file",
+        help="Output python file",
     )
     args = parser.parse_args()
     compile(args.include_files, args.output_file)
