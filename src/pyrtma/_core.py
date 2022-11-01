@@ -28,7 +28,7 @@ def core_def(msg_cls, *args, **kwargs):
 ctypes_map = {
     "char": ctypes.c_char,
     "unsigned char": ctypes.c_ubyte,
-    "byte": ctypes.c_char,
+    "byte": ctypes.c_ubyte,
     "int": ctypes.c_int,
     "signed int": ctypes.c_uint,
     "unsigned int": ctypes.c_uint,
@@ -44,6 +44,14 @@ ctypes_map = {
     "unsigned long long": ctypes.c_ulonglong,
     "float": ctypes.c_float,
     "double": ctypes.c_double,
+    "int8_t": ctypes.c_int8,
+    "int16_t": ctypes.c_int16,
+    "int32_t": ctypes.c_int32,
+    "int64_t": ctypes.c_int64,
+    "uint8_t": ctypes.c_uint8,
+    "uint16_t": ctypes.c_uint16,
+    "uint32_t": ctypes.c_uint32,
+    "uint64_t": ctypes.c_uint64,
     "MODULE_ID": ctypes.c_short,
     "HOST_ID": ctypes.c_short,
     "MSG_TYPE": ctypes.c_int,
@@ -65,10 +73,37 @@ def print_ctype_array(arr):
     return str
 
 
+def _create_ftype_map(obj: "MessageData"):
+    super(MessageData, obj).__setattr__(
+        "_ftype_map",
+        {
+            k: v._type_
+            for k, v in super(MessageData, obj).__getattribute__("_fields_")
+            if hasattr(v, "_type_")
+        },
+    )
+
+
 # TODO: Make this class abstract
 class MessageData(ctypes.Structure):
     type_id: ClassVar[int] = -1
     type_name: ClassVar[str] = ""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _create_ftype_map(self)
+
+    @classmethod
+    def from_buffer(cls, source, offset=0):
+        obj = type(cls).from_buffer(cls, source, offset)
+        _create_ftype_map(obj)
+        return obj
+
+    @classmethod
+    def from_buffer_copy(cls, source, offset=0):
+        obj = type(cls).from_buffer_copy(cls, source, offset)
+        _create_ftype_map(obj)
+        return obj
 
     @property
     def size(self) -> int:
@@ -111,6 +146,26 @@ class MessageData(ctypes.Structure):
 
     def __str__(self):
         return self.pretty_print()
+
+    def __getattribute__(self, name: str) -> Any:
+        value = super().__getattribute__(name)
+        ftype = super().__getattribute__("_ftype_map").get(name)
+
+        # Automatically decode char types to a string
+        if ftype is ctypes.c_char:
+            return value.decode()
+        else:
+            return value
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        ftype = super().__getattribute__("_ftype_map").get(name)
+
+        # Automatically encode a string value to bytes
+        if ftype is ctypes.c_char:
+            if isinstance(value, str):
+                value = value.encode()
+
+        super().__setattr__(name, value)
 
 
 class MessageHeader(ctypes.Structure):
@@ -191,18 +246,21 @@ class Message:
 # START OF LSB INTERNAL MESSAGE DEFINITIONS
 @core_def
 class EXIT(MessageData):
+    _fields_ = []
     type_id: ClassVar[int] = MT_EXIT
     type_name: ClassVar[str] = "EXIT"
 
 
 @core_def
 class KILL(MessageData):
+    _fields_ = []
     type_id: ClassVar[int] = MT_KILL
     type_name: ClassVar[str] = "KILL"
 
 
 @core_def
 class ACKNOWLEDGE(MessageData):
+    _fields_ = []
     type_id: ClassVar[int] = MT_ACKNOWLEDGE
     type_name: ClassVar[str] = "ACKNOWLEDGE"
 
