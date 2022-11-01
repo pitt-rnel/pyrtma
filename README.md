@@ -115,7 +115,7 @@ mod.connect(server_name="127.0.0.1:7111")
 
 # Create an instance of the person message and populate with data
 msg = message.MDF_PERSON_MESSAGE()
-msg.name = "Alice".encode()  # String must be encoded to bytes
+msg.name = "Alice"  # str gets converted to c_char
 msg.age = 42
 
 # Send the person message every second
@@ -150,8 +150,7 @@ while True:
             # Find out what kind of message we received
             # We can check the message id
             if msg.type_id == message.MDF_PERSON_MESSAGE.type_id:
-                name_raw = msg.data.name  # Strings must be decoded
-                name = bytearray(name_raw).decode()
+                name = msg.data.name  # c_char get converted to str
                 age = msg.data.age
                 print(f"Hello my name is {name} and I am {age} years old")
 
