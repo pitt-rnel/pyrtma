@@ -143,7 +143,7 @@ if __name__ == "__main__":
     import argparse
 
     # Configuration flags for bench utility
-    parser = argparse.ArgumentParser(description="lsbClient bench test utility")
+    parser = argparse.ArgumentParser(description="RtmaClient bench test utility")
     parser.add_argument(
         "-ms", default=128, type=int, dest="msg_size", help="Messge size in bytes."
     )
@@ -168,11 +168,11 @@ if __name__ == "__main__":
         "-s",
         default="127.0.0.1:7111",
         dest="server",
-        help="LSB message manager ip address (default: 127.0.0.1:7111)",
+        help="RTMA message manager ip address (default: 127.0.0.1:7111)",
     )
     args = parser.parse_args()
 
-    # Main Thread LSB client
+    # Main Thread RTMA client
     mod = Client()
     mod.connect(server_name=args.server)
     mod.send_module_ready()

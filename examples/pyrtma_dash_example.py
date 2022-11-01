@@ -24,23 +24,23 @@ mod = pyrtma.Client()
 
 app = Dash(
     __name__,
-    title="LSB Example",
+    title="RTMA Example",
     external_stylesheets=["https://codepen.io/chriddyp/pen/bWLwgP.css"],
 )
 
 msg_queue = Queue()  # global message queue
 
 
-def send_lsb_message(msg):
+def send_rtma_message(msg):
     try:
         if not mod.connected:
             mod.connect()
         mod.send_message(msg)
     except:
-        print("Error sending LSB message")
+        print("Error sending RTMA message")
 
 
-class LsbThread(threading.Thread):
+class RtmaThread(threading.Thread):
     def __init__(self):
         self.running = False
         self.connected = mod.connected
@@ -54,24 +54,24 @@ class LsbThread(threading.Thread):
         connect_attempts = 0
         max_attempts = 10
         while self.running:
-            # connect to LSB
+            # connect to RTMA
             if not (mod.connected and self.connected):
                 connect_attempts += 1
                 try:
                     mod.connect()
                     self.connected = mod.connected
                     connect_attempts = 0
-                    print("Connected to LSB message manager")
+                    print("Connected to RTMA message manager")
                 except:
                     if connect_attempts < max_attempts:
                         print(
-                            "Warning: Exception connecting to message manager in LsbThread, trying again."
+                            "Warning: Exception connecting to message manager in RtmaThread, trying again."
                         )
                         time.sleep(2)
                         continue
                     else:
                         print(
-                            "ERROR: Could not connect to message manager in LsbThread, exceeded max tries.",
+                            "ERROR: Could not connect to message manager in RtmaThread, exceeded max tries.",
                             file=sys.stderr,
                         )
                         self.running = False
@@ -96,7 +96,7 @@ class LsbThread(threading.Thread):
                         msg_queue.put(msg)
                 except:
                     self.connected = False
-                    print("Exception in LsbThread read loop")
+                    print("Exception in RtmaThread read loop")
                     time.sleep(2)
 
 
@@ -157,7 +157,7 @@ def send_callback(n_clicks):
         msg.str[: len(py_string)] = py_string
         msg.val = n_clicks + 0.123
         msg.arr[:] = list(range(8))
-        send_lsb_message(msg)
+        send_rtma_message(msg)
         out = str(msg)
     else:
         out = ""
@@ -181,8 +181,8 @@ def interval_callback(txt, n):
 
 if __name__ == "__main__":
     try:
-        lsb_thread = LsbThread()
-        lsb_thread.start()
+        rtma_thread = RtmaThread()
+        rtma_thread.start()
         app.run(
             host="127.0.0.1",
             port="8050",

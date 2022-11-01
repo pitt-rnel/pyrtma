@@ -233,7 +233,7 @@ class MessageManager:
         src_module.pid = mr.pid
 
     def read_message(self, sock: socket.socket) -> bool:
-        # Read LSB Header Section
+        # Read RTMA Header Section
         nbytes = sock.recv_into(
             self.header_buffer, self.header_size, socket.MSG_WAITALL
         )

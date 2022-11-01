@@ -326,7 +326,7 @@ class Client(object):
                 [self._sock], [], []
             )  # blocking
 
-        # Read LSB Header Section
+        # Read RTMA Header Section
         if readfds:
             header = self._header_cls()
             try:
