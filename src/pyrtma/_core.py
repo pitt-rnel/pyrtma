@@ -149,7 +149,14 @@ class MessageData(ctypes.Structure):
 
     def __getattribute__(self, name: str) -> Any:
         value = super().__getattribute__(name)
-        ftype = super().__getattribute__("_ftype_map").get(name)
+        try:
+            # This is a workaround for nested messages. _ftype_map should exist for
+            # for other cases.
+            ftype = super().__getattribute__("_ftype_map").get(name)
+        except AttributeError:
+            # Create map if it doesn't exist
+            _create_ftype_map(self)
+            ftype = super().__getattribute__("_ftype_map").get(name)
 
         # Automatically decode char types to a string
         if ftype is ctypes.c_char:
@@ -158,7 +165,12 @@ class MessageData(ctypes.Structure):
             return value
 
     def __setattr__(self, name: str, value: Any) -> None:
-        ftype = super().__getattribute__("_ftype_map").get(name)
+        try:
+            ftype = super().__getattribute__("_ftype_map").get(name)
+        except AttributeError:
+            # Create map if it doesn't exist
+            _create_ftype_map(self)
+            ftype = super().__getattribute__("_ftype_map").get(name)
 
         # Automatically encode a string value to bytes
         if ftype is ctypes.c_char:
