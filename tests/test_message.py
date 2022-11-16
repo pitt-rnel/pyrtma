@@ -27,10 +27,7 @@ class TEST_MESSAGE(MessageData):
 @msg_def
 class NESTED_MESSAGE(MessageData):
     _pack_ = True
-    _fields_ = [
-        ("idx", ctypes.c_int),
-        ("nested", TEST_MESSAGE)
-    ]
+    _fields_ = [("idx", ctypes.c_int), ("nested", TEST_MESSAGE)]
 
     type_id: int = MT_NESTED_MESSAGE
     type_name: str = "NESTED_MESSAGE"
@@ -40,7 +37,7 @@ class TestMessageData(unittest.TestCase):
     """
     Test MessageData functionality.
     """
-    
+
     def test_whenSingleMessage_setCorrectValues(self):
         """
         Test if a single message sets correct values.
@@ -70,7 +67,7 @@ class TestMessageData(unittest.TestCase):
         nested = TEST_MESSAGE()
         nested.str_value = "test"
         nested.int_value = 55
-        
+
         msg = NESTED_MESSAGE()
         msg.idx = 1200
         msg.nested = nested
