@@ -1,4 +1,5 @@
 import ctypes
+import json
 
 from dataclasses import dataclass
 from collections import ChainMap
@@ -84,6 +85,32 @@ def _create_ftype_map(obj: "MessageData"):
     )
 
 
+class RTMAJSONEncoder(json.JSONEncoder):
+    """JSONEncoder object used to convert MessageData to json
+
+    Example:
+        data = json.dumps(msg, cls=pyrtma.encoding.RTMAJSONEncoder)
+    """
+
+    def default(self, o: Any) -> Any:
+
+        if isinstance(o, Message):
+            return dict(header=o.header, data=o.data)
+
+        if isinstance(o, MessageData):
+            d = dict(type_name=o.type_name, type_id=o.type_id)
+            d.update({k: getattr(o, k) for k, _ in getattr(o, ("_fields_"))})
+            return d
+
+        if issubclass(o.__class__, ctypes.Structure):
+            return {k: getattr(o, k) for k, _ in getattr(o, ("_fields_"))}
+
+        if isinstance(o, ctypes.Array):
+            return list(o)
+
+        return super().default(o)
+
+
 # TODO: Make this class abstract
 class MessageData(ctypes.Structure):
     type_id: ClassVar[int] = -1
@@ -113,7 +140,6 @@ class MessageData(ctypes.Structure):
     def buffer(self):
         return memoryview(self)
 
-    # custom print for message data
     def pretty_print(self, add_tabs=0):
         str = "\t" * add_tabs + f"{type(self).__name__}:"
         for field_name, field_type in self._fields_:
@@ -179,6 +205,9 @@ class MessageData(ctypes.Structure):
 
         super().__setattr__(name, value)
 
+    def to_json(self, **kwargs) -> str:
+        return json.dumps(self, cls=RTMAJSONEncoder, **kwargs)
+
 
 class MessageHeader(ctypes.Structure):
     _fields_ = [
@@ -204,7 +233,6 @@ class MessageHeader(ctypes.Structure):
     def buffer(self):
         return memoryview(self)
 
-    # custom print for message data
     def pretty_print(self, add_tabs=0):
         str = "\t" * add_tabs + f"{type(self).__name__}:"
         for field_name, field_type in self._fields_:
@@ -219,6 +247,9 @@ class MessageHeader(ctypes.Structure):
     @property
     def get_data(self) -> Type[MessageData]:
         return msg_defs[self.msg_type]
+
+    def to_json(self, **kwargs) -> str:
+        return json.dumps(self, cls=RTMAJSONEncoder, **kwargs)
 
 
 class TimeCodeMessageHeader(MessageHeader):
@@ -248,11 +279,13 @@ class Message:
     def name(self) -> str:
         return self.data.type_name
 
-    # custom print for message data
     def pretty_print(self, add_tabs=0):
         return (
             self.header.pretty_print(add_tabs) + "\n" + self.data.pretty_print(add_tabs)
         )
+
+    def to_json(self, **kwargs) -> str:
+        return json.dumps(self, cls=RTMAJSONEncoder, **kwargs)
 
 
 # START OF RTMA INTERNAL MESSAGE DEFINITIONS
