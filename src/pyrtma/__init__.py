@@ -2,6 +2,7 @@ from ._core import (
     MessageHeader,
     MessageData,
     Message,
+    RTMAJSONEncoder,
     user_msg_defs,
     core_msg_defs,
     msg_defs,
