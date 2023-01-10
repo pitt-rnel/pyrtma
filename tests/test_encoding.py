@@ -3,7 +3,6 @@ import json
 import unittest
 
 from pyrtma import MessageData, msg_def
-from pyrtma.encoding import RTMAJSONEncoder
 
 # Choose a unique message type id number
 MT_TEST_MESSAGE = 1234
@@ -54,7 +53,7 @@ class TestJSONEncoding(unittest.TestCase):
         msg.longarr_value = (ctypes.c_long * 2)(4, 7)
 
         # Act
-        result = json.dumps(msg, cls=RTMAJSONEncoder, separators=[",", ":"])
+        result = msg.to_json()
 
         # Assert
         result_map = json.loads(result)
@@ -82,7 +81,7 @@ class TestJSONEncoding(unittest.TestCase):
         print(msg.nested.int_value)
 
         # Act
-        result = json.dumps(msg, cls=RTMAJSONEncoder, separators=[",", ":"])
+        result = msg.to_json()
 
         # Assert
         result_map = json.loads(result)
