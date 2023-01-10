@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyrtma"
-version = "1.1.1"
+version = "1.2.0"
 authors = [
   { name="David Weir", email="dmw109@pitt.edu" },
   { name="Jeff Weiss", email="jmw182@pitt.edu" },
