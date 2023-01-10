@@ -77,7 +77,10 @@ def requires_connection(func):
 
 class Client(object):
     def __init__(
-        self, module_id: int = 0, host_id: int = 0, timecode: bool = False,
+        self,
+        module_id: int = 0,
+        host_id: int = 0,
+        timecode: bool = False,
     ):
         self._module_id = module_id
         self._host_id = host_id
@@ -85,7 +88,7 @@ class Client(object):
         self._server = ("", -1)
         self._connected = False
         self._header_cls = get_header_cls(timecode)
-        self._recv_buffer = bytearray(1024 ** 2)
+        self._recv_buffer = bytearray(1024**2)
 
     def __del__(self):
         if self._connected:
