@@ -45,6 +45,9 @@ def parse_defines(text: str) -> Dict:
         elif name.startswith("MID_"):
             defines["MID"][name] = exp
         else:
+            if "/" in exp and "." not in exp:
+                # Ensure division results in an integer if no decimal
+                exp = "int(" + exp + ")"
             defines["constants"][name] = exp
 
     return defines
