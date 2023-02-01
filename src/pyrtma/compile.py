@@ -168,7 +168,6 @@ def generate_struct(name: str, fields):
 
     template = f"""
 class {name}(ctypes.Structure):
-    _pack_ = True
     _fields_ = [
 {fstr}
     ]
@@ -195,7 +194,6 @@ def generate_msg_def(name: str, fields):
     template = f"""
 @pyrtma.msg_def
 class {name}(pyrtma.MessageData):
-    _pack_ = True
     _fields_ = [
 {fstr}
     ]
