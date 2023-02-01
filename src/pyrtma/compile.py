@@ -45,6 +45,9 @@ def parse_defines(text: str) -> Dict:
         elif name.startswith("MID_"):
             defines["MID"][name] = exp
         else:
+            if "/" in exp and "." not in exp:
+                # Ensure division results in an integer if no decimal
+                exp = "int(" + exp + ")"
             defines["constants"][name] = exp
 
     return defines
@@ -307,15 +310,21 @@ def compile(include_files: List, out_filename: Optional[str]):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="LabSwitchBoard Message Definition Compiler."
-    )
+    parser = argparse.ArgumentParser(description="pyrtma Message Definition Compiler.")
 
     parser.add_argument(
-        "-i", "-I", "--include", nargs="*", dest="include_files", help="Files to parse",
+        "-i",
+        "-I",
+        "--include",
+        nargs="*",
+        dest="include_files",
+        help="Files to parse",
     )
     parser.add_argument(
-        "-o", "--out", dest="output_file", help="Output python file",
+        "-o",
+        "--out",
+        dest="output_file",
+        help="Output python file",
     )
     args = parser.parse_args()
     compile(args.include_files, args.output_file)

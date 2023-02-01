@@ -25,7 +25,8 @@ The recommended way of creating messages is to define them in a C header file (.
 // message.h
 
 // Module IDs
-#define MID_PERSON_MESSAGE 555
+#define MID_PERSON_PUBLISHER 112
+#define MID_PERSON_SUBSCRIBER 113
 
 // Message IDs
 #define MT_PERSON_MESSAGE 1234
@@ -69,7 +70,8 @@ MT_PERSON_MESSAGE = 1234
 MT_ANOTHER_EXAMPLE = 5678
 
 # User Module IDs: message.h
-MID_PERSON_MESSAGE = 555
+MID_PERSON_PUBLISHER = 112
+MID_PERSON_SUBSCRIBER = 113
 
 # User Type Definitions: message.h
 # User Message Definitions: message.h
@@ -108,7 +110,7 @@ import message
 import pyrtma
 import time
 
-mod = pyrtma.Client()
+mod = pyrtma.Client(module_id=message.MID_PERSON_PUBLISHER)
 
 # Connect to the manager
 mod.connect(server_name="127.0.0.1:7111")
@@ -132,6 +134,8 @@ while True:
 import message
 import pyrtma
 
+# Keeping module_id blank makes Manager dynamically create a module id.
+# This is default behavior.
 mod = pyrtma.Client()
 
 # Connect to the manager
