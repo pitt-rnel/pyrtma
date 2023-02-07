@@ -8,6 +8,7 @@ import pyrtma
 # Choose a unique message type id number
 MT_USER_MESSAGE = 1234
 
+
 # Create a user defined message from a ctypes.Structure or basic ctypes
 @pyrtma.msg_def
 class USER_MESSAGE(pyrtma.MessageData):

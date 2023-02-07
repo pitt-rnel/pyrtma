@@ -9,6 +9,7 @@ MT_SINE_TEST_MSG = 9000
 MT_SINE_STOP = 9001
 MT_SINE_START = 9002
 
+
 # Create a user defined message from a ctypes.Structure or basic ctypes
 @pyrtma.msg_def
 class SINE_TEST_MSG(pyrtma.MessageData):
