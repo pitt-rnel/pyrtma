@@ -32,7 +32,7 @@ def parse_defines(text: str) -> Dict:
 
     # Get Defines (Only simple one line constants here)
     macros = re.findall(
-        r"#define\s*(?P<name>\w+)\s+(?P<expression>[\(\)\[\]\w \*/\+-]+)\n", text
+        r"#define\s*(?P<name>\w+)\s+(?P<expression>[\(\)\[\]\w \*/\+-\.]+)\n", text
     )
 
     for name, exp in macros:
