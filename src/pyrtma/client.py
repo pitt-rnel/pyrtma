@@ -104,7 +104,6 @@ class Client(object):
         logger_status: bool = False,
         daemon_status: bool = False,
     ):
-
         addr, port = server_name.split(":")
         self._server = (addr, int(port))
 
@@ -227,7 +226,6 @@ class Client(object):
         dest_host_id: int = 0,
         timeout: float = -1,
     ):
-
         # Verify that the module & host ids are valid
         if dest_mod_id < 0 or dest_mod_id > MAX_MODULES:
             raise InvalidDestinationModule(f"Invalid dest_mod_id  of [{dest_mod_id}]")

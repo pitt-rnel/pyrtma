@@ -17,7 +17,6 @@ from collections import defaultdict, Counter
 
 @dataclass
 class Module:
-
     conn: socket.socket
     address: Tuple[str, int]
     header_cls: Type[MessageHeader]
@@ -52,7 +51,6 @@ class Module:
 
 
 class MessageManager:
-
     _keep_running = True
 
     def __init__(
@@ -63,7 +61,6 @@ class MessageManager:
         debug=False,
         send_msg_timing=True,
     ):
-
         self.ip_address = ip_address
         self.port = port
 
@@ -150,7 +147,6 @@ class MessageManager:
 
         MAX_DYN_IDS = MAX_MODULES - DYN_MOD_ID_START
         for i in range(0, MAX_DYN_IDS):
-
             mod_id = self.next_dynamic_mod_id_offset + DYN_MOD_ID_START
             self.next_dynamic_mod_id_offset += 1
             if self.next_dynamic_mod_id_offset == MAX_DYN_IDS:
@@ -372,7 +368,6 @@ class MessageManager:
         time_of_failure: float,
         wlist: List[socket.socket],
     ):
-
         header = self.header_cls()
         data = FAILED_MESSAGE()
 
@@ -397,7 +392,6 @@ class MessageManager:
         self.message_counts[header.msg_type] += 1
 
     def send_timing_message(self, wlist: List[socket.socket]):
-
         header = self.header_cls()
         data = TIMING_MESSAGE()
 
@@ -408,7 +402,7 @@ class MessageManager:
 
         data.send_time = time.time()
 
-        for (mt, count) in self.message_counts.items():
+        for mt, count in self.message_counts.items():
             data.timing[mt] = count
         self.message_counts.clear()
 
@@ -524,7 +518,6 @@ class MessageManager:
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-a",

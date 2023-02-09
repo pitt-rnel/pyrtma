@@ -93,7 +93,6 @@ class RTMAJSONEncoder(json.JSONEncoder):
     """
 
     def default(self, o: Any) -> Any:
-
         if isinstance(o, Message):
             return dict(header=o.header, data=o.data)
 
