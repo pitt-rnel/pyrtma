@@ -162,7 +162,7 @@ def generate_struct(name: str, fields):
     f = []
     fnum = len(fields)
     for i, (fname, ftyp, flen) in enumerate(fields, start=1):
-        if flen and re.search(r"/", flen):
+        if flen and re.search(r"/+*-", flen):
             flen = "int(" + flen + ")"
         nl = ",\n" if i < fnum else ""
         f.append(f"        (\"{fname}\", {ftyp}{' * ' + flen if flen else ''}){nl}")
@@ -186,7 +186,7 @@ def generate_msg_def(name: str, fields):
     f = []
     fnum = len(fields)
     for i, (fname, ftyp, flen) in enumerate(fields, start=1):
-        if flen and re.search(r"/", flen):
+        if flen and re.search(r"/+*-", flen):
             flen = "int(" + flen + ")"
         nl = ",\n" if i < fnum else ""
         f.append(f"        (\"{fname}\", {ftyp}{' * ' + flen if flen else ''}){nl}")
@@ -313,18 +313,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="pyrtma Message Definition Compiler.")
 
     parser.add_argument(
-        "-i",
-        "-I",
-        "--include",
-        nargs="*",
-        dest="include_files",
-        help="Files to parse",
+        "-i", "-I", "--include", nargs="*", dest="include_files", help="Files to parse",
     )
     parser.add_argument(
-        "-o",
-        "--out",
-        dest="output_file",
-        help="Output python file",
+        "-o", "--out", dest="output_file", help="Output python file",
     )
     args = parser.parse_args()
     compile(args.include_files, args.output_file)
