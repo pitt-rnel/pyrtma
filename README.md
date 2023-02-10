@@ -11,7 +11,7 @@ $ pip install pyrtma
 
 ### Installing for pyrtma development
 
-This is only necessary for indivuals who would like to contribute to pyrtma.
+This is only necessary for individuals who would like to contribute to pyrtma.
 ```shell
 $ pip install --upgrade pip setuptools
 $ pip install -e .
