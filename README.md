@@ -9,6 +9,14 @@ pyrtma is [available on PyPI](https://pypi.org/project/pyrtma/)
 $ pip install pyrtma
 ```
 
+### Installing for pyrtma development
+
+This is only necessary for indivuals who would like to contribute to pyrtma.
+```shell
+$ pip install --upgrade pip setuptools
+$ pip install -e .
+```
+
 ## Usage
 
 ### Launch Manager
