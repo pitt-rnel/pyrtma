@@ -3,6 +3,10 @@ import select
 import argparse
 import logging
 import time
+"""pyrtma.manager module
+
+Contains :py:class:`~MessageManager` class
+"""
 import random
 import ctypes
 import os
@@ -17,6 +21,11 @@ from collections import defaultdict, Counter
 
 @dataclass
 class Module:
+    """Module dataclass
+
+    Used internally by MessageManager to manage connections to each client module.
+    """    
+
     conn: socket.socket
     address: Tuple[str, int]
     header_cls: Type[MessageHeader]
@@ -51,6 +60,11 @@ class Module:
 
 
 class MessageManager:
+    """MessageManager class
+
+    RTMA Message Manager server implemented in python.
+    """    
+
     _keep_running = True
 
     def __init__(
@@ -462,6 +476,7 @@ class MessageManager:
         self._keep_running = False
 
     def run(self):
+        """Start the message manager server"""        
         try:
             while self._keep_running:
                 rlist, _, _ = select.select(

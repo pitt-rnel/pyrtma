@@ -1,3 +1,6 @@
+"""pyrtma.compile Message Type Compiler
+"""
+
 from io import TextIOWrapper
 import re
 from typing import List, Dict, Optional
