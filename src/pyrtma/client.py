@@ -84,11 +84,11 @@ class Client(object):
     """RTMA Client interface
 
     Args:
-            module_id (optional): Static module ID, which must be unique. 
-                Defaults to 0, which generates a dynamic module ID.
-            host_id (optional): Host ID. Defaults to 0.
-            timecode (optional): Add additional timecode fields to message 
-                header, used by some projects at RNEL. Defaults to False.
+        module_id (optional): Static module ID, which must be unique. 
+            Defaults to 0, which generates a dynamic module ID.
+        host_id (optional): Host ID. Defaults to 0.
+        timecode (optional): Add additional timecode fields to message 
+            header, used by some projects at RNEL. Defaults to False.
     """    
 
     def __init__(

@@ -1,12 +1,13 @@
+"""pyrtma.manager module
+
+Contains :py:class:`~MessageManager` class
+"""
+
 import socket
 import select
 import argparse
 import logging
 import time
-"""pyrtma.manager module
-
-Contains :py:class:`~MessageManager` class
-"""
 import random
 import ctypes
 import os
@@ -278,10 +279,17 @@ class MessageManager:
         wlist: List[socket.socket],
     ):
         """Forward a message from other modules
+
         The given message will be forwarded to:
+
             - all subscribed logger modules (ALWAYS)
             - if the message has a destination address, and it is subscribed to by that destination it will be forwarded only there
             - if the message has no destination address, it will be forwarded to all subscribed modules
+
+        Args:
+            header: Message Header
+            data: Message Data
+            wlist: sockets ready for writing
         """
 
         dest_mod_id = header.dest_mod_id
