@@ -25,7 +25,7 @@ class Module:
     """Module dataclass
 
     Used internally by MessageManager to manage connections to each client module.
-    """    
+    """
 
     conn: socket.socket
     address: Tuple[str, int]
@@ -64,7 +64,7 @@ class MessageManager:
     """MessageManager class
 
     RTMA Message Manager server implemented in python.
-    """    
+    """
 
     _keep_running = True
 
@@ -484,7 +484,7 @@ class MessageManager:
         self._keep_running = False
 
     def run(self):
-        """Start the message manager server"""        
+        """Start the message manager server"""
         try:
             while self._keep_running:
                 rlist, _, _ = select.select(
