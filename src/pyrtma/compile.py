@@ -215,7 +215,6 @@ def generate_sig_def(name: str):
 # Signal Definition
 @pyrtma.msg_def
 class {name}(pyrtma.MessageData):
-    _pack_ = True
     _fields_ = []
     type_id = {msg_id}
     type_name = \"{basename}\"
