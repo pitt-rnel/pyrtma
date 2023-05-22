@@ -7,6 +7,7 @@ from typing import Type, ClassVar, Optional, Any, Dict, ChainMap
 
 from .constants import *
 
+
 core_msg_defs: Dict[int, Type["MessageData"]] = {}
 user_msg_defs: Dict[int, Type["MessageData"]] = {}
 
@@ -83,6 +84,20 @@ def _create_ftype_map(obj: "MessageData"):
             if hasattr(v, "_type_")
         },
     )
+
+
+def _json_decode(obj, data):
+    for (name, ftype) in obj._fields_:
+        if issubclass(ftype, ctypes.Structure):
+            _json_decode(getattr(obj, name), data[name])
+        elif issubclass(ftype, ctypes.Array):
+            if issubclass(ftype._type_, ctypes.Structure):
+                for i, elem in enumerate(getattr(obj, name)):
+                    _json_decode(elem, data[name][i])
+            else:
+                getattr(obj, name)[:] = data[name]
+        else:
+            setattr(obj, name, data[name])
 
 
 class RTMAJSONEncoder(json.JSONEncoder):
@@ -207,6 +222,17 @@ class MessageData(ctypes.Structure):
     def to_json(self, **kwargs) -> str:
         return json.dumps(self, cls=RTMAJSONEncoder, **kwargs)
 
+    @classmethod
+    def from_dict(cls, data):
+        obj = cls()
+        _json_decode(obj, data)
+        return obj
+
+    @classmethod
+    def from_json(cls, s):
+        obj = cls.from_dict(json.loads(s))
+        return obj
+
 
 class MessageHeader(ctypes.Structure):
     _fields_ = [
@@ -250,6 +276,17 @@ class MessageHeader(ctypes.Structure):
     def to_json(self, **kwargs) -> str:
         return json.dumps(self, cls=RTMAJSONEncoder, **kwargs)
 
+    @classmethod
+    def from_dict(cls, data):
+        obj = cls()
+        _json_decode(obj, data)
+        return obj
+
+    @classmethod
+    def from_json(cls, s):
+        obj = cls.from_dict(json.loads(s))
+        return obj
+
 
 class TimeCodeMessageHeader(MessageHeader):
     _fields_ = [
@@ -285,6 +322,23 @@ class Message:
 
     def to_json(self, **kwargs) -> str:
         return json.dumps(self, cls=RTMAJSONEncoder, **kwargs)
+
+    @classmethod
+    def from_json(cls, s: str):
+        # Convert json string to dict
+        d = json.loads(s)
+
+        # Decode header segment
+        hdr_cls = get_header_cls()
+        hdr = hdr_cls.from_dict(d["header"])
+
+        # Decode message data segment
+        msg_cls = msg_defs[hdr.msg_type]
+        msg_data = msg_cls.from_dict(d["data"])
+
+        obj = cls(hdr, msg_data)
+
+        return obj
 
 
 # START OF RTMA INTERNAL MESSAGE DEFINITIONS
