@@ -1,3 +1,7 @@
+"""pyrtma.client module
+
+Includes :py:class:`~Client` class and associated exception classes
+"""
 import socket
 import select
 import time
@@ -65,6 +69,8 @@ class InvalidDestinationHost(ClientError):
 
 
 def requires_connection(func):
+    """Decorator wrapper for Client methods that require a connection"""
+
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         if not self.connected:
@@ -76,6 +82,16 @@ def requires_connection(func):
 
 
 class Client(object):
+    """RTMA Client interface
+
+    Args:
+        module_id (optional): Static module ID, which must be unique.
+            Defaults to 0, which generates a dynamic module ID.
+        host_id (optional): Host ID. Defaults to 0.
+        timecode (optional): Add additional timecode fields to message
+            header, used by some projects at RNEL. Defaults to False.
+    """
+
     def __init__(
         self,
         module_id: int = 0,
@@ -95,7 +111,7 @@ class Client(object):
             try:
                 self.disconnect()
             except ClientError:
-                """Siliently ignore any errors at this point."""
+                """Silently ignore any errors at this point."""
                 pass
 
     def connect(
@@ -104,6 +120,19 @@ class Client(object):
         logger_status: bool = False,
         daemon_status: bool = False,
     ):
+        """Connect to message manager server
+
+        Args:
+            server_name (optional): IP_addr:port_num string associated with message manager.
+                Defaults to "localhost:7111".
+            logger_status (optional): Flag to declare client as a logger module.
+                Logger modules are automatically subscribed to all message types.
+                Defaults to False.
+            daemon_status (optional): Flag to declare client as a daemon. Defaults to False.
+
+        Raises:
+            MessageManagerNotFound: Unable to connect to message manager
+        """
         addr, port = server_name.split(":")
         self._server = (addr, int(port))
 
@@ -139,6 +168,7 @@ class Client(object):
             self._module_id = ack_msg.header.dest_mod_id
 
     def disconnect(self):
+        """Disconnect from message manager server"""
         try:
             if self._connected:
                 self.send_signal(MT_DISCONNECT)
@@ -151,34 +181,45 @@ class Client(object):
 
     @property
     def server(self) -> Tuple[str, int]:
+        """Message manager server address as a (IP_addr, port_num) tuple"""
         return self._server
 
     @property
     def ip_addr(self) -> str:
+        """Message manager IP address string"""
         return self._server[0]
 
     @property
     def port(self) -> int:
+        """Message manager port number"""
         return self._server[1]
 
     @property
     def connected(self) -> bool:
+        """Status of connection to message manager server"""
         return self._connected
 
     @property
     def msg_count(self) -> int:
+        """Count of messages that have been sent"""
         return self._msg_count
 
     @property
     def module_id(self) -> int:
+        """Numeric module ID of client"""
         return self._module_id
 
     @property
     def header_cls(self) -> Type[MessageHeader]:
+        """Class defining the RTMA message header"""
         return self._header_cls
 
     @requires_connection
     def send_module_ready(self):
+        """Send a signal to message manager that client is ready
+
+        This method also sends the client's process ID to message manager.
+        """
         msg = MODULE_READY()
         msg.pid = os.getpid()
         self.send_message(msg)
@@ -204,18 +245,41 @@ class Client(object):
 
     @requires_connection
     def subscribe(self, msg_list: List[int]):
+        """Subscribe to message types
+
+        Calling this method multiple times will add to, and not replace,
+        the list of subscribed messages.
+
+        Args:
+            msg_list: A list of numeric message IDs to subscribe to
+        """
         self._subscription_control(msg_list, "Subscribe")
 
     @requires_connection
     def unsubscribe(self, msg_list: List[int]):
+        """Unsubscribe from message types
+
+        Args:
+            msg_list: A list of numeric message IDs to unsubscribe to
+        """
         self._subscription_control(msg_list, "Unsubscribe")
 
     @requires_connection
     def pause_subscription(self, msg_list: List[int]):
+        """Pause subscription to message types
+
+        Args:
+            msg_list (List[int]): A list of numeric message IDs to temporarily unsubscribe to
+        """
         self._subscription_control(msg_list, "PauseSubscription")
 
     @requires_connection
     def resume_subscription(self, msg_list: List[int]):
+        """Resume subscription to message types
+
+        Args:
+            msg_list (List[int]): A list of paused message IDs to resubscribe to
+        """
         self._subscription_control(msg_list, "ResumeSubscription")
 
     @requires_connection
@@ -226,6 +290,23 @@ class Client(object):
         dest_host_id: int = 0,
         timeout: float = -1,
     ):
+        """Send a signal
+
+        A signal is a message type without an associated data payload.
+        Only a unique message type ID is required to send a signal.
+        To send a message with data, see :py:func:`send_message`.
+
+        Args:
+            signal_type: Numeric message type ID of signal
+            dest_mod_id (optional): Specific module ID to send to. Defaults to 0 (broadcast).
+            dest_host_id (optional): Specific host ID to send to. Defaults to 0 (broadcast).
+            timeout (optional): Timeout in seconds to wait for socket to be available for sending.
+                Defaults to -1 (blocking).
+
+        Raises:
+            InvalidDestinationModule: Specified destination module is invalid
+            InvalidDestinationHost: Specified destination host is invalid
+        """
         # Verify that the module & host ids are valid
         if dest_mod_id < 0 or dest_mod_id > MAX_MODULES:
             raise InvalidDestinationModule(f"Invalid dest_mod_id  of [{dest_mod_id}]")
@@ -269,6 +350,22 @@ class Client(object):
         dest_host_id: int = 0,
         timeout: float = -1,
     ):
+        """Send a message
+
+        A message is a packet that contains a defined data payload.
+        To send a message without associated data, see :py:func:`send_signal`.
+
+        Args:
+            msg_data: Object containing the message to send
+            dest_mod_id (optional): Specific module ID to send to. Defaults to 0 (broadcast).
+            dest_host_id (optional): Specific host ID to send to. Defaults to 0 (broadcast).
+            timeout (optional): Timeout in seconds to wait for socket to be available for sending.
+                Defaults to -1 (blocking).
+
+        Raises:
+            InvalidDestinationModule: Specified destination module is invalid
+            InvalidDestinationHost: Specified destination host is invalid
+        """
         # Verify that the module & host ids are valid
         if dest_mod_id < 0 or dest_mod_id > MAX_MODULES:
             raise InvalidDestinationModule(f"Invalid dest_mod_id of [{dest_mod_id}]")
@@ -317,6 +414,19 @@ class Client(object):
     def read_message(
         self, timeout: Union[int, float] = -1, ack=False
     ) -> Optional[Message]:
+        """Read a message
+
+        Args:
+            timeout (optional): Timeout to wait for a message to be available for reading.
+                Defaults to -1 (blocking).
+            ack (optional): Reserved for future use. Defaults to False.
+
+        Raises:
+            ConnectionLost: Connection error to message manager server
+
+        Returns:
+            Message object. If no message is read before timeout, returns None.
+        """
         if timeout >= 0:
             readfds, writefds, exceptfds = select.select([self._sock], [], [], timeout)
         else:
@@ -362,7 +472,22 @@ class Client(object):
 
         return Message(header, data)
 
-    def wait_for_acknowledgement(self, timeout: float = 3):
+    def wait_for_acknowledgement(self, timeout: float = 3) -> Message:
+        """Wait for acknowledgement from message manager module
+
+        Used internally when acknowledgement replies from message manager are expected
+
+        TODO rename to _wait_for_acknowledgement()?
+
+        Args:
+            timeout (optional): Timeout in seconds to wait for ack message. Defaults to 3.
+
+        Raises:
+            AcknowledgementTimeout: Ack not received from message manager
+
+        Returns:
+            Ack message
+        """
         ret = 0
 
         # Wait Forever
@@ -392,6 +517,16 @@ class Client(object):
             )
 
     def discard_messages(self, timeout: float = 1) -> bool:
+        """Read and discard messages in socket buffer up to timeout
+
+        Args:
+            timeout (optional): Maximum time in seconds to loop through message buffer.
+                Defaults to 1.
+
+        Returns:
+            True if all messages have been read, False if messages remain in buffer
+        """
+
         """Read and discard messages in socket buffer up to timeout.
         Returns: True if all messages available have been read.
         """

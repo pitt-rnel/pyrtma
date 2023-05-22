@@ -1,3 +1,6 @@
+"""pyrtma._core
+
+Core RTMA message definitions and functions"""
 import ctypes
 import json
 

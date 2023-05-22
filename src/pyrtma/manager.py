@@ -1,3 +1,8 @@
+"""pyrtma.manager module
+
+Contains :py:class:`~MessageManager` class
+"""
+
 import socket
 import select
 import argparse
@@ -17,6 +22,11 @@ from collections import defaultdict, Counter
 
 @dataclass
 class Module:
+    """Module dataclass
+
+    Used internally by MessageManager to manage connections to each client module.
+    """
+
     conn: socket.socket
     address: Tuple[str, int]
     header_cls: Type[MessageHeader]
@@ -51,6 +61,11 @@ class Module:
 
 
 class MessageManager:
+    """MessageManager class
+
+    RTMA Message Manager server implemented in python.
+    """
+
     _keep_running = True
 
     def __init__(
@@ -264,10 +279,17 @@ class MessageManager:
         wlist: List[socket.socket],
     ):
         """Forward a message from other modules
+
         The given message will be forwarded to:
+
             - all subscribed logger modules (ALWAYS)
             - if the message has a destination address, and it is subscribed to by that destination it will be forwarded only there
             - if the message has no destination address, it will be forwarded to all subscribed modules
+
+        Args:
+            header: Message Header
+            data: Message Data
+            wlist: sockets ready for writing
         """
 
         dest_mod_id = header.dest_mod_id
@@ -462,6 +484,7 @@ class MessageManager:
         self._keep_running = False
 
     def run(self):
+        """Start the message manager server"""
         try:
             while self._keep_running:
                 rlist, _, _ = select.select(

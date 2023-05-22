@@ -1,3 +1,8 @@
+"""pyrtma.constants module
+
+Includes core message type IDs and other constants
+"""
+
 import ctypes
 
 MAX_MODULES = 200
