@@ -97,6 +97,8 @@ def _json_decode(obj, data):
             if issubclass(ftype._type_, ctypes.Structure):
                 for i, elem in enumerate(getattr(obj, name)):
                     _json_decode(elem, data[name][i])
+            elif ftype._type_ is ctypes.c_char:
+                setattr(obj, name, data[name])
             else:
                 getattr(obj, name)[:] = data[name]
         else:
@@ -115,7 +117,7 @@ class RTMAJSONEncoder(json.JSONEncoder):
             return dict(header=o.header, data=o.data)
 
         if isinstance(o, MessageData):
-            d = dict(type_name=o.type_name, type_id=o.type_id)
+            d = {}
             d.update({k: getattr(o, k) for k, _ in getattr(o, ("_fields_"))})
             return d
 
@@ -222,8 +224,14 @@ class MessageData(ctypes.Structure):
 
         super().__setattr__(name, value)
 
-    def to_json(self, **kwargs) -> str:
-        return json.dumps(self, cls=RTMAJSONEncoder, **kwargs)
+    def to_json(self, minify: bool = False, **kwargs) -> str:
+        if minify:
+            return json.dumps(
+                self, cls=RTMAJSONEncoder, separators=(",", ":"), **kwargs
+            )
+
+        else:
+            return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
 
     @classmethod
     def from_dict(cls, data):
@@ -276,8 +284,13 @@ class MessageHeader(ctypes.Structure):
     def get_data(self) -> Type[MessageData]:
         return msg_defs[self.msg_type]
 
-    def to_json(self, **kwargs) -> str:
-        return json.dumps(self, cls=RTMAJSONEncoder, **kwargs)
+    def to_json(self, minify: bool = False, **kwargs) -> str:
+        if minify:
+            return json.dumps(
+                self, cls=RTMAJSONEncoder, separators=(",", ":"), **kwargs
+            )
+        else:
+            return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
 
     @classmethod
     def from_dict(cls, data):
@@ -323,8 +336,13 @@ class Message:
             self.header.pretty_print(add_tabs) + "\n" + self.data.pretty_print(add_tabs)
         )
 
-    def to_json(self, **kwargs) -> str:
-        return json.dumps(self, cls=RTMAJSONEncoder, **kwargs)
+    def to_json(self, minify: bool = False, **kwargs) -> str:
+        if minify:
+            return json.dumps(
+                self, cls=RTMAJSONEncoder, separators=(",", ":"), **kwargs
+            )
+        else:
+            return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
 
     @classmethod
     def from_json(cls, s: str):
