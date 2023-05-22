@@ -29,41 +29,6 @@ def core_def(msg_cls, *args, **kwargs):
     return msg_cls
 
 
-# Field type name to ctypes
-ctypes_map = {
-    "char": ctypes.c_char,
-    "unsigned char": ctypes.c_ubyte,
-    "byte": ctypes.c_ubyte,
-    "int": ctypes.c_int,
-    "signed int": ctypes.c_uint,
-    "unsigned int": ctypes.c_uint,
-    "unsigned": ctypes.c_uint,
-    "short": ctypes.c_short,
-    "signed short": ctypes.c_short,
-    "unsigned short": ctypes.c_ushort,
-    "long": ctypes.c_long,
-    "signed long": ctypes.c_long,
-    "unsigned long": ctypes.c_ulong,
-    "long long": ctypes.c_longlong,
-    "signed long long": ctypes.c_longlong,
-    "unsigned long long": ctypes.c_ulonglong,
-    "float": ctypes.c_float,
-    "double": ctypes.c_double,
-    "int8_t": ctypes.c_int8,
-    "int16_t": ctypes.c_int16,
-    "int32_t": ctypes.c_int32,
-    "int64_t": ctypes.c_int64,
-    "uint8_t": ctypes.c_uint8,
-    "uint16_t": ctypes.c_uint16,
-    "uint32_t": ctypes.c_uint32,
-    "uint64_t": ctypes.c_uint64,
-    "MODULE_ID": ctypes.c_short,
-    "HOST_ID": ctypes.c_short,
-    "MSG_TYPE": ctypes.c_int,
-    "MSG_COUNT": ctypes.c_int,
-}
-
-
 def print_ctype_array(arr):
     """expand and print ctype arrays"""
     max_len = 20
