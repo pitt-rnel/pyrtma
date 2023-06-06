@@ -21,21 +21,12 @@ supported_types = [
     "unsigned long long",
     "float",
     "double",
-    "int8_t",
-    "int16_t",
-    "int32_t",
-    "int64_t",
-    "uint8_t",
-    "uint16_t",
-    "uint32_t",
-    "uint64_t",
 ]
 
 
 class JSDefCompiler:
     def __init__(self, processor: Processor):
         self.processor = processor
-        self.RTMA = {}
 
     def generate_constant(self, name: str, value: str):
         return f"const {name}= {value};\n"
@@ -191,8 +182,6 @@ class JSDefCompiler:
             indent -= 1
             f.write(indent * "\t")
             f.write("},\n")
-
-            #
 
             # Close Top-Level RTMA object
             f.write("};\n")

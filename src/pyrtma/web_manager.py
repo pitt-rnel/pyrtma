@@ -60,16 +60,13 @@ class RTMAWebSocketHandler(WebSocketHandler):
                 if msg is not None:
                     # Pass message thru websocket as json
                     self.send_message(msg.to_json())
-                    # print(msg.to_json())
 
     def pong_received(self, msg: str):
         logger.info("Websocket PONG received.")
 
     def process_json_message(self, message: str):
         """Called when a client receives a message over websocket."""
-        # print(message)
         msg = pyrtma.Message.from_json(message)
-        # print(msg.header.pretty_print())
         self.proxy.forward_message(msg.header, msg.data or None)
 
     def read_ws_message(self) -> Optional[str]:
