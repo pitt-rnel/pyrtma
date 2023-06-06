@@ -1,7 +1,7 @@
 import re
 import ctypes
 
-from pyrtma.parser import Parser
+from pyrtma.parser import Processor, Struct
 
 
 # Field type name to ctypes
@@ -24,14 +24,6 @@ ctypes_map = {
     "unsigned long long": ctypes.c_ulonglong,
     "float": ctypes.c_float,
     "double": ctypes.c_double,
-    "int8_t": ctypes.c_int8,
-    "int16_t": ctypes.c_int16,
-    "int32_t": ctypes.c_int32,
-    "int64_t": ctypes.c_int64,
-    "uint8_t": ctypes.c_uint8,
-    "uint16_t": ctypes.c_uint16,
-    "uint32_t": ctypes.c_uint32,
-    "uint64_t": ctypes.c_uint64,
     "MODULE_ID": ctypes.c_short,
     "HOST_ID": ctypes.c_short,
     "MSG_TYPE": ctypes.c_int,
@@ -40,17 +32,17 @@ ctypes_map = {
 
 
 class PyDefCompiler:
-    def __init__(self, parser: Parser):
-        self.parser = parser
+    def __init__(self, processor: Processor):
+        self.processor = processor
 
-    def generate_constant(self, name, value):
+    def generate_constant(self, name: str, value: str):
         # Ensure division results in an integer if no decimal
         if "/" in value and "." not in value:
             return f"{name} = int({value})\n"
         else:
             return f"{name} = {value}\n"
 
-    def generate_typedef(self, alias, value):
+    def generate_typedef(self, alias: str, value: str):
         t = ctypes_map.get(value)
         if t:
             ftype = f"{t.__module__}.{t.__name__}"
@@ -59,28 +51,32 @@ class PyDefCompiler:
 
         return f"{alias} = {ftype}"
 
-    def generate_struct(self, name: str, fields):
-        assert not name.startswith("MDF_")
+    def generate_struct(self, s: Struct):
+        assert not s.name.startswith("MDF_")
         f = []
-        fnum = len(fields)
-        for i, (fname, ftype, flen) in enumerate(fields, start=1):
-            if flen and re.search(r"/|\+|\*|-", flen):
-                flen = "int(" + flen + ")"
+        fnum = len(s.fields)
+        for i, field in enumerate(s.fields, start=1):
+            if field.length and re.search(r"/|\+|\*|-", field.length):
+                flen = "int(" + field.length + ")"
+            else:
+                flen = field.length
 
             nl = ",\n" if i < fnum else ""
 
-            t = ctypes_map.get(ftype)
+            t = ctypes_map.get(field.type_name)
             if t:
                 ftype = f"{t.__module__}.{t.__name__}"
+            else:
+                ftype = field.type_name
 
             f.append(
-                f"        (\"{fname}\", {ftype}{' * ' + flen if flen else ''}){nl}"
+                f"        (\"{field.name}\", {ftype}{' * ' + flen if flen else ''}){nl}"
             )
 
         fstr = "".join(f)
 
         template = f"""
-class {name}(ctypes.Structure):
+class {s.name}(ctypes.Structure):
     _fields_ = [
 {fstr}
     ]
@@ -88,24 +84,28 @@ class {name}(ctypes.Structure):
 """
         return template
 
-    def generate_msg_def(self, name: str, fields):
-        assert name.startswith("MDF_")
-
-        basename = name[4:]
+    def generate_msg_def(self, s: Struct):
+        assert s.name.startswith("MDF_")
+        basename = s.name[4:]
         f = []
-        fnum = len(fields)
-        for i, (fname, ftype, flen) in enumerate(fields, start=1):
-            if flen and re.search(r"/|\+|\*|-", flen):
-                flen = "int(" + flen + ")"
+        fnum = len(s.fields)
+        for i, field in enumerate(s.fields, start=1):
+            if field.length and re.search(r"/|\+|\*|-", field.length):
+                flen = "int(" + field.length + ")"
+            else:
+                flen = field.length
 
             nl = ",\n" if i < fnum else ""
 
-            t = ctypes_map.get(ftype)
+            # Check for a typedef back to native c type
+            t = ctypes_map.get(field.type_name)
             if t:
                 ftype = f"{t.__module__}.{t.__name__}"
+            else:
+                ftype = field.type_name
 
             f.append(
-                f"        (\"{fname}\", {ftype}{' * ' + flen if flen else ''}){nl}"
+                f"        (\"{field.name}\", {ftype}{' * ' + flen if flen else ''}){nl}"
             )
 
         fstr = "".join(f)
@@ -113,7 +113,7 @@ class {name}(ctypes.Structure):
         msg_id = "MT_" + basename
         template = f"""
 @pyrtma.msg_def
-class {name}(pyrtma.MessageData):
+class {s.name}(pyrtma.MessageData):
     _fields_ = [
 {fstr}
     ]
@@ -123,14 +123,14 @@ class {name}(pyrtma.MessageData):
 """
         return template
 
-    def generate_sig_def(self, name: str):
-        assert name.startswith("MDF_")
-        basename = name[4:]
+    def generate_sig_def(self, s: Struct):
+        assert s.name.startswith("MDF_")
+        basename = s.name[4:]
         msg_id = "MT_" + basename
         template = f"""
 # Signal Definition
 @pyrtma.msg_def
-class {name}(pyrtma.MessageData):
+class {s.name}(pyrtma.MessageData):
     _fields_ = []
     type_id = {msg_id}
     type_name = \"{basename}\"
@@ -151,27 +151,27 @@ from pyrtma.constants import *
         with open(out_filepath, mode="w") as f:
             f.write(self.generate_imports())
 
-            for name, value in self.parser.constants.items():
-                f.write(self.generate_constant(name, value))
+            for name, expression in self.processor.constants.items():
+                f.write(self.generate_constant(name, expression))
             f.write("\n")
 
-            for name, value in self.parser.MT.items():
-                f.write(self.generate_constant(name, value))
+            for name, expression in self.processor.MT.items():
+                f.write(self.generate_constant(name, expression))
             f.write("\n")
 
-            for name, value in self.parser.MID.items():
-                f.write(self.generate_constant(name, value))
+            for name, expression in self.processor.MID.items():
+                f.write(self.generate_constant(name, expression))
             f.write("\n")
 
-            for name, value in self.parser.typedefs.items():
-                f.write(self.generate_typedef(name, value))
+            for alias, ftype in self.processor.typedefs.items():
+                f.write(self.generate_typedef(alias, ftype))
             f.write("\n")
 
-            for name, fields in self.parser.structs.items():
+            for name, s in self.processor.structs.items():
                 if name.startswith("MDF_"):
-                    if fields is not None:
-                        f.write(self.generate_msg_def(name, fields))
+                    if len(s.fields) > 0:
+                        f.write(self.generate_msg_def(s))
                     else:
-                        f.write(self.generate_sig_def(name))
+                        f.write(self.generate_sig_def(s))
                 else:
-                    f.write(self.generate_struct(name, fields))
+                    f.write(self.generate_struct(s))
