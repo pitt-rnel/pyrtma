@@ -357,6 +357,13 @@ class CONNECT(MessageData):
 
 
 @core_def
+class DISCONNECT(MessageData):
+    _fields_ = []
+    type_id: ClassVar[int] = MT_DISCONNECT
+    type_name: ClassVar[str] = "DISCONNECT"
+
+
+@core_def
 class SUBSCRIBE(MessageData):
     _fields_ = [("msg_type", MSG_TYPE)]
     type_id: ClassVar[int] = MT_SUBSCRIBE
