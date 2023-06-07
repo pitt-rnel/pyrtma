@@ -225,6 +225,7 @@ class Processor:
         self.constants = {}
         self.MT: Dict[str, str] = {}
         self.MID: Dict[str, str] = {}
+        self.HID: Dict[str, str] = {}
         self.typedefs: Dict[str, str] = {}
         self.structs: Dict[str, Struct] = {}
         self.eval(parser)
@@ -242,6 +243,11 @@ class Processor:
                     self.MID[macro.name] = macro.expression
                 else:
                     raise KeyError(f"Duplicate MID definition found: {macro.name}")
+            elif macro.name.startswith("HID_"):
+                if self.HID.get(macro.name) is None:
+                    self.HID[macro.name] = macro.expression
+                else:
+                    raise KeyError(f"Duplicate HID definition found: {macro.name}")
             else:
                 if self.constants.get(macro.name) is None:
                     self.constants[macro.name] = macro.expression

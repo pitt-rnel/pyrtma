@@ -56,6 +56,8 @@ def compile(
     if matlab:
         print("Building matlab message definitions...")
         from pyrtma.compilers.matlab import MatlabDefCompiler
+        
+        parser = Parser()
 
         pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
         core_defs_h = pkg_dir / "core_defs/core_defs.h"
@@ -67,9 +69,13 @@ def compile(
 
         processor = Processor(parser)
         compiler = MatlabDefCompiler(processor)
-        ext = ".m"
+        name = "generate_RTMA_config.m"
+        
         p = pathlib.Path(out_filepath)
-        out = p.stem + ext
+        if p.is_dir():
+            out = p / name
+        else:
+            out = p.parent / name
         compiler.generate(out)
 
     print("DONE.")
