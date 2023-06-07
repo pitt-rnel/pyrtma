@@ -47,7 +47,7 @@ class PyDefCompiler:
         if t:
             ftype = f"{t.__module__}.{t.__name__}"
         else:
-            raise ValueError("Invalid typedef alias for {alias} to {value}.")
+            raise ValueError(f"Invalid typedef alias for {alias} to {value}.")
 
         return f"{alias} = {ftype}"
 

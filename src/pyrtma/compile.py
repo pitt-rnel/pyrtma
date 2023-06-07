@@ -7,7 +7,7 @@ from typing import List
 
 
 def compile(
-    include_files: List,
+    defs_files: List[str],
     out_filepath: str,
     python: bool = False,
     javascript: bool = False,
@@ -18,39 +18,42 @@ def compile(
         print("Building python message definitions...")
         from pyrtma.compilers.python import PyDefCompiler
 
-        parser = Parser()
-        parser.parse(include_files)
-        if debug:
-            print(parser.to_json())
+        tokens = []
+        for f in defs_files:
+            tokens.extend(Parser.parse(f))
 
-        processor = Processor(parser)
+            if debug:
+                print(Parser.to_json(f))
+
+        processor = Processor(tokens)
         compiler = PyDefCompiler(processor)
         ext = ".py"
         p = pathlib.Path(out_filepath)
         out = p.stem + ".py"
 
-        compiler.generate(out)
+        compiler.generate(str(p.parent / out))
 
     if javascript:
         print("Building javascript message definitions...")
         from pyrtma.compilers.javascript import JSDefCompiler
 
-        parser = Parser()
-
         pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
         core_defs_h = pkg_dir / "core_defs/core_defs.h"
+        defs_files.insert(0, str(core_defs_h))
 
-        include_files.insert(0, str(core_defs_h))
-        parser.parse(include_files)
-        if debug:
-            print(parser.to_json())
+        tokens = []
+        for f in defs_files:
+            tokens.extend(Parser.parse(f))
 
-        processor = Processor(parser)
+            if debug:
+                print(Parser.to_json(j))
+
+        processor = Processor(tokens)
         compiler = JSDefCompiler(processor)
         ext = ".js"
         p = pathlib.Path(out_filepath)
         out = p.stem + ".js"
-        compiler.generate(out)
+        compiler.generate(str(p.parent / out))
 
     print("DONE.")
 
@@ -63,9 +66,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "-i",
         "-I",
-        "--include",
+        "--defs",
         nargs="*",
-        dest="include_files",
+        dest="defs_files",
         help="Files to parse",
     )
     group = parser.add_mutually_exclusive_group()
