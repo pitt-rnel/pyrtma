@@ -11,6 +11,7 @@ def compile(
     out_filepath: str,
     python: bool = False,
     javascript: bool = False,
+    matlab: bool = False,
     debug: bool = False,
 ):
 
@@ -27,7 +28,7 @@ def compile(
         compiler = PyDefCompiler(processor)
         ext = ".py"
         p = pathlib.Path(out_filepath)
-        out = p.stem + ".py"
+        out = p.stem + ext
 
         compiler.generate(out)
 
@@ -49,7 +50,26 @@ def compile(
         compiler = JSDefCompiler(processor)
         ext = ".js"
         p = pathlib.Path(out_filepath)
-        out = p.stem + ".js"
+        out = p.stem + ext
+        compiler.generate(out)
+
+    if matlab:
+        print("Building matlab message definitions...")
+        from pyrtma.compilers.matlab import MatlabDefCompiler
+
+        pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
+        core_defs_h = pkg_dir / "core_defs/core_defs.h"
+
+        include_files.insert(0, str(core_defs_h))
+        parser.parse(include_files)
+        if debug:
+            print(parser.to_json())
+
+        processor = Processor(parser)
+        compiler = MatlabDefCompiler(processor)
+        ext = ".m"
+        p = pathlib.Path(out_filepath)
+        out = p.stem + ext
         compiler.generate(out)
 
     print("DONE.")
@@ -83,6 +103,14 @@ if __name__ == "__main__":
         dest="javascript",
         action="store_true",
         help="Output json file",
+    )
+
+    group.add_argument(
+        "--matlab",
+        "--ml",
+        dest="matlab",
+        action="store_true",
+        help="Output matlab .m file",
     )
 
     parser.add_argument(
