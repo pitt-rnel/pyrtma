@@ -61,14 +61,7 @@ RTMAObjects = Union[Constant, MT, MID, TypeAlias, MDF, SDF, Field]
 
 class Processor:
     def __init__(self, tokens: List[Token]):
-        self.constants = {}
-        self.MT: Dict[str, str] = {}
-        self.MID: Dict[str, str] = {}
-        self.typedefs: Dict[str, str] = {}
-        self.structs: Dict[str, Struct] = {}
-
         self.objs: List[RTMAObjects] = []
-
         self.process(tokens)
 
     def process_define(self, macro: Define):
