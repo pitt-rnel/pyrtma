@@ -94,7 +94,7 @@ DEFINE_REGEX = (
     rf"{MACRO_MULTI_REGEX}|{MACRO_FUNC_REGEX}|{MACRO_EXP_REGEX}|{MACRO_FLAG_REGEX}"
 )
 
-TYPEDEF_REGEX = r"\s*typedef\s+(?P<typedef_qual1>\w+\s+)?\s*(?P<typedef_qual2>\w+\s+)?\s*(?P<typedef_type>\w+)\s+(?P<typedef_alias>\w+)\s*;\s*"
+TYPEDEF_REGEX = r"\s*typedef\s+(?P<typedef_qual1>\w+\s+)?\s*(?P<typedef_qual2>\w+\s+)?\s*(?P<typedef_type>\w+\s*)(?P<ptr>(\*\s+)|\s+)(?P<typedef_alias>\*?\w*)\s*;\s*"
 
 FIELD_REGEX = r"\s*(?P<qual1>\w+\s+)?\s*(?P<qual2>\w+\s+)?\s*(?P<typ>\w+\s*)(?P<ptr>(\*\s*)|\s+)(?P<name>\w+)\s*(\[(?P<length>.*?)\])?;"
 
@@ -249,10 +249,13 @@ class Parser:
     def handle_typedef(self, m: re.Match):
         raw = m.group()
 
-        if "*" in raw:
+        if "*" in m.group("ptr"):
             raise SyntaxError(f"Typedefs can not reference pointer types: {raw}")
 
         alias = m.group("typedef_alias").strip()
+        if "*" in alias:
+            raise SyntaxError(f"Typedefs alias can not be a pointer: {raw}")
+
         qual1 = (m.group("typedef_qual1") or "").strip()
         qual2 = (m.group("typedef_qual2") or "").strip()
         base_type = m.group("typedef_type").strip()
@@ -266,6 +269,7 @@ class Parser:
 
         # Find the base type ultimately represented by the typedef alias
         n = 0
+        prev = ftype
         while n < 10:
             if ftype in supported_types:
                 self.tokens.append(TypeDef(raw, alias, ftype))
@@ -285,6 +289,10 @@ class Parser:
                     return
 
             n += 1
+            if ftype == prev:
+                raise RuntimeError(f"Unable to resolve typedef: {raw}")
+            else:
+                prev = ftype
 
         raise RuntimeError(f"Recursion limit exceeded for typedef: {alias}")
 
