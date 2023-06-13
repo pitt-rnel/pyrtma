@@ -1,18 +1,11 @@
 import re
 import json
-import copy
 from hashlib import sha256
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Union
 from dataclasses import dataclass, field, is_dataclass, asdict
 
 
-def camelcase(name):
-    name = re.sub(r"_", " ", name)
-    pieces = [s.title() for s in name.split(sep=" ")]
-    return "".join(pieces)
-
-
-# Field type name to ctypes
+# Native C types that are supported
 supported_types = [
     "char",
     "unsigned char",
@@ -36,17 +29,25 @@ supported_types = [
 
 
 @dataclass
+class Include:
+    raw: str
+    name: str
+
+
+@dataclass
 class Define:
     raw: str
     name: str
     expression: str
+    expanded: str = ""
+    value: Optional[Union[str, int, float]] = None
 
 
 @dataclass
-class Typedef:
+class TypeDef:
     raw: str
-    alias: str
-    native_type: str
+    name: str
+    type: str
 
 
 @dataclass
@@ -54,7 +55,8 @@ class StructField:
     raw: str
     name: str
     type_name: str
-    length: Optional[str]
+    length_str: Optional[str] = None
+    length: Optional[int] = None
 
 
 @dataclass
@@ -65,20 +67,92 @@ class Struct:
     fields: List[StructField] = field(default_factory=list)
 
 
+Token = Union[Include, Define, TypeDef, Struct]
+
+COMMENT_REGEX = r"//(.*)\n"
+
+BLOCK_COMMENT_REGEX = r"/\*(.*?)\*/"
+
+INCLUDE_REGEX = r"#include\s+\"(?P<include_file>[\w/\._:]+)\""
+
+# Simple online macro expressions
+MACRO_EXP_REGEX = r"#define[\t ]+(?P<macro_name>\w+)[\t ]+(?P<expression>.*)"
+
+# Macro directive flags with no expression
+MACRO_FLAG_REGEX = r"#define[\t ]+(?P<macro_flag>\w+)\s*\n"
+
+# Oneline function like macros (not supported)
+MACRO_FUNC_REGEX = (
+    r"#define[\t ]+(?P<macro_func>\w+\(.*\))[\t ]+(?P<func_expression>.*)"
+)
+
+# Multiline macros (not supported)
+MACRO_MULTI_REGEX = r"#define[\t ]+(?P<macro_multi>\w+|\w+\(.*\)).*\\$"
+
+# Combined regex for #define types. Note order matters.
+DEFINE_REGEX = (
+    rf"{MACRO_MULTI_REGEX}|{MACRO_FUNC_REGEX}|{MACRO_EXP_REGEX}|{MACRO_FLAG_REGEX}"
+)
+
+TYPEDEF_REGEX = r"\s*typedef\s+(?P<typedef_qual1>\w+\s+)?\s*(?P<typedef_qual2>\w+\s+)?\s*(?P<typedef_type>\w+)\s+(?P<typedef_alias>\w+)\s*;\s*"
+
+FIELD_REGEX = r"\s*(?P<qual1>\w+\s+)?\s*(?P<qual2>\w+\s+)?\s*(?P<typ>\w+\s*)(?P<ptr>(\*\s*)|\s+)(?P<name>\w+)\s*(\[(?P<length>.*?)\])?;"
+
+STRUCT_REGEX = r"(?s:(\s*struct\s+(?P<struct_name>\w*)\s*\{(?P<struct_def>.*?)\}\s*;))"
+
+TYPEDEF_STRUCT_REGEX = r"(?s:(\s*typedef\s+struct\s*\{(?P<td_struct_def>.*?)\}(?P<td_struct_name>\s*\w*)\s*;))"
+
+# Other patterns
+INT_REGEX = r"[-+]?(0[xX][\dA-Fa-f]+|0[0-7]*|\d+)"
+HEX_REGEX = r"[-+]?(0[xX])?[\dA-Fa-f]+"
+BINARY_REGEX = r"0b[01]+"
+FLOAT_REGEX = r"[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?"
+STRING_REGEX = r"\"(?P<text>[ \t\w\:]*)\""
+VARNAME_REGEX = r"[a-zA-Z_]*"
+OPERATOR_REGEX = r"[\+\-\*\/]"
+
+token_specification = [
+    ("INCLUDE", INCLUDE_REGEX),
+    ("DEFINE", DEFINE_REGEX),
+    ("TYPEDEF", TYPEDEF_REGEX),
+    ("TYPEDEF_STRUCT", TYPEDEF_STRUCT_REGEX),
+    ("STRUCT", STRUCT_REGEX),
+]
+
+token_pattern = "|".join(
+    rf"(?P<{name}>{regex})" for (name, regex) in token_specification
+)
+
+
 class Parser:
-    DEFINE_REGEX = r"#define\s*(?P<name>\w+)\s+(?P<expression>[\(\)\[\]\w \*/\+-\.]+)\n"
+    def __init__(self, debug: bool = False):
+        self.tokens = []
+        self.included_files = []
+        self.debug = debug
 
-    TYPEDEF_REGEX = r"\s*typedef\s+(?P<qual1>\w+\s+)?\s*(?P<qual2>\w+\s+)?\s*(?P<typ>\w+)\s+(?P<name>\w+)\s*;\s*$"
+    def clear(self):
+        self.tokens = []
+        self.included_files = []
 
-    STRUCT_REGEX = r"\s*typedef\s+struct\s*\{(?P<def>.*?)\}(?P<name>\s*\w*)\s*;"
+    @property
+    def defines(self):
+        return {t.name: t.value for t in self.tokens if isinstance(t, Define)}
 
-    FIELD_REGEX = r"(?P<qual1>\w+\s+)?\s*(?P<qual2>\w+\s+)?\s*(?P<typ>\w+)\s+(?P<name>\w+)\s*(\[(?P<length>.*)\])?$"
+    @property
+    def typedefs(self):
+        return {t.name: t.type for t in self.tokens if isinstance(t, TypeDef)}
 
-    def __init__(self):
-        self.defines = []
-        self.typedefs = []
-        self.structs = []
-        self.files = []
+    @property
+    def structs(self):
+        d = {}
+        for t in self.tokens:
+            if not isinstance(t, Struct):
+                continue
+            d[t.name] = []
+            for f in t.fields:
+                d[t.name].append((f.name, f.type_name, f.length))
+
+        return d
 
     def preprocess(self, text: str) -> str:
         # Strip Inline Comments
@@ -92,125 +166,242 @@ class Parser:
 
         return text
 
-    def parse_defines(self, text: str):
-        # Get Defines (Only simple one line constants here)
-        macros = re.finditer(self.DEFINE_REGEX, text)
+    def expand_macro(self, d: Define):
+        # Get the current set of defined macros
+        defines = {t.name: t for t in self.tokens if isinstance(t, Define)}
 
-        for m in macros:
-            raw = m.group()
-            name = m.group("name").strip()
+        s = d.expression
+        rdepth_limit = 10
+        n = 0
+        symbol_regex = r"\b(?P<symbol>[a-zA-Z_]+\w*)\b"
+        m = re.search(symbol_regex, s)
+        while m:
+            symbol = m.group()
+            n += 1
+            try:
+                macro = defines[symbol]
+            except KeyError:
+                raise RuntimeError(
+                    f"Unable to expand macro {d.name} -> {symbol} not defined."
+                )
+
+            assert (
+                re.search(rf"\b{d.name}\b", macro.expression) is None
+            ), "Circular reference in macro {d.name}."
+
+            assert (
+                macro.value is not None
+            ), f"{macro.name} has not been evaluated to a value."
+
+            s = re.sub(rf"\b{macro.name}\b", str(macro.value), s)
+
+            if n > rdepth_limit:
+                raise RuntimeError(
+                    f"Recursion limit reached expanding macro: {macro.name}"
+                )
+
+            # Try to match another macro symbol
+            m = re.search(symbol_regex, s)
+
+        # Add the expanded form and evaluated value
+        d.expanded = s
+        d.value = eval(s)
+
+    def handle_include(self, m: re.Match):
+        raw = m.group()
+        fname = m.group("include_file").strip()
+        token = Include(raw, fname)
+        self.tokens.append(token)
+        self.parse(fname)
+
+    def handle_define(self, m: re.Match):
+        raw = m.group()
+        if m.group("macro_name") is not None:
+            name = m.group("macro_name").strip()
             exp = m.group("expression").strip()
-            macro = Define(raw, name, exp)
-            self.defines.append(macro)
-
-    def parse_typedefs(self, text: str):
-        # Get simple typedefs
-        c_typedefs = re.finditer(
-            self.TYPEDEF_REGEX,
-            text,
-            flags=re.MULTILINE,
-        )
-
-        for m in c_typedefs:
-            raw = m.group()
-            alias = m.group("name").strip()
-            if alias.startswith("MDF_"):
-                # TODO:Non struct message defintion. Maybe drop support?
-                pass
+            ms = re.match(STRING_REGEX, exp)
+            if ms is not None:
+                # Const char literal
+                token = Define(
+                    raw,
+                    name,
+                    expression=exp,
+                    expanded=exp,
+                    value=ms.groupdict()["text"],
+                )
             else:
-                # Field type
-                qual1 = m.group("qual1")
-                qual2 = m.group("qual2")
-                typ = m.group("typ")
+                # Expand numerical expression now
+                token = Define(raw, name, expression=exp)
+                self.expand_macro(token)
+        elif m.group("macro_flag") is not None:
+            name = m.group("macro_flag").strip()
+            value = 1
+            token = Define(raw, name, expression="", value=value)
+        elif m.group("macro_func") is not None:
+            raise SyntaxError(f"Macro functions are not supported: {raw}")
+        elif m.group("macro_multi") is not None:
+            raise SyntaxError(f"Multi-line macros are not supported: {raw}")
+        else:
+            raise SyntaxError(f"Failed to correctly parse macro: {raw}")
 
-                ftype = ""
-                if qual1:
-                    ftype += qual1.strip()
-                    ftype += " "
+        self.tokens.append(token)
 
-                if qual2:
-                    ftype += qual2.strip()
-                    ftype += " "
+    def handle_typedef(self, m: re.Match):
+        raw = m.group()
 
-                ftype += typ.strip()
+        if "*" in raw:
+            raise SyntaxError(f"Typedefs can not reference pointer types: {raw}")
 
-                # Must be a natively supported field type
-                assert (
-                    ftype in supported_types
-                ), f"Alias {alias} to type {ftype} is not supported."
+        alias = m.group("typedef_alias").strip()
+        qual1 = (m.group("typedef_qual1") or "").strip()
+        qual2 = (m.group("typedef_qual2") or "").strip()
+        base_type = m.group("typedef_type").strip()
+        ftype = f"{qual1}"
+        ftype += f" {qual2}" if qual2 else ""
+        ftype += f" {base_type}"
+        ftype = ftype.strip()
 
-                self.typedefs.append(Typedef(raw, alias, ftype))
+        struct_types = [t for t in self.tokens if isinstance(t, Struct)]
+        typedefs_types = [t for t in self.tokens if isinstance(t, TypeDef)]
 
-    def parse_structs(self, text: str):
-        # Strip Newlines
-        text = re.sub(r"\n", "", text)
+        # Find the base type ultimately represented by the typedef alias
+        n = 0
+        while n < 10:
+            if ftype in supported_types:
+                self.tokens.append(TypeDef(raw, alias, ftype))
+                return
 
-        # Get Struct Raw Definitions
-        c_msg_defs = re.finditer(self.STRUCT_REGEX, text)
+            # Check if ftype points back to another typedef
+            for t in typedefs_types:
+                if ftype == t.name:
+                    n += 1
+                    ftype = t.type
 
-        for m in c_msg_defs:
-            raw = m.group()
-            hash = sha256(raw.strip().encode()).hexdigest()
-            name = m.group("name").strip()
-            s = Struct(raw, hash, name)
+            # Check if ftype points back to a user defined struct
+            for s in struct_types:
+                if ftype == s.name:
+                    ftype = s.name
+                    self.tokens.append(TypeDef(raw, alias, ftype))
+                    return
 
-            fields = m.group("def").split(sep=";")
-            fields = [f.strip() for f in fields if f.strip() != ""]
+            n += 1
 
-            for field in fields:
-                fmatch = re.match(self.FIELD_REGEX, field)
+        raise RuntimeError(f"Recursion limit exceeded for typedef: {alias}")
 
-                if fmatch is None:
-                    print(field)
-                    raise RuntimeError("Error parsing field definition.")
+    def handle_typedef_struct(self, m: re.Match):
+        raw = m.group()
+        hash = sha256(raw.strip().encode()).hexdigest()
+        name = m.group("td_struct_name").strip()
 
-                # Field name
-                raw = fmatch.group()
-                fname = fmatch.group("name").strip()
-                qual1 = fmatch.group("qual1")
-                qual2 = fmatch.group("qual2")
-                typ = fmatch.group("typ")
+        if name == "":
+            raise SyntaxError(f"Structs must have a name: {raw}")
 
-                ftype = ""
-                if qual1:
-                    ftype += qual1.strip()
-                    ftype += " "
+        token = Struct(raw, hash, name)
 
-                if qual2:
-                    ftype += qual2.strip()
-                    ftype += " "
+        if "struct" in m.groupdict()["td_struct_def"]:
+            raise SyntaxError("Anonymous structs are not supported: {name}:{raw}")
 
-                ftype += typ.strip()
+        if "union" in m.groupdict()["td_struct_def"]:
+            raise SyntaxError("Anonymous unions are not supported: {name}:{raw}")
 
-                flen = fmatch.group("length") or None
-                s.fields.append(StructField(raw, fname, ftype, flen))
+        for fmatch in re.finditer(
+            FIELD_REGEX,
+            m.groupdict()["td_struct_def"],
+            flags=re.MULTILINE | re.DOTALL,
+        ):
+            self.print(f"{fmatch.lastgroup}: \n{fmatch.group().strip()}")
+            raw = fmatch.group()
 
-            self.structs.append(s)
+            if "*" in fmatch.group("ptr"):
+                raise SyntaxError(
+                    f"Struct fields can not reference pointer types: {name}:{raw}"
+                )
+
+            fname = fmatch.group("name").strip()
+            qual1 = (fmatch.group("qual1") or "").strip()
+            qual2 = (fmatch.group("qual2") or "").strip()
+            base_type = fmatch.group("typ").strip()
+
+            ftype = f"{qual1}"
+            ftype += f" {qual2}" if qual2 else ""
+            ftype += f" {base_type}"
+            ftype = ftype.strip()
+            len_str = fmatch.group("length") or None
+            flen = None
+
+            # Expand the length string if needed
+            if len_str is not None:
+                defines = {
+                    t.name: t.value for t in self.tokens if isinstance(t, Define)
+                }
+                s = len_str
+                symbol_regex = r"\b(?P<symbol>[a-zA-Z_]+\w*)\b"
+                mo = re.search(symbol_regex, s)
+                while mo:
+                    symbol = mo.group()
+                    try:
+                        value = defines[symbol]
+                    except KeyError:
+                        raise RuntimeError(
+                            f"Unable to expand length expression for struct {name}: field {fname} -> {symbol} not defined."
+                        )
+
+                    assert isinstance(value, (int, float))
+                    s = re.sub(rf"\b{symbol}\b", str(value), s)
+
+                    # Try to match another macro symbol
+                    mo = re.search(symbol_regex, s)
+
+                # Evaluate the length expression
+                flen = eval(s)
+
+                # Cast expression result to an int
+                flen = int(flen)
+
+            token.fields.append(StructField(raw, fname, ftype, len_str, flen))
+
+        if len(token.fields) == 0:
+            raise SyntaxError(f"Unable to parse field values: {name} -> {raw}")
+
+        self.tokens.append(token)
+
+    def parse_text(self, text: str):
+        """Parse the given text for token objects."""
+        for m in re.finditer(token_pattern, text, flags=re.MULTILINE):
+            token_type = m.lastgroup
+            self.print(m.group())
+            if token_type == "INCLUDE":
+                self.handle_include(m)
+            elif token_type == "DEFINE":
+                self.handle_define(m)
+            elif token_type == "TYPEDEF":
+                self.handle_typedef(m)
+            elif token_type == "TYPEDEF_STRUCT":
+                self.handle_typedef_struct(m)
+            elif token_type == "STRUCT":
+                raise SyntaxError(f"Only typedef structs are supported: {m.group()}")
+            else:
+                raise RuntimeError("Unknown token type of {token_type} found.")
+
+    def parse(self, msgdefs_file: str):
+        if msgdefs_file in self.included_files:
+            self.print(f"{msgdefs_file} already parsed...skipping")
+            return
+
+        self.print(f"Parsing {msgdefs_file}")
+        self.included_files.append(msgdefs_file)
+
+        with open(msgdefs_file, "rt") as f:
+            text = self.preprocess(f.read())
+
+        self.parse_text(text)
 
     def to_json(self):
-        d = dict(defines=self.defines, typedefs=self.typedefs, structs=self.structs)
-        return json.dumps(d, indent=2, cls=CustomEncoder)
+        return json.dumps(self.tokens, indent=2, cls=CustomEncoder)
 
-    def parse_file(self, filename):
-        """Parse a C header file for message definitions.
-        Notes:
-            * Does not follow other #includes (TODO)
-            * Parsing order: #defines, typedefs, typedef struct
-        """
-
-        self.files.append(filename)
-
-        with open(filename, "r") as f:
-            raw = f.read()
-
-        text = self.preprocess(raw)
-        self.parse_defines(text)
-        self.parse_typedefs(text)
-        self.parse_structs(text)
-
-    def parse(self, files):
-        for file in files:
-            self.parse_file(file)
+    def print(self, text):
+        if self.debug:
+            print(text)
 
 
 class CustomEncoder(json.JSONEncoder):
@@ -218,68 +409,3 @@ class CustomEncoder(json.JSONEncoder):
         if is_dataclass(o):
             return asdict(o)
         return super().default(o)
-
-
-class Processor:
-    def __init__(self, parser: Parser):
-        self.constants = {}
-        self.MT: Dict[str, str] = {}
-        self.MID: Dict[str, str] = {}
-        self.HID: Dict[str, str] = {}
-        self.typedefs: Dict[str, str] = {}
-        self.structs: Dict[str, Struct] = {}
-        self.eval(parser)
-
-    def eval_defines(self, defines: List[Define]):
-        # Store a mapping for each define type
-        for macro in defines:
-            if macro.name.startswith("MT_"):
-                if self.MT.get(macro.name) is None:
-                    self.MT[macro.name] = macro.expression
-                else:
-                    raise KeyError(f"Duplicate MT definition found: {macro.name}")
-            elif macro.name.startswith("MID_"):
-                if self.MID.get(macro.name) is None:
-                    self.MID[macro.name] = macro.expression
-                else:
-                    raise KeyError(f"Duplicate MID definition found: {macro.name}")
-            elif macro.name.startswith("HID_"):
-                if self.HID.get(macro.name) is None:
-                    self.HID[macro.name] = macro.expression
-                else:
-                    raise KeyError(f"Duplicate HID definition found: {macro.name}")
-            else:
-                if self.constants.get(macro.name) is None:
-                    self.constants[macro.name] = macro.expression
-                else:
-                    raise KeyError(f"Duplicate constant definition found: {macro.name}")
-
-    def eval_typedefs(self, typedefs: List[Typedef]):
-        for typedef in typedefs:
-            if self.typedefs.get(typedef.alias) is None:
-                self.typedefs[typedef.alias] = typedef.native_type
-            else:
-                raise KeyError(f"Duplicate typedef found: {typedef.alias}")
-
-    def eval_structs(self, structs: List[Struct]):
-        for struct in structs:
-            if self.structs.get(struct.name) is None:
-                self.structs[struct.name] = copy.deepcopy(struct)
-            else:
-                raise KeyError(f"Duplicate struct definition found: {struct.name}")
-
-        for msg_type in self.MT.keys():
-            # Add an empty struct placeholder for signal definitions
-            if msg_type.startswith("MT_"):
-                raw = ""
-                hash = sha256(b"").hexdigest()
-                name = "MDF_" + msg_type[3:]
-
-                if name not in self.structs.keys():
-                    s = Struct(raw, hash, name)
-                    self.structs[name] = s
-
-    def eval(self, parser: Parser):
-        self.eval_defines(parser.defines)
-        self.eval_typedefs(parser.typedefs)
-        self.eval_structs(parser.structs)

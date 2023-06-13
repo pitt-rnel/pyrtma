@@ -2,12 +2,13 @@
 
 import pathlib
 import os
-from .parser import Parser, Processor
+from .parser import Parser
+from .processor import Processor
 from typing import List
 
 
 def compile(
-    include_files: List,
+    defs_files: List[str],
     out_filepath: str,
     python: bool = False,
     javascript: bool = False,
@@ -15,43 +16,39 @@ def compile(
     debug: bool = False,
 ):
 
+    # Add the core defintions
+    # pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
+    # core_defs_h = pkg_dir / "core_defs/core_defs.h"
+    # defs_files.insert(0, str(core_defs_h))
+
+    parser = Parser(debug=debug)
+    for f in defs_files:
+        parser.parse(f)
+
+    if debug:
+        print(parser.to_json())
+
+    processor = Processor(parser.tokens, debug=debug)
+
     if python:
         print("Building python message definitions...")
         from pyrtma.compilers.python import PyDefCompiler
 
-        parser = Parser()
-        parser.parse(include_files)
-        if debug:
-            print(parser.to_json())
-
-        processor = Processor(parser)
-        compiler = PyDefCompiler(processor)
+        compiler = PyDefCompiler(processor, debug=debug)
         ext = ".py"
         p = pathlib.Path(out_filepath)
         out = p.stem + ext
-
-        compiler.generate(out)
+        compiler.generate(str(p.parent / out))
 
     if javascript:
         print("Building javascript message definitions...")
         from pyrtma.compilers.javascript import JSDefCompiler
 
-        parser = Parser()
-
-        pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
-        core_defs_h = pkg_dir / "core_defs/core_defs.h"
-
-        include_files.insert(0, str(core_defs_h))
-        parser.parse(include_files)
-        if debug:
-            print(parser.to_json())
-
-        processor = Processor(parser)
-        compiler = JSDefCompiler(processor)
+        compiler = JSDefCompiler(processor, debug=debug)
         ext = ".js"
         p = pathlib.Path(out_filepath)
         out = p.stem + ext
-        compiler.generate(out)
+        compiler.generate(str(p.parent / out))
 
     if matlab:
         print("Building matlab message definitions...")
@@ -76,7 +73,7 @@ def compile(
             out = p / name
         else:
             out = p.parent / name
-        compiler.generate(out)
+        compiler.generate(str(out))
 
     print("DONE.")
 
@@ -89,9 +86,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "-i",
         "-I",
-        "--include",
+        "--defs",
         nargs="*",
-        dest="include_files",
+        dest="defs_files",
         help="Files to parse",
     )
     group = parser.add_mutually_exclusive_group()
