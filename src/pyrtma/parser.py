@@ -1,7 +1,7 @@
 import re
 import json
 from hashlib import sha256
-from typing import List, Optional, Any, Dict, Union
+from typing import List, Optional, Any, Union
 from dataclasses import dataclass, field, is_dataclass, asdict
 
 
@@ -96,7 +96,7 @@ DEFINE_REGEX = (
 
 TYPEDEF_REGEX = r"\s*typedef\s+(?P<typedef_qual1>\w+\s+)?\s*(?P<typedef_qual2>\w+\s+)?\s*(?P<typedef_type>\w+)\s+(?P<typedef_alias>\w+)\s*;\s*"
 
-FIELD_REGEX = r"\s*(?P<qual1>\w+\s+)?\s*(?P<qual2>\w+\s+)?\s*(?P<typ>\w+\s*\*?)\s+(?P<name>\w+)\s*(\[(?P<length>.*?)\])?;"
+FIELD_REGEX = r"\s*(?P<qual1>\w+\s+)?\s*(?P<qual2>\w+\s+)?\s*(?P<typ>\w+\s*)(?P<ptr>(\*\s*)|\s+)(?P<name>\w+)\s*(\[(?P<length>.*?)\])?;"
 
 STRUCT_REGEX = r"(?s:(\s*struct\s+(?P<struct_name>\w*)\s*\{(?P<struct_def>.*?)\}\s*;))"
 
@@ -125,9 +125,10 @@ token_pattern = "|".join(
 
 
 class Parser:
-    def __init__(self):
+    def __init__(self, debug: bool = False):
         self.tokens = []
         self.included_files = []
+        self.debug = debug
 
     def clear(self):
         self.tokens = []
@@ -291,6 +292,10 @@ class Parser:
         raw = m.group()
         hash = sha256(raw.strip().encode()).hexdigest()
         name = m.group("td_struct_name").strip()
+
+        if name == "":
+            raise SyntaxError(f"Structs must have a name: {raw}")
+
         token = Struct(raw, hash, name)
 
         if "struct" in m.groupdict()["td_struct_def"]:
@@ -304,18 +309,18 @@ class Parser:
             m.groupdict()["td_struct_def"],
             flags=re.MULTILINE | re.DOTALL,
         ):
-            # print(f"{fmatch.lastgroup}: \n{fmatch.group().strip()}")
+            self.print(f"{fmatch.lastgroup}: \n{fmatch.group().strip()}")
             raw = fmatch.group()
+
+            if "*" in fmatch.group("ptr"):
+                raise SyntaxError(
+                    f"Struct fields can not reference pointer types: {name}:{raw}"
+                )
 
             fname = fmatch.group("name").strip()
             qual1 = (fmatch.group("qual1") or "").strip()
             qual2 = (fmatch.group("qual2") or "").strip()
             base_type = fmatch.group("typ").strip()
-
-            if "*" in base_type:
-                raise SyntaxError(
-                    f"Struct fields can not reference pointer types: {name}:{raw}"
-                )
 
             ftype = f"{qual1}"
             ftype += f" {qual2}" if qual2 else ""
@@ -355,25 +360,16 @@ class Parser:
 
             token.fields.append(StructField(raw, fname, ftype, len_str, flen))
 
+        if len(token.fields) == 0:
+            raise SyntaxError(f"Unable to parse field values: {name} -> {raw}")
+
         self.tokens.append(token)
 
-    def parse(self, msgdefs_file: str):
-        if msgdefs_file in self.included_files:
-            print(f"{msgdefs_file} already parsed...skipping")
-            return
-
-        print(f"Parsing {msgdefs_file}")
-        self.included_files.append(msgdefs_file)
-
-        with open(msgdefs_file, "rt") as f:
-            text = self.preprocess(f.read())
-
-        with open("test.txt", "wt") as f:
-            f.write(text)
-
+    def parse_text(self, text: str):
+        """Parse the given text for token objects."""
         for m in re.finditer(token_pattern, text, flags=re.MULTILINE):
             token_type = m.lastgroup
-            print(m.group())
+            self.print(m.group())
             if token_type == "INCLUDE":
                 self.handle_include(m)
             elif token_type == "DEFINE":
@@ -387,8 +383,25 @@ class Parser:
             else:
                 raise RuntimeError("Unknown token type of {token_type} found.")
 
+    def parse(self, msgdefs_file: str):
+        if msgdefs_file in self.included_files:
+            self.print(f"{msgdefs_file} already parsed...skipping")
+            return
+
+        self.print(f"Parsing {msgdefs_file}")
+        self.included_files.append(msgdefs_file)
+
+        with open(msgdefs_file, "rt") as f:
+            text = self.preprocess(f.read())
+
+        self.parse_text(text)
+
     def to_json(self):
         return json.dumps(self.tokens, indent=2, cls=CustomEncoder)
+
+    def print(self, text):
+        if self.debug:
+            print(text)
 
 
 class CustomEncoder(json.JSONEncoder):
