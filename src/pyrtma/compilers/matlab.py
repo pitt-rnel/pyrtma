@@ -153,6 +153,22 @@ class MatlabDefCompiler:
         """
         return dedent(op)
     
+    def generate__by_MT(self) -> str:
+        # append matlab code to generate _by_MT cell arrays from other fields
+        prefix = self.struct_name
+        s = f"""\n
+        % add _by_MT arrays
+        mtns = fieldnames({prefix}.MT);
+        for idx = 1:length(mtns)
+            mtn = mtns{{idx}};
+            mt = {prefix}.MT.(mtn) + 1;
+            mdf = {prefix}.MDF.(mtn);
+            {prefix}.MTN_by_MT{{mt, 1}} = mtn;
+            {prefix}.MDF_by_MT{{mt, 1}} = mdf;
+        end\n
+        """
+        return dedent(s)
+
     def generate_vars(self):
         # do nothing (for now)
         return f"{self.struct_name}.vars = [];\n"
@@ -212,31 +228,18 @@ class MatlabDefCompiler:
 
                 if self.debug:
                     print(s, end="")
-
-            # HID -- in loop
-            
-            # MID -- in loop
-            
-            # MT -- in loop
-            
-            # MDF -- in loop
             
             # MESSAGE_HEADER
             f.write(self.generate_message_header())
             
-            # MTN_by_MT -- TODO
-            
-            # MDF_by_MT -- TODO
-            
             # mex_opcode
             f.write(self.generate_mex_opcodes())
             
-            # defines -- in loop
-            
-            # typedefs -- in loop
-            
             # vars -- empty struct (for now)
             f.write(self.generate_vars())
+
+            # MTN_by_MT and MDF_by_MT
+            f.write(self.generate__by_MT())
             
             # close function
             f.write(self.generate_fcn_close())
