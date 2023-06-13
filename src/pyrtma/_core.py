@@ -55,7 +55,7 @@ def _create_ftype_map(obj: "MessageData"):
 
 
 def _json_decode(obj, data):
-    for (name, ftype) in obj._fields_:
+    for name, ftype in obj._fields_:
         if issubclass(ftype, ctypes.Structure):
             _json_decode(getattr(obj, name), data[name])
         elif issubclass(ftype, ctypes.Array):

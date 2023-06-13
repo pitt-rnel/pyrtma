@@ -90,9 +90,7 @@ class JSDefCompiler:
         return s
 
     def generate(self, out_filepath: str):
-
         with open(out_filepath, mode="w") as f:
-
             f.write("export { RTMA } ;\n\n")
 
             # Top-Level Constants

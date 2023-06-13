@@ -38,54 +38,60 @@ class MatlabDefCompiler:
 
     def generate_fcn_header(self, fcn_name: str) -> str:
         return f"function {self.struct_name} = {fcn_name}()\n\n"
-    
+
     def initialize_struct(self) -> str:
         mstruct = f"""
 {self.struct_name} = struct('HID', [], 'MID', [], 'MT', [], 'MDF', [], 'MESSAGE_HEADER', [], ...
 'MTN_by_MT', [], 'MDF_by_MT', [], 'mex_opcode', [], 'defines', [], 'typedefs', [], 'vars', []);
 """
         return mstruct
-    
+
     @staticmethod
     def generate_fcn_close() -> str:
         return "end\n"
-    
+
     @staticmethod
     def sanitize_name(name: str) -> str:
-        name = name.lstrip('_0123456789') # strip leading characters that are invalid to start a fieldname (only letters allowed)
+        name = name.lstrip(
+            "_0123456789"
+        )  # strip leading characters that are invalid to start a fieldname (only letters allowed)
         for c in name:
-            if not c.isalnum() and c != '_': # matlab fieldnames allow alphanum and _ after starting characters
-                name = name.replace(c, '')
+            if (
+                not c.isalnum() and c != "_"
+            ):  # matlab fieldnames allow alphanum and _ after starting characters
+                name = name.replace(c, "")
         return name
-    
+
     def generate_field(self, top_field: str, name: str, value: Any) -> str:
-        name = name.replace(f"{top_field}_", "", 1) # strip top_field from fieldname
+        name = name.replace(f"{top_field}_", "", 1)  # strip top_field from fieldname
         name = self.sanitize_name(name)
         return f"{self.struct_name}.{top_field}.{name} = {value};\n"
-    
+
     def generate_constant(self, c: Union[Constant, HID, MID, MT]) -> str:
         if isinstance(c.value, str):
-            c.value = f'"{c.value}"' # encase string value in quotes
+            c.value = f'"{c.value}"'  # encase string value in quotes
         return self.generate_field("defines", c.name, c.value)
-    
+
     def generate_host_id(self, hid: HID) -> str:
         return self.generate_field("HID", hid.name, hid.value)
-    
+
     def generate_module_id(self, mid: MID) -> str:
         return self.generate_field("MID", mid.name, mid.value)
-    
+
     def generate_msg_type_id(self, mt: MT) -> str:
         return self.generate_field("MT", mt.name, mt.value)
-    
+
     def generate_type_alias(self, td: TypeAlias) -> str:
         ftype = type_map.get(td.type_name)
         if ftype:
             return self.generate_field("typedefs", td.name, f"{ftype}(0)")
         else:
-            return self.generate_field("typedefs", td.name, f"{self.struct_name}.typedefs.{td.type_name}") # TODO validate this
+            return self.generate_field(
+                "typedefs", td.name, f"{self.struct_name}.typedefs.{td.type_name}"
+            )  # TODO validate this
 
     def generate_struct(self, sdf: Union[SDF, MDF], top_field: str = "typedefs") -> str:
-        #assert not sdf.name.startswith("MDF_")
+        # assert not sdf.name.startswith("MDF_")
         f = []
         fnum = len(sdf.fields)
         fstr = ""
@@ -94,11 +100,11 @@ class MatlabDefCompiler:
         else:
             for i, field in enumerate(sdf.fields, start=1):
                 flen = field.length
-                nl = "\n" #if i < fnum else ""
+                nl = "\n"  # if i < fnum else ""
                 ftype = type_map.get(field.type_name)
 
                 if ftype is None:
-                    stype = f"{self.struct_name}.typedefs.{field.type_name}" # does not work properly if flen > 1
+                    stype = f"{self.struct_name}.typedefs.{field.type_name}"  # does not work properly if flen > 1
 
                 else:
                     stype = f"{ftype}(0)"
@@ -123,12 +129,12 @@ class MatlabDefCompiler:
 
     def generate_msg_def(self, mdf: MDF) -> str:
         assert mdf.name.startswith("MDF_")
-        mdf.name = mdf.name.replace(f"MDF_", "", 1) # strip top_field from fieldname
+        mdf.name = mdf.name.replace(f"MDF_", "", 1)  # strip top_field from fieldname
         return self.generate_struct(mdf, "MDF")
-    
+
     def generate_message_header(self) -> str:
         return f"{self.struct_name}.MESSAGE_HEADER = {self.struct_name}.typedefs.RTMA_MSG_HEADER;\n"
-    
+
     def generate_mex_opcodes(self) -> str:
         # these are copied from MatlabRTMA.h
         prefix = f"{self.struct_name}.mex_opcode"
@@ -152,7 +158,7 @@ class MatlabDefCompiler:
         {prefix}.GET_MODULE_ID = 17;
         """
         return dedent(op)
-    
+
     def generate__by_MT(self) -> str:
         # append matlab code to generate _by_MT cell arrays from other fields
         prefix = self.struct_name
@@ -174,19 +180,17 @@ class MatlabDefCompiler:
         return f"{self.struct_name}.vars = [];\n"
 
     def generate(self, out_filepath: Path):
-
         if self.debug:
             print(out_filepath)
 
         with open(out_filepath, mode="w") as f:
-            
             # create RTMA config generator .m function
             f.write(self.generate_fcn_header(out_filepath.stem))
-            
+
             # init struct
             f.write(self.initialize_struct())
             f.write("\n")
-            
+
             prev_obj = None
             for obj in self.processor.objs:
                 s = ""
@@ -210,7 +214,7 @@ class MatlabDefCompiler:
                     s = self.generate_type_alias(obj)
                 else:
                     raise RuntimeError(f"Unknown rtma object type of {type(obj)}")
-                
+
                 # Add two lines before struct definition after a define
                 if type(prev_obj) in (Constant, MT, MID, HID):
                     if type(obj) in (TypeAlias, MDF, SDF):
@@ -228,19 +232,18 @@ class MatlabDefCompiler:
 
                 if self.debug:
                     print(s, end="")
-            
+
             # MESSAGE_HEADER
             f.write(self.generate_message_header())
-            
+
             # mex_opcode
             f.write(self.generate_mex_opcodes())
-            
+
             # vars -- empty struct (for now)
             f.write(self.generate_vars())
 
             # MTN_by_MT and MDF_by_MT
             f.write(self.generate__by_MT())
-            
+
             # close function
             f.write(self.generate_fcn_close())
-        

@@ -134,7 +134,6 @@ class PyDefCompiler:
         return dedent(s)
 
     def generate(self, out_filepath: str):
-
         if self.debug:
             print(out_filepath)
 

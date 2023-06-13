@@ -23,6 +23,7 @@ class MID:
     name: str
     value: int
 
+
 @dataclass
 class HID:
     name: str
@@ -89,7 +90,7 @@ class Processor:
 
             obj = MID(name, value)
 
-         # Module Ids
+        # Module Ids
         elif macro.name.startswith("HID_"):
             if not isinstance(value, int):
                 raise SyntaxError(f"Host ids must be an int: {name} -> {value}")
