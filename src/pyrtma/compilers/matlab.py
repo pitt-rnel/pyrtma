@@ -25,9 +25,9 @@ class MatlabDefCompiler:
     
     @staticmethod
     def sanitize_name(name: str) -> str:
-        name = name.lstrip('_0123456789') # strip leading characters that are invalid to start a fieldname
+        name = name.lstrip('_0123456789') # strip leading characters that are invalid to start a fieldname (only letters allowed)
         for c in name:
-            if not c.isalpha() and c != '_':
+            if not c.isalnum() and c != '_': # matlab fieldnames allow alphanum and _ after starting characters
                 name = name.replace(c, '')
         return name
     
