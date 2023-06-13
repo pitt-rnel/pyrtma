@@ -54,18 +54,7 @@ def compile(
         print("Building matlab message definitions...")
         from pyrtma.compilers.matlab import MatlabDefCompiler
         
-        parser = Parser()
-
-        pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
-        core_defs_h = pkg_dir / "core_defs/core_defs.h"
-
-        include_files.insert(0, str(core_defs_h))
-        parser.parse(include_files)
-        if debug:
-            print(parser.to_json())
-
-        processor = Processor(parser)
-        compiler = MatlabDefCompiler(processor)
+        compiler = MatlabDefCompiler(processor, debug=debug)
         name = "generate_RTMA_config.m"
         
         p = pathlib.Path(out_filepath)
@@ -73,7 +62,7 @@ def compile(
             out = p / name
         else:
             out = p.parent / name
-        compiler.generate(str(out))
+        compiler.generate(out)
 
     print("DONE.")
 
