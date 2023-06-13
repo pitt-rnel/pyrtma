@@ -134,8 +134,10 @@ class Processor:
             if isinstance(obj, MT):
                 mt = obj
                 mdfs = [o.name for o in self.objs[n:] if isinstance(o, MDF)]
+                td = [o.name for o in self.objs[n:] if isinstance(o, TypeAlias)]
+
                 name = "MDF_" + mt.name[3:]
-                if name not in mdfs:
+                if name not in mdfs and name not in td:
                     hash = sha256(name.encode()).hexdigest()
                     self.objs.append(MDF(hash, name, mt))
             n += 1
