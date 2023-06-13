@@ -133,9 +133,9 @@ class PyDefCompiler:
         """
         return dedent(s)
 
-    def generate(self, out_filepath: str, debug: bool = False):
+    def generate(self, out_filepath: str):
 
-        if debug:
+        if self.debug:
             print(out_filepath)
 
         with open(out_filepath, mode="w") as f:
@@ -174,5 +174,5 @@ class PyDefCompiler:
                 # Store the previous object generated
                 prev_obj = obj
 
-                if debug:
+                if self.debug:
                     print(s, end="")
