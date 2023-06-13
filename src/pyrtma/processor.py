@@ -1,6 +1,6 @@
 import json
 from hashlib import sha256
-from typing import List, Optional, Any, Dict, Union
+from typing import List, Optional, Any, Union
 from dataclasses import dataclass, field, is_dataclass, asdict
 
 from .parser import Include, TypeDef, Define, Struct, Token
@@ -60,7 +60,8 @@ RTMAObjects = Union[Constant, MT, MID, TypeAlias, MDF, SDF, Field]
 
 
 class Processor:
-    def __init__(self, tokens: List[Token]):
+    def __init__(self, tokens: List[Token], debug: bool = False):
+        self.debug = debug
         self.objs: List[RTMAObjects] = []
         self.process(tokens)
 
@@ -135,7 +136,7 @@ class Processor:
                 mdfs = [o.name for o in self.objs[n:] if isinstance(o, MDF)]
                 name = "MDF_" + mt.name[3:]
                 if name not in mdfs:
-                    hash = sha256(b"").hexdigest()
+                    hash = sha256(name.encode()).hexdigest()
                     self.objs.append(MDF(hash, name, mt))
             n += 1
 
