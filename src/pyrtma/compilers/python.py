@@ -11,7 +11,7 @@ type_map = {
     "unsigned char": "ctypes.c_ubyte",
     "byte": "ctypes.c_ubyte",
     "int": "ctypes.c_int",
-    "signed int": "ctypes.c_uint",
+    "signed int": "ctypes.c_int",
     "unsigned int": "ctypes.c_uint",
     "unsigned": "ctypes.c_uint",
     "short": "ctypes.c_short",
