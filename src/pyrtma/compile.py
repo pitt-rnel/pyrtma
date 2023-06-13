@@ -2,7 +2,8 @@
 
 import pathlib
 import os
-from .parser import Parser, Processor
+from .parser import Parser
+from .processor import Processor
 from typing import List
 
 
@@ -14,45 +15,38 @@ def compile(
     debug: bool = False,
 ):
 
+    # Add the core defintions
+    # pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
+    # core_defs_h = pkg_dir / "core_defs/core_defs.h"
+    # defs_files.insert(0, str(core_defs_h))
+
+    parser = Parser(debug=debug)
+    for f in defs_files:
+        parser.parse(f)
+
+    if debug:
+        print(parser.to_json())
+
+    processor = Processor(parser.tokens, debug=debug)
+
     if python:
         print("Building python message definitions...")
         from pyrtma.compilers.python import PyDefCompiler
 
-        tokens = []
-        for f in defs_files:
-            tokens.extend(Parser.parse(f))
-
-            if debug:
-                print(Parser.to_json(f))
-
-        processor = Processor(tokens)
-        compiler = PyDefCompiler(processor)
+        compiler = PyDefCompiler(processor, debug=debug)
         ext = ".py"
         p = pathlib.Path(out_filepath)
-        out = p.stem + ".py"
-
+        out = p.stem + ext
         compiler.generate(str(p.parent / out))
 
     if javascript:
         print("Building javascript message definitions...")
         from pyrtma.compilers.javascript import JSDefCompiler
 
-        pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
-        core_defs_h = pkg_dir / "core_defs/core_defs.h"
-        defs_files.insert(0, str(core_defs_h))
-
-        tokens = []
-        for f in defs_files:
-            tokens.extend(Parser.parse(f))
-
-            if debug:
-                print(Parser.to_json(j))
-
-        processor = Processor(tokens)
-        compiler = JSDefCompiler(processor)
+        compiler = JSDefCompiler(processor, debug=debug)
         ext = ".js"
         p = pathlib.Path(out_filepath)
-        out = p.stem + ".js"
+        out = p.stem + ext
         compiler.generate(str(p.parent / out))
 
     print("DONE.")
