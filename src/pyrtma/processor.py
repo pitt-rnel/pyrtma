@@ -23,6 +23,11 @@ class MID:
     name: str
     value: int
 
+@dataclass
+class HID:
+    name: str
+    value: int
+
 
 @dataclass
 class TypeAlias:
@@ -83,6 +88,13 @@ class Processor:
                 raise SyntaxError(f"Module ids must be an int: {name} -> {value}")
 
             obj = MID(name, value)
+
+         # Module Ids
+        elif macro.name.startswith("HID_"):
+            if not isinstance(value, int):
+                raise SyntaxError(f"Host ids must be an int: {name} -> {value}")
+
+            obj = HID(name, value)
 
         # Constant values
         else:
