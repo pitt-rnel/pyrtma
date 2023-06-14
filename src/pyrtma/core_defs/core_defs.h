@@ -32,9 +32,10 @@
 #define MT_SUBSCRIBE            15   
 #define MT_UNSUBSCRIBE          16 
 #define MT_PAUSE_SUBSCRIPTION   85
+#define MT_RESUME_SUBSCRIPTION  86
 #define MT_FAIL_SUBSCRIBE       6
 #define MT_FAILED_MESSAGE       8
-#define MT_FORCED_DISCONNECT    82
+#define MT_FORCE_DISCONNECT    82
 #define MT_MODULE_READY         26
 #define MT_SAVE_MESSAGE_LOG     56
 #define MT_TIMING_MESSAGE       80
