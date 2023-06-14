@@ -37,7 +37,7 @@ def compile(
         ext = ".py"
         p = pathlib.Path(out_filepath)
         out = p.stem + ext
-        compiler.generate(str(p.parent / out))
+        compiler.generate(str(p.parent.absolute() / out))
 
     if javascript:
         print("Building javascript message definitions...")

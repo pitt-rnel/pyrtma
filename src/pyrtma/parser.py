@@ -1,5 +1,8 @@
 import re
 import json
+import pathlib
+import os
+
 from hashlib import sha256
 from typing import List, Optional, Any, Union
 from dataclasses import dataclass, field, is_dataclass, asdict
@@ -392,6 +395,14 @@ class Parser:
                 raise RuntimeError("Unknown token type of {token_type} found.")
 
     def parse(self, msgdefs_file: str):
+        # Get the current pwd
+        cwd = pathlib.Path.cwd()
+
+        # Set the pwd to the directory containing the msgdef file
+        defs_path = pathlib.Path(msgdefs_file)
+        def_dir = pathlib.Path(msgdefs_file).parent
+        os.chdir(str(def_dir.absolute()))
+
         if msgdefs_file in self.included_files:
             self.print(f"{msgdefs_file} already parsed...skipping")
             return
@@ -399,10 +410,13 @@ class Parser:
         self.print(f"Parsing {msgdefs_file}")
         self.included_files.append(msgdefs_file)
 
-        with open(msgdefs_file, "rt") as f:
+        with open(defs_path.name, "rt") as f:
             text = self.preprocess(f.read())
 
         self.parse_text(text)
+
+        # Set pwd back to starting point
+        os.chdir(cwd.absolute())
 
     def to_json(self):
         return json.dumps(self.tokens, indent=2, cls=CustomEncoder)
