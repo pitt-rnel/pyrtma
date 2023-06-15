@@ -62,7 +62,7 @@ class SDF:
     fields: List[Field] = field(default_factory=list)
 
 
-RTMAObjects = Union[Constant, MT, MID, TypeAlias, MDF, SDF, Field]
+RTMAObjects = Union[Constant, MT, HID, MID, TypeAlias, MDF, SDF, Field]
 
 
 class Processor:
