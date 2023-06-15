@@ -267,6 +267,11 @@ class Parser:
         ftype += f" {base_type}"
         ftype = ftype.strip()
 
+        if ftype.startswith("MDF_") and not alias.startswith("MDF_"):
+            raise SyntaxError(
+                f"Typedefs of message def types must be prefixed with MDF_: {raw}"
+            )
+
         struct_types = [t for t in self.tokens if isinstance(t, Struct)]
         typedefs_types = [t for t in self.tokens if isinstance(t, TypeDef)]
 
@@ -400,11 +405,9 @@ class Parser:
 
         defs_path = pathlib.Path(msgdefs_file)
         def_dir = pathlib.Path(msgdefs_file).parent
-        
+
         # check excluded dirs (exclude rtma_type.h and rtma.h)
-        exclude_dirs = [
-            pathlib.Path("/rtma/include")
-        ]
+        exclude_dirs = [pathlib.Path("/rtma/include")]
         for ed in exclude_dirs:
             if str(ed).lower() in str(def_dir).lower():
                 self.print(f"{msgdefs_file} in excluded dir...skipping")
