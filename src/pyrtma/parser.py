@@ -215,16 +215,6 @@ class Parser:
         fname = m.group("include_file").strip()
         token = Include(raw, fname)
         self.tokens.append(token)
-        # exclude rtma_types.h and rtma.h from original rtma
-        exclude_dirs = [
-            "/rtma/include",
-            "\\rtma\\include",
-            "/rtma\\include",
-            "\\rtma/include",
-        ]
-        for ed in exclude_dirs:
-            if ed in fname.lower():
-                return
         self.parse(fname)
 
     def handle_define(self, m: re.Match):
@@ -408,14 +398,25 @@ class Parser:
         # Get the current pwd
         cwd = pathlib.Path.cwd()
 
-        # Set the pwd to the directory containing the msgdef file
         defs_path = pathlib.Path(msgdefs_file)
         def_dir = pathlib.Path(msgdefs_file).parent
-        os.chdir(str(def_dir.absolute()))
+        
+        # check excluded dirs (exclude rtma_type.h and rtma.h)
+        exclude_dirs = [
+            pathlib.Path("/rtma/include")
+        ]
+        for ed in exclude_dirs:
+            if str(ed).lower() in str(def_dir).lower():
+                self.print(f"{msgdefs_file} in excluded dir...skipping")
+                return
 
-        if msgdefs_file in self.included_files:
+        # check previously included files
+        if [x for x in self.included_files if pathlib.Path(x) == pathlib.Path(msgdefs_file)]:
             self.print(f"{msgdefs_file} already parsed...skipping")
             return
+
+        # Set the pwd to the directory containing the msgdef file
+        os.chdir(str(def_dir.absolute()))
 
         self.print(f"Parsing {msgdefs_file}")
         self.included_files.append(msgdefs_file)
