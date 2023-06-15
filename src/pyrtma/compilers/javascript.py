@@ -1,185 +1,187 @@
-import textwrap
-import pyrtma
-from pyrtma.parser import Processor, Struct
+from typing import Union
+from pyrtma.parser import Struct
+from textwrap import dedent
+from pyrtma.processor import Processor, Constant, TypeAlias, MT, MID, MDF, SDF, HID
 
-supported_types = [
-    "char",
-    "unsigned char",
-    "byte",
-    "int",
-    "signed int",
-    "unsigned int",
-    "unsigned",
-    "short",
-    "signed short",
-    "unsigned short",
-    "long",
-    "signed long",
-    "unsigned long",
-    "long long",
-    "signed long long",
-    "unsigned long long",
-    "float",
-    "double",
-]
+# Native C types that are supported
+typemap = {
+    "char": '""',
+    "unsigned char": "0",
+    "byte": "0",
+    "int": "0",
+    "signed int": "0",
+    "unsigned int": "0",
+    "unsigned": "0",
+    "short": "0",
+    "signed short": "0",
+    "unsigned short": "0",
+    "long": "0",
+    "signed long": "0",
+    "unsigned long": "0",
+    "long long": "0",
+    "signed long long": "0",
+    "unsigned long long": "0",
+    "float": "0",
+    "double": "0",
+}
+
+
+def pad(indent: int) -> str:
+    return indent * "\t"
 
 
 class JSDefCompiler:
-    def __init__(self, processor: Processor):
+    def __init__(self, processor: Processor, debug: bool = False):
+        self.debug = debug
         self.processor = processor
 
-    def generate_constant(self, name: str, value: str):
-        return f"const {name}= {value};\n"
+    def generate_constant(self, c: Constant):
+        if isinstance(c.value, str):
+            return f'RTMA.constants.{c.name} = "{c.value}"\n'
+
+        return f"RTMA.constants.{c.name}= {c.value};\n"
 
     def generate_prop(self, name: str, value: str):
         return f"{name}: {value}"
 
-    def generate_fields(self, s: Struct):
-        x = {}
-        for field in s.fields:
-            # Check for a typedef of a supported type
-            if self.processor.typedefs.get(field.type_name) is not None:
-                field.type_name = self.processor.typedefs[field.type_name]
+    def generate_msg_type_id(self, mt: MT) -> str:
+        base_name = mt.name[3:]
+        return f"RTMA.MT.{base_name} = {mt.value};\n"
 
-            if field.type_name in supported_types:
-                # regular type
+    def generate_host_id(self, hid: HID) -> str:
+        return f"RTMA.HID.{hid.name} = {hid.value};\n"
+
+    def generate_module_id(self, mid: MID) -> str:
+        base_name = mid.name[4:]
+        return f"RTMA.MID.{base_name} = {mid.value};\n"
+
+    def generate_type_alias(self, td: TypeAlias) -> str:
+        s = typemap.get(td.type_name)
+        if s:
+            return f"RTMA.typedefs.{td.name} = {s};\n"
+
+        if td.type_name.startswith("MDF_"):
+            if td.name.startswith("MDF_"):
+                return f"RTMA.MDF.{td.name[4:]} = RTMA.MDF.{td.type_name[4:]};\n"
+            else:
+                return f"RTMA.typedefs.{td.name} = RTMA.MDF.{td.type_name[4:]};\n"
+
+        return f"RTMA.typedefs.{td.name} = RTMA.typedefs.{td.type_name};\n"
+
+    def generate_obj(self, struct: Union[SDF, MDF]) -> str:
+        if isinstance(struct, MDF):
+            prefix = "MDF"
+            basename = struct.name[4:]
+        elif isinstance(struct, SDF):
+            prefix = "typedefs"
+            basename = struct.name
+
+        tabs = "\t" * 2
+        num_fields = len(struct.fields)
+
+        if num_fields == 0:
+            return f"RTMA.{prefix}.{basename} = () => {{ return {{}} }};"
+
+        s = f"RTMA.{prefix}.{basename} = () => {{\n\treturn {{\n"
+
+        for n, field in enumerate(struct.fields, start=1):
+            s += tabs
+            if field.type_name in typemap.keys():
                 if field.length is not None:
-                    # Array
                     if field.type_name.startswith("char"):
-                        x[field.name] = f'{field.name}: ""'
+                        s += f'{field.name}: ""'
                     else:
-                        x[field.name] = f"{field.name}: Array({field.length}).fill(0)"
-
+                        s += f"{field.name}: Array({field.length}).fill(0)"
                 else:
                     if field.type_name.startswith("char"):
-                        x[field.name] = f'{field.name}: ""'
+                        s += f'{field.name}: ""'
                     else:
-                        x[field.name] = f"{field.name}: 0"
-
-            elif self.processor.structs.get(field.type_name):
-                # struct type
-                s = self.processor.structs[field.type_name]
-                x[field.name] = self.generate_fields(s)
+                        s += f"{field.name}: 0"
+            elif field.type_name.startswith("MDF"):
+                if field.length is not None:
+                    s += f"{field.name}: Array({field.length}).fill(RTMA.MDF.{field.type_name}())"
+                else:
+                    s += f"{field.name}: RTMA.MDF.{field.type_name}()"
             else:
-                raise RuntimeError(
-                    f"Unsupported type in message defintion {s.name} : {field.type_name}"
-                )
-        return x
+                if field.length is not None:
+                    s += f"{field.name}: Array({field.length}).fill(RTMA.typedefs.{field.type_name}())"
+                else:
+                    s += f"{field.name}: RTMA.typedefs.{field.type_name}()"
 
-    def generate_obj(self, x, fname: str = "", indent=1):
-        # Open object
-        padding = "\t" * indent
-        if fname == "":
-            s = "{\n"
-        else:
-            s = f"{padding}{fname}: {{\n"
-
-        # Fill object fields
-        for field, value in x.items():
-            if isinstance(value, dict):
-                obj = self.generate_obj(value, fname=field, indent=indent + 1)
-                s += obj
+            if n < num_fields:
+                s += ",\n"
             else:
-                s += (indent + 1) * "\t"
-                s += value
-            s += ",\n"
+                s += "\n"
 
-        # Close object
-        s += padding
-        s += "}"
+        s += "\t}\n"
+        s += "};"
+
         return s
 
     def generate(self, out_filepath: str):
+
+        if self.debug:
+            print(out_filepath)
+
         with open(out_filepath, mode="w") as f:
+            # Exports
             f.write("export { RTMA } ;\n\n")
 
-            # Top-Level Constants
-            f.write("// RTMA Constants\n")
-            for name, value in self.processor.constants.items():
-                f.write(self.generate_constant(name, value))
-
-            f.write("\n")
-
             # Top-Level RTMA object
-            f.write("const RTMA = {\n")
+            f.write("const RTMA = {};\n\n")
 
             # RTMA.constants
-            indent = 1
-            f.write(indent * "\t")
-            f.write("constants: {\n")
+            f.write("RTMA.constants =  {};\n")
 
-            indent += 1
-            for name, value in self.processor.constants.items():
-                f.write(indent * "\t")
-                f.write(self.generate_prop(name, value))
-                f.write(",\n")
-            indent -= 1
-            f.write(indent * "\t")
-            f.write("},\n")
-
-            f.write("\n")
+            # RTMA.typedefs
+            f.write("RTMA.typedefs =  {};\n")
 
             # RTMA.MT
-            f.write(indent * "\t")
-            f.write("MT: {\n")
+            f.write("RTMA.MT = {};\n")
 
-            indent += 1
-            for name, value in self.processor.MT.items():
-                f.write(indent * "\t")
-                if name.startswith("MT_"):
-                    prop_name = name[3:]
-                else:
-                    prop_name = name
-
-                f.write(self.generate_prop(prop_name, value))
-                f.write(",\n")
-            indent -= 1
-            f.write(indent * "\t")
-            f.write("},\n")
-
-            f.write("\n")
+            # RTMA.HID
+            f.write("RTMA.HID =  {};\n")
 
             # RTMA.MID
-            f.write(indent * "\t")
-            f.write("MID: {\n")
+            f.write("RTMA.MID =  {};\n")
 
-            indent += 1
-            for name, value in self.processor.MID.items():
-                f.write(indent * "\t")
-                if name.startswith("MID_"):
-                    prop_name = name[4:]
-                else:
-                    prop_name = name
-                f.write(self.generate_prop(prop_name, value))
-                f.write(",\n")
-            indent -= 1
-            f.write(indent * "\t")
-            f.write("},\n")
+            # RTMA.MDF
+            f.write("RTMA.MDF = {};\n")
 
             f.write("\n")
 
-            # RTMA.MDF
-            f.write(indent * "\t")
-            f.write("MDF : {\n")
-
-            indent += 1
-            for name, s in self.processor.structs.items():
-                x = self.generate_fields(s)
-                f.write(indent * "\t")
-                pad = (indent + 1) * "\t"
-                if name.startswith("MDF_"):
-                    prop_name = name[4:]
+            prev_obj = None
+            for obj in self.processor.objs:
+                s = ""
+                if type(obj) is Constant:
+                    s = self.generate_constant(obj)
+                elif type(obj) is MT:
+                    s = self.generate_msg_type_id(obj)
+                elif type(obj) is MID:
+                    s = self.generate_module_id(obj)
+                elif type(obj) is HID:
+                    s = self.generate_host_id(obj)
+                elif type(obj) is TypeAlias:
+                    s = self.generate_type_alias(obj)
+                elif isinstance(obj, (SDF, MDF)):
+                    s = self.generate_obj(obj)
                 else:
-                    prop_name = name
+                    raise RuntimeError(f"Unknown rtma object type of {type(obj)}")
 
-                f.write(f"{prop_name}: () => {{\n{pad}return ")
+                # Add two lines before obj definition after a define
+                if type(prev_obj) in (Constant, MT, MID):
+                    if type(obj) in (TypeAlias, MDF, SDF):
+                        f.write("\n\n")
 
-                f.write(self.generate_obj(x, indent=indent + 1))
-                pad = indent * "\t"
-                f.write(f"\n{pad}}},\n\n")
-            indent -= 1
-            f.write(indent * "\t")
-            f.write("},\n")
+                # Write the generated code
+                f.write(s)
 
-            # Close Top-Level RTMA object
-            f.write("};\n")
+                # Add two lines after a class definition
+                if type(obj) in (TypeAlias, MDF, SDF):
+                    f.write("\n\n")
+
+                # Store the previous object generated
+                prev_obj = obj
+
+                if self.debug:
+                    print(s, end="")
