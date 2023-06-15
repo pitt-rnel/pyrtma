@@ -215,6 +215,16 @@ class Parser:
         fname = m.group("include_file").strip()
         token = Include(raw, fname)
         self.tokens.append(token)
+        # exclude rtma_types.h and rtma.h from original rtma
+        exclude_dirs = [
+            "/rtma/include",
+            "\\rtma\\include",
+            "/rtma\\include",
+            "\\rtma/include",
+        ]
+        for ed in exclude_dirs:
+            if ed in fname.lower():
+                return
         self.parse(fname)
 
     def handle_define(self, m: re.Match):
