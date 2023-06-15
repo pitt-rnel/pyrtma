@@ -16,9 +16,9 @@ def compile(
     debug: bool = False,
 ):
     # Add the core defintions
-    # pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
-    # core_defs_h = pkg_dir / "core_defs/core_defs.h"
-    # defs_files.insert(0, str(core_defs_h))
+    pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
+    core_defs_h = pkg_dir / "core_defs/core_defs.h"
+    defs_files.insert(0, str(core_defs_h))
 
     parser = Parser(debug=debug)
     for f in defs_files:
@@ -79,8 +79,8 @@ if __name__ == "__main__":
         dest="defs_files",
         help="Files to parse",
     )
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument(
+
+    parser.add_argument(
         "--python",
         "--py",
         dest="python",
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         help="Output python file",
     )
 
-    group.add_argument(
+    parser.add_argument(
         "--javascript",
         "--js",
         dest="javascript",
@@ -96,7 +96,7 @@ if __name__ == "__main__":
         help="Output json file",
     )
 
-    group.add_argument(
+    parser.add_argument(
         "--matlab",
         "--ml",
         dest="matlab",
