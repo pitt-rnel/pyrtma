@@ -1,6 +1,4 @@
 from typing import Union
-from pyrtma.parser import Struct
-from textwrap import dedent
 from pyrtma.processor import Processor, Constant, TypeAlias, MT, MID, MDF, SDF, HID
 
 # Native C types that are supported
