@@ -71,6 +71,34 @@ class Processor:
         self.objs: List[RTMAObjects] = []
         self.process(tokens)
 
+    @property
+    def constant(self) -> List[Constant]:
+        return [o for o in self.objs if isinstance(o, Constant)]
+
+    @property
+    def mt(self) -> List[MT]:
+        return [o for o in self.objs if isinstance(o, MT)]
+
+    @property
+    def mid(self) -> List[MID]:
+        return [o for o in self.objs if isinstance(o, MID)]
+
+    @property
+    def hid(self) -> List[HID]:
+        return [o for o in self.objs if isinstance(o, HID)]
+
+    @property
+    def mdf(self) -> List[MDF]:
+        return [o for o in self.objs if isinstance(o, MDF)]
+
+    @property
+    def sdf(self) -> List[SDF]:
+        return [o for o in self.objs if isinstance(o, SDF)]
+
+    @property
+    def type_alias(self) -> List[TypeAlias]:
+        return [o for o in self.objs if isinstance(o, TypeAlias)]
+
     def process_define(self, macro: Define):
         name, value = (macro.name, macro.value)
 
