@@ -167,9 +167,11 @@ class JSDefCompiler:
                     raise RuntimeError(f"Unknown rtma object type of {type(obj)}")
 
                 # Add two lines before obj definition after a define
-                if type(prev_obj) in (Constant, MT, MID):
+                if type(prev_obj) in (Constant, MT, MID, HID):
                     if type(obj) in (TypeAlias, MDF, SDF):
                         f.write("\n\n")
+                    elif not isinstance(obj, type(prev_obj)):
+                        f.write("\n")
 
                 # Write the generated code
                 f.write(s)
