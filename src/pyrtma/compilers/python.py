@@ -2,7 +2,7 @@ import re
 import ctypes
 
 from textwrap import dedent
-from pyrtma.processor import Processor, Constant, TypeAlias, MT, MID, MDF, SDF
+from pyrtma.processor import Processor, Constant, TypeAlias, MT, MID, HID, MDF, SDF
 
 
 # Field type name to ctypes
@@ -48,6 +48,9 @@ class PyDefCompiler:
 
     def generate_module_id(self, mid: MID):
         return f"{mid.name} = {mid.value}\n"
+
+    def generate_host_id(self, hid: HID):
+        return f"{hid.name} = {hid.value}\n"
 
     def generate_type_alias(self, td: TypeAlias):
         ftype = type_map.get(td.type_name)
@@ -155,6 +158,8 @@ class PyDefCompiler:
                     s = self.generate_struct(obj)
                 elif type(obj) is TypeAlias:
                     s = self.generate_type_alias(obj)
+                elif type(obj) is HID:
+                    s = self.generate_host_id(obj)
                 else:
                     raise RuntimeError(f"Unknown rtma object type of {type(obj)}")
 
