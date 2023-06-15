@@ -411,7 +411,7 @@ class Parser:
                 return
 
         # check previously included files
-        if [x for x in self.included_files if pathlib.Path(x) == pathlib.Path(msgdefs_file)]:
+        if [x for x in self.included_files if pathlib.Path(x) == defs_path]:
             self.print(f"{msgdefs_file} already parsed...skipping")
             return
 
