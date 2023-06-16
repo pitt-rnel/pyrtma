@@ -123,7 +123,7 @@ class MatlabDefCompiler:
                         f"{self.struct_name}.{top_field}.{sdf.name}.{field.name} = {stype};{nl}"
                     )
 
-                fstr += "".join(f)
+            fstr += "".join(f)
 
         return fstr
 
