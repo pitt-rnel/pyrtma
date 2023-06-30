@@ -76,34 +76,34 @@ COMMENT_REGEX = r"//(.*)\n"
 
 BLOCK_COMMENT_REGEX = r"/\*(.*?)\*/"
 
-INCLUDE_REGEX = r"#include\s+\"(?P<include_file>[\w/\._:]+)\""
+INCLUDE_REGEX = r"^\s*#include\s+\"(?P<include_file>[\w/\._:]+)\""
 
 # Simple online macro expressions
-MACRO_EXP_REGEX = r"#define[\t ]+(?P<macro_name>\w+)[\t ]+(?P<expression>.*)"
+MACRO_EXP_REGEX = r"^\s*#define[\t ]+(?P<macro_name>\w+)[\t ]+(?P<expression>.*)"
 
 # Macro directive flags with no expression
-MACRO_FLAG_REGEX = r"#define[\t ]+(?P<macro_flag>\w+)\s*\n"
+MACRO_FLAG_REGEX = r"^\s*#define[\t ]+(?P<macro_flag>\w+)\s*\n"
 
 # Oneline function like macros (not supported)
 MACRO_FUNC_REGEX = (
-    r"#define[\t ]+(?P<macro_func>\w+\(.*\))[\t ]+(?P<func_expression>.*)"
+    r"^\s*#define[\t ]+(?P<macro_func>\w+\(.*\))[\t ]+(?P<func_expression>.*)"
 )
 
 # Multiline macros (not supported)
-MACRO_MULTI_REGEX = r"#define[\t ]+(?P<macro_multi>\w+|\w+\(.*\)).*\\$"
+MACRO_MULTI_REGEX = r"^\s*#define[\t ]+(?P<macro_multi>\w+|\w+\(.*\)).*\\$"
 
 # Combined regex for #define types. Note order matters.
 DEFINE_REGEX = (
     rf"{MACRO_MULTI_REGEX}|{MACRO_FUNC_REGEX}|{MACRO_EXP_REGEX}|{MACRO_FLAG_REGEX}"
 )
 
-TYPEDEF_REGEX = r"\s*typedef\s+(?P<typedef_qual1>\w+\s+)?\s*(?P<typedef_qual2>\w+\s+)?\s*(?P<typedef_type>\w+\s*)(?P<ptr>(\*\s+)|\s+)(?P<typedef_alias>\*?\w*)\s*;\s*"
+TYPEDEF_REGEX = r"^\s*typedef\s+(?P<typedef_qual1>\w+\s+)?\s*(?P<typedef_qual2>\w+\s+)?\s*(?P<typedef_type>\w+\s*)(?P<ptr>(\*\s+)|\s+)(?P<typedef_alias>\*?\w*)\s*;\s*"
 
 FIELD_REGEX = r"\s*(?P<qual1>\w+\s+)?\s*(?P<qual2>\w+\s+)?\s*(?P<typ>\w+\s*)(?P<ptr>(\*\s*)|\s+)(?P<name>\w+)\s*(\[(?P<length>.*?)\])?;"
 
-STRUCT_REGEX = r"(?s:(\s*struct\s+(?P<struct_name>\w*)\s*\{(?P<struct_def>.*?)\}\s*;))"
+STRUCT_REGEX = r"(?s:(^\s*struct\s+(?P<struct_name>\w*)\s*\{(?P<struct_def>.*?)\}\s*;))"
 
-TYPEDEF_STRUCT_REGEX = r"(?s:(\s*typedef\s+struct\s*\{(?P<td_struct_def>.*?)\}(?P<td_struct_name>\s*\w*)\s*;))"
+TYPEDEF_STRUCT_REGEX = r"(?s:(^\s*typedef\s+struct\s*\{(?P<td_struct_def>.*?)\}(?P<td_struct_name>\s*\w*)\s*;))"
 
 # Other patterns
 INT_REGEX = r"[-+]?(0[xX][\dA-Fa-f]+|0[0-7]*|\d+)"
