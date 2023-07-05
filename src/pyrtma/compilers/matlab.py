@@ -275,7 +275,7 @@ class MatlabDefCompiler:
                 f.write(self.generate_msg_type_id(obj))
             f.write("\n")
 
-            # RTMA.SDF
+            # RTMA.typedefs
             f.write("% Struct Definitions\n")
             for obj in self.parser.struct_defs.values():
                 f.write(self.generate_struct(obj))
@@ -287,7 +287,7 @@ class MatlabDefCompiler:
                 f.write(self.generate_struct(obj, top_field="MDF"))
                 f.write("\n\n")
 
-            # RTMA.MDF
+            # RTMA.hash
             f.write("% Message Definition Hashes\n")
             for obj in self.parser.message_defs.values():
                 f.write(self.generate_hash_id(obj))

@@ -153,7 +153,7 @@ class JSDefCompiler:
             f.write("const RTMA = {};\n\n")
 
             # RTMA.constants
-            f.write("// Constants\n\n")
+            f.write("// Constants\n")
             f.write("RTMA.constants =  {};\n")
             for obj in self.parser.constants.values():
                 f.write(self.generate_constant(obj))
