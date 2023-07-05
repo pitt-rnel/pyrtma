@@ -134,6 +134,7 @@ class PyDefCompiler:
             type_name = \"{basename}\"
             type_hash = \"{mdf.hash[:8]}\"
             
+
         MDF_{mdf.name} = {mdf.name}
         """
         return dedent(template)
@@ -167,6 +168,7 @@ class PyDefCompiler:
             f.write("# Type Aliases\n")
             for obj in self.parser.aliases.values():
                 f.write(self.generate_type_alias(obj))
+                f.write("\n\n")
             f.write("\n")
 
             f.write("# Host IDs\n")
