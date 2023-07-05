@@ -21,6 +21,11 @@ classifiers = [
 ]
 dynamic = ["version"]
 
+dependencies = [
+  "PyYaml",
+  "websocket-server"
+]
+
 [tool.setuptools.dynamic]
 version = {attr = "pyrtma.__version__"}
 
