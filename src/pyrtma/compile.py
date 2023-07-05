@@ -10,6 +10,7 @@ def compile(
     python: bool = False,
     javascript: bool = False,
     matlab: bool = False,
+    c_lang: bool = False,
     debug: bool = False,
 ):
     parser = Parser(debug=debug)
@@ -35,8 +36,8 @@ def compile(
         from pyrtma.compilers.javascript import JSDefCompiler
 
         compiler = JSDefCompiler(parser, debug=debug)
-        ext = ".js"
         p = pathlib.Path(out_filepath)
+        ext = ".js"
         out = p.stem + ext
         compiler.generate(str(p.parent / out))
 
@@ -53,6 +54,16 @@ def compile(
         else:
             out = p.parent / name
         compiler.generate(out)
+
+    if c_lang:
+        print("Building C/C++ message definitions...")
+        from pyrtma.compilers.c99 import CDefCompiler
+
+        p = pathlib.Path(out_filepath)
+        compiler = CDefCompiler(parser, filename=p.stem, debug=debug)
+        ext = ".h"
+        out = p.stem + ext
+        compiler.generate(str(p.parent / out))
 
     print("DONE.")
 
@@ -71,11 +82,19 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--c",
+        "--c_lang",
+        dest="c_lang",
+        action="store_true",
+        help="Output C .h file",
+    )
+
+    parser.add_argument(
         "--python",
         "--py",
         dest="python",
         action="store_true",
-        help="Output python file",
+        help="Output python .py file",
     )
 
     parser.add_argument(
@@ -83,7 +102,7 @@ if __name__ == "__main__":
         "--js",
         dest="javascript",
         action="store_true",
-        help="Output json file",
+        help="Output javascrip .js file",
     )
 
     parser.add_argument(
