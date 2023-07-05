@@ -107,6 +107,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--matlab",
+        "--mat",
         "--ml",
         dest="matlab",
         action="store_true",
