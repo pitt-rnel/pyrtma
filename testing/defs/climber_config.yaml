@@ -1,0 +1,1677 @@
+# Message defs file in yaml format
+
+imports:
+  - ./defs/mjvr_types.yaml
+
+string_constants:
+  DEFAULT_MM_IP: "localhost:7111"
+
+constants:
+  MAX_SPIKE_SOURCES: 2
+  MAX_SPIKE_SOURCES_N256: 1
+  MAX_SPIKE_CHANS_PER_SOURCE: 128  # single 256 neuroport used in Chicago or Gemin
+  MAX_SPIKE_CHANS_PER_SOURCE_N256: 256  # 256 neuroport used in Chicago or Gemini
+  MAX_COINCIDENT_SPIKES: 45  # threshold for coincidence detection (>= MAX_COINCIDENT_SPIKES with same timestamp are ignored)
+  MAX_ANALOG_CHANS: 16
+  MAX_UNITS_PER_CHAN: 5  # Units 1..5 are sorted, Unit 0 is unsorted threshold crossings (not including the sorted units)
+  MAX_TOTAL_SPIKE_CHANS_PER_SOURCE: (MAX_SPIKE_CHANS_PER_SOURCE * MAX_UNITS_PER_CHAN)
+  MAX_TOTAL_SPIKE_CHANS_PER_SOURCE_N256: (MAX_SPIKE_CHANS_PER_SOURCE_N256 * MAX_UNITS_PER_CHAN)
+  MAX_TOTAL_SPIKE_CHANS: (MAX_SPIKE_SOURCES * MAX_TOTAL_SPIKE_CHANS_PER_SOURCE)
+  MAX_TOTAL_SPIKE_CHANS_N256: (MAX_SPIKE_SOURCES_N256 * MAX_TOTAL_SPIKE_CHANS_PER_SOURCE_N256) # should equal MAX_TOTAL_SPIKE_CHANS
+  LFPSAMPLES_PER_HEARTBEAT: 10  #LFP sampled at 1kHz, heartbeats at 10ms==100Hz therefore 10 samples agregated
+  ANALOGSAMPLES_PER_HEARTBEAT: 10
+  RAW_COUNTS_PER_SAMPLE: 2  # sets system sample rate to 50 Hz
+  SAMPLE_LENGTH_MS: (10 * RAW_COUNTS_PER_SAMPLE) # milliseconds
+  SAMPLE_LENGTH: (0.01 * RAW_COUNTS_PER_SAMPLE) # seconds (0.02)
+  SNIPPETS_PER_MESSAGE: 25
+  SAMPLES_PER_SNIPPET: 48  # from Blackrock Setting
+  MAX_DIG_PER_SAMPLE: 10
+  MAX_DATAGLOVE_SENSORS: 18
+  NUM_DOMAINS: 6
+  MAX_COMMAND_DIMS: 30
+  MPL_RAW_PERCEPT_DIMS: 54
+  # STIM DEFINES
+  NUM_STIM_CHANS: 64
+  SHAM_STIM_CHANS: 32  # bank C
+  MAX_STIM_CHANS_ON: 12
+  PULSE_TRAIN_SIZE: 101  #probably want to make this so it isn't hardcoded
+  MAX_CS_CONFIGS: 16
+  NUM_SPIKES_PER_STIM_MSG: 26  #Even number for byte balancing
+  
+  
+  # Grapevine defines
+  MAX_XIPP_EEG_HEADSTAGES: 2
+  MAX_XIPP_CHANS: 32 * MAX_XIPP_EEG_HEADSTAGES
+  MAX_XIPP_ANALOG_CHANS: 32
+  XIPP_SAMPLES_PER_MSG: 20
+  MAX_MYO_EMG_CHANS: 8
+  MYO_SAMPLES_PER_MSG: 4
+  
+  GRIP_DIMS_R: 1  #how many of the ROC grasps to use simultaneously.
+  GRIP_DIMS_L: 1  #how many of the ROC grasps to use simultaneously.
+  MAX_GRIP_DIMS: 9
+  MAX_GRIPPER_DIMS: 1  # 1, 5 for Prensilia
+  MAX_GRIPPER_JOINT_ANGLES: 5  # joint angles for gripper tasks, TBD
+  MAX_GRIPPER_FORCES: 5  # 2, 6 for Prensilia
+  MJ_MAX_MOTOR: MAX_GRIPPER_DIMS
+  MJ_MAX_JOINT: MAX_GRIPPER_JOINT_ANGLES
+  MJ_MAX_CONTACT: MAX_GRIPPER_FORCES
+
+  # MujocoVR Defines
+  # moved to mjvr_types.h
+  
+  #ResultCodes: (Should be arranged as binary style flags to be added together)
+  NoResult: -1  #not to be combined with other codes
+  SuccessfulTrial: 1
+  BadTrial: 2
+  ManualProceed: 4
+  ManualFail: 8
+  
+  #Deka Hand Constants
+  HX_DEKA_LUKE_CONTACT_COUNT: 13
+  HX_LUKE_MOTOR_COUNT: 6
+  
+  #Right Hand Robotics
+  NUM_FINGERS: 3
+  NUM_SENSORS_PER_FINGER: 9
+  NUM_SENSORS_PALM: 11
+  NUM_TAKKTILE: (NUM_FINGERS * NUM_SENSORS_PER_FINGER + NUM_SENSORS_PALM)
+  NUM_ENCODERS: NUM_FINGERS
+  NUM_SERVOS: 4
+  NUM_DYNAMIXEL: NUM_SERVOS
+  
+  MECH_STIM_SINE: 1
+  MECH_STIM_RAMP_AND_HOLD: 2
+
+  DEKA_DOF_COUNT: 7
+  KUKA_DOF_COUNT: 7
+  
+  PRENSILIA_DOF: 5
+  PRENSILIA_EXT_SENSORS: 7
+
+  TAG_LENGTH: 64
+  
+  # Possible ways for us to control the MPL
+  # i.e. modes of the GROBOT_COMMAND Message
+  # They all begin with MPL_AT_ which stands for MPL Actuation Type
+  MPL_AT_ARM_EPV_FING_JV: 0
+  MPL_AT_ARM_EPV_FING_JP: 1
+  MPL_AT_ARM_JV_FING_JP: 2
+  MPL_AT_ALL_JV: 3
+  MPL_AT_ALL_JP: 4
+  MPL_AT_ARM_EPP_FING_JP: 5
+  
+  # Time Freq Decomposition parameters:
+  TFD_FREQ_BINS: 20
+
+host_ids:
+  null
+
+# Module ID-s PLEASE KEEP MIDs IN ASCENDING ORDER, DO NOT DUPLICATE, AND STAY WITHIN RANGE 10-99!
+module_ids:
+  JSTICK_COMMAND: 10
+  COMBINER: 11
+  CEREBUS: 12  #DO NOT ADD ANYTHING BETWEEN 12 and 15! the cerebus module adds nsp_index to this to maintain unique numbers
+  RAW_LOGGER: 16
+  
+  INPUT_TRANSFORM: 20
+  RPPL_RECORD: 21
+  CENTRAL: 22  #DO NOT ADD ANYTHING BETWEEN 22 and 30! the NSPCentralControl module adds nsp_index to this to maintain unique numbers
+  
+  EXTRACTION: 30  # retired MID_LFPEEXTRACTION (31), MID_CREATEBUFFER (35)
+  MYO: 31
+  
+  MECH_STIM_MODULE: 39
+  
+  MPL_CONTROL: 40
+  GRIP_CONTROL: 41
+  
+  #DEKA MIDS
+  DEKA_CAN_MODULE: 42
+  DEKA_ACI_RESPONSE: 43
+  DEKA_DISPLAY: 44  # previously: 47
+  # NREC WAM IDS (RETIRED, CAN REUSE)
+  #NREC_WAM_RECV: 44
+  # NREC_WAM_SEND: 45
+  PSYCHTLBX: 46
+  #2018-08-23 Royston: working on PsychoPy-RTMA integration, added a module for testing
+  STIM_PRESENT: 48
+  
+  ACTIVE_ASSIST: 50
+  # KUKA MIDS
+  KUKA_DISPLAY: 51
+  ROBOTICS_FEEDBACK_INTEGRATOR: 52
+  KUKA_INTERFACE_MODULE: 53
+  KUKA_JOINT_COMMAND_DISPLAY: 54
+  KUKA_DIAGNOSTICS: 55
+  #
+  FORCE_PLATFORM: 58
+  FORCE_PLATFORM_DISPLAY: 59
+  
+  MPL_FEEDBACK: 60
+  #MUJOCO_VR_MODULE: 61  # MujocoVR C++ Module  # def moved to mjvr_types.h
+  AJA_CONTROL: 65  # python module to control Aja Ki Pro Mini video recorder
+  SEAIOCONTROL: 66  # module to send digital high/low from SeaIO card in stim computer
+  
+  EXECUTIVE: 70
+  COMMENT_MANAGER: 71
+  
+  FLIP_THAT_BUCKET_MESSENGER: 74
+  #LUX_STREAMER: 0
+  VOLTAGE_MONITOR_GUI: 76
+  VOLTAGE_MONITOR: 77
+  ATIsensor: 78
+  
+  # Frets on fire game
+  FOFIX: 79
+  # Space invaders game
+  STIM_THRESH_GAME: 80
+  
+  # RETIRED MID_GENERIC (80) REPLACED WITH DYNAMIC MID 0. Also retired MID_VISUALATION (82), MID_VIDEO_LOGGER (83), MID_AUDIO_LOGGER (84), MID_DATAGLOVE_CONTROL (85)
+  MESSAGERATES: 81  # Diagnostic module (USED BY LOADER)
+  VISUAL_GRATING: 85
+  BIASMODULE: 86
+  CURSOR: 87
+  # RIGHT HAND GRIPPER Modules
+  RHR_COMMAND_MODULE: 88
+  RHR_SENSOR_MODULE: 89
+  
+  SOUNDPLAYER: 90  # retired MID_KNOB_FEEDBACK (94), MID_APLSENDER (98), MID_APLRECEIVER (99)
+  RFDISPLAY: 91
+  RFACTIVITY: 92
+  ImageDisplayer: 93
+  
+  # Predict movement intent
+  FLIP_THAT_BUCKET: 94
+  
+  # Stim MIDs
+  STIM_SAFETY_MODULE: 95
+  SENSOR_STIM_TRANS_MODULE: 96
+  CERESTIM_CONTROL: 97
+  SENSE_TOUCH_INTERFACE: 98
+  SENSOR_STIM_TRANSFORM_PY: 99
+
+aliases:
+  SPIKE_COUNT_DATA_TYPE: unsigned char
+
+# Non-message structured data (no id field)
+struct_defs:
+  MSG_HEADER:
+    fields:
+      serial_no: int
+      sub_sample: int
+
+  SPIKE_SNIPPET_TYPE:
+    fields: 
+      source_index: int  # a zero-based index in the range 0..(N-1) for N spike sources (e.g. separate acquisition boxes)
+      channel: short
+      unit: unsigned char
+      reserved1: unsigned char  #64-bit alignment
+      source_timestamp: double  # [seconds]source timestamp of the event that caused this count to happen
+      fPattern: double[3]
+      nPeak: short
+      nValley: short
+      reserved2: int
+      snippet: short[SAMPLES_PER_SNIPPET]
+
+  REJECTED_SNIPPET_TYPE:
+    fields:
+      source_index: int  # a zero-based index in the range 0..(N-1) for N spike sources (e.g. separate acquisition boxes)
+      channel: short
+      unit: unsigned char
+      reserved1: unsigned char  #64-bit alignment
+      source_timestamp: double  # [seconds]source timestamp of the event that caused this count to happen
+      fPattern: double[3]
+      nPeak: short
+      nValley: short
+      rejectType: int  # 1 for blanking window (primary artifact), 2 for secondary artifact
+      snippet: short[SAMPLES_PER_SNIPPET]
+
+  DEKA_CAN_MSG:
+    fields:
+      can_id: unsigned int  #Deka Can Message ID
+      data: unsigned char[8] #8 Byte data field in deka Can Message
+      padding: int
+
+  RH_FINGER_DATA:
+    fields:
+      proximal_angle: float
+      distal_angle: float
+      pressure: float[NUM_SENSORS_PER_FINGER] #Unitless
+      contact: int[NUM_SENSORS_PER_FINGER]
+
+  DYNAMIXEL_INFO:
+    fields:
+      joint_angle: float[NUM_DYNAMIXEL] #Radians
+      raw_angle: float[NUM_DYNAMIXEL]
+      velocity: float[NUM_DYNAMIXEL]
+      load: float[NUM_DYNAMIXEL] #Unitless
+      voltage: float[NUM_DYNAMIXEL]
+      temperature: int[NUM_DYNAMIXEL] #Celsius
+
+
+# Message Definitions
+message_defs:
+  JSON_CONFIG:
+    id: 1200
+    fields: 
+      src: int  # src MID sending this config
+      dest: int  # destination MID intended to receive this config
+      json_config: char[256] # config data as a JSON string
+
+  FINISHED_COMMAND:
+    id: 1700
+    fields: 
+      header: MSG_HEADER
+      command: double[MAX_COMMAND_DIMS]
+      stiffness: double[MPL_RAW_PERCEPT_DIMS]
+      src: int
+      reserved: int
+
+  CONTROL_SPACE_FEEDBACK:
+    id: 1701
+    fields: 
+      header: MSG_HEADER
+      position: double[MAX_COMMAND_DIMS]
+      velocity: double[MAX_COMMAND_DIMS]
+      #force: double[MAX_COMMAND_DIMS]
+
+  CONTROL_SPACE_COMMAND:
+    id: 1702
+    fields: 
+      header: MSG_HEADER
+      command: double[MAX_COMMAND_DIMS]
+      dZ: double[MAX_GRIP_DIMS] # decoded change in impedance
+      src: int
+      actual_pos: int
+
+  MPL_RAW_PERCEPT:
+    id: 1703
+    fields: 
+      header: MSG_HEADER
+      position: double[MPL_RAW_PERCEPT_DIMS]
+      velocity: double[MPL_RAW_PERCEPT_DIMS]
+      torque: double[MPL_RAW_PERCEPT_DIMS]
+      temperature: double[MPL_RAW_PERCEPT_DIMS]
+
+  BIAS_COMMAND:
+    id: 1704
+    fields: 
+      header: MSG_HEADER
+      command: double[MAX_COMMAND_DIMS]
+      dZ: double[MAX_GRIP_DIMS] # decoded change in impedance
+      src: int
+      reserved: int
+
+  MPL_REBIASED_SENSORDATA:
+    id: 1705
+    fields: 
+      header: MSG_HEADER
+      torque: double[MPL_RAW_PERCEPT_DIMS]
+      ind_force: double[14]
+      mid_force: double[14]
+      rng_force: double[14]
+      lit_force: double[14]
+      thb_force: double[14]
+      contacts: short[16] # [II,IP,MI,MP,RI,RP,P1,P2,P3,P4]
+
+  CONTROL_SPACE_FEEDBACK_RHR_GRIPPER:
+    id: 1706
+    fields: null
+
+  CONTROL_SPACE_POS_COMMAND:
+    id: 1710
+    fields: 
+      header: MSG_HEADER
+      command: double[MAX_COMMAND_DIMS]
+      src: int
+      reserved: int
+
+  MPL_SEGMENT_PERCEPTS:
+    id: 1711
+    fields: 
+      header: MSG_HEADER
+      ind_force: double[14]
+      mid_force: double[14]
+      rng_force: double[14]
+      lit_force: double[14]
+      thb_force: double[14]
+  
+      ind_accel: double[3]
+      mid_accel: double[3]
+      rng_accel: double[3]
+      lit_accel: double[3]
+      thb_accel: double[3]
+  
+      contacts: short[16] # [II,IP,MI,MP,RI,RP,P1,P2,P3,P4]
+
+  WAM_FEEDBACK:
+    id: 1712
+    fields: 
+      position: double[7]
+      velocity: double[7]
+
+  IMPEDANCE_COMMAND:
+    id: 1713
+    fields: 
+      header: MSG_HEADER
+      stiffness: double[MPL_RAW_PERCEPT_DIMS]
+      src: int
+      reserved: int
+
+  EXECUTIVE_CTRL:
+    id: 1714
+    fields: 
+      proceed: short  # boolean [0 or 1]
+      fail: short  # boolean [0 or 1]
+      reserved: int  # for 64-bit alignment
+
+ 
+  CURSOR_FEEDBACK:
+    id: 1720
+    fields: 
+      header: MSG_HEADER
+      torque: double[MPL_RAW_PERCEPT_DIMS]
+      ind_force: double[14]
+      mid_force: double[14]
+      rng_force: double[14]
+      lit_force: double[14]
+      thb_force: double[14]
+      contacts: short[16] # [II,IP,MI,MP,RI,RP,P1,P2,P3,P4]
+
+  VISUAL_GRATING_BUILD:
+    id: 1721
+    fields: 
+      grating_visibility: short  # [No:-1 or Yes:1]
+      stimulation_on: short  # [No:-1 or Yes:1]
+      trial_set: short
+      presentation: short  # [1 or 2]
+      increment_block: short  # boolean [0 or 1]
+      wait_response: short  # boolean [0 or 1]
+      reserved: short  # for 64-bit alignment
+
+  VISUAL_GRATING_RESPONSE:
+    id: 1722
+    fields: 
+      channel: short
+      session_num: short
+      set_num: short
+      block_num: short
+      trial_num: short
+      block_ID: short
+      DELTA_reference_frequency: short
+      ICMS_reference_frequency: float
+      ICMS_reference_amplitude: float
+      ICMS_frequency_1: float
+      ICMS_frequency_2: float
+      ICMS_amplitude_1: float
+      ICMS_amplitude_2: float
+      VIS_reference_frequency: float
+      VIS_reference_amplitude: float
+      VIS_frequency_1: float
+      VIS_frequency_2: float
+      VIS_amplitude_1: float
+      VIS_amplitude_2: float
+      response: short  # 64-bit aligned
+
+ 
+  GRIP_COMMAND:
+    id: 1730
+    fields: 
+      header: MSG_HEADER
+      grip_pos: double[MAX_GRIPPER_DIMS]
+      velocity: double[MAX_GRIPPER_DIMS]
+      force: double[MAX_GRIPPER_DIMS]
+      impedance: double[MAX_GRIPPER_DIMS]
+      controlMask: short[4]
+      src: int
+      reserved: int
+
+  GRIP_FINISHED_COMMAND:
+    id: 1731
+    fields: 
+      header: MSG_HEADER
+      grip_pos: double[MAX_GRIPPER_DIMS]
+      velocity: double[MAX_GRIPPER_DIMS]
+      force: double[MAX_GRIPPER_DIMS]
+      impedance: double[MAX_GRIPPER_DIMS]
+      controlMask: short[4]
+      effector: char[64]
+
+  GRIPPER_FEEDBACK:
+    id: 1732
+    fields: 
+      header: MSG_HEADER
+      grip_pos: double[MAX_GRIPPER_DIMS]
+      velocity: double[MAX_GRIPPER_DIMS]
+      force: double[MAX_GRIPPER_FORCES]
+      effector: char[64]
+
+  MUJOCO_SENSOR:
+    id: 1733
+    fields: 
+      header: MSG_HEADER
+      motor_pos: double[MJ_VR_MAX_MOTOR_COUNT]
+      motor_vel: double[MJ_VR_MAX_MOTOR_COUNT]
+      motor_torque: double[MJ_VR_MAX_MOTOR_COUNT]
+      joint_pos: double[MJ_VR_MAX_JOINT_COUNT]
+      joint_vel: double[MJ_VR_MAX_JOINT_COUNT]
+      contact: double[MJ_VR_MAX_CONTACT_COUNT]
+
+  MUJOCO_CMD:
+    id: 1734
+    fields: 
+      header: MSG_HEADER
+      ref_pos: double[MJ_MAX_MOTOR]
+      ref_vel: double[MJ_MAX_MOTOR]
+      gain_pos: double[MJ_MAX_MOTOR]
+      gain_vel: double[MJ_MAX_MOTOR]
+      ref_pos_enabled: short
+      ref_vel_enabled: short
+      gain_pos_enabled: short
+      gain_vel_enabled: short
+
+  MUJOCO_MOVE:
+    id: 1735
+    fields: 
+      mocap_id: unsigned int  # mocap id associated with object (order in model file)
+      link_objects: unsigned int  #flag to link or unlink objects (such that they all move together), this is read only if mocap_id is set to MUJOCO_LINK_ID
+      pos: double[3]
+
+  MUJOCO_MSG:
+    id: 1736
+    fields: 
+      message: char[256] # mujoco message text
+      position: int  # 0: top right, 1: top left, 2: bottom right, 3: bottom left
+
+  MUJOCO_GHOST_COLOR:
+    id: 1737
+    fields: 
+      color_id: double  # color_id: 0 (invisible), 1 (red), 2 (green), 3 (yellow)
+
+  MUJOCO_OBJMOVE:
+    id: 1738
+    fields: 
+      obj_id: unsigned int  # mocap id associated with object (order in model file)
+      pos: double[3]
+      orientation: double[3]
+
+  OPENHAND_CMD:
+    id: 1740
+    fields: 
+      header: MSG_HEADER
+      motor_sp: unsigned short[2]   # motor set points
+      reserved1: unsigned short[2] # 64-bit balancing
+      mode: unsigned char  # control mode {'Pos' 'Vel' 'Force' 'VelForce' 'SensReq'}
+      reserved2: unsigned char[3]   # 64-bit balancing
+
+  OPENHAND_SENS:
+    id: 1741
+    fields: 
+      header: MSG_HEADER
+      motor_pos: unsigned short
+      force: unsigned short
+
+  PRENSILIA_SENS:
+    id: 1742
+    fields: 
+      header: MSG_HEADER
+      stream_type: unsigned short
+      current: unsigned short[PRENSILIA_DOF]
+      position: unsigned short[PRENSILIA_DOF]
+      external: unsigned short[PRENSILIA_EXT_SENSORS]
+      tension: unsigned short[PRENSILIA_DOF] # element 0 expected to be empty
+      reserved: unsigned short
+
+  PRENSILIA_CMD:
+    id: 1743
+    fields: 
+      header: MSG_HEADER
+      mode: short[PRENSILIA_DOF] # 0 pos, 1 velocity, 2 force
+      command: short[PRENSILIA_DOF]
+
+  TABLE_LOAD_CELLS:
+    id: 1744
+    fields: 
+      header: MSG_HEADER
+      left_plate: double[4]
+      left_plate_mean: double
+      center_plate: double[4]
+      center_plate_mean: double
+      right_plate: double[4]
+      right_plate_mean: double
+
+  REZERO_GRIPPER_SENSORS:
+    id: 1745
+    fields: null
+
+  SINGLETACT_DATA:
+    id: 1760
+    fields: 
+      header: MSG_HEADER
+      raw_analog: int[3]
+      force: double[3]
+
+ 
+  # gamification
+  GET_USER_RESPONSE:
+    id: 1761
+    fields: null
+
+  USER_RESPONSE_L:
+    id: 1762
+    fields: null
+
+  USER_RESPONSE_R:
+    id: 1763
+    fields: null
+
+  RAW_SPIKECOUNT:
+    id: 1800
+    fields: 
+      source_index: int  # a zero-based index in the range 0..(N-1) for N spike sources (e.g. separate acquisition boxes)
+      reserved: int  # for 64-bit alignment
+      source_timestamp: double  # [seconds]source timestamp of the event that caused this count to happen
+      count_interval: double  # [seconds]time interval over which this count was integrated
+      counts: unsigned char[MAX_TOTAL_SPIKE_CHANS_PER_SOURCE]
+
+  SPM_SPIKECOUNT:
+    id: 1801
+    fields: 
+      header: MSG_HEADER
+      source_timestamp: double[MAX_SPIKE_SOURCES] # [seconds] source timestamp of the event that caused this count to happen
+      count_interval: double  # [seconds]
+      counts: SPIKE_COUNT_DATA_TYPE[MAX_TOTAL_SPIKE_CHANS]
+
+  SPIKE_SNIPPET:
+    id: 1802
+    fields: 
+      ss: SPIKE_SNIPPET_TYPE[SNIPPETS_PER_MESSAGE]
+
+  RAW_CTSDATA:
+    id: 1803
+    fields: 
+      source_index: int  # a zero-based index in the range 0..(N-1) for N spike sources (e.g. separate acquisition boxes)
+      num_chans_enabled: int  # number of channels enabled (expected 128)
+      source_timestamp: double  # [seconds]source timestamp of the event that caused this count to happen
+      data: short[LFPSAMPLES_PER_HEARTBEAT * MAX_SPIKE_CHANS_PER_SOURCE]
+
+  SPM_CTSDATA:
+    id: 1804
+    fields: 
+      header: MSG_HEADER
+      source_timestamp: double[MAX_SPIKE_SOURCES] # [seconds]source timestamp of the event that caused this count to happen
+      data: short[RAW_COUNTS_PER_SAMPLE * LFPSAMPLES_PER_HEARTBEAT * MAX_SPIKE_SOURCES * MAX_SPIKE_CHANS_PER_SOURCE]
+
+  REJECTED_SNIPPET:
+    id: 1805
+    fields: 
+      rs: REJECTED_SNIPPET_TYPE[SNIPPETS_PER_MESSAGE]
+
+  RAW_DIGITAL_EVENT:
+    id: 1806
+    fields: 
+      source_index: int
+      channel: int
+      source_timestamp: double
+      data: unsigned int[2]
+
+  SPM_DIGITAL_EVENT:
+    id: 1807
+    fields: 
+      header: MSG_HEADER
+      source_index: int[MAX_DIG_PER_SAMPLE]
+      source_timestamp: double[MAX_SPIKE_SOURCES]
+      byte0: unsigned short[MAX_DIG_PER_SAMPLE]
+      byte1: unsigned short[MAX_DIG_PER_SAMPLE]
+      num_events: int
+      reserved: int
+
+  STIM_SYNC_EVENT:
+    id: 1808  # special type of digital event
+    fields: 
+      source_index: int  #0 for NSP 1, 1 for NSP 2, 3 for CereStim module
+      channel: int
+      source_timestamp: double  #NSP timestamp, s
+      data: unsigned int
+      reserved: int
+
+  STIM_UPDATE_EVENT: # special type of digital event
+    id: 1809
+    fields: 
+      source_index: int  #0 for NSP 1, 1 for NSP 2
+      channel: int
+      source_timestamp: double  #NSP timestamp, s
+      data: unsigned int
+      reserved: int
+
+  CENTRALRECORD:
+    id: 1810
+    fields: 
+      pathname: char[MAX_LOGGER_FILENAME_LENGTH]    #MAX_LOGGER_FILENAME_LENGTH = 256, defined in RTMA_types.h (also used by SAVE_MESSAGE_LOG)
+      subjectID: char[MAX_LOGGER_FILENAME_LENGTH  / 2] # 128
+      record: unsigned  # 1 start, 0 stop
+      reserved: unsigned
+
+  RAW_ANALOGDATA:
+    id: 1811
+    fields: 
+      source_index: int  # a zero-based index in the range 0..(N-1) for N spike sources (e.g. separate acquisition boxes)
+      num_chans_enabled: int  # number of channels enabled (expected 16)
+      source_timestamp: double  # [seconds]source timestamp of the event that caused this count to happen
+      data: short[ANALOGSAMPLES_PER_HEARTBEAT * MAX_ANALOG_CHANS]
+
+  SPM_ANALOGDATA:
+    id: 1812
+    fields: 
+      header: MSG_HEADER
+      source_timestamp: double[MAX_SPIKE_SOURCES] # [seconds]source timestamp of the event that caused this count to happen
+      data: short[RAW_COUNTS_PER_SAMPLE * LFPSAMPLES_PER_HEARTBEAT * MAX_SPIKE_SOURCES * MAX_ANALOG_CHANS]
+
+  RAW_SPIKECOUNT_N256:
+    id: 1815
+    fields: 
+      source_index: int  # a zero-based index in the range 0..(N-1) for N spike sources (e.g. separate acquisition boxes)
+      reserved: int  # for 64-bit alignment
+      source_timestamp: double  # [seconds]source timestamp of the event that caused this count to happen
+      count_interval: double  # [seconds]time interval over which this count was integrated
+      counts: unsigned char[MAX_TOTAL_SPIKE_CHANS_PER_SOURCE_N256]
+
+  RAW_CTSDATA_N256:
+    id: 1816
+    fields: 
+      source_index: int  # a zero-based index in the range 0..(N-1) for N spike sources (e.g. separate acquisition boxes)
+      num_chans_enabled: int  # number of channels enabled (expected 256)
+      source_timestamp: double  # [seconds]source timestamp of the event that caused this count to happen
+      data: short[LFPSAMPLES_PER_HEARTBEAT * MAX_SPIKE_CHANS_PER_SOURCE_N256]
+
+  MECH_SYNC_EVENT:  # special type of digital event
+    id: 1817
+    fields: 
+      source_index: int  #0 for NSP 1, 1 for NSP 2, 3 for CereStim module
+      channel: int
+      source_timestamp: double  #NSP timestamp, s
+      data: unsigned int
+      reserved: int
+
+  SAMPLE_GENERATED:
+    id: 1820
+    fields: 
+      header: MSG_HEADER  # sample no in header.serial_no
+      source_timestamp: double[MAX_SPIKE_SOURCES]
+      #xipp_timestamp: unsigned int  # ripple timestamp
+      #reserved: int
+
+  XIPP_EMG_DATA_RAW:
+    id: 1830
+    fields: 
+      header: MSG_HEADER  # message header
+      num_chans_per_headstage: int[MAX_XIPP_EEG_HEADSTAGES]
+      source_timestamp: unsigned int[XIPP_SAMPLES_PER_MSG] # array of grapevine timestamps for each data point
+      data: float[XIPP_SAMPLES_PER_MSG * MAX_XIPP_CHANS] # array of 40 samples of EMG data per channel, reshaped into a vector
+
+  MYO_EMG_DATA:
+    id: 1831  # myo band emg
+    fields: 
+      header: MSG_HEADER  # message header
+      source_timestamp: unsigned long long[MYO_SAMPLES_PER_MSG] # array of myo timestamps for each data point
+      data: int[MYO_SAMPLES_PER_MSG * MAX_MYO_EMG_CHANS]  # array of 4 samples of EMG data per channel, reshaped into a vector
+
+  MYO_KIN_DATA:
+    id: 1832  # myo band kinematics
+    fields: 
+      header: MSG_HEADER  # message header
+      source_timestamp: unsigned long long  # array of myo timestamps for each data point
+      orientation: float[4]
+      gyroscope: float[3]
+      acceleration: float[3]
+
+ 
+  INPUT_DOF_DATA:
+    id: 1850
+    fields: 
+      header: MSG_HEADER
+      tag: char[TAG_LENGTH]
+      dof_vals: double[MAX_COMMAND_DIMS]
+
+  DATAGLOVE:
+    id: 1860
+    fields: 
+      header: MSG_HEADER
+      tag: char[TAG_LENGTH]
+      raw_vals: double[MAX_DATAGLOVE_SENSORS]
+      calib_vals: double[MAX_DATAGLOVE_SENSORS]
+      gesture: int
+      glovetype: int
+      hand: int
+      reserved: int
+
+  OPTITRACK_RIGID_BODY:
+    id: 1861
+    fields: 
+      header: MSG_HEADER
+      ID: int
+      reserved: int
+      pos: double[3]    #x,y,z
+      orient: double[3] #roll,pitch,yaw
+      timestamp: double  # [seconds] source timestamp of the event that caused this count to happen
+      name: char[128]
+
+ 
+  TASK_STATE_CONFIG:
+    id: 1900
+    fields: 
+      state_name: char[128]
+      target: double[MAX_COMMAND_DIMS]
+      active_assist_weight: double[NUM_DOMAINS] #3 "domains": {x,y,z} {rotation} {hand}
+      brain_control_weight: double[NUM_DOMAINS]
+      passive_assist_weight: double[NUM_DOMAINS]
+      jstick_control_weight: double[NUM_DOMAINS]
+      gain: double[NUM_DOMAINS]
+      threshold: double[NUM_DOMAINS]
+      force_targ: double[MAX_GRIP_DIMS]
+      dZ_gain: double  # gain on change in impedance
+      force_thresh: double
+      active_override: int[MAX_COMMAND_DIMS] # dimensions to override with 100% auto/0% BC
+      use_for_calib: int
+      result_code: int
+      stim_enable: int
+      force_calib: int  # whether or not to calibrate on force
+      targ_set: int  # target set number
+      targ_idx: int  # index within target set
+      gripperControlMask: short[4]
+
+  PHASE_RESULT:  #Just like a TASK_STATE_CONFIG but to be sent at the end of a state/phase of a trial to capture waypoints and more detail about results
+    id: 1901
+    fields: 
+      state_name: char[128]
+      target: double[MAX_COMMAND_DIMS]
+      active_assist_weight: double[NUM_DOMAINS] #3 "domains": {x,y,z} {rotation} {hand}
+      brain_control_weight: double[NUM_DOMAINS]
+      passive_assist_weight: double[NUM_DOMAINS]
+      jstick_control_weight: double[NUM_DOMAINS]
+      gain: double[NUM_DOMAINS]
+      threshold: double[NUM_DOMAINS]
+      force_targ: double[MAX_GRIP_DIMS]
+      dZ_gain: double  # gain on change in impedance
+      force_thresh: double
+      active_override: int[MAX_COMMAND_DIMS] # dimensions to override with 100% auto/0% BC
+      use_for_calib: int
+      result_code: int
+      stim_enable: int
+      force_calib: int  # whether or not to calibrate on force
+      targ_set: int  # target set number
+      targ_idx: int  # index within target set
+      gripperControlMask: short[4]
+
+  EXTRACTION_RESPONSE:
+    id: 1902
+    fields: 
+      src: int
+      decoder_type: char[128]
+      decoder_loc: char[256]
+
+  NORMALIZATION_FACTOR:
+    id: 1903
+    fields: 
+      header: MSG_HEADER
+      factor: double  # Normalization Factor applied to this message
+      length: double  # length of window used to calculate normalizatio
+
+  TRIAL_METADATA:
+    id: 1904
+    fields:
+      session_num: int
+      set_num: int
+      block_num: int
+      trial_num: int
+      session_type: char[128] # character fields must be at bottom to avoid issues reading in Python
+      subject_id: char[64]
+
+  EXTRACTION_REQUEST:
+    id: 1905  # signal to request an extraction response
+    fields: null
+
+  UPDATE_UNIT_STATE:
+    id: 1906
+    fields: 
+      unit_idx: int
+      enabled: int
+
+  DISABLED_UNITS:
+    id: 1907
+    fields: 
+      header: MSG_HEADER
+      disabled_units: unsigned char[MAX_TOTAL_SPIKE_CHANS]
+
+  TRIAL_END:
+    id: 1910  # signal at end of trial_num
+    fields: null
+
+  REP_START:
+    id: 1911  # msg at beginning of rep w/ rep num (added for communication between open-loop stim and touch interface)
+    fields: 
+      rep_num: int
+      reserved: int
+
+  REP_END:
+    id: 1912  # signal at rep end
+    fields: null
+
+  EXEC_SCORE:
+    id: 1913  # success/failure
+    fields: 
+      passed: int
+      failed: int
+
+  FLIP_THAT_BUCKET_DATA:
+    id: 1914  # communicate stimulus updates and participant responses within the Flip That Bucket game
+    fields: 
+      state_name: char[128]
+      state_value: double
+
+ 
+  SET_START:
+    id: 1915
+    fields:
+      session_num: int
+      set_num: int
+      session_type: char[128] # character fields must be at bottom to avoid issues reading in Python
+      subject_id: char[64]
+
+  SET_END:
+    id: 1916
+    fields: 
+      session_num: int
+      set_num: int
+      session_type: char[128] # character fields must be at bottom to avoid issues reading in Python
+      subject_id: char[64]
+
+  BLOCK_START:
+    id: 1917
+    fields: 
+      block_num: int
+
+  BLOCK_END:
+    id: 1918  # signal
+    fields: null
+
+  SET_METADATA:
+    id: 1919
+    fields:
+      session_id: int
+      num_blocks: int
+      num_trials: int
+      stim_trigger: int  # boolean
+      subject_response: int  # boolean
+      reserved: int
+      session_type: char[128] # character fields must be at bottom to avoid issues reading in Python
+      subject_id: char[64]
+      data_path: char[128]
+
+  EXEC_PAUSE: # message to allow other modules to request that executive pause or resume task
+    id: 1950  # message to pause/resume exec
+    fields: 
+      pause: int  # 1: pause, 0: resume
+      reserved: int
+
+ 
+  EM_ADAPT_NOW:
+    id: 2000
+    fields: null
+
+  EM_CONFIGURATION:
+    id: 2001
+    fields: 
+      type: int  #0 -> filename
+      reserved: int
+      data: char[256]
+
+  TDMS_CREATE:
+    id: 2002
+    fields: 
+      pathname: char[MAX_LOGGER_FILENAME_LENGTH] #MAX_LOGGER_FILENAME_LENGTH = 256, defined in RTMA_types.h (also used by SAVE_MESSAGE_LOG)
+      pathname_length: int
+      reserved: int
+
+  RF_REPORT:
+    id: 2003
+    fields: 
+      handp: char[48]
+      handd: char[18]
+      head: char[13]
+      arms: char[20]
+      tag: int
+      flipframe: int
+
+  PICDISPLAY:
+    id: 2004
+    fields: 
+      filename: char[256]
+      timer: double
+
+  STIMDATA:
+    id: 2005
+    fields: 
+      ConfigID: double[12]
+      Vmax: double[12]
+      Vmin: double[12]
+      interphase: double[12]
+
+  #KNOB_FEEDBACK:
+  #    id: 2006
+  #  fields:
+  #    ardpos: double[256] #Buffer size
+  #    A: double
+  #    B: double
+  #    C: double
+
+  SEAIO_OUT:
+    id: 2007
+    fields: 
+      bit: int
+      value: int
+
+  ATIforcesensor:
+    id: 2008
+    fields: 
+      header: MSG_HEADER
+      #FTsequence: int[2]
+      #Funits: char[128]
+      #Tunits: char[128]
+      Fx: double
+      Fy: double
+      Fz: double
+      Tz: double
+      Tx: double
+      Ty: double
+
+  TACTOR_CMD:
+    id: 2009  # signal to trigger vibrotactor(s)
+    fields: null
+
+  HSTLOG:
+    id: 3000
+    fields: 
+      len: int
+      reserved: int
+      log: char[512]
+
+  #TFD:
+  #    id: 3001  #Time-Frequency Data for visualization (so that processing can still be done in Extraction Module)
+  #  fields: 
+  #    header: MSG_HEADER
+  #    TF: double[TFD_FREQ_BINS*MAX_SPIKE_SOURCES*MAX_SPIKE_CHANS_PER_SOURCE]
+  #    freq: double[TFD_FREQ_BINS]
+
+ 
+  # gamification
+  STIM_INTERVAL:
+    id: 3001
+    fields: 
+      interval: int
+
+  USER_SHOT_L:
+    id: 3002
+    fields: null
+
+  USER_SHOT_R:
+    id: 3003
+    fields: null
+
+  STIM_THRESH:
+    id: 3004
+    fields:
+      threshold: double
+      channel: int
+      reserved: int
+
+  GAME_ROUND_INFO:
+    id: 3005
+    fields: 
+      num_intervals: int
+      stim_interval: int
+
+  USER_SHOT:
+    id: 3006
+    fields: 
+      interval: int
+
+  GAME_HEARTBEAT_REQUEST:
+    id: 3007
+    fields: null
+
+  GAME_HEARTBEAT_RESPONSE:
+    id: 3008
+    fields: null
+
+  PLAYSOUND:
+    id: 3100
+    fields:
+      filename: char[256]
+
+  PLAYVIDEO:
+    id: 3102
+    fields:
+      filename: char[256]
+
+  START_TIMED_RECORDING:
+    id: 3101
+    fields: 
+      start_command: double
+
+ 
+  AJA_CONFIG:
+    id: 3200
+    fields: 
+      record: int
+      stop: int
+      filename: char[256]
+
+  AJA_TIMECODE:
+    id: 3201
+    fields: 
+      header: MSG_HEADER
+      timecode: char[128]
+
+  AJA_STATUS:
+    id: 3202
+    fields: 
+      status: int
+      reserved: int
+      clipname: char[256]
+
+  AJA_STATUS_REQUEST:
+    id: 3203
+    fields: null
+
+  # FLIGHT SIM
+  #APLC:
+  #  id: 3500
+  #  fields: 
+  #    runindex: int
+  #    serial_no: int
+  #    hour: int
+  #    minute: int
+  #    second: int
+
+
+ 
+  # Frets on Fire
+  FOFIX_PROMPT:
+    id: 3600
+    fields: 
+      note: int
+      length: int
+      target_time: double
+      game_time: double
+
+  FOFIX_INPUT:
+    id: 3601
+    fields: 
+      notes_strummed: int[5]
+      reserved: short
+      game_time: double
+      hit_note: short
+
+  FOFIX_MISSED:
+    id: 3602
+    fields: 
+      note: int
+      reserved: int
+      target_time: double
+      game_time: double
+
+  FOFIX_STIM:
+    id: 3603
+    fields: 
+      note: int
+      condition: int
+
+  FOFIX_KEY:
+    id: 3604
+    fields: 
+      note: int
+      enabled: int
+
+ 
+  # stim message IDs
+  CERESTIM_CONFIG_MODULE:
+    id: 4000
+    fields: 
+      configID: int[MAX_CS_CONFIGS]  # equates to pattern in config_chan, MAX_CS_CONFIGS = 16
+      amp1: int[MAX_CS_CONFIGS] #unsigned char required by API, current amplitude in uA
+      amp2: int[MAX_CS_CONFIGS] #unsigned char required by API, current amplitude in uA
+      frequency: int[MAX_CS_CONFIGS] #unsigned short required by API, Hz
+      num_modules: int  # more accurately, number of configurations (up to 16)
+      afcf: int
+      width1: int  #unsigned short required by API, us
+      width2: int  #unsigned short required by API, us
+      interphase: int  #unsigned short required by API, us
+
+  CERESTIM_CONFIG_CHAN_PRESAFETY:
+    id: 4001
+    fields: 
+      header: MSG_HEADER
+      stop: int
+      numChans: int  # requested (before limit by safety_mod), up to 64
+      channel: int[NUM_STIM_CHANS] # NUM_STIM_CHANS = 64
+      pattern: int[NUM_STIM_CHANS] # corresponds to configID in config_module
+      reps: int  # usage: play(reps). 0 for indefinite (loop)
+      pause_t: float  # usage: (milliseconds) how quickly the subsequent stimulus in the buffer is used (set to 0 if only one stimulation)
+
+  CERESTIM_CONFIG_CHAN:
+    id: 4002
+    fields: 
+      header: MSG_HEADER
+      stop: int
+      numChans: int  # Nuber of channels stimulated, up to 12
+      channel: int[MAX_STIM_CHANS_ON] # Array channel stimulated, MAX_STIM_CHANS_ON = 12
+      pattern: int[MAX_STIM_CHANS_ON] # corresponds to configID in config_module
+      reps: int  # usage: play(reps) - 0 for indefinite (loop)
+      pause_t: float  # usage: (milliseconds) how quickly the subsequent stimulus in the buffer is used (set to 0 if only one stimulation)
+
+  CERESTIM_ERROR:
+    id: 4003
+    fields: 
+      error: int
+      config: int  # used for configuration error
+      #error: char[128]
+
+  CERESTIM_ALIVE:
+    id: 4004
+    fields: null
+
+  CS_TRAIN_END:
+    id: 4005  # sent when an (open-loop) pulse-train has ended
+    fields: null
+
+  CERESTIM_CONFIG_CHAN_PRESAFETY_ARBITRARY:
+    id: 4006  #NEW MESSAGE TYPE FOR ARBITRARY PULSE TIMINGS
+    fields: 
+      header: MSG_HEADER
+      stop: int
+      numChans: int  # requested (before limit by safety_mod), up to 64
+      channel: int[NUM_STIM_CHANS] # NUM_STIM_CHANS = 64
+      pattern: int[NUM_STIM_CHANS] # corresponds to configID in config_module
+      reps: int  # usage: play(reps). 0 for indefinite (loop)
+      reserved: int
+      pathname: char[MAX_LOGGER_FILENAME_LENGTH]
+      pathlength: int
+
+  CERESTIM_CONFIG_CHAN_ARBITRARY: #changed these to be identical to config chan because we are now loading separate config file
+    id: 4007  #NEW MESSAGE TYPE FOR ARBITRARY PULSE TIMINGS
+    fields: 
+      header: MSG_HEADER
+      #stop: int
+      #numChans: int  # up to 12
+      #channel: int[MAX_STIM_CHANS_ON] # MAX_STIM_CHANS_ON = 12
+      #pattern: int[MAX_STIM_CHANS_ON] # corresponds to configID in config_module
+      #reps: int  # usage: play(reps). 0 for indefinite (loop)
+      #reserved: int
+      stop: int
+      pathname: char[MAX_LOGGER_FILENAME_LENGTH]
+      pathlength: int
+      pulselength: int
+
+  CS_ARBITRARY_CLOSE:
+    id: 4008  #for closing arbitrary pulse timings when config is wrong
+    fields: null
+
+  STIM_VOLTAGE_MONITOR_DATA:
+    id: 4009
+    fields: 
+      sample_rate: int  #[Hz] DAQ sample rate for digital and analog data
+      pulse_count: int  #Number of analog pulses in this message
+      daq_channel: int[NUM_SPIKES_PER_STIM_MSG]     # From the DAQ, 1-12
+      array_channel: int[NUM_SPIKES_PER_STIM_MSG]     # From the headstage array, 1-64. CAUTION: This value is calcuated and may not be correct
+      daq_timestamp: double[NUM_SPIKES_PER_STIM_MSG] # [seconds] DAQ timestamp of the start of spike voltage data
+      voltage: float[NUM_SPIKES_PER_STIM_MSG * 100]  # [volts] 1 ms of voltage data, starting at time daq_timestamp
+      interphase: float[NUM_SPIKES_PER_STIM_MSG]     # [volts] Voltage at the interphase time after the first rise of the data. Interphase time is defined by CERESTIM_CONFIG_MODULE.
+      Vmax: float[NUM_SPIKES_PER_STIM_MSG]       # [volts]
+      Vmin: float[NUM_SPIKES_PER_STIM_MSG]       # [volts]
+
+  STIM_VOLTAGE_MONITOR_DIGITAL_DATA:
+    id: 4010
+    fields: 
+      stim_sync_event: float[30] #[seconds] DAQ timestamps when digital input became high
+      stim_param_event: float[5] #[seconds] DAQ timestamps when digital input became high
+      spm_daq_delta_t: double  #[seconds] Differnce in clock time between SPM and DAQ, calcuated using the stim param/update event
+
+  VOLTAGE_MONITOR_STATUS:
+    id: 4011
+    fields: 
+      msg_length: int
+      msg: char[1024]
+
+  STIM_DUTYCYCLE_TIME:
+    id: 4012
+    fields: 
+      dutycycle_time: double
+
+  STIM_TRIAL_DURATION:
+    id: 4013
+    fields: 
+      trial_duration: double
+
+  CERESTIM_HEARTBEAT:
+    id: 4014  #Thing charles asked for the both specify cerestim type and confirm has not crashed
+    fields: 
+      type: int
+
+  CERESTIM_HEARTBEAT_RQST:
+    id: 4015
+    fields: null
+
+  CERESTIM_SAFETY_ALIVE:
+    id: 4016
+    fields: null
+
+  CERESTIM_SAFETY_ALIVE_RQST:
+    id: 4017
+    fields: null
+
+  # stim touch interface IDs
+  # USER RESPONSES:  ACN 2/10
+  # quality
+  NATURAL_RESPONSE:
+    id: 4050
+    fields: 
+      a: double
+
+  DEPTH_RESPONSE:
+    id: 4051
+    fields: 
+      idx: int
+      enabled: int
+      depth: char[256]
+
+  PAIN_RESPONSE:
+    id: 4052
+    fields: 
+      a: double
+
+  OVERALL_INTENSITY_RESPONSE:
+    id: 4053
+    fields: 
+      a: double
+
+ # modality
+  OTHER_RESPONSE:
+    id: 4054
+    fields: 
+      enabled: int
+      reserved: int
+      a: double
+
+  MECH_RESPONSE:
+    id: 4055
+    fields: 
+      idx: int
+      enabled: int
+      a: double
+      quality: char[256]
+
+  MOVE_RESPONSE:
+    id: 4056
+    fields: 
+      idx: int
+      enabled: int
+      a: double
+      quality: char[256]
+
+  TINGLE_RESPONSE:
+    id: 4057
+    fields: 
+      idx: int
+      enabled: int
+      a: double
+      quality: char[256]
+
+  TEMP_RESPONSE:
+    id: 4058
+    fields: 
+      a: double
+      quality: char[256]
+
+  DIR_PIXEL_COORDS:
+    id: 4059
+    fields: 
+      img: char[32]
+      moreMsgs: int
+      reserved: int
+      pixels: float[64]
+
+  PIXEL_COORDS:
+    id: 4060  # canvas drawing
+    fields: 
+      img: char[32]
+      moreMsgs: int
+      reserved: int
+      pixels: float[64]
+
+  HOTSPOT_COORDS:
+    id: 4061  # canvas hotspot
+    fields: 
+      img: char[128]
+      x: double
+      y: double
+
+  CLEAR_LINE:
+    id: 4062  # clear current sensation
+    fields: 
+      img: char[256]
+
+  CLEAR_HOTSPOT:
+    id: 4063  # clear current hotspot
+    fields: 
+      img: char[256]
+
+  ADD_SENSATION:
+    id: 4064  # add sensation
+    fields: null
+
+  SLIDER_DATA:
+    id: 4065  #From palette sliders
+    fields: 
+      header: MSG_HEADER
+      type: int
+      channel: int
+      value: int
+      time: int
+
+ 
+  # realtime control of stimulation parameters
+  USER_DEFINED_STIM: # allow user to set stimulation parameters via tablet interface
+    id: 4067
+    fields: 
+      frequency: int
+      amplitude: int[3]
+      channel: int[3]
+
+  USER_BEHAVIOUR: # keep track of user behavior in interface
+    id: 4068
+    fields: 
+      current_trial: int
+      current_screen: char[256]
+      current_object: char[256]
+      left_canvas: int[2]
+      right_canvas: int[2]
+      frequency: int
+      freq_choice: int
+      bio: int
+      drag: int
+      amplitude: int[3]
+      satisfaction: int
+      certainty: int
+      chosen_object: char[256]
+      object_quest: int[6]
+      affective_quest: int[5]
+
+  STOP_STIM: # stop stimulation externally
+    id: 4069
+    fields: 
+      stop_stim: int
+
+  PAUSE_TRIAL: # stop stimulation externally
+    id: 4070
+    fields: 
+      pause_trial: int
+
+ 
+  # misc messages IDs
+  CST_LAMBDA:
+    id: 4100  # message to log lambda value in cst task
+    fields: 
+      header: MSG_HEADER
+      lambda: float
+      k: int
+      cursor_pos: double  # if discretized, different than control_space_feedback
+
+  CST_SETTINGS:
+    id: 4101
+    fields: 
+      sweep_rate: double  # 0 for static
+      vis_bins: int  # number of bins for vision
+      stim_bins: int  # number of bins for stim
+
+ 
+  #  toolbox IDs
+  STIM_PRES_CONFIG:
+    id: 4150
+    fields: 
+      filename: char[256]
+      randomization: int
+
+  STIM_PRES_PHASE_END:
+    id: 4151
+    fields: 
+      phase_rep_end: int
+
+  STIM_PRESENT:
+    id: 4152
+    fields: 
+      stim_filename: char[256]
+      stim_state_name: char[256]
+      stim_display_time: double
+      stim_start_delay: double
+
+  STIM_PRES_STATUS:
+    id: 4153
+    fields: 
+      pause_resume: int
+      stop: int
+
+  STIM_CONFIG_TYPE:
+    id: 4154
+    fields: 
+      stim_configtype: char[128]
+
+ 
+  #Deka SC Arm Messages
+  DEKA_ACI_RESPONSE:
+    id: 4200
+    fields: 
+      header: MSG_HEADER
+      ACI_1: DEKA_CAN_MSG  #ACI 1, MessageID 0x210
+      ACI_2: DEKA_CAN_MSG  #ACI_2, MessageID 0x211
+      ACI_3: DEKA_CAN_MSG  #ACI_3, MessageID 0x212
+
+  DEKA_SENSOR:
+    id: 4201
+    fields: 
+      header: MSG_HEADER  #Message header with serial no. and sub serial no.
+      position_msg_1: DEKA_CAN_MSG  #Shoulder/Elbow, MessageID 0x4AA
+      position_msg_2: DEKA_CAN_MSG  #Wrist/Hand, MessageID 0x4AC
+      motor_pos: double[DEKA_DOF_COUNT] #Decoded motor position in degrees {'WristRot','WristFE', 'Hand,'ShoulderAbAd','ShoulderFE', 'HumeralRot','Elbow'}
+      motor_current: double[DEKA_DOF_COUNT]
+      mode: int #Standby = 0, Arm = 1
+      sync: int  #Flag to indicate whether all sensor data came from same 0x080 sync period
+      grip: int  #Current Grip Number Selected
+      padding: int
+
+  DEKA_CAN_TOGGLE:
+    id: 4202
+    fields: 
+      toggle: int
+      padding: int
+
+  DEKA_CAN_GRIP_TOGGLE:
+    id: 4203
+    fields: 
+      toggle: int #Up = 1 Down = 0
+      padding: int
+
+  DEKA_CAN_EXIT:
+    id: 4204
+    fields: 
+      exit: int
+      padding: int
+
+ #Deka Luke Hand Messages
+  DEKA_HAND_SENSOR:
+    id: 4205
+    fields: 
+      header: MSG_HEADER  #Message header with serial no. and sub serial no.
+      position_msg_1: DEKA_CAN_MSG  #Wrist/Finger Positions, MessageID 0x4AA
+      position_msg_2: DEKA_CAN_MSG  #Thumb Positions, MessageID 0x4BF
+      force_msg_1: DEKA_CAN_MSG  #Finger Forces, MessageID 0x241
+      force_msg_2: DEKA_CAN_MSG  #Palm Forces, MessageID, 0x341
+      force_msg_3: DEKA_CAN_MSG  #Thumb Forces, MessageID, 0x4C2
+      motor_pos: double[HX_LUKE_MOTOR_COUNT]    #Decoded motor position in degrees {'WristRot','WristFE', 'ThumbYaw','ThumbPitch','Index', 'MRP'}
+      contact: double[HX_DEKA_LUKE_CONTACT_COUNT] #Decoded contact forces in Newtons. {'ProximalPalm','DistalPalm','HandDorsal','HandEdge','ThumbVolar','ThumbRadial','ThumbDorsal','ThumbUlnar',...
+                          #'IndexTip','IndexLateral','MiddleTip', 'RingTip','PinkyTip'};
+      mode: int #Standby = 0, Hand = 1
+      status: int[HX_DEKA_LUKE_CONTACT_COUNT]    #Robot Sensor Status
+      sync: int  #Flag to indicate whether all sensor data came from same 0x080 sync period
+      grip: int
+
+  DEKA_HAND_JSTICK_CMD:
+    id: 4206
+    fields: 
+      header: MSG_HEADER  # message header with serial no.
+      ref_vel: double[HX_LUKE_MOTOR_COUNT] # vector of motor velocity commands
+
+ #Right Hand Robotics Messages
+  RH_GRIPPER_SENSOR:
+    id: 4207
+    fields: 
+      header: MSG_HEADER
+      finger_1: RH_FINGER_DATA
+      finger_2: RH_FINGER_DATA
+      finger_3: RH_FINGER_DATA
+      motor_info: DYNAMIXEL_INFO
+
+ #KUKA Messages
+  KUKA_JOINT_COMMAND:
+    id: 4208
+    fields: 
+      header: MSG_HEADER
+      joint_dest: double[KUKA_DOF_COUNT]
+      err_move_mode: int
+      err_input_cap: int[6] #6 translation/rotation DOF
+      err_cart_wall_eef: int[6] #6 translation/rotation DOF, End-effector (EEF)
+      err_cart_wall_arm: int[6] #6 translation/rotation DOF, Wrist/Elbow
+      err_jpos_stop: int[3]
+
+  KUKA_FEEDBACK:
+    id: 4209
+    fields: 
+      header: MSG_HEADER
+      time: double  #seconds
+      joint_pos: double[KUKA_DOF_COUNT] #radians
+      cart_pos: double[3]          #meters
+      cart_angle: double[3]        #radians
+      cart_pos_vel: double[3]        #m/s
+      cart_rot_vel: double[3]        #rad/s
+      cart_force: double[3]        #Newtons
+      cart_torque: double[3]        #N*m
+      dest_delta_t: double  #nanoseconds
+      mode: int  #Movement mode
+      reserved: int
+
+  KUKA_EXIT:
+    id: 4210
+    fields: 
+      exit: int
+      padding: int
+
+  KUKA_PTP_JOINT:
+    id: 4211
+    fields: 
+      joint_pos: double[KUKA_DOF_COUNT] #radians
+
+  KUKA_DEBUG:
+    id: 4212
+    fields: 
+      joint_pos: double[KUKA_DOF_COUNT] #radians
+
+ 
+  # MujocoVR C++ Messages
+  # moved to mjvr_types.h
+  # MT:4213-4232 in use (as of: 2020-06-08)
+  
+  # Lux Sensor
+  VEML7700_SYNC:
+    id: 4248
+    fields: 
+      timestamp: unsigned long
+      sync_idx: unsigned long
+
+  VEML7700_DATA:
+    id: 4249
+    fields: 
+      timestamp: unsigned long
+      sample_id: unsigned long
+      lux: float
+
+  VEML7700_PING:
+    id: 4250
+    fields: null
+
+  VEML7700_PONG:
+    id: 4251
+    fields: null
+
+  VEML7700_START:
+    id: 4252
+    fields: null
+
+  VEML7700_STOP:
+    id: 4253
+    fields: null
+
+  VEML7700_RESET:
+    id: 4254
+    fields: null
+
+  VEML7700_CONNECT:
+    id: 4256
+    fields: null
+
+  #Mechanical Indenter Messages (JW increased all by: 20 to avoid conflict w/ lux sensor)
+  MECH_STIM_CONFIGURE:
+    id: 4260
+    fields: 
+      source: int  # 0:Exec Panel, 1:GUI
+      length: int
+      str: char[1024]
+
+  MECH_STIM_RESET:
+    id: 4261
+    fields: null
+
+  MECH_STIM_STAGE:
+    id: 4262
+    fields: null
+
+  MECH_STIM_WAITING:
+    id: 4263
+    fields: null
+
+  MECH_STIM_TRIGGER:
+    id: 4264
+    fields: null
+
+  MECH_STIM_CANCEL:
+    id: 4265
+    fields: null
+
+  MECH_STIM_DONE:
+    id: 4266
+    fields: null
+
+  MECH_STIM_ERROR:
+    id: 4267
+    fields: null
+
+  UC_MECH_STIM_CONFIGURE:
+    id: 4268
+    fields: 
+      amp: double
+      speed: double  #Freq or Speed
+      offset: double
+      phase: double
+      duration: double
+      type: int
+      padding: int

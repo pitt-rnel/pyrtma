@@ -1,39 +1,30 @@
 """pyrtma.compile Message Type Compiler """
 
 import pathlib
-import os
 from .parser import Parser
-from .processor import Processor
-from typing import List
 
 
 def compile(
-    defs_files: List[str],
+    defs_file: str,
     out_filepath: str,
     python: bool = False,
     javascript: bool = False,
     matlab: bool = False,
     debug: bool = False,
 ):
-    # Add the core defintions
-    pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
-    core_defs_h = pkg_dir / "core_defs/core_defs.h"
-    defs_files.insert(0, str(core_defs_h))
-
     parser = Parser(debug=debug)
-    for f in defs_files:
-        parser.parse(f)
+    parser.parse(pathlib.Path(defs_file))
 
     if debug:
         print(parser.to_json())
-
-    processor = Processor(parser.tokens, debug=debug)
+        with open("parser.json", "w") as f:
+            f.write(parser.to_json())
 
     if python:
         print("Building python message definitions...")
         from pyrtma.compilers.python import PyDefCompiler
 
-        compiler = PyDefCompiler(processor, debug=debug)
+        compiler = PyDefCompiler(parser, debug=debug)
         ext = ".py"
         p = pathlib.Path(out_filepath)
         out = p.stem + ext
@@ -43,7 +34,7 @@ def compile(
         print("Building javascript message definitions...")
         from pyrtma.compilers.javascript import JSDefCompiler
 
-        compiler = JSDefCompiler(processor, debug=debug)
+        compiler = JSDefCompiler(parser, debug=debug)
         ext = ".js"
         p = pathlib.Path(out_filepath)
         out = p.stem + ext
@@ -53,7 +44,7 @@ def compile(
         print("Building matlab message definitions...")
         from pyrtma.compilers.matlab import MatlabDefCompiler
 
-        compiler = MatlabDefCompiler(processor, debug=debug)
+        compiler = MatlabDefCompiler(parser, debug=debug)
         name = "generate_RTMA_config.m"
 
         p = pathlib.Path(out_filepath)
@@ -75,9 +66,8 @@ if __name__ == "__main__":
         "-i",
         "-I",
         "--defs",
-        nargs="*",
-        dest="defs_files",
-        help="Files to parse",
+        dest="defs_file",
+        help="File to parse",
     )
 
     parser.add_argument(

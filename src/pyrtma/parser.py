@@ -2,9 +2,12 @@ import re
 import json
 import pathlib
 import os
+import textwrap
+import yaml
 
+from copy import copy
 from hashlib import sha256
-from typing import List, Optional, Any, Union
+from typing import List, Optional, Any, Union, Tuple, Dict
 from dataclasses import dataclass, field, is_dataclass, asdict
 
 
@@ -28,412 +31,529 @@ supported_types = [
     "unsigned long long",
     "float",
     "double",
+    "uint8",
+    "uint16",
+    "uint32",
+    "uint64",
+    "int8",
+    "int16",
+    "int32",
+    "int64",
 ]
 
 
 @dataclass
-class Include:
-    raw: str
-    name: str
+class Import:
+    file: pathlib.Path
+    src: pathlib.Path
 
 
 @dataclass
-class Define:
-    raw: str
+class ConstantExpr:
     name: str
     expression: str
-    expanded: str = ""
-    value: Optional[Union[str, int, float]] = None
+    expanded: Optional[str]
+    value: Union[str, int, float]
+    src: pathlib.Path
 
 
 @dataclass
-class TypeDef:
-    raw: str
+class ConstantString:
     name: str
-    type: str
+    value: str
+    src: pathlib.Path
 
 
 @dataclass
-class StructField:
-    raw: str
+class MT:
+    name: str
+    value: int
+    src: pathlib.Path
+
+
+@dataclass
+class MID:
+    name: str
+    value: int
+    src: pathlib.Path
+
+
+@dataclass
+class HID:
+    name: str
+    value: int
+    src: pathlib.Path
+
+
+@dataclass
+class TypeAlias:
     name: str
     type_name: str
-    length_str: Optional[str] = None
+    src: pathlib.Path
+
+
+@dataclass
+class Field:
+    name: str
+    type_name: str
+    length_expression: Optional[str] = None
+    length_expanded: Optional[str] = None
     length: Optional[int] = None
 
 
 @dataclass
-class Struct:
+class MDF:
     raw: str
     hash: str
     name: str
-    fields: List[StructField] = field(default_factory=list)
+    type_id: int
+    src: pathlib.Path
+    fields: List[Field] = field(default_factory=list)
+
+    @property
+    def signal(self) -> bool:
+        return len(self.fields) > 0
 
 
-Token = Union[Include, Define, TypeDef, Struct]
+@dataclass
+class SDF:
+    raw: str
+    hash: str
+    name: str
+    src: pathlib.Path
+    fields: List[Field] = field(default_factory=list)
 
-COMMENT_REGEX = r"//(.*)\n"
 
-BLOCK_COMMENT_REGEX = r"/\*(.*?)\*/"
-
-INCLUDE_REGEX = r"^\s*#include\s+\"(?P<include_file>[\w/\._:]+)\""
-
-# Simple online macro expressions
-MACRO_EXP_REGEX = r"^\s*#define[\t ]+(?P<macro_name>\w+)[\t ]+(?P<expression>.*)"
-
-# Macro directive flags with no expression
-MACRO_FLAG_REGEX = r"^\s*#define[\t ]+(?P<macro_flag>\w+)\s*\n"
-
-# Oneline function like macros (not supported)
-MACRO_FUNC_REGEX = (
-    r"^\s*#define[\t ]+(?P<macro_func>\w+\(.*\))[\t ]+(?P<func_expression>.*)"
-)
-
-# Multiline macros (not supported)
-MACRO_MULTI_REGEX = r"^\s*#define[\t ]+(?P<macro_multi>\w+|\w+\(.*\)).*\\$"
-
-# Combined regex for #define types. Note order matters.
-DEFINE_REGEX = (
-    rf"{MACRO_MULTI_REGEX}|{MACRO_FUNC_REGEX}|{MACRO_EXP_REGEX}|{MACRO_FLAG_REGEX}"
-)
-
-TYPEDEF_REGEX = r"^\s*typedef\s+(?P<typedef_qual1>\w+\s+)?\s*(?P<typedef_qual2>\w+\s+)?\s*(?P<typedef_type>\w+\s*)(?P<ptr>(\*\s+)|\s+)(?P<typedef_alias>\*?\w*)\s*;\s*"
-
-FIELD_REGEX = r"\s*(?P<qual1>\w+\s+)?\s*(?P<qual2>\w+\s+)?\s*(?P<typ>\w+\s*)(?P<ptr>(\*\s*)|\s+)(?P<name>\w+)\s*(\[(?P<length>.*?)\])?;"
-
-STRUCT_REGEX = r"(?s:(^\s*struct\s+(?P<struct_name>\w*)\s*\{(?P<struct_def>.*?)\}\s*;))"
-
-TYPEDEF_STRUCT_REGEX = r"(?s:(^\s*typedef\s+struct\s*\{(?P<td_struct_def>.*?)\}(?P<td_struct_name>\s*\w*)\s*;))"
-
-# Other patterns
-INT_REGEX = r"[-+]?(0[xX][\dA-Fa-f]+|0[0-7]*|\d+)"
-HEX_REGEX = r"[-+]?(0[xX])?[\dA-Fa-f]+"
-BINARY_REGEX = r"0b[01]+"
-FLOAT_REGEX = r"[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?"
-STRING_REGEX = r"\"(?P<text>[ \t\w\:]*)\""
-VARNAME_REGEX = r"[a-zA-Z_]*"
-OPERATOR_REGEX = r"[\+\-\*\/]"
-
-token_specification = [
-    ("INCLUDE", INCLUDE_REGEX),
-    ("DEFINE", DEFINE_REGEX),
-    ("TYPEDEF", TYPEDEF_REGEX),
-    ("TYPEDEF_STRUCT", TYPEDEF_STRUCT_REGEX),
-    ("STRUCT", STRUCT_REGEX),
-]
-
-token_pattern = "|".join(
-    rf"(?P<{name}>{regex})" for (name, regex) in token_specification
-)
+RTMAObjects = Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, MDF, SDF, Field]
 
 
 class Parser:
     def __init__(self, debug: bool = False):
-        self.tokens = []
         self.included_files = []
+        self.current_file = pathlib.Path()
         self.debug = debug
 
+        self.imports: List[Import] = []
+        self.constants: Dict[str, ConstantExpr] = {}
+        self.string_constants: Dict[str, ConstantString] = {}
+        self.aliases: Dict[str, TypeAlias] = {}
+        self.host_ids: Dict[str, HID] = {}
+        self.module_ids: Dict[str, MID] = {}
+        self.struct_defs: Dict[str, SDF] = {}
+        self.message_ids: Dict[str, MT] = {}
+        self.message_defs: Dict[str, MDF] = {}
+
     def clear(self):
-        self.tokens = []
+        self.current_file = pathlib.Path()
         self.included_files = []
+        self.imports = []
+        self.constants = {}
+        self.string_constants: Dict[str, ConstantString] = {}
+        self.aliases = {}
+        self.host_ids = {}
+        self.module_ids = {}
+        self.struct_defs = {}
+        self.message_ids = {}
+        self.message_defs = {}
 
-    @property
-    def defines(self):
-        return {t.name: t.value for t in self.tokens if isinstance(t, Define)}
-
-    @property
-    def typedefs(self):
-        return {t.name: t.type for t in self.tokens if isinstance(t, TypeDef)}
-
-    @property
-    def structs(self):
-        d = {}
-        for t in self.tokens:
-            if not isinstance(t, Struct):
-                continue
-            d[t.name] = []
-            for f in t.fields:
-                d[t.name].append((f.name, f.type_name, f.length))
-
-        return d
-
-    def preprocess(self, text: str) -> str:
-        # Strip Inline Comments
-        text = re.sub(r"//(.*)\n", r"\n", text)
-
-        # Strip Block Comments
-        text = re.sub(r"/\*(.*?)\*/", r"\n", text, flags=re.DOTALL)
-
-        # Strip Tabs
-        text = re.sub(r"\t+", " ", text)
-
-        return text
-
-    def expand_macro(self, d: Define):
-        # Get the current set of defined macros
-        defines = {t.name: t for t in self.tokens if isinstance(t, Define)}
-
-        s = d.expression
+    def expand_expression(self, name: str, expr: str) -> Tuple[str, int]:
         rdepth_limit = 10
         n = 0
         symbol_regex = r"\b(?P<symbol>[a-zA-Z_]+\w*)\b"
-        m = re.search(symbol_regex, s)
+        m = re.search(symbol_regex, expr)
         while m:
             symbol = m.group()
             n += 1
             try:
-                macro = defines[symbol]
+                c = self.constants[symbol]
             except KeyError:
                 raise RuntimeError(
-                    f"Unable to expand macro {d.name} -> {symbol} not defined."
+                    f"Unable to expand expression {name} -> {symbol} not defined: {self.current_file.absolute()}"
                 )
 
             assert (
-                re.search(rf"\b{d.name}\b", macro.expression) is None
+                re.search(rf"\b{name}\b", c.expression) is None
             ), "Circular reference in macro {d.name}."
 
-            assert (
-                macro.value is not None
-            ), f"{macro.name} has not been evaluated to a value."
+            assert c.value is not None, f"{c.name} has not been evaluated to a value."
 
-            s = re.sub(rf"\b{macro.name}\b", str(macro.value), s)
+            expr = re.sub(rf"\b{c.name}\b", str(c.value), expr)
 
             if n > rdepth_limit:
                 raise RuntimeError(
-                    f"Recursion limit reached expanding macro: {macro.name}"
+                    f"Recursion limit reached expanding constant expression {name} in {self.current_file.absolute()}"
                 )
 
             # Try to match another macro symbol
-            m = re.search(symbol_regex, s)
+            m = re.search(symbol_regex, expr)
 
         # Add the expanded form and evaluated value
-        d.expanded = s
-        d.value = eval(s)
+        expanded = expr
 
-    def handle_include(self, m: re.Match):
-        raw = m.group()
-        fname = m.group("include_file").strip()
-        token = Include(raw, fname)
-        self.tokens.append(token)
-        self.parse(fname)
+        # TODO: check that only numbers and operators are left in expression
+        value = eval(expr)
 
-    def handle_define(self, m: re.Match):
-        raw = m.group()
-        if m.group("macro_name") is not None:
-            name = m.group("macro_name").strip()
-            exp = m.group("expression").strip()
-            ms = re.match(STRING_REGEX, exp)
-            if ms is not None:
-                # Const char literal
-                token = Define(
-                    raw,
-                    name,
-                    expression=exp,
-                    expanded=exp,
-                    value=ms.groupdict()["text"],
+        return expanded, value
+
+    def handle_import(self, fname: str):
+        imp = Import(pathlib.Path(fname), src=self.current_file)
+        self.imports.append(imp)
+        self.parse_file(imp.file)
+
+    def handle_expression(self, name: str, expression: Union[int, float, str]):
+        for c in self.constants.values():
+            if name == c.name:
+                raise SyntaxError(
+                    f"Duplicate constant conflict found for {name} in \n1: {c.src.absolute()}\n2: {self.current_file.absolute()}\n"
                 )
-            else:
-                # Expand numerical expression now
-                token = Define(raw, name, expression=exp)
-                self.expand_macro(token)
-        elif m.group("macro_flag") is not None:
-            name = m.group("macro_flag").strip()
-            value = 1
-            token = Define(raw, name, expression="", value=value)
-        elif m.group("macro_func") is not None:
-            raise SyntaxError(f"Macro functions are not supported: {raw}")
-        elif m.group("macro_multi") is not None:
-            raise SyntaxError(f"Multi-line macros are not supported: {raw}")
-        else:
-            raise SyntaxError(f"Failed to correctly parse macro: {raw}")
 
-        self.tokens.append(token)
-
-    def handle_typedef(self, m: re.Match):
-        raw = m.group()
-
-        if "*" in m.group("ptr"):
-            raise SyntaxError(f"Typedefs can not reference pointer types: {raw}")
-
-        alias = m.group("typedef_alias").strip()
-        if "*" in alias:
-            raise SyntaxError(f"Typedefs alias can not be a pointer: {raw}")
-
-        qual1 = (m.group("typedef_qual1") or "").strip()
-        qual2 = (m.group("typedef_qual2") or "").strip()
-        base_type = m.group("typedef_type").strip()
-        ftype = f"{qual1}"
-        ftype += f" {qual2}" if qual2 else ""
-        ftype += f" {base_type}"
-        ftype = ftype.strip()
-
-        if ftype.startswith("MDF_") and not alias.startswith("MDF_"):
-            raise SyntaxError(
-                f"Typedefs of message def types must be prefixed with MDF_: {raw}"
+        # Expand numerical expression now
+        if isinstance(expression, (int, float)):
+            self.constants[name] = ConstantExpr(
+                name,
+                expression=str(expression),
+                expanded=str(expression),
+                value=expression,
+                src=self.current_file,
+            )
+        elif isinstance(expression, str):
+            expanded, value = self.expand_expression(name, expression)
+            self.constants[name] = ConstantExpr(
+                name,
+                expression=expression,
+                expanded=expanded,
+                value=value,
+                src=self.current_file,
             )
 
-        struct_types = [t for t in self.tokens if isinstance(t, Struct)]
-        typedefs_types = [t for t in self.tokens if isinstance(t, TypeDef)]
+    def handle_string(self, name: str, value: str):
+        for c in self.string_constants.values():
+            raise SyntaxError(
+                f"Duplicate string_constant conflict found for {name} in \n1: {c.src.absolute()}\n2: {self.current_file.absolute()}\n"
+            )
+
+        if not isinstance(value, str):
+            raise SyntaxError(
+                f"Values in 'string_constants' section must evaluate to string type not {type(value)}. {name}: {value} -> {self.current_file.absolute()}"
+            )
+
+        self.string_constants[name] = ConstantString(
+            name, value=f'"{value}"', src=self.current_file
+        )
+
+    def handle_alias(self, alias: str, ftype: str):
+        for a in self.aliases.values():
+            if alias == a.name:
+                raise SyntaxError(
+                    f"Duplicate type_alias conflict found for {alias} in: \n1: {a.src.absolute()}\n2: {self.current_file.absolute()}\n"
+                )
 
         # Find the base type ultimately represented by the typedef alias
         n = 0
         prev = ftype
         while n < 10:
             if ftype in supported_types:
-                self.tokens.append(TypeDef(raw, alias, ftype))
+                self.aliases[alias] = TypeAlias(alias, ftype, self.current_file)
                 return
 
-            # Check if ftype points back to another typedef
-            for t in typedefs_types:
-                if ftype == t.name:
-                    n += 1
-                    ftype = t.type
-
             # Check if ftype points back to a user defined struct
-            for s in struct_types:
-                if ftype == s.name:
-                    ftype = s.name
-                    self.tokens.append(TypeDef(raw, alias, ftype))
+            for sdf in self.struct_defs.values():
+                if ftype == sdf.name:
+                    ftype = sdf.name
+                    self.aliases[alias] = TypeAlias(alias, ftype, src=self.current_file)
                     return
 
-            n += 1
+            # Check if ftype points back to another typedef
+            for a in self.aliases.values():
+                if ftype == a.name:
+                    n += 1
+                    ftype = a.type_name
+
             if ftype == prev:
-                raise RuntimeError(f"Unable to resolve typedef: {raw}")
+                raise RuntimeError(f"Unable to resolve alias: {ftype}")
             else:
                 prev = ftype
 
         raise RuntimeError(f"Recursion limit exceeded for typedef: {alias}")
 
-    def handle_typedef_struct(self, m: re.Match):
-        raw = m.group()
-        hash = sha256(raw.strip().encode()).hexdigest()
-        name = m.group("td_struct_name").strip()
+    def handle_host_id(self, name: str, value: int):
+        if not isinstance(value, int):
+            raise SyntaxError(
+                f"Values in 'host_ids' section must evaluate to int type not {type(value)}. {name}: {value}"
+            )
 
-        if name == "":
-            raise SyntaxError(f"Structs must have a name: {raw}")
-
-        token = Struct(raw, hash, name)
-
-        if "struct" in m.groupdict()["td_struct_def"]:
-            raise SyntaxError("Anonymous structs are not supported: {name}:{raw}")
-
-        if "union" in m.groupdict()["td_struct_def"]:
-            raise SyntaxError("Anonymous unions are not supported: {name}:{raw}")
-
-        for fmatch in re.finditer(
-            FIELD_REGEX,
-            m.groupdict()["td_struct_def"],
-            flags=re.MULTILINE | re.DOTALL,
-        ):
-            self.print(f"{fmatch.lastgroup}: \n{fmatch.group().strip()}")
-            raw = fmatch.group()
-
-            if "*" in fmatch.group("ptr"):
+        if value < 10 or value > 32767:
+            if self.current_file.name != "core_defs.yaml":
                 raise SyntaxError(
-                    f"Struct fields can not reference pointer types: {name}:{raw}"
+                    f"Value outside of valid range [0 - 32767] for host_id: {name}: {value}"
                 )
 
-            fname = fmatch.group("name").strip()
-            qual1 = (fmatch.group("qual1") or "").strip()
-            qual2 = (fmatch.group("qual2") or "").strip()
-            base_type = fmatch.group("typ").strip()
+        for hid in self.host_ids.values():
+            if value == hid.value:
+                raise SyntaxError(
+                    f"Duplicate host id conflict found for {name} and {hid.name} -> {value}\n1: {hid.src.absolute()}\n2: {self.current_file.absolute()}\n"
+                )
+        self.host_ids[name] = HID(name, int(value), src=self.current_file)
 
-            ftype = f"{qual1}"
-            ftype += f" {qual2}" if qual2 else ""
-            ftype += f" {base_type}"
-            ftype = ftype.strip()
-            len_str = fmatch.group("length") or None
-            flen = None
+    def handle_module_id(self, name: str, value: int):
+        if not isinstance(value, int):
+            raise SyntaxError(
+                f"Values in 'module_ids' section must evaluate to int type not {type(value)}. {name}: {value} -> {self.current_file.absolute()}"
+            )
+
+        if value < 10 or value > 99:
+            if self.current_file.name != "core_defs.yaml":
+                raise SyntaxError(
+                    f"Value outside of valid range [100 - 200] for module_id: {name}: {value} -> {self.current_file.absolute()}"
+                )
+
+        for mid in self.module_ids.values():
+            if value == mid.value:
+                raise SyntaxError(
+                    f"Duplicate host id conflict found for {name} and {mid.name} -> {value}\n1: {mid.src.absolute()}\n2: {self.current_file.absolute()}\n"
+                )
+
+        self.module_ids[name] = MID(name, int(value), src=self.current_file)
+
+    def handle_def(self, def_type: str, name: str, mdf: Dict[str, Any]):
+        is_signal_def = mdf["fields"] is None
+        is_struct_def = False
+
+        # Check the schema
+        if def_type == "msg_def":
+            valid_sections = ("id", "fields")
+        elif def_type == "struct_def":
+            valid_sections = ("fields",)
+            is_struct_def = True
+        else:
+            raise RuntimeError(f"Unknown struct type section {def_type}.")
+
+        for section in mdf.keys():
+            if section not in valid_sections:
+                raise SyntaxError(
+                    f"Invalid top-level section '{section}' in message or struct definition of {name} -> {self.current_file.absolute()}."
+                )
+
+        # Create a string representation of the defintion to hash
+        if is_signal_def:
+            raw = f"{name}:\n  id: {mdf['id']}\n  fields: null"
+        elif is_struct_def:
+            f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
+            f = "\n".join(f)
+            raw = f"{name}:\n  fields:\n{f}"
+        else:
+            f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
+            f = "\n".join(f)
+            raw = f"{name}:\n  id: {mdf['id']}\n  fields:\n{f}"
+
+        raw = textwrap.dedent(raw)
+        hash = sha256(raw.encode()).hexdigest()
+
+        if is_struct_def:
+            obj = SDF(raw, hash, name, src=self.current_file)
+        else:
+            obj = MDF(raw, hash, name, type_id=mdf["id"], src=self.current_file)
+            if is_signal_def:
+                self.message_defs[name] = obj
+                return
+
+        # Check and validate message id
+        if not is_struct_def:
+            msg_id = mdf["id"]
+            if not isinstance(msg_id, int):
+                raise SyntaxError(
+                    f"Message definition id must evaluate to int type not {msg_id}. {name}: {msg_id}"
+                )
+
+            if msg_id < 0 or msg_id > 10000:
+                raise SyntaxError(
+                    "Value outside of valid range [0 - 10000] for module_id: {name}: {value}"
+                )
+
+            for mt in self.message_ids.values():
+                if msg_id == mt.value:
+                    raise SyntaxError(
+                        f"Duplicate message ids conflict found for {mt.name} and {name}: {msg_id} ->\n1: {mt.src.absolute()}\n2: {self.current_file.absolute()}\n"
+                    )
+
+            self.message_ids[name] = MT(name, msg_id, src=self.current_file)
+
+        # Pattern to parse field specs
+        FIELD_REGEX = r"\s*(?P<ftype>[\s\w]*)(\[(?P<len_str>.*)\])?"
+
+        # Copy fields from another definition
+        if isinstance(mdf["fields"], str):
+            type_name = mdf["fields"]
+            df = self.message_defs.get(type_name) or self.struct_defs.get(type_name)
+            if df is None:
+                raise SyntaxError(
+                    f"Unable to find definition for {type_name} in {name} -> {self.current_file.absolute()}"
+                )
+
+            for field in df.fields:
+                obj.fields.append(copy(field))
+
+        # Parse field specs into Field objects
+        reserved_field_names = ("type_id", "type_name", "type_hash")
+
+        for fname, fstr in mdf["fields"].items():
+            if fname in reserved_field_names:
+                raise SyntaxError(f"{fname} is a reserved field name for internal use.")
+
+            if not isinstance(fstr, str):
+                raise SyntaxError(
+                    f"Field types must be a string not type not {type(fstr)}: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                )
+
+            m = re.match(FIELD_REGEX, fstr)
+            if m is None:
+                raise SyntaxError(
+                    f"Invalid syntax for field type specification: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                )
+
+            ftype = m.groupdict()["ftype"].strip()
+            len_str = (m.groupdict()["len_str"] or "").strip()
+
+            if ftype is None:
+                raise SyntaxError(
+                    f"Invalid syntax for field type specification: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                )
+
+            if len_str == "" and "[" in fstr:
+                raise SyntaxError(
+                    f"Invalid syntax for array field length: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                )
+
+            # Check for a valid type
+            if ftype not in supported_types:
+                if ftype not in self.aliases.keys():
+                    if ftype not in self.struct_defs.keys():
+                        if ftype not in self.message_defs.keys():
+                            raise SyntaxError(
+                                f"Unknown type specified ({ftype}): {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                            )
 
             # Expand the length string if needed
-            if len_str is not None:
-                defines = {
-                    t.name: t.value for t in self.tokens if isinstance(t, Define)
-                }
-                s = len_str
-                symbol_regex = r"\b(?P<symbol>[a-zA-Z_]+\w*)\b"
-                mo = re.search(symbol_regex, s)
-                while mo:
-                    symbol = mo.group()
-                    try:
-                        value = defines[symbol]
-                    except KeyError:
-                        raise RuntimeError(
-                            f"Unable to expand length expression for struct {name}: field {fname} -> {symbol} not defined."
-                        )
+            if len_str:
+                expanded, flen = self.expand_expression(f"{name}->{fname}", len_str)
+                obj.fields.append(Field(fname, ftype, len_str, expanded, int(flen)))
+            else:
+                obj.fields.append(Field(fname, ftype))
 
-                    assert isinstance(value, (int, float))
-                    s = re.sub(rf"\b{symbol}\b", str(value), s)
-
-                    # Try to match another macro symbol
-                    mo = re.search(symbol_regex, s)
-
-                # Evaluate the length expression
-                flen = eval(s)
-
-                # Cast expression result to an int
-                flen = int(flen)
-
-            token.fields.append(StructField(raw, fname, ftype, len_str, flen))
-
-        if len(token.fields) == 0:
-            raise SyntaxError(f"Unable to parse field values: {name} -> {raw}")
-
-        self.tokens.append(token)
+        if isinstance(obj, SDF):
+            self.struct_defs[name] = obj
+        else:
+            self.message_defs[name] = obj
 
     def parse_text(self, text: str):
-        """Parse the given text for token objects."""
-        for m in re.finditer(token_pattern, text, flags=re.MULTILINE):
-            token_type = m.lastgroup
-            self.print(m.group())
-            if token_type == "INCLUDE":
-                self.handle_include(m)
-            elif token_type == "DEFINE":
-                self.handle_define(m)
-            elif token_type == "TYPEDEF":
-                self.handle_typedef(m)
-            elif token_type == "TYPEDEF_STRUCT":
-                self.handle_typedef_struct(m)
-            elif token_type == "STRUCT":
-                raise SyntaxError(f"Only typedef structs are supported: {m.group()}")
-            else:
-                raise RuntimeError("Unknown token type of {token_type} found.")
+        # Parse the yaml file
+        data = yaml.load(text, Loader=yaml.Loader)
 
-    def parse(self, msgdefs_file: str):
+        valid_sections = (
+            "imports",
+            "constants",
+            "string_constants",
+            "aliases",
+            "host_ids",
+            "module_ids",
+            "struct_defs",
+            "message_defs",
+        )
+
+        # Check file format
+        for section in valid_sections:
+            if section not in data.keys():
+                raise SyntaxError(
+                    f"Missing top-level section '{section}' in message defs file -> {self.current_file.absolute()}."
+                )
+
+        if data["imports"] is not None:
+            for imp in data["imports"]:
+                self.handle_import(imp)
+
+        if data["constants"] is not None:
+            for name, expr in data["constants"].items():
+                self.handle_expression(name, expr)
+
+        if data["string_constants"] is not None:
+            for name, str_const in data["string_constants"].items():
+                self.handle_string(name, str_const)
+
+        if data["aliases"] is not None:
+            for alias, ftype in data["aliases"].items():
+                self.handle_alias(alias, ftype)
+
+        if data["host_ids"] is not None:
+            for name, value in data["host_ids"].items():
+                self.handle_host_id(name, value)
+
+        if data["module_ids"] is not None:
+            for name, value in data["module_ids"].items():
+                self.handle_module_id(name, value)
+
+        if data["struct_defs"] is not None:
+            for name, sdf in data["struct_defs"].items():
+                self.handle_def("struct_def", name, sdf)
+
+        if data["message_defs"] is not None:
+            for name, mdf in data["message_defs"].items():
+                self.handle_def("msg_def", name, mdf)
+
+    def parse(self, msgdefs_file: os.PathLike):
         # Get the current pwd
         cwd = pathlib.Path.cwd()
 
-        defs_path = pathlib.Path(msgdefs_file)
-        def_dir = pathlib.Path(msgdefs_file).parent
+        try:
+            # Always start by parsing the core_defs.yaml file
+            pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
+            core_defs = pkg_dir / "core_defs/core_defs.yaml"
+            os.chdir(str(core_defs.parent.absolute()))
+            self.parse_file(core_defs)
+            os.chdir(str(cwd.absolute()))
 
-        # check excluded dirs (exclude rtma_type.h and rtma.h)
-        exclude_dirs = [pathlib.Path("/rtma/include")]
-        for ed in exclude_dirs:
-            if str(ed).lower() in str(def_dir).lower():
-                self.print(f"{msgdefs_file} in excluded dir...skipping")
-                return
+            # Set the pwd to the directory containing the msgdef file
+            defs_path = pathlib.Path(msgdefs_file)
+            def_dir = defs_path.parent
+            os.chdir(str(def_dir.absolute()))
+            self.parse_file(defs_path)
+
+        except Exception as e:
+            self.clear()
+            raise
+        finally:
+            # Set pwd back to starting point
+            os.chdir(str(cwd.absolute()))
+
+    def parse_file(self, msgdefs_file: pathlib.Path):
 
         # check previously included files
-        if [x for x in self.included_files if pathlib.Path(x) == defs_path]:
+        if msgdefs_file in self.included_files:
             self.print(f"{msgdefs_file} already parsed...skipping")
             return
 
-        # Set the pwd to the directory containing the msgdef file
-        os.chdir(str(def_dir.absolute()))
-
         self.print(f"Parsing {msgdefs_file}")
+        prev_file = self.current_file
+        self.current_file = msgdefs_file
         self.included_files.append(msgdefs_file)
 
-        with open(defs_path.name, "rt") as f:
-            text = self.preprocess(f.read())
+        with open(msgdefs_file.name, "rt") as f:
+            text = f.read()
 
         self.parse_text(text)
-
-        # Set pwd back to starting point
-        os.chdir(cwd.absolute())
+        self.current_file = prev_file
 
     def to_json(self):
-        return json.dumps(self.tokens, indent=2, cls=CustomEncoder)
+        d = dict(
+            imports=self.imports,
+            constants=self.constants,
+            string_constants=self.string_constants,
+            host_ids=self.host_ids,
+            module_ids=self.module_ids,
+            aliases=self.aliases,
+            struct_defs=self.struct_defs,
+            message_defs=self.message_defs,
+        )
+        return json.dumps(d, indent=2, cls=CustomEncoder)
 
     def print(self, text):
         if self.debug:

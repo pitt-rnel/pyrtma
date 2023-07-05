@@ -1,4 +1,15 @@
-from pyrtma.processor import Processor, Constant, TypeAlias, MT, MID, HID, MDF, SDF
+from pyrtma.parser import (
+    Parser,
+    ConstantExpr,
+    ConstantString,
+    TypeAlias,
+    MT,
+    MID,
+    HID,
+    MDF,
+    SDF,
+)
+
 from typing import Any, Union
 from pathlib import Path
 from textwrap import dedent
@@ -23,28 +34,43 @@ type_map = {
     "unsigned long long": "uint64",
     "float": "single",
     "double": "double",
-    "MODULE_ID": "int16",
-    "HOST_ID": "int16",
-    "MSG_TYPE": "int32",
-    "MSG_COUNT": "int32",
+    "uint8": "uint8",
+    "uint16": "uint16",
+    "uint32": "uint32",
+    "uint64": "uint64",
+    "int8": "int8",
+    "int16": "int16",
+    "int32": "int32",
+    "int64": "int64",
 }
 
 
 class MatlabDefCompiler:
-    def __init__(self, processor: Processor, debug: bool = False):
+    def __init__(self, parser: Parser, debug: bool = False):
         self.debug = debug
-        self.processor = processor
+        self.parser = parser
         self.struct_name = "RTMA"
 
     def generate_fcn_header(self, fcn_name: str) -> str:
         return f"function {self.struct_name} = {fcn_name}()\n\n"
 
     def initialize_struct(self) -> str:
-        mstruct = f"""
-{self.struct_name} = struct('HID', [], 'MID', [], 'MT', [], 'MDF', [], 'MESSAGE_HEADER', [], ...
-'MTN_by_MT', [], 'MDF_by_MT', [], 'mex_opcode', [], 'defines', [], 'typedefs', [], 'vars', []);
-"""
-        return mstruct
+        s = f"""\
+            {self.struct_name} = struct();
+            {self.struct_name}.HID = [];
+            {self.struct_name}.MID = [];
+            {self.struct_name}.MT = [];
+            {self.struct_name}.MDF = [];
+            {self.struct_name}.MESSAGE_HEADER = [];
+            {self.struct_name}.MTN_by_MT = [];
+            {self.struct_name}.MDF_by_MT = [];
+            {self.struct_name}.mex_opcode = [];
+            {self.struct_name}.defines = [];
+            {self.struct_name}.typedefs = [];
+            {self.struct_name}.hash = [];
+        """
+
+        return dedent(s)
 
     @staticmethod
     def generate_fcn_close() -> str:
@@ -52,13 +78,13 @@ class MatlabDefCompiler:
 
     @staticmethod
     def sanitize_name(name: str) -> str:
-        name = name.lstrip(
-            "_0123456789"
-        )  # strip leading characters that are invalid to start a fieldname (only letters allowed)
+        # strip leading characters that are invalid to start
+        #  a fieldname (only letters allowed)
+        name = name.lstrip("_0123456789")
+
+        # matlab fieldnames allow alphanum and _ after starting characters
         for c in name:
-            if (
-                not c.isalnum() and c != "_"
-            ):  # matlab fieldnames allow alphanum and _ after starting characters
+            if not c.isalnum() and c != "_":
                 name = name.replace(c, "")
         return name
 
@@ -67,9 +93,18 @@ class MatlabDefCompiler:
         name = self.sanitize_name(name)
         return f"{self.struct_name}.{top_field}.{name} = {value};\n"
 
-    def generate_constant(self, c: Union[Constant, HID, MID, MT]) -> str:
-        if isinstance(c.value, str):
-            c.value = f'"{c.value}"'  # encase string value in quotes
+    def generate_constant(self, c: Union[ConstantExpr, HID, MID, MT]) -> str:
+        if isinstance(c, ConstantExpr):
+            prefix = ""
+        elif isinstance(c, HID):
+            prefix = "HID_"
+        elif isinstance(c, MID):
+            prefix = "MID_"
+        elif isinstance(c, MT):
+            prefix = "MT_"
+        return self.generate_field("defines", f"{prefix}{c.name}", c.value)
+
+    def generate_constant_string(self, c: ConstantString):
         return self.generate_field("defines", c.name, c.value)
 
     def generate_host_id(self, hid: HID) -> str:
@@ -82,58 +117,65 @@ class MatlabDefCompiler:
         return self.generate_field("MT", mt.name, mt.value)
 
     def generate_type_alias(self, td: TypeAlias) -> str:
-        ftype = type_map.get(td.type_name)
-        if ftype:
-            return self.generate_field("typedefs", td.name, f"{ftype}(0)")
-        else:
-            return self.generate_field(
-                "typedefs", td.name, f"{self.struct_name}.typedefs.{td.type_name}"
-            )  # TODO validate this
+        if td.type_name in type_map.keys():
+            s = type_map[td.type_name]
+            return f"{self.struct_name}.typedefs.{td.name} = {s}(0);\n"
 
-    def generate_struct(self, sdf: Union[SDF, MDF], top_field: str = "typedefs") -> str:
-        # assert not sdf.name.startswith("MDF_")
+        if td.type_name in self.parser.aliases.keys():
+            return f"{self.struct_name}.typedefs.{td.name} = RTMA.typedefs.{td.type_name};\n"
+
+        if td.type_name in self.parser.struct_defs.keys():
+            return f"{self.struct_name}.typedefs.{td.name} = RTMA.typedefs.{td.type_name};\n"
+
+        if td.type_name in self.parser.message_defs.keys():
+            return f"{self.struct_name}.MDF.{td.name} = RTMA.MDF.{td.type_name};\n"
+
+        raise RuntimeError(f"No type found for alias: {td.name}")
+
+    def generate_struct(
+        self, struct: Union[SDF, MDF], top_field: str = "typedefs"
+    ) -> str:
         f = []
-        fnum = len(sdf.fields)
-        fstr = ""
-        if fnum == 0:
-            fstr += f"{self.struct_name}.{top_field}.{sdf.name} = [];"
+
+        if isinstance(struct, MDF) and len(struct.fields) == 0:
+            f.append(f"% {struct.name} (Signal)")
         else:
-            for i, field in enumerate(sdf.fields, start=1):
-                flen = field.length
-                nl = "\n"  # if i < fnum else ""
-                ftype = type_map.get(field.type_name)
+            f.append(f"% {struct.name}")
 
-                if ftype is None:
-                    stype = f"{self.struct_name}.typedefs.{field.type_name}"  # does not work properly if flen > 1
+        f.append(f"{self.struct_name}.{top_field}.{struct.name} = struct();")
 
-                else:
-                    stype = f"{ftype}(0)"
+        for field in struct.fields:
+            if field.type_name in type_map.keys():
+                s = type_map[field.type_name]
+                ftype = f"{self.struct_name}.typedefs.{s}(0)"
+            elif field.type_name in self.parser.message_defs.keys():
+                ftype = f"{self.struct_name}.MDF.{field.type_name}"
+            elif field.type_name in self.parser.struct_defs.keys():
+                ftype = f"{self.struct_name}.typedefs.{field.type_name}"
+            elif field.type_name in self.parser.aliases.keys():
+                ftype = f"{self.struct_name}.typedefs.{field.type_name}"
+            else:
+                raise RuntimeError(f"Unknown field name {field.name} in {struct.name}")
 
-                if flen:
-                    slen = f"({flen})"
-                else:
-                    slen = ""
+            if field.length is not None:
+                f.append(
+                    f"{self.struct_name}.{top_field}.{struct.name}.{field.name} = repmat({ftype}, 1, {field.length});"
+                )
+            else:
+                f.append(
+                    f"{self.struct_name}.{top_field}.{struct.name}.{field.name} = {ftype};"
+                )
 
-                if flen:
-                    f.append(
-                        f"{self.struct_name}.{top_field}.{sdf.name}.{field.name} = repmat({stype}, 1, {flen});{nl}"
-                    )
-                else:
-                    f.append(
-                        f"{self.struct_name}.{top_field}.{sdf.name}.{field.name} = {stype};{nl}"
-                    )
-
-            fstr += "".join(f)
-
-        return fstr
+        return "\n".join(f)
 
     def generate_msg_def(self, mdf: MDF) -> str:
-        assert mdf.name.startswith("MDF_")
-        mdf.name = mdf.name.replace(f"MDF_", "", 1)  # strip top_field from fieldname
         return self.generate_struct(mdf, "MDF")
 
     def generate_message_header(self) -> str:
         return f"{self.struct_name}.MESSAGE_HEADER = {self.struct_name}.typedefs.RTMA_MSG_HEADER;\n"
+
+    def generate_hash_id(self, mdf: MDF) -> str:
+        return f'{self.struct_name}.hash.{mdf.name} = "{mdf.hash[:8]}";\n'
 
     def generate_mex_opcodes(self) -> str:
         # these are copied from MatlabRTMA.h
@@ -159,7 +201,7 @@ class MatlabDefCompiler:
         """
         return dedent(op)
 
-    def generate__by_MT(self) -> str:
+    def generate_by_MT(self) -> str:
         # append matlab code to generate _by_MT cell arrays from other fields
         prefix = self.struct_name
         s = f"""\n
@@ -187,63 +229,83 @@ class MatlabDefCompiler:
             # create RTMA config generator .m function
             f.write(self.generate_fcn_header(out_filepath.stem))
 
-            # init struct
+            # Top-Level RTMA object
+            f.write("% Top-Level RTMA object\n")
             f.write(self.initialize_struct())
+            f.write("\n\n")
+
+            # RTMA.constants
+            f.write("% Constants\n")
+            for obj in self.parser.constants.values():
+                f.write(self.generate_constant(obj))
+            for obj in self.parser.host_ids.values():
+                f.write(self.generate_constant(obj))
+            for obj in self.parser.module_ids.values():
+                f.write(self.generate_constant(obj))
+            for obj in self.parser.message_ids.values():
+                f.write(self.generate_constant(obj))
             f.write("\n")
 
-            prev_obj = None
-            for obj in self.processor.objs:
-                s = ""
-                if type(obj) is Constant:
-                    s = self.generate_constant(obj)
-                elif type(obj) is MT:
-                    s = self.generate_constant(obj)
-                    s += self.generate_msg_type_id(obj)
-                elif type(obj) is MID:
-                    s = self.generate_constant(obj)
-                    s += self.generate_module_id(obj)
-                elif type(obj) is HID:
-                    s = self.generate_constant(obj)
-                    s += self.generate_host_id(obj)
-                elif type(obj) is MDF:
-                    s = self.generate_struct(obj)
-                    s += self.generate_msg_def(obj)
-                elif type(obj) is SDF:
-                    s = self.generate_struct(obj)
-                elif type(obj) is TypeAlias:
-                    s = self.generate_type_alias(obj)
-                else:
-                    raise RuntimeError(f"Unknown rtma object type of {type(obj)}")
+            f.write("% String Constants\n")
+            for obj in self.parser.string_constants.values():
+                f.write(self.generate_constant_string(obj))
+            f.write("\n")
 
-                # Add two lines before struct definition after a define
-                if type(prev_obj) in (Constant, MT, MID, HID):
-                    if type(obj) in (TypeAlias, MDF, SDF):
-                        f.write("\n\n")
+            # RTMA.typedefs
+            f.write("% Type Aliases\n")
+            for obj in self.parser.aliases.values():
+                f.write(self.generate_type_alias(obj))
+            f.write("\n")
 
-                # Write the generated code
-                f.write(s)
+            # RTMA.HID
+            f.write("% Host IDs\n")
+            for obj in self.parser.host_ids.values():
+                f.write(self.generate_host_id(obj))
+            f.write("\n")
 
-                # Add two lines after a struct definition
-                if type(obj) in (TypeAlias, MDF, SDF):
-                    f.write("\n\n")
+            # RTMA.MID
+            f.write("% Module IDs\n")
+            for obj in self.parser.module_ids.values():
+                f.write(self.generate_module_id(obj))
+            f.write("\n")
 
-                # Store the previous object generated
-                prev_obj = obj
+            # RTMA.MT
+            f.write("% Message Type IDs\n")
+            for obj in self.parser.message_ids.values():
+                f.write(self.generate_msg_type_id(obj))
+            f.write("\n")
 
-                if self.debug:
-                    print(s, end="")
+            # RTMA.SDF
+            f.write("% Struct Definitions\n")
+            for obj in self.parser.struct_defs.values():
+                f.write(self.generate_struct(obj))
+                f.write("\n\n")
+
+            # RTMA.MDF
+            f.write("% Message Definitions\n")
+            for obj in self.parser.message_defs.values():
+                f.write(self.generate_struct(obj, top_field="MDF"))
+                f.write("\n\n")
+
+            # RTMA.MDF
+            f.write("% Message Definition Hashes\n")
+            for obj in self.parser.message_defs.values():
+                f.write(self.generate_hash_id(obj))
+            f.write("\n\n")
 
             # MESSAGE_HEADER
             f.write(self.generate_message_header())
+            f.write("\n\n")
 
             # mex_opcode
             f.write(self.generate_mex_opcodes())
+            f.write("\n\n")
 
             # vars -- empty struct (for now)
             f.write(self.generate_vars())
 
             # MTN_by_MT and MDF_by_MT
-            f.write(self.generate__by_MT())
+            f.write(self.generate_by_MT())
 
             # close function
             f.write(self.generate_fcn_close())

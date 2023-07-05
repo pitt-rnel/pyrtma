@@ -1,26 +1,44 @@
 from typing import Union
-from pyrtma.processor import Processor, Constant, TypeAlias, MT, MID, MDF, SDF, HID
+from pyrtma.parser import (
+    Parser,
+    ConstantExpr,
+    ConstantString,
+    TypeAlias,
+    MT,
+    MID,
+    HID,
+    MDF,
+    SDF,
+)
 
 # Native C types that are supported
-typemap = {
+type_map = {
     "char": '""',
-    "unsigned char": "0",
-    "byte": "0",
-    "int": "0",
-    "signed int": "0",
-    "unsigned int": "0",
-    "unsigned": "0",
-    "short": "0",
-    "signed short": "0",
-    "unsigned short": "0",
-    "long": "0",
-    "signed long": "0",
-    "unsigned long": "0",
-    "long long": "0",
-    "signed long long": "0",
-    "unsigned long long": "0",
-    "float": "0",
-    "double": "0",
+    "unsigned char": 0,
+    "byte": 0,
+    "int": 0,
+    "signed int": 0,
+    "unsigned int": 0,
+    "unsigned": 0,
+    "short": 0,
+    "signed short": 0,
+    "unsigned short": 0,
+    "long": 0,
+    "signed long": 0,
+    "unsigned long": 0,
+    "long long": 0,
+    "signed long long": 0,
+    "unsigned long long": 0,
+    "float": 0,
+    "double": 0,
+    "uint8": 0,
+    "uint16": 0,
+    "uint32": 0,
+    "uint64": 0,
+    "int8": 0,
+    "int16": 0,
+    "int32": 0,
+    "int64": 0,
 }
 
 
@@ -29,82 +47,79 @@ def pad(indent: int) -> str:
 
 
 class JSDefCompiler:
-    def __init__(self, processor: Processor, debug: bool = False):
+    def __init__(self, parser: Parser, debug: bool = False):
         self.debug = debug
-        self.processor = processor
+        self.parser = parser
 
-    def generate_constant(self, c: Constant):
-        if isinstance(c.value, str):
-            return f'RTMA.constants.{c.name} = "{c.value}"\n'
-
+    def generate_constant(self, c: ConstantExpr):
         return f"RTMA.constants.{c.name}= {c.value};\n"
+
+    def generate_string_constant(self, c: ConstantString):
+        return f"RTMA.constants.{c.name} = {c.value};\n"
 
     def generate_prop(self, name: str, value: str):
         return f"{name}: {value}"
 
     def generate_msg_type_id(self, mt: MT) -> str:
-        base_name = mt.name[3:]
-        return f"RTMA.MT.{base_name} = {mt.value};\n"
+        return f"RTMA.MT.{mt.name} = {mt.value};\n"
 
     def generate_host_id(self, hid: HID) -> str:
         return f"RTMA.HID.{hid.name} = {hid.value};\n"
 
     def generate_module_id(self, mid: MID) -> str:
-        base_name = mid.name[4:]
-        return f"RTMA.MID.{base_name} = {mid.value};\n"
+        return f"RTMA.MID.{mid.name} = {mid.value};\n"
+
+    def generate_hash_id(self, mdf: Union[MDF, SDF]) -> str:
+        return f'RTMA.HASH.{mdf.name} = "{mdf.hash[:8]}";\n'
 
     def generate_type_alias(self, td: TypeAlias) -> str:
-        s = typemap.get(td.type_name)
-        if s:
-            return f"RTMA.typedefs.{td.name} = {s};\n"
+        if td.type_name in type_map.keys():
+            clean_name = td.type_name.replace(" ", "_")
+            return f"RTMA.aliases.{td.name} = type_map.{clean_name}();\n"
 
-        if td.type_name.startswith("MDF_"):
-            if td.name.startswith("MDF_"):
-                return f"RTMA.MDF.{td.name[4:]} = RTMA.MDF.{td.type_name[4:]};\n"
-            else:
-                return f"RTMA.typedefs.{td.name} = RTMA.MDF.{td.type_name[4:]};\n"
+        if td.type_name in self.parser.aliases.keys():
+            return f"RTMA.aliases.{td.name} = RTMA.aliases.{td.type_name};\n"
 
-        return f"RTMA.typedefs.{td.name} = RTMA.typedefs.{td.type_name};\n"
+        if td.type_name in self.parser.struct_defs.keys():
+            return f"RTMA.SDF.{td.name} = RTMA.SDF.{td.type_name};\n"
+
+        if td.type_name in self.parser.message_defs.keys():
+            return f"RTMA.MDF.{td.name} = RTMA.MDF.{td.type_name};\n"
+
+        raise RuntimeError(f"No type found for alias: {td.name}")
 
     def generate_obj(self, struct: Union[SDF, MDF]) -> str:
         if isinstance(struct, MDF):
-            prefix = "MDF"
-            basename = struct.name[4:]
+            top_field = "MDF"
         elif isinstance(struct, SDF):
-            prefix = "typedefs"
-            basename = struct.name
+            top_field = "SDF"
 
         tabs = "\t" * 2
         num_fields = len(struct.fields)
 
         if num_fields == 0:
-            return f"RTMA.{prefix}.{basename} = () => {{ return {{}} }};"
+            return f"RTMA.{top_field}.{struct.name} = () => {{ return {{}} }};"
 
-        s = f"RTMA.{prefix}.{basename} = () => {{\n\treturn {{\n"
+        s = f"RTMA.{top_field}.{struct.name} = () => {{\n\treturn {{\n"
 
         for n, field in enumerate(struct.fields, start=1):
             s += tabs
-            if field.type_name in typemap.keys():
-                if field.length is not None:
-                    if field.type_name.startswith("char"):
-                        s += f'{field.name}: ""'
-                    else:
-                        s += f"{field.name}: Array({field.length}).fill(0)"
-                else:
-                    if field.type_name.startswith("char"):
-                        s += f'{field.name}: ""'
-                    else:
-                        s += f"{field.name}: 0"
-            elif field.type_name.startswith("MDF"):
-                if field.length is not None:
-                    s += f"{field.name}: Array({field.length}).fill(RTMA.MDF.{field.type_name}())"
-                else:
-                    s += f"{field.name}: RTMA.MDF.{field.type_name}()"
+            if field.type_name in type_map.keys():
+                clean_name = field.type_name.replace(" ", "_")
+                ftype = f"type_map.{clean_name}"
+            elif field.type_name in self.parser.message_defs.keys():
+                ftype = f"RTMA.MDF.{field.type_name}"
+            elif field.type_name in self.parser.struct_defs.keys():
+                ftype = f"RTMA.SDF.{field.type_name}"
+            elif field.type_name in self.parser.aliases.keys():
+                ftype = f"RTMA.aliases.{field.type_name}"
             else:
-                if field.length is not None:
-                    s += f"{field.name}: Array({field.length}).fill(RTMA.typedefs.{field.type_name}())"
-                else:
-                    s += f"{field.name}: RTMA.typedefs.{field.type_name}()"
+                raise RuntimeError(f"Unknown field name {field.name} in {struct.name}")
+
+            if field.length is None:
+                s += f"{field.name}: Array({field.length}).fill({ftype}())"
+            else:
+                s += f"{field.name}: {ftype}()"
 
             if n < num_fields:
                 s += ",\n"
@@ -125,63 +140,74 @@ class JSDefCompiler:
             # Exports
             f.write("export { RTMA } ;\n\n")
 
+            # Generate Type Map Helper
+            f.write("// Type Map Default Values\n")
+            f.write("const type_map = {};\n")
+            for name, value in type_map.items():
+                name = name.replace(" ", "_")
+                f.write(f"type_map.{name} = () => {value};\n")
+            f.write("\n")
+
             # Top-Level RTMA object
+            f.write("// Top-Level RTMA object\n")
             f.write("const RTMA = {};\n\n")
 
             # RTMA.constants
+            f.write("// Constants\n\n")
             f.write("RTMA.constants =  {};\n")
-
-            # RTMA.typedefs
-            f.write("RTMA.typedefs =  {};\n")
-
-            # RTMA.MT
-            f.write("RTMA.MT = {};\n")
-
-            # RTMA.HID
-            f.write("RTMA.HID =  {};\n")
-
-            # RTMA.MID
-            f.write("RTMA.MID =  {};\n")
-
-            # RTMA.MDF
-            f.write("RTMA.MDF = {};\n")
-
+            for obj in self.parser.constants.values():
+                f.write(self.generate_constant(obj))
             f.write("\n")
 
-            prev_obj = None
-            for obj in self.processor.objs:
-                s = ""
-                if type(obj) is Constant:
-                    s = self.generate_constant(obj)
-                elif type(obj) is MT:
-                    s = self.generate_msg_type_id(obj)
-                elif type(obj) is MID:
-                    s = self.generate_module_id(obj)
-                elif type(obj) is HID:
-                    s = self.generate_host_id(obj)
-                elif type(obj) is TypeAlias:
-                    s = self.generate_type_alias(obj)
-                elif isinstance(obj, (SDF, MDF)):
-                    s = self.generate_obj(obj)
-                else:
-                    raise RuntimeError(f"Unknown rtma object type of {type(obj)}")
+            f.write("// String Constants\n")
+            for obj in self.parser.string_constants.values():
+                f.write(self.generate_string_constant(obj))
+            f.write("\n")
 
-                # Add two lines before obj definition after a define
-                if type(prev_obj) in (Constant, MT, MID, HID):
-                    if type(obj) in (TypeAlias, MDF, SDF):
-                        f.write("\n\n")
-                    elif not isinstance(obj, type(prev_obj)):
-                        f.write("\n")
+            # RTMA.typedefs
+            f.write("// Type Aliases\n")
+            f.write("RTMA.aliases =  {};\n\n")
+            for obj in self.parser.aliases.values():
+                f.write(self.generate_type_alias(obj))
+            f.write("\n")
 
-                # Write the generated code
-                f.write(s)
+            # RTMA.HID
+            f.write("// Host IDs\n")
+            f.write("RTMA.HID =  {};\n\n")
+            for obj in self.parser.host_ids.values():
+                f.write(self.generate_host_id(obj))
+            f.write("\n")
 
-                # Add two lines after a class definition
-                if type(obj) in (TypeAlias, MDF, SDF):
-                    f.write("\n\n")
+            # RTMA.MID
+            f.write("// Module IDs\n")
+            f.write("RTMA.MID =  {};\n\n")
+            for obj in self.parser.module_ids.values():
+                f.write(self.generate_module_id(obj))
+            f.write("\n")
 
-                # Store the previous object generated
-                prev_obj = obj
+            # RTMA.MT
+            f.write("// Message Type IDs\n")
+            f.write("RTMA.MT = {};\n\n")
+            for obj in self.parser.message_ids.values():
+                f.write(self.generate_msg_type_id(obj))
+            f.write("\n")
 
-                if self.debug:
-                    print(s, end="")
+            # RTMA.SDF
+            f.write("// Struct Definitions\n")
+            f.write("RTMA.SDF = {};\n\n")
+            for obj in self.parser.struct_defs.values():
+                f.write(self.generate_obj(obj))
+                f.write("\n\n")
+
+            # RTMA.MDF
+            f.write("// Message Definitions\n")
+            f.write("RTMA.MDF = {};\n\n")
+            for obj in self.parser.message_defs.values():
+                f.write(self.generate_obj(obj))
+                f.write("\n\n")
+
+            # RTMA.MDF
+            f.write("// Message Definition Hashes\n")
+            f.write("RTMA.HASH = {};\n\n")
+            for obj in self.parser.message_defs.values():
+                f.write(self.generate_hash_id(obj))

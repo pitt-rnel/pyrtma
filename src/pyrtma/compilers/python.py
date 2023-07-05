@@ -1,8 +1,15 @@
-import re
-import ctypes
-
 from textwrap import dedent
-from pyrtma.processor import Processor, Constant, TypeAlias, MT, MID, HID, MDF, SDF
+from pyrtma.parser import (
+    Parser,
+    ConstantExpr,
+    ConstantString,
+    TypeAlias,
+    MT,
+    MID,
+    HID,
+    MDF,
+    SDF,
+)
 
 
 # Field type name to ctypes
@@ -25,29 +32,33 @@ type_map = {
     "unsigned long long": "ctypes.c_ulonglong",
     "float": "ctypes.c_float",
     "double": "ctypes.c_double",
-    "MODULE_ID": "ctypes.c_short",
-    "HOST_ID": "ctypes.c_short",
-    "MSG_TYPE": "ctypes.c_int",
-    "MSG_COUNT": "ctypes.c_int",
+    "uint8": "ctypes.c_uint8",
+    "uint16": "ctypes.c_uint16",
+    "uint32": "ctypes.c_uint32",
+    "uint64": "ctypes.c_uint64",
+    "int8": "ctypes.c_int8",
+    "int16": "ctypes.c_int16",
+    "int32": "ctypes.c_int32",
+    "int64": "ctypes.c_int64",
 }
 
 
 class PyDefCompiler:
-    def __init__(self, processor: Processor, debug: bool = False):
+    def __init__(self, parser: Parser, debug: bool = False):
         self.debug = debug
-        self.processor = processor
+        self.parser = parser
 
-    def generate_constant(self, c: Constant):
-        if isinstance(c.value, str):
-            return f'{c.name} = "{c.value}"\n'
+    def generate_constant(self, c: ConstantExpr):
+        return f"{c.name} = {c.value}\n"
 
+    def generate_string_constant(self, c: ConstantString):
         return f"{c.name} = {c.value}\n"
 
     def generate_msg_type_id(self, mt: MT):
-        return f"{mt.name} = {mt.value}\n"
+        return f"MT_{mt.name} = {mt.value}\n"
 
     def generate_module_id(self, mid: MID):
-        return f"{mid.name} = {mid.value}\n"
+        return f"MID_{mid.name} = {mid.value}\n"
 
     def generate_host_id(self, hid: HID):
         return f"{hid.name} = {hid.value}\n"
@@ -60,7 +71,6 @@ class PyDefCompiler:
             return f"{td.name} = {td.type_name}\n"
 
     def generate_struct(self, sdf: SDF):
-        assert not sdf.name.startswith("MDF_")
         f = []
         fnum = len(sdf.fields)
         fstr = "["
@@ -91,7 +101,6 @@ class PyDefCompiler:
         return dedent(template)
 
     def generate_msg_def(self, mdf: MDF):
-        assert mdf.name.startswith("MDF_")
         basename = mdf.name[4:]
         f = []
         fnum = len(mdf.fields)
@@ -116,8 +125,7 @@ class PyDefCompiler:
             fstr += "".join(f)
             fstr += f"\n{tab * 3}]"
 
-        msg_id = mdf.type_id.name
-        comment = "# Signal Definition\n" if fnum == 0 else ""
+        msg_id = mdf.type_id
         template = f"""\
         @pyrtma.msg_def
         class {mdf.name}(pyrtma.MessageData):
@@ -125,7 +133,9 @@ class PyDefCompiler:
             type_id = {msg_id}
             type_name = \"{basename}\"
             type_hash = \"{mdf.hash[:8]}\"
-            """
+            
+        MDF_{mdf.name} = {mdf.name}
+        """
         return dedent(template)
 
     def generate_imports(self):
@@ -143,40 +153,43 @@ class PyDefCompiler:
         with open(out_filepath, mode="w") as f:
             f.write(self.generate_imports())
             f.write("\n")
-            prev_obj = None
-            for obj in self.processor.objs:
-                s = ""
-                if type(obj) is Constant:
-                    s = self.generate_constant(obj)
-                elif type(obj) is MT:
-                    s = self.generate_msg_type_id(obj)
-                elif type(obj) is MID:
-                    s = self.generate_module_id(obj)
-                elif type(obj) is MDF:
-                    s = self.generate_msg_def(obj)
-                elif type(obj) is SDF:
-                    s = self.generate_struct(obj)
-                elif type(obj) is TypeAlias:
-                    s = self.generate_type_alias(obj)
-                elif type(obj) is HID:
-                    s = self.generate_host_id(obj)
-                else:
-                    raise RuntimeError(f"Unknown rtma object type of {type(obj)}")
 
-                # Add two lines before class definition after a define
-                if type(prev_obj) in (Constant, MT, MID):
-                    if type(obj) in (TypeAlias, MDF, SDF):
-                        f.write("\n\n")
+            f.write("# Constants\n")
+            for obj in self.parser.constants.values():
+                f.write(self.generate_constant(obj))
+            f.write("\n")
 
-                # Write the generated code
-                f.write(s)
+            f.write("# String Constants\n")
+            for obj in self.parser.string_constants.values():
+                f.write(self.generate_string_constant(obj))
+            f.write("\n")
 
-                # Add two lines after a class definition
-                if type(obj) in (TypeAlias, MDF, SDF):
-                    f.write("\n\n")
+            f.write("# Type Aliases\n")
+            for obj in self.parser.aliases.values():
+                f.write(self.generate_type_alias(obj))
+            f.write("\n")
 
-                # Store the previous object generated
-                prev_obj = obj
+            f.write("# Host IDs\n")
+            for obj in self.parser.host_ids.values():
+                f.write(self.generate_host_id(obj))
+            f.write("\n")
 
-                if self.debug:
-                    print(s, end="")
+            f.write("# Module IDs\n")
+            for obj in self.parser.module_ids.values():
+                f.write(self.generate_module_id(obj))
+            f.write("\n")
+
+            f.write("# Message Type IDs\n")
+            for obj in self.parser.message_ids.values():
+                f.write(self.generate_msg_type_id(obj))
+            f.write("\n\n")
+
+            f.write("# Struct Definitions\n")
+            for obj in self.parser.struct_defs.values():
+                f.write(self.generate_struct(obj))
+                f.write("\n\n")
+
+            f.write("# Message Definitions\n")
+            for obj in self.parser.message_defs.values():
+                f.write(self.generate_msg_def(obj))
+                f.write("\n\n")
