@@ -198,7 +198,7 @@ class Parser:
     def handle_import(self, fname: str):
         imp = Import(pathlib.Path(fname), src=self.current_file)
         self.imports.append(imp)
-        self.parse_file(imp.file)
+        self.parse_file(imp.file.absolute())
 
     def handle_expression(self, name: str, expression: Union[int, float, str]):
         for c in self.constants.values():
@@ -500,43 +500,32 @@ class Parser:
                 self.handle_def("msg_def", name, mdf)
 
     def parse(self, msgdefs_file: os.PathLike):
-        # Get the current pwd
-        cwd = pathlib.Path.cwd()
-
         try:
             # Always start by parsing the core_defs.yaml file
             pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
             core_defs = pkg_dir / "core_defs/core_defs.yaml"
-            os.chdir(str(core_defs.parent.absolute()))
-            self.parse_file(core_defs)
-            os.chdir(str(cwd.absolute()))
+            self.parse_file(core_defs.absolute())
 
-            # Set the pwd to the directory containing the msgdef file
             defs_path = pathlib.Path(msgdefs_file)
-            def_dir = defs_path.parent
-            os.chdir(str(def_dir.absolute()))
-            self.parse_file(defs_path)
+            self.parse_file(defs_path.absolute())
 
         except Exception as e:
             self.clear()
             raise
-        finally:
-            # Set pwd back to starting point
-            os.chdir(str(cwd.absolute()))
 
     def parse_file(self, msgdefs_file: pathlib.Path):
 
         # check previously included files
         if msgdefs_file in self.included_files:
-            self.print(f"{msgdefs_file} already parsed...skipping")
+            print(f"{msgdefs_file} already parsed...skipping")
             return
 
-        self.print(f"Parsing {msgdefs_file}")
+        print(f"Parsing {msgdefs_file}")
         prev_file = self.current_file
         self.current_file = msgdefs_file
         self.included_files.append(msgdefs_file)
 
-        with open(msgdefs_file.name, "rt") as f:
+        with open(msgdefs_file, "rt") as f:
             text = f.read()
 
         self.parse_text(text)
@@ -564,4 +553,6 @@ class CustomEncoder(json.JSONEncoder):
     def default(self, o: Any) -> Any:
         if is_dataclass(o):
             return asdict(o)
+        if isinstance(o, pathlib.Path):
+            return str(o.absolute())
         return super().default(o)
