@@ -52,7 +52,7 @@ class JSDefCompiler:
         self.parser = parser
 
     def generate_constant(self, c: ConstantExpr):
-        return f"RTMA.constants.{c.name}= {c.value};\n"
+        return f"RTMA.constants.{c.name} = {c.value};\n"
 
     def generate_string_constant(self, c: ConstantString):
         return f"RTMA.constants.{c.name} = {c.value};\n"
