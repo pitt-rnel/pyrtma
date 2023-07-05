@@ -3,7 +3,9 @@ import json
 import pathlib
 import os
 import textwrap
-import yaml
+
+# import yaml
+from ruamel import yaml
 
 from copy import copy
 from hashlib import sha256
@@ -124,7 +126,7 @@ class SDF:
     fields: List[Field] = field(default_factory=list)
 
 
-RTMAObjects = Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, MDF, SDF, Field]
+RTMAObject = Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, MDF, SDF, Field]
 
 
 class Parser:
@@ -155,6 +157,18 @@ class Parser:
         self.struct_defs = {}
         self.message_ids = {}
         self.message_defs = {}
+
+    def check_duplicate_name(
+        self, section: str, name: str, namespaces: Tuple[str, ...]
+    ):
+        """Check namespaces for conflicting names."""
+        for namespace in namespaces:
+            ns = getattr(self, namespace)
+            for o in ns.values():
+                if name == o.name:
+                    raise SyntaxError(
+                        f"Duplicate name conflict found: \n\n1: {namespace} -> {o.name} -> {o.src.absolute()}\n2: {section} -> {name} -> {self.current_file.absolute()}\n"
+                    )
 
     def expand_expression(self, name: str, expr: str) -> Tuple[str, int]:
         rdepth_limit = 10
@@ -201,12 +215,6 @@ class Parser:
         self.parse_file(imp.file.absolute())
 
     def handle_expression(self, name: str, expression: Union[int, float, str]):
-        for c in self.constants.values():
-            if name == c.name:
-                raise SyntaxError(
-                    f"Duplicate constant conflict found for {name} in \n1: {c.src.absolute()}\n2: {self.current_file.absolute()}\n"
-                )
-
         # Expand numerical expression now
         if isinstance(expression, (int, float)):
             self.constants[name] = ConstantExpr(
@@ -227,10 +235,7 @@ class Parser:
             )
 
     def handle_string(self, name: str, value: str):
-        for c in self.string_constants.values():
-            raise SyntaxError(
-                f"Duplicate string_constant conflict found for {name} in \n1: {c.src.absolute()}\n2: {self.current_file.absolute()}\n"
-            )
+        self.check_duplicate_name("string_constants", name, namespaces=("constants",))
 
         if not isinstance(value, str):
             raise SyntaxError(
@@ -242,13 +247,11 @@ class Parser:
         )
 
     def handle_alias(self, alias: str, ftype: str):
-        for a in self.aliases.values():
-            if alias == a.name:
-                raise SyntaxError(
-                    f"Duplicate type_alias conflict found for {alias} in: \n1: {a.src.absolute()}\n2: {self.current_file.absolute()}\n"
-                )
+        """Find the base type ultimately represented by the typedef alias"""
+        self.check_duplicate_name(
+            "aliases", alias, namespaces=("struct_defs", "message_defs")
+        )
 
-        # Find the base type ultimately represented by the typedef alias
         n = 0
         prev = ftype
         while n < 10:
@@ -316,6 +319,17 @@ class Parser:
         self.module_ids[name] = MID(name, int(value), src=self.current_file)
 
     def handle_def(self, def_type: str, name: str, mdf: Dict[str, Any]):
+        self.check_duplicate_name(
+            def_type,
+            name,
+            namespaces=(
+                "constants",
+                "aliases",
+                "struct_defs" if "msg_defs" else "msg_defs",
+                "message_defs",
+            ),
+        )
+
         is_signal_def = mdf["fields"] is None
         is_struct_def = False
 
@@ -500,6 +514,9 @@ class Parser:
                 self.handle_def("msg_def", name, mdf)
 
     def parse(self, msgdefs_file: os.PathLike):
+        # Get the current pwd
+        cwd = pathlib.Path.cwd()
+
         try:
             # Always start by parsing the core_defs.yaml file
             pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
@@ -507,29 +524,36 @@ class Parser:
             self.parse_file(core_defs.absolute())
 
             defs_path = pathlib.Path(msgdefs_file)
-            self.parse_file(defs_path.absolute())
-
+            self.parse_file(defs_path)
         except Exception as e:
             self.clear()
             raise
+        finally:
+            os.chdir(str(cwd.absolute()))
 
     def parse_file(self, msgdefs_file: pathlib.Path):
+        # Change the working directory
+        cwd = pathlib.Path.cwd()
+        msgdefs_path = cwd / msgdefs_file
+        os.chdir(str(msgdefs_path.parent.absolute()))
 
         # check previously included files
         if msgdefs_file in self.included_files:
-            print(f"{msgdefs_file} already parsed...skipping")
+            print(f"{msgdefs_path.absolute()} already parsed...skipping")
             return
 
-        print(f"Parsing {msgdefs_file}")
+        print(f"Parsing {msgdefs_path.absolute()}")
         prev_file = self.current_file
         self.current_file = msgdefs_file
         self.included_files.append(msgdefs_file)
 
-        with open(msgdefs_file, "rt") as f:
+        with open(msgdefs_path, "rt") as f:
             text = f.read()
 
         self.parse_text(text)
         self.current_file = prev_file
+
+        os.chdir(str(cwd.absolute()))
 
     def to_json(self):
         d = dict(
