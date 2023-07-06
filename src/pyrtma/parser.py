@@ -447,6 +447,7 @@ class Parser:
                     n += 2
                     npad += 1
                     ptr += padding.size
+                    ptr += field.size
             else:
                 n += 1
                 ptr += field.size
