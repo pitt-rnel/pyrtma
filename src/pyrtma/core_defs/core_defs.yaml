@@ -21,8 +21,8 @@ string_constants: null
 aliases: 
   MODULE_ID: short
   HOST_ID: short
-  MSG_TYPE: short
-  MSG_COUNT: short
+  MSG_TYPE: int
+  MSG_COUNT: int
 
 host_ids:
   LOCAL_HOST: 0
@@ -102,7 +102,7 @@ message_defs:
     id: 8
     fields:
       dest_mod_id: MODULE_ID
-      reserved: short
+      reserved: short[3]
       time_of_failure: double
       msg_header: RTMA_MSG_HEADER
 
