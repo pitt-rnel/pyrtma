@@ -1,7 +1,7 @@
 # Message defs file in yaml format
 
 imports:
-  - ./defs/mjvr_types.yaml
+  - ./mjvr_types.yaml
 
 string_constants:
   DEFAULT_MM_IP: "localhost:7111"
@@ -400,6 +400,7 @@ message_defs:
       trial_num: short
       block_ID: short
       DELTA_reference_frequency: short
+      response: short  # 64-bit aligned
       ICMS_reference_frequency: float
       ICMS_reference_amplitude: float
       ICMS_frequency_1: float
@@ -412,7 +413,6 @@ message_defs:
       VIS_frequency_2: float
       VIS_amplitude_1: float
       VIS_amplitude_2: float
-      response: short  # 64-bit aligned
 
  
   GRIP_COMMAND:
@@ -493,6 +493,7 @@ message_defs:
     id: 1738
     fields: 
       obj_id: unsigned int  # mocap id associated with object (order in model file)
+      padding: int # 64-bit alignment
       pos: double[3]
       orientation: double[3]
 
@@ -550,6 +551,7 @@ message_defs:
     fields: 
       header: MSG_HEADER
       raw_analog: int[3]
+      padding: int # 64-bit alignment
       force: double[3]
 
  
@@ -941,6 +943,7 @@ message_defs:
       handd: char[18]
       head: char[13]
       arms: char[20]
+      padding: char
       tag: int
       flipframe: int
 
@@ -1111,8 +1114,8 @@ message_defs:
     fields: 
       notes_strummed: int[5]
       reserved: short
-      game_time: double
       hit_note: short
+      game_time: double
 
   FOFIX_MISSED:
     id: 3602
@@ -1236,6 +1239,7 @@ message_defs:
     fields: 
       stim_sync_event: float[30] #[seconds] DAQ timestamps when digital input became high
       stim_param_event: float[5] #[seconds] DAQ timestamps when digital input became high
+      padding: float # 64-bit alignment
       spm_daq_delta_t: double  #[seconds] Differnce in clock time between SPM and DAQ, calcuated using the stim param/update event
 
   VOLTAGE_MONITOR_STATUS:
