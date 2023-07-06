@@ -1,0 +1,32 @@
+# Example file - message.yaml
+
+imports: null
+
+constants: 
+  STR_SIZE: 32
+
+string_constants: null
+
+host_ids: null
+
+module_ids:
+    PERSON_PUBLISHER: 212
+    PERSON_SUBSCRIBER: 213
+
+aliases: null
+
+struct_defs: null
+
+message_defs:
+    PERSON_MESSAGE:
+        id: 1234
+        fields:
+            name: char[STR_SIZE]
+            age: int
+    ANOTHER_EXAMPLE:
+        id: 5678
+        fields:
+            value_str: char[STR_SIZE]
+            value_int: int
+            value_float: float
+            value_double: double

@@ -1,4 +1,5 @@
-# pyrtma 
+# pyrtma
+
 [![Python package](https://github.com/pitt-rnel/pyrtma/actions/workflows/python-package.yml/badge.svg)](https://github.com/pitt-rnel/pyrtma/actions/workflows/python-package.yml)
 [![Documentation Status](https://readthedocs.org/projects/pyrtma/badge/?version=latest)](https://pyrtma.readthedocs.io/en/latest/?badge=latest)
 
@@ -7,16 +8,18 @@ RTMA/Dragonfly client written in python with no external dependencies. Based on 
 ## Installation
 
 pyrtma is [available on PyPI](https://pypi.org/project/pyrtma/)
+
 ```shell
-$ pip install pyrtma
+pip install pyrtma
 ```
 
 ### Installing for pyrtma development
 
 This is only necessary for individuals who would like to contribute to pyrtma.
+
 ```shell
-$ pip install --upgrade pip setuptools
-$ pip install -e .
+pip install --upgrade pip setuptools
+pip install -e .
 ```
 
 ## Usage
@@ -24,96 +27,89 @@ $ pip install -e .
 ### Launch Manager
 
 ```shell
-$ python -m pyrtma.manager -a "127.0.0.1"
+python -m pyrtma.manager -a "127.0.0.1"
 ```
 
 ### Create a message in message.h
 
-The recommended way of creating messages is to define them in a C header file (.h file).
+Message definitions are created in a .yaml file.
 
-```c
-// message.h
+```yaml
+# message.yaml
 
-// Module IDs
-#define MID_PERSON_PUBLISHER 112
-#define MID_PERSON_SUBSCRIBER 113
+imports: null
 
-// Message IDs
-#define MT_PERSON_MESSAGE 1234
-#define MT_ANOTHER_EXAMPLE 5678
+constants: 
+    STR_SIZE: 32
 
-// We can define other constants as well
-#define STR_SIZE 32 
+string_constants: null
 
+host_ids: null
 
-// Message definitions
-typedef struct {
-	char name[STR_SIZE];
-	int age;
-} MDF_PERSON_MESSAGE;
+module_ids:
+    PERSON_PUBLISHER: 112
+    PERSON_SUBSCRIBER: 113
 
-typedef struct {
-	char value_str[STR_SIZE];
-	int value_int;
-    float value_float;
-    double value_double
-} MDF_ANOTHER_EXAMPLE;
+struct_defs: null
+
+message_defs:
+    PERSON_MESSAGE:
+        id: 1234
+        fields:
+            name: char[STR_SIZE]
+            age: int
+    ANOTHER_EXAMPLE:
+        id: 5678
+        fields:
+            value_str: char[STR_SIZE]
+            value_int: int
+            value_float: float
+            value_double: double
 ```
 
-Run the following command to compile the header file into Python types and files. This will output a message.py file.
+Run the following command to compile the yaml file into Python, C, Matlab, or Javascript files. This will output a message.(py|h|m|js) file.
 
 ```shell
-$ python -m pyrtma.compile -i message.h -o message.py
+python -m pyrtma.compile -i msg_defs/message.yaml --py --c --mat --js
 ```
 
+Below shows the python class objects output for the user defined messages in message.yaml
+
 ```python
-# message.py
-import ctypes
-import pyrtma
-from pyrtma.constants import *
-
-# User Constants: message.h
-STR_SIZE = 32
-
-# User Message IDs: message.h
-MT_PERSON_MESSAGE = 1234
-MT_ANOTHER_EXAMPLE = 5678
-
-# User Module IDs: message.h
-MID_PERSON_PUBLISHER = 112
-MID_PERSON_SUBSCRIBER = 113
-
-# User Type Definitions: message.h
-# User Message Definitions: message.h
-
 
 @pyrtma.msg_def
-class MDF_PERSON_MESSAGE(pyrtma.MessageData):
-    _pack_ = True
+class PERSON_MESSAGE(pyrtma.MessageData):
     _fields_ = [
-        ("name", ctypes.c_char * STR_SIZE),
-        ("age", ctypes.c_long)
+        ("name", ctypes.c_char * 32),
+        ("age", ctypes.c_int)
     ]
-    type_id = MT_PERSON_MESSAGE
+    type_id = 1234
     type_name = "PERSON_MESSAGE"
+    type_hash = "76f148a9"
 
+
+MDF_PERSON_MESSAGE = PERSON_MESSAGE
 
 
 @pyrtma.msg_def
-class MDF_ANOTHER_EXAMPLE(pyrtma.MessageData):
-    _pack_ = True
+class ANOTHER_EXAMPLE(pyrtma.MessageData):
     _fields_ = [
-        ("value_str", ctypes.c_char * STR_SIZE),
-        ("value_int", ctypes.c_long),
+        ("value_str", ctypes.c_char * 32),
+        ("value_int", ctypes.c_int),
         ("value_float", ctypes.c_float),
         ("value_double", ctypes.c_double)
     ]
-    type_id = MT_ANOTHER_EXAMPLE
+    type_id = 5678
     type_name = "ANOTHER_EXAMPLE"
+    type_hash = "3b377f5a"
+
+
+MDF_ANOTHER_EXAMPLE = ANOTHER_EXAMPLE
+
 ```
-*Note: Messages can also be defined in a Python file without the compile step*
 
 ### Create a publisher module in publisher.py
+
 ```python
 # publisher.py
 import message
@@ -178,12 +174,15 @@ while True:
 ```
 
 ### Launch the publisher
+
 ```shell
-$ python publisher.py
+python publisher.py
 ```
 
 ### Launch the subscriber
+
 You should see the message 'Hello my name is Alice and I am 42 years old' print in your shell
+
 ```shell
-$ python subscriber.py
+python subscriber.py
 ```
