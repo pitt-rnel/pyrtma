@@ -440,7 +440,9 @@ class Parser:
                         length=length,
                     )
 
-                    print(f"WARNING: Adding padding before {s.name}.{field.name}.")
+                    print(
+                        f"WARNING: Adding {length} padding byte(s) before {s.name}.{field.name}."
+                    )
                     s.fields.insert(n, padding)
                     n += 2
                     npad += 1
@@ -464,7 +466,7 @@ class Parser:
         #         length=length or None,
         #     )
         #     s.fields.append(padding)
-        #     print(f"WARNING: Adding trailing padding at end of {s.name}.")
+        #     print(f"WARNING: Adding {length} trailing padding byte(s) at end of {s.name}.")
 
         # Final size check using Python's builtin struct module
         assert s.size == struct.calcsize(s.format), f"{s.name} is not 64-bit aligned."
