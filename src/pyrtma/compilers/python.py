@@ -101,7 +101,6 @@ class PyDefCompiler:
         return dedent(template)
 
     def generate_msg_def(self, mdf: MDF):
-        basename = mdf.name[4:]
         f = []
         fnum = len(mdf.fields)
         fstr = "["
@@ -131,7 +130,7 @@ class PyDefCompiler:
         class {mdf.name}(pyrtma.MessageData):
             _fields_ = {fstr}
             type_id = {msg_id}
-            type_name = \"{basename}\"
+            type_name = \"{mdf.name}\"
             type_hash = \"{mdf.hash[:8]}\"
             
 
