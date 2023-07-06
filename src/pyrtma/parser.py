@@ -402,10 +402,10 @@ class Parser:
                 f"Values in 'module_ids' section must evaluate to int type not {type(value)}. {name}: {value} -> {self.current_file.absolute()}"
             )
 
-        if value < 10 or value > 99:
+        if value < 10 or (99 < value < 200):
             if self.current_file.name != "core_defs.yaml" and value != 0:
                 raise SyntaxError(
-                    f"Value outside of valid range [100 - 200] for module_id: {name}: {value} -> {self.current_file.absolute()}"
+                    f"Value outside of valid range [10 - 99 or > 200] for module_id: {name}: {value} -> {self.current_file.absolute()}"
                 )
 
         for mid in self.module_ids.values():
