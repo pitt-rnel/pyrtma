@@ -3,6 +3,7 @@ import json
 import pathlib
 import os
 import textwrap
+import struct
 
 # import yaml
 from ruamel import yaml
@@ -13,35 +14,49 @@ from typing import List, Optional, Any, Union, Tuple, Dict
 from dataclasses import dataclass, field, is_dataclass, asdict
 
 
-# Native C types that are supported
-supported_types = [
-    "char",
-    "unsigned char",
-    "byte",
-    "int",
-    "signed int",
-    "unsigned int",
-    "unsigned",
-    "short",
-    "signed short",
-    "unsigned short",
-    "long",
-    "signed long",
-    "unsigned long",
-    "long long",
-    "signed long long",
-    "unsigned long long",
-    "float",
-    "double",
-    "uint8",
-    "uint16",
-    "uint32",
-    "uint64",
-    "int8",
-    "int16",
-    "int32",
-    "int64",
-]
+@dataclass
+class NativeType:
+    name: str
+    size: int
+    format: str
+
+
+# Native C types and sizes that are supported
+supported_types = {
+    "char": NativeType(name="char", size=1, format="c"),
+    "signed char": NativeType(name="signed_char", size=1, format="b"),
+    "unsigned char": NativeType(name="unsigned char", size=1, format="B"),
+    "byte": NativeType(name="byte", size=1, format="B"),
+    "int": NativeType(name="int", size=4, format="i"),
+    "signed int": NativeType(name="signed int", size=4, format="i"),
+    "unsigned int": NativeType(name="unsigned int", size=4, format="I"),
+    "unsigned": NativeType(name="unsigned", size=4, format="I"),
+    "short": NativeType(name="short", size=2, format="h"),
+    "signed short": NativeType(name="signed short", size=2, format="h"),
+    "unsigned short": NativeType(name="unsigned short", size=2, format="H"),
+    "long": NativeType(name="long", size=4, format="l"),
+    "signed long": NativeType(name="signed long", size=4, format="l"),
+    "unsigned long": NativeType(name="unsigned long", size=4, format="L"),
+    "long long": NativeType(name="long long", size=8, format="q"),
+    "signed long long": NativeType(name="signed long long", size=8, format="q"),
+    "unsigned long long": NativeType(name="unsigned long long", size=8, format="Q"),
+    "float": NativeType(name="float", size=4, format="f"),
+    "double": NativeType(name="double", size=8, format="d"),
+    "uint8": NativeType(name="uint8", size=1, format="B"),
+    "uint16": NativeType(name="uint16", size=2, format="H"),
+    "uint32": NativeType(name="uint32", size=4, format="I"),
+    "uint64": NativeType(name="uint64", size=8, format="Q"),
+    "int8": NativeType(name="int8", size=1, format="b"),
+    "int16": NativeType(name="int16", size=2, format="h"),
+    "int32": NativeType(name="int32", size=4, format="i"),
+    "int64": NativeType(name="int64", size=8, format="q"),
+}
+
+
+class AlignmentError(Exception):
+    """Raised when a struct is not 64-bit aligned"""
+
+    pass
 
 
 @dataclass
@@ -91,16 +106,55 @@ class HID:
 class TypeAlias:
     name: str
     type_name: str
+    type_obj: Union[NativeType, "SDF"]
     src: pathlib.Path
+
+    @property
+    def size(self) -> int:
+        return self.type_obj.size
+
+    @property
+    def boundary(self) -> int:
+        if isinstance(self.type_obj, NativeType):
+            return self.type_obj.size
+        else:
+            return self.type_obj.boundary
+
+    @property
+    def format(self) -> str:
+        return self.type_obj.format
 
 
 @dataclass
 class Field:
     name: str
     type_name: str
+    type_obj: Union[NativeType, TypeAlias, "MDF", "SDF"]
     length_expression: Optional[str] = None
     length_expanded: Optional[str] = None
     length: Optional[int] = None
+
+    @property
+    def base_size(self) -> int:
+        return self.type_obj.size
+
+    @property
+    def size(self):
+        return self.type_obj.size * (self.length or 1)
+
+    @property
+    def boundary(self) -> int:
+        if isinstance(self.type_obj, NativeType):
+            return self.type_obj.size
+        else:
+            return self.type_obj.boundary
+
+    @property
+    def format(self) -> str:
+        if self.length:
+            return self.length * self.type_obj.format
+        else:
+            return self.type_obj.format
 
 
 @dataclass
@@ -116,6 +170,26 @@ class MDF:
     def signal(self) -> bool:
         return len(self.fields) > 0
 
+    @property
+    def size(self) -> int:
+        return sum([f.size for f in self.fields])
+
+    @property
+    def boundary(self) -> int:
+        f0 = self.fields[0]
+        if isinstance(f0.type_obj, NativeType):
+            return f0.type_obj.size
+        else:
+            return f0.type_obj.boundary
+
+    @property
+    def format(self) -> str:
+        s = ""
+        for field in self.fields:
+            s += field.format
+
+        return s
+
 
 @dataclass
 class SDF:
@@ -124,6 +198,26 @@ class SDF:
     name: str
     src: pathlib.Path
     fields: List[Field] = field(default_factory=list)
+
+    @property
+    def size(self) -> int:
+        return sum([f.size for f in self.fields])
+
+    @property
+    def boundary(self) -> int:
+        f0 = self.fields[0]
+        if isinstance(f0.type_obj, NativeType):
+            return f0.type_obj.size
+        else:
+            return f0.type_obj.boundary
+
+    @property
+    def format(self) -> str:
+        s = ""
+        for field in self.fields:
+            s += field.format
+
+        return s
 
 
 RTMAObject = Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, MDF, SDF, Field]
@@ -255,15 +349,19 @@ class Parser:
         n = 0
         prev = ftype
         while n < 10:
-            if ftype in supported_types:
-                self.aliases[alias] = TypeAlias(alias, ftype, self.current_file)
+            if ftype in supported_types.keys():
+                self.aliases[alias] = TypeAlias(
+                    alias, ftype, supported_types[ftype], self.current_file
+                )
                 return
 
             # Check if ftype points back to a user defined struct
             for sdf in self.struct_defs.values():
                 if ftype == sdf.name:
                     ftype = sdf.name
-                    self.aliases[alias] = TypeAlias(alias, ftype, src=self.current_file)
+                    self.aliases[alias] = TypeAlias(
+                        alias, ftype, sdf, src=self.current_file
+                    )
                     return
 
             # Check if ftype points back to another typedef
@@ -305,7 +403,7 @@ class Parser:
             )
 
         if value < 10 or value > 99:
-            if self.current_file.name != "core_defs.yaml":
+            if self.current_file.name != "core_defs.yaml" and value != 0:
                 raise SyntaxError(
                     f"Value outside of valid range [100 - 200] for module_id: {name}: {value} -> {self.current_file.absolute()}"
                 )
@@ -317,6 +415,59 @@ class Parser:
                 )
 
         self.module_ids[name] = MID(name, int(value), src=self.current_file)
+
+    def check_alignment(self, s: Union[SDF, MDF], auto_pad: bool = True):
+        """Confirm 64 bit alignment of structures"""
+        npad = 0
+        ptr = 0
+        n = 0
+        while n < len(s.fields):
+            field = s.fields[n]
+            boundary = field.boundary
+            if ptr % boundary != 0:
+                if not auto_pad:
+                    raise AlignmentError(
+                        f"{s.name}.{field.name} does not start on a valid memory boundary for type: {field.type_name}. Add padding fields prior for 64-bit alignment."
+                    )
+                else:
+                    length = boundary - (ptr % boundary)
+                    padding = Field(
+                        name=f"padding_{npad}_",
+                        type_name="char",
+                        type_obj=supported_types["char"],
+                        length_expression=f'"{length}"',
+                        length_expanded=f'"{length}"',
+                        length=length,
+                    )
+
+                    print(f"WARNING: Adding padding before {s.name}.{field.name}.")
+                    s.fields.insert(n, padding)
+                    n += 2
+                    npad += 1
+                    ptr += padding.size
+            else:
+                n += 1
+                ptr += field.size
+
+        # Align the end of the struct to 64 bit pointer boundary.
+        # if ptr % 8 != 0:
+        #     length = 8 - (ptr % 8)
+        #     if length == 1:
+        #         length = ""
+
+        #     padding = Field(
+        #         name=f"padding_{npad}_",
+        #         type_name="char",
+        #         type_obj=supported_types["char"],
+        #         length_expression=f'"{length}"',
+        #         length_expanded=f'"{length}"',
+        #         length=length or None,
+        #     )
+        #     s.fields.append(padding)
+        #     print(f"WARNING: Adding trailing padding at end of {s.name}.")
+
+        # Final size check using Python's builtin struct module
+        assert s.size == struct.calcsize(s.format), f"{s.name} is not 64-bit aligned."
 
     def handle_def(self, def_type: str, name: str, mdf: Dict[str, Any]):
         self.check_duplicate_name(
@@ -439,21 +590,50 @@ class Parser:
                 )
 
             # Check for a valid type
-            if ftype not in supported_types:
-                if ftype not in self.aliases.keys():
-                    if ftype not in self.struct_defs.keys():
-                        if ftype not in self.message_defs.keys():
-                            raise SyntaxError(
-                                f"Unknown type specified ({ftype}): {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
-                            )
+            if ftype in supported_types.keys():
+                ftype_obj = supported_types[ftype]
+            elif ftype in self.aliases.keys():
+                ftype_obj = self.aliases[ftype]
+            elif ftype in self.struct_defs.keys():
+                ftype_obj = self.struct_defs[ftype]
+            elif ftype in self.message_defs.keys():
+                ftype_obj = self.message_defs[ftype]
+            else:
+                raise SyntaxError(
+                    f"Unknown type specified ({ftype}): {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                )
+
+            # Check for invalid signal def usage
+            if ftype in self.message_defs.keys():
+                assert (
+                    len(self.message_defs[ftype].fields) != 0
+                ), f"Signal definitions can not be used as field types: {name}=> {fname}:{fstr} -> {self.current_file.absolute()}"
 
             # Expand the length string if needed
             if len_str:
                 expanded, flen = self.expand_expression(f"{name}->{fname}", len_str)
-                obj.fields.append(Field(fname, ftype, len_str, expanded, int(flen)))
+                new_field = Field(
+                    name=fname,
+                    type_name=ftype,
+                    type_obj=ftype_obj,
+                    length_expression=len_str,
+                    length_expanded=expanded,
+                    length=int(flen),
+                )
             else:
-                obj.fields.append(Field(fname, ftype))
+                new_field = Field(name=fname, type_name=ftype, type_obj=ftype_obj)
 
+            obj.fields.append(new_field)
+
+        # Check number of fields > 0
+        assert (
+            len(obj.fields) > 0
+        ), f"Message and Struct definitions must have at least one field: {name} -> {self.current_file.absolute()}"
+
+        # Check memory alignment layout
+        self.check_alignment(obj, auto_pad=True)
+
+        # Store the definition
         if isinstance(obj, SDF):
             self.struct_defs[name] = obj
         else:
