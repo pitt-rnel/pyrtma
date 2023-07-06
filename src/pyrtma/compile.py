@@ -21,6 +21,10 @@ def compile(
         with open("parser.json", "w") as f:
             f.write(parser.to_json())
 
+    # Use the same filename as the message defs file by default
+    if out_filepath == "":
+        out_filepath = defs_file
+
     if python:
         print("Building python message definitions...")
         from pyrtma.compilers.python import PyDefCompiler
@@ -117,6 +121,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-o",
         "--out",
+        default="",
         dest="out_filepath",
         help="Output file",
     )
