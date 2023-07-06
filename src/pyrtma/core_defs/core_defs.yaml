@@ -21,8 +21,8 @@ string_constants: null
 aliases: 
   MODULE_ID: short
   HOST_ID: short
-  MSG_TYPE: short
-  MSG_COUNT: short
+  MSG_TYPE: int
+  MSG_COUNT: int
 
 host_ids:
   LOCAL_HOST: 0
