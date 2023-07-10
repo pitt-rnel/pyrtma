@@ -34,43 +34,82 @@ python -m pyrtma.manager -a "127.0.0.1"
 
 Message definitions are created in a .yaml file.
 
+Notes about yaml format:
+
+- Whitespace sensitive. Use either 2 or 4 spaces for tab not '\t'
+- Must follow the top-level headers shown below.
+- Unused sections should be marked `null`
+- Use **(.yaml)** extension not **(.yml)**
+
+Below is an example:
+
 ```yaml
 # message.yaml
 
 imports: null
 
+# Constant values and expressions
 constants: 
     STR_SIZE: 32
+    LONG_STRING: STR_SIZE * 2
 
-string_constants: null
+# Constant string values
+string_constants:
+    default_msg: "hello_world"
 
 host_ids: null
 
 module_ids:
-    PERSON_PUBLISHER: 112
-    PERSON_SUBSCRIBER: 113
+    PERSON_PUBLISHER: 212
+    PERSON_SUBSCRIBER: 214
 
-struct_defs: null
+# Alias a type by another name
+aliases:
+    AGE_TYPE: int
 
+# Non-message structured data (no id field)
+struct_defs:
+    TEST_STRUCT:
+        fields:
+            value_str: char[STR_SIZE]
+            value_int: int
+
+# Message defintions with user assigned id field
 message_defs:
     PERSON_MESSAGE:
         id: 1234
         fields:
             name: char[STR_SIZE]
-            age: int
+            age: AGE_TYPE
+
     ANOTHER_EXAMPLE:
         id: 5678
         fields:
-            value_str: char[STR_SIZE]
-            value_int: int
+            value_struct: TEST_STRUCT
             value_float: float
             value_double: double
+
+    # Example signal definition
+    USER_SIGNAL:
+        id: 2468
+        fields: null
+
+    # Example using a nested message defintion 
+    PERSON_LIST:
+        id: 1357
+        fields:
+            person: PERSON_MESSAGE[32]
+
+    # Example reusing a message definition by another name
+    EMPLOYEES:
+        id: 1368
+        fields: PERSON_LIST
 ```
 
 Run the following command to compile the yaml file into Python, C, Matlab, or Javascript files. This will output a message.(py|h|m|js) file.
 
 ```shell
-python -m pyrtma.compile -i msg_defs/message.yaml --py --c --mat --js
+python -m pyrtma.compile -i examples/msg_defs/message.yaml --py --c --mat --js
 ```
 
 Below shows the python class objects output for the user defined messages in message.yaml
@@ -176,7 +215,7 @@ while True:
 ### Launch the publisher
 
 ```shell
-python publisher.py
+python examples/publisher.py
 ```
 
 ### Launch the subscriber
@@ -184,5 +223,5 @@ python publisher.py
 You should see the message 'Hello my name is Alice and I am 42 years old' print in your shell
 
 ```shell
-python subscriber.py
+python examples/subscriber.py
 ```
