@@ -112,40 +112,11 @@ Run the following command to compile the yaml file into Python, C, Matlab, or Ja
 python -m pyrtma.compile -i examples/msg_defs/message.yaml --py --c --mat --js
 ```
 
-Below shows the python class objects output for the user defined messages in message.yaml
+The msg_defs directory should now have message def files created for each language.
 
-```python
+The rtma objects are compiled into objects suitable for each language.
 
-@pyrtma.msg_def
-class PERSON_MESSAGE(pyrtma.MessageData):
-    _fields_ = [
-        ("name", ctypes.c_char * 32),
-        ("age", ctypes.c_int)
-    ]
-    type_id = 1234
-    type_name = "PERSON_MESSAGE"
-    type_hash = "76f148a9"
-
-
-MDF_PERSON_MESSAGE = PERSON_MESSAGE
-
-
-@pyrtma.msg_def
-class ANOTHER_EXAMPLE(pyrtma.MessageData):
-    _fields_ = [
-        ("value_str", ctypes.c_char * 32),
-        ("value_int", ctypes.c_int),
-        ("value_float", ctypes.c_float),
-        ("value_double", ctypes.c_double)
-    ]
-    type_id = 5678
-    type_name = "ANOTHER_EXAMPLE"
-    type_hash = "3b377f5a"
-
-
-MDF_ANOTHER_EXAMPLE = ANOTHER_EXAMPLE
-
-```
+## Example Pub/Sub
 
 ### Create a publisher module in publisher.py
 
