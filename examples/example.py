@@ -63,7 +63,7 @@ def subscriber(server="127.0.0.1:7111", timecode=False):
                 if msg.name == "USER_MESSAGE":
                     msg.data.hexdump()
                     print("")
-                    print(msg.pretty_print())
+                    print(msg.to_json())
                 elif msg.name == "EXIT":
                     print("Goodbye.")
                     break
