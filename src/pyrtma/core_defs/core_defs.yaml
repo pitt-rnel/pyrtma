@@ -18,7 +18,7 @@ constants:
 
 string_constants: null
 
-aliases: 
+aliases:
   MODULE_ID: short
   HOST_ID: short
   MSG_TYPE: int
@@ -86,7 +86,7 @@ message_defs:
     fields:
       msg_type: MSG_TYPE
 
-  RESUMSE_SUBSCRIPTION:
+  RESUME_SUBSCRIPTION:
     id: 86
     fields:
       msg_type: MSG_TYPE
