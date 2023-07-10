@@ -506,11 +506,17 @@ class Parser:
         if is_signal_def:
             raw = f"{name}:\n  id: {mdf['id']}\n  fields: null"
         elif is_struct_def:
-            f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
+            if isinstance(mdf["fields"], str):
+                f = f"    fields: {mdf['fields']}"
+            else:
+                f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
             f = "\n".join(f)
             raw = f"{name}:\n  fields:\n{f}"
         else:
-            f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
+            if isinstance(mdf["fields"], str):
+                f = f"    fields: {mdf['fields']}"
+            else:
+                f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
             f = "\n".join(f)
             raw = f"{name}:\n  id: {mdf['id']}\n  fields:\n{f}"
 
@@ -561,72 +567,75 @@ class Parser:
             for field in df.fields:
                 obj.fields.append(copy(field))
 
-        # Parse field specs into Field objects
-        reserved_field_names = ("type_id", "type_name", "type_hash")
+        else:
+            # Parse field specs into Field objects
+            reserved_field_names = ("type_id", "type_name", "type_hash")
 
-        for fname, fstr in mdf["fields"].items():
-            if fname in reserved_field_names:
-                raise SyntaxError(f"{fname} is a reserved field name for internal use.")
+            for fname, fstr in mdf["fields"].items():
+                if fname in reserved_field_names:
+                    raise SyntaxError(
+                        f"{fname} is a reserved field name for internal use."
+                    )
 
-            if not isinstance(fstr, str):
-                raise SyntaxError(
-                    f"Field types must be a string not type not {type(fstr)}: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
-                )
+                if not isinstance(fstr, str):
+                    raise SyntaxError(
+                        f"Field types must be a string not type not {type(fstr)}: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                    )
 
-            m = re.match(FIELD_REGEX, fstr)
-            if m is None:
-                raise SyntaxError(
-                    f"Invalid syntax for field type specification: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
-                )
+                m = re.match(FIELD_REGEX, fstr)
+                if m is None:
+                    raise SyntaxError(
+                        f"Invalid syntax for field type specification: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                    )
 
-            ftype = m.groupdict()["ftype"].strip()
-            len_str = (m.groupdict()["len_str"] or "").strip()
+                ftype = m.groupdict()["ftype"].strip()
+                len_str = (m.groupdict()["len_str"] or "").strip()
 
-            if ftype is None:
-                raise SyntaxError(
-                    f"Invalid syntax for field type specification: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
-                )
+                if ftype is None:
+                    raise SyntaxError(
+                        f"Invalid syntax for field type specification: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                    )
 
-            if len_str == "" and "[" in fstr:
-                raise SyntaxError(
-                    f"Invalid syntax for array field length: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
-                )
+                if len_str == "" and "[" in fstr:
+                    raise SyntaxError(
+                        f"Invalid syntax for array field length: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                    )
 
-            # Check for a valid type
-            if ftype in supported_types.keys():
-                ftype_obj = supported_types[ftype]
-            elif ftype in self.aliases.keys():
-                ftype_obj = self.aliases[ftype]
-            elif ftype in self.struct_defs.keys():
-                ftype_obj = self.struct_defs[ftype]
-            elif ftype in self.message_defs.keys():
-                ftype_obj = self.message_defs[ftype]
-            else:
-                raise SyntaxError(
-                    f"Unknown type specified ({ftype}): {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
-                )
+                # Check for a valid type
+                if ftype in supported_types.keys():
+                    ftype_obj = supported_types[ftype]
+                elif ftype in self.aliases.keys():
+                    ftype_obj = self.aliases[ftype]
+                elif ftype in self.struct_defs.keys():
+                    ftype_obj = self.struct_defs[ftype]
+                elif ftype in self.message_defs.keys():
+                    ftype_obj = self.message_defs[ftype]
+                else:
+                    raise SyntaxError(
+                        f"Unknown type specified ({ftype}): {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                    )
 
-            # Check for invalid signal def usage
-            if ftype in self.message_defs.keys():
-                assert (
-                    len(self.message_defs[ftype].fields) != 0
-                ), f"Signal definitions can not be used as field types: {name}=> {fname}:{fstr} -> {self.current_file.absolute()}"
+                # Check for invalid signal def usage
+                if ftype in self.message_defs.keys():
+                    assert (
+                        len(self.message_defs[ftype].fields) != 0
+                    ), f"Signal definitions can not be used as field types: {name}=> {fname}:{fstr} -> {self.current_file.absolute()}"
 
-            # Expand the length string if needed
-            if len_str:
-                expanded, flen = self.expand_expression(f"{name}->{fname}", len_str)
-                new_field = Field(
-                    name=fname,
-                    type_name=ftype,
-                    type_obj=ftype_obj,
-                    length_expression=len_str,
-                    length_expanded=expanded,
-                    length=int(flen),
-                )
-            else:
-                new_field = Field(name=fname, type_name=ftype, type_obj=ftype_obj)
+                # Expand the length string if needed
+                if len_str:
+                    expanded, flen = self.expand_expression(f"{name}->{fname}", len_str)
+                    new_field = Field(
+                        name=fname,
+                        type_name=ftype,
+                        type_obj=ftype_obj,
+                        length_expression=len_str,
+                        length_expanded=expanded,
+                        length=int(flen),
+                    )
+                else:
+                    new_field = Field(name=fname, type_name=ftype, type_obj=ftype_obj)
 
-            obj.fields.append(new_field)
+                obj.fields.append(new_field)
 
         # Check number of fields > 0
         assert (
