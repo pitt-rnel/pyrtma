@@ -82,7 +82,7 @@ if __name__ == "__main__":
         "-I",
         "--defs",
         dest="defs_file",
-        help="File to parse",
+        help="YAML message defintion file to parse",
     )
 
     parser.add_argument(
