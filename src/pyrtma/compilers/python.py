@@ -82,10 +82,17 @@ class PyDefCompiler:
             for i, field in enumerate(sdf.fields, start=1):
                 flen = field.length
                 nl = ",\n" if i < fnum else ""
-                ftype = type_map.get(field.type_name)
 
-                if ftype is None:
-                    ftype = field.type_name
+                if field.type_name in type_map.keys():
+                    ftype = type_map[field.type_name]
+                elif field.type_name in self.parser.message_defs.keys():
+                    ftype = f"MDF_{field.type_name}"
+                elif field.type_name in self.parser.struct_defs.keys():
+                    ftype = f"_{field.type_name}"
+                elif field.type_name in self.parser.aliases.keys():
+                    ftype = f"{field.type_name}"
+                else:
+                    raise RuntimeError(f"Unknown field name {field.name} in {sdf.name}")
 
                 f.append(
                     f"{tab *4}(\"{field.name}\", {ftype}{' * ' + str(flen) if flen else ''}){nl}"
@@ -95,7 +102,7 @@ class PyDefCompiler:
             fstr += f"\n{tab * 3}]"
 
         template = f"""\
-        class {sdf.name}(ctypes.Structure):
+        class _{sdf.name}(ctypes.Structure):
             _fields_ = {fstr}
         """
         return dedent(template)
@@ -112,10 +119,17 @@ class PyDefCompiler:
             for i, field in enumerate(mdf.fields, start=1):
                 flen = field.length
                 nl = ",\n" if i < fnum else ""
-                ftype = type_map.get(field.type_name)
 
-                if ftype is None:
-                    ftype = field.type_name
+                if field.type_name in type_map.keys():
+                    ftype = type_map[field.type_name]
+                elif field.type_name in self.parser.message_defs.keys():
+                    ftype = f"_{field.type_name}"
+                elif field.type_name in self.parser.struct_defs.keys():
+                    ftype = f"_{field.type_name}"
+                elif field.type_name in self.parser.aliases.keys():
+                    ftype = f"{field.type_name}"
+                else:
+                    raise RuntimeError(f"Unknown field name {field.name} in {mdf.name}")
 
                 f.append(
                     f"{tab *4}(\"{field.name}\", {ftype}{' * ' + str(flen) if flen else ''}){nl}"
@@ -127,14 +141,14 @@ class PyDefCompiler:
         msg_id = mdf.type_id
         template = f"""\
         @pyrtma.msg_def
-        class {mdf.name}(pyrtma.MessageData):
+        class _{mdf.name}(pyrtma.MessageData):
             _fields_ = {fstr}
             type_id = {msg_id}
             type_name = \"{mdf.name}\"
-            type_hash = \"{mdf.hash[:8]}\"
+            type_hash = 0x{mdf.hash[:8]}
             
 
-        MDF_{mdf.name} = {mdf.name}
+        MDF_{mdf.name} = _{mdf.name}
         """
         return dedent(template)
 
@@ -144,6 +158,59 @@ class PyDefCompiler:
         import pyrtma
         from pyrtma.constants import *
         """
+        return dedent(s)
+
+    def generate_type_info(self) -> str:
+        s = "# Collect all info into one object\n"
+        s += "class _constants:\n"
+        for obj in self.parser.constants.values():
+            s += f"    {obj.name} = {obj.value}\n"
+        for obj in self.parser.string_constants.values():
+            s += f"    {obj.name} = {obj.value}\n"
+        s += "\n" * 2
+
+        s += "class _HID:\n"
+        for obj in self.parser.host_ids.values():
+            s += f"    {obj.name} = {obj.value}\n"
+        s += "\n" * 2
+
+        s += "class _MID:\n"
+        for obj in self.parser.module_ids.values():
+            s += f"    {obj.name} = {obj.value}\n"
+        s += "\n" * 2
+
+        s += "class _aliases:\n"
+        for obj in self.parser.aliases.values():
+            s += f"    {obj.name} = {obj.name}\n"
+        s += "\n" * 2
+
+        s += "class _SDF:\n"
+        for obj in self.parser.struct_defs.values():
+            s += f"    {obj.name} = _{obj.name}\n"
+        s += "\n" * 2
+
+        s += "class _MT:\n"
+        for obj in self.parser.message_ids.values():
+            s += f"    {obj.name} = {obj.value}\n"
+        s += "\n" * 2
+
+        s += "class _MDF:\n"
+        for obj in self.parser.message_defs.values():
+            s += f"    {obj.name} = _{obj.name}\n"
+        s += "\n" * 2
+
+        s += "class _RTMA:\n"
+        s += "    constants = _constants\n"
+        s += "    HID = _HID\n"
+        s += "    MID = _MID\n"
+        s += "    aliases = _aliases\n"
+        s += "    MT = _MT\n"
+        s += "    MDF = _MDF\n"
+        s += "    SDF = _SDF\n"
+        s += "\n" * 2
+
+        s += "RTMA = _RTMA()"
+
         return dedent(s)
 
     def generate(self, out_filepath: str):
@@ -194,3 +261,5 @@ class PyDefCompiler:
             for obj in self.parser.message_defs.values():
                 f.write(self.generate_msg_def(obj))
                 f.write("\n\n")
+
+            f.write(self.generate_type_info())

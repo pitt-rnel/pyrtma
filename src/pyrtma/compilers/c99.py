@@ -12,6 +12,8 @@ from pyrtma.parser import (
     SDF,
 )
 
+tab = "    "
+
 # Native C types that are supported
 type_map = {
     "char": "char",
@@ -96,7 +98,7 @@ class CDefCompiler:
             return f"// {struct.name} -> Signal"
 
         f = ["typedef struct {"]
-        tabs = "\t" * 2
+        tabs = f"{tab}" * 1
         for field in struct.fields:
             if field.type_name in type_map.keys():
                 ftype = f"{field.type_name}"
@@ -135,6 +137,114 @@ class CDefCompiler:
             """
 
         return dedent(s)
+
+    def generate_type_info(self) -> str:
+        s = ""
+
+        s += "typedef struct {\n"
+        for obj in self.parser.constants.values():
+            if type(obj.value) is float:
+                ftype = "double"
+            else:
+                ftype = "int"
+
+            s += f'#pragma push_macro("{obj.name}")\n'
+            s += f"#undef {obj.name}\n"
+            s += f"    {ftype} {obj.name};\n"
+            s += f'#pragma pop_macro("{obj.name}")\n'
+            s += "\n"
+
+        for obj in self.parser.string_constants.values():
+            s += f'#pragma push_macro("{obj.name}")\n'
+            s += f"#undef {obj.name}\n"
+            s += f"    const char* {obj.name};\n"
+            s += f'#pragma pop_macro("{obj.name}")\n'
+            s += "\n"
+
+        s += "} ConstantInfo;\n"
+        s += "\n" * 2
+
+        s += "typedef struct {\n"
+        for obj in self.parser.host_ids.values():
+            s += f"    HOST_ID {obj.name};\n"
+        s += "} HostIdInfo;\n"
+
+        s += "\n" * 2
+
+        s += "typedef struct {\n"
+        for obj in self.parser.module_ids.values():
+            s += f"    MODULE_ID {obj.name};\n"
+        s += "} ModuleIdInfo;\n"
+
+        s += "\n" * 2
+
+        s += "typedef struct {\n"
+        for obj in self.parser.message_ids.values():
+            s += f"    MSG_TYPE {obj.name};\n"
+        s += "} MsgIdInfo;\n"
+
+        s += "\n" * 2
+
+        s += "typedef struct {\n"
+        for obj in self.parser.message_defs.values():
+            s += f"    int {obj.name};\n"
+        s += "} MsgHashInfo;\n"
+
+        s += "\n" * 2
+
+        s += "typedef struct {\n"
+        s += "    ConstantInfo constants;\n"
+        s += "    HostIdInfo HID;\n"
+        s += "    ModuleIdInfo MID;\n"
+        s += "    MsgIdInfo MT;\n"
+        s += "    MsgHashInfo HASH;\n"
+        s += "} RTMAInfo;\n"
+
+        s += "\n" * 2
+
+        return dedent(s)
+
+    def generate_rtma_info_getter(self) -> str:
+        s = "const RTMAInfo get_rtma_info() {\n"
+        s += "    static RTMAInfo RTMA;\n"
+
+        for obj in self.parser.constants.values():
+            s += f'#pragma push_macro("{obj.name}")\n'
+            s += f"#undef {obj.name}\n"
+            s += f"{tab}RTMA.constants.{obj.name} = {obj.value};\n"
+            s += f'#pragma pop_macro("{obj.name}")\n'
+            s += "\n"
+
+        for obj in self.parser.string_constants.values():
+            s += f'#pragma push_macro("{obj.name}")\n'
+            s += f"#undef {obj.name}\n"
+            s += f"{tab}RTMA.constants.{obj.name} = {obj.value};\n"
+            s += f'#pragma pop_macro("{obj.name}")\n'
+            s += "\n"
+
+        for obj in self.parser.host_ids.values():
+            s += f"{tab}RTMA.HID.{obj.name} = {obj.value};\n"
+
+        s += "\n" * 2
+
+        for obj in self.parser.module_ids.values():
+            s += f"{tab}RTMA.MID.{obj.name} = {obj.value};\n"
+
+        s += "\n" * 2
+
+        for obj in self.parser.message_ids.values():
+            s += f"{tab}RTMA.MT.{obj.name} = {obj.value};\n"
+
+        s += "\n" * 2
+
+        for obj in self.parser.message_defs.values():
+            s += f"{tab}RTMA.HASH.{obj.name} = 0x{obj.hash[:8]};\n"
+
+        s += "\n"
+        s += "    return RTMA;\n"
+        s += "};\n"
+
+        return s
 
     def generate_close_guard(self) -> str:
         filename = self.filename.replace(" ", "_").upper()
@@ -201,6 +311,14 @@ class CDefCompiler:
             f.write("// Message Definition Hashes\n")
             for obj in self.parser.message_defs.values():
                 f.write(self.generate_hash_id(obj))
+            f.write("\n")
+
+            # Message Definition Type Info (Future Use)
+            f.write("// Type Information\n")
+            f.write(self.generate_type_info())
+            f.write("\n")
+
+            f.write(self.generate_rtma_info_getter())
             f.write("\n")
 
             # Close header guard
