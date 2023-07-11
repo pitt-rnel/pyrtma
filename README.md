@@ -41,6 +41,32 @@ Notes about yaml format:
 - Unused sections should be marked `null`
 - Use **(.yaml)** extension not **(.yml)**
 
+List of supported native data types:
+- char
+- unsigned char
+- byte
+- int
+- signed int
+- unsigned int
+- short
+- unsigned short
+- long
+- signed long
+- unsigned long
+- long long
+- signed long long
+- unsigned long long
+- float
+- double
+- int8
+- uint8
+- int16
+- uint16
+- int32
+- uint32
+- int64
+- uint64
+
 Below is an example:
 
 ```yaml
