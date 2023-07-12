@@ -116,7 +116,7 @@ class JSDefCompiler:
             else:
                 raise RuntimeError(f"Unknown field name {field.name} in {struct.name}")
 
-            if field.length is None:
+            if field.length is not None:
                 s += f"{field.name}: Array({field.length}).fill({ftype}())"
             else:
                 s += f"{field.name}: {ftype}()"
