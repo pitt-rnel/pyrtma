@@ -488,9 +488,9 @@ class Parser:
         is_struct_def = False
 
         # Check the schema
-        if def_type == "msg_def":
+        if def_type == "message_defs":
             valid_sections = ("id", "fields")
-        elif def_type == "struct_def":
+        elif def_type == "struct_defs":
             valid_sections = ("fields",)
             is_struct_def = True
         else:
@@ -699,11 +699,11 @@ class Parser:
 
         if data["struct_defs"] is not None:
             for name, sdf in data["struct_defs"].items():
-                self.handle_def("struct_def", name, sdf)
+                self.handle_def("struct_defs", name, sdf)
 
         if data["message_defs"] is not None:
             for name, mdf in data["message_defs"].items():
-                self.handle_def("msg_def", name, mdf)
+                self.handle_def("message_defs", name, mdf)
 
     def parse(self, msgdefs_file: os.PathLike):
         # Get the current pwd
@@ -726,18 +726,18 @@ class Parser:
     def parse_file(self, msgdefs_file: pathlib.Path):
         # Change the working directory
         cwd = pathlib.Path.cwd()
-        msgdefs_path = cwd / msgdefs_file
+        msgdefs_path = (cwd / msgdefs_file).resolve()
         os.chdir(str(msgdefs_path.parent.absolute()))
 
         # check previously included files
-        if msgdefs_file in self.included_files:
-            print(f"{msgdefs_path.absolute()} already parsed...skipping")
+        if any((msgdefs_path == f for f in self.included_files)):
+            print(f"Skipping {msgdefs_path.absolute()} already parsed...")
             return
 
         print(f"Parsing {msgdefs_path.absolute()}")
         prev_file = self.current_file
-        self.current_file = msgdefs_file
-        self.included_files.append(msgdefs_file)
+        self.current_file = msgdefs_path
+        self.included_files.append(msgdefs_path)
 
         with open(msgdefs_path, "rt") as f:
             text = f.read()
