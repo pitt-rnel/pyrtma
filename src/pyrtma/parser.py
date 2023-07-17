@@ -667,41 +667,41 @@ class Parser:
         )
 
         # Check file format
-        for section in valid_sections:
-            if section not in data.keys():
+        for section in data.keys():
+            if section not in valid_sections:
                 raise SyntaxError(
-                    f"Missing top-level section '{section}' in message defs file -> {self.current_file.absolute()}."
+                    f"Invalid top-level section '{section}' in message defs file -> {self.current_file.absolute()}."
                 )
 
-        if data["imports"] is not None:
+        if data.get("imports") is not None:
             for imp in data["imports"]:
                 self.handle_import(imp)
 
-        if data["constants"] is not None:
+        if data.get("constants") is not None:
             for name, expr in data["constants"].items():
                 self.handle_expression(name, expr)
 
-        if data["string_constants"] is not None:
+        if data.get("string_constants") is not None:
             for name, str_const in data["string_constants"].items():
                 self.handle_string(name, str_const)
 
-        if data["aliases"] is not None:
+        if data.get("aliases") is not None:
             for alias, ftype in data["aliases"].items():
                 self.handle_alias(alias, ftype)
 
-        if data["host_ids"] is not None:
+        if data.get("host_ids") is not None:
             for name, value in data["host_ids"].items():
                 self.handle_host_id(name, value)
 
-        if data["module_ids"] is not None:
+        if data.get("module_ids") is not None:
             for name, value in data["module_ids"].items():
                 self.handle_module_id(name, value)
 
-        if data["struct_defs"] is not None:
+        if data.get("struct_defs") is not None:
             for name, sdf in data["struct_defs"].items():
                 self.handle_def("struct_defs", name, sdf)
 
-        if data["message_defs"] is not None:
+        if data.get("message_defs") is not None:
             for name, mdf in data["message_defs"].items():
                 self.handle_def("message_defs", name, mdf)
 
