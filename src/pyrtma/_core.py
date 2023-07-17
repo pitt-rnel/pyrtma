@@ -99,6 +99,8 @@ class RTMAJSONEncoder(json.JSONEncoder):
 class MessageData(ctypes.Structure):
     type_id: ClassVar[int] = -1
     type_name: ClassVar[str] = ""
+    type_hash: str
+    type_src: str
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

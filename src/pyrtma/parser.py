@@ -306,6 +306,11 @@ class Parser:
     def handle_import(self, fname: str):
         imp = Import(pathlib.Path(fname), src=self.current_file)
         self.imports.append(imp)
+        if imp.file.is_dir():
+            raise TypeError(f"Imports must be yaml files, not directories. -> {self.current_file.absolute()}")
+        if not imp.file.suffix.lower() in [".yaml", ".yml"]:
+            raise TypeError(f"Imports must be .yaml files -> {self.current_file.absolute()}")
+            
         self.parse_file(imp.file.absolute())
 
     def handle_expression(self, name: str, expression: Union[int, float, str]):
@@ -569,7 +574,7 @@ class Parser:
 
         else:
             # Parse field specs into Field objects
-            reserved_field_names = ("type_id", "type_name", "type_hash")
+            reserved_field_names = ("type_id", "type_name", "type_hash", "type_source")
 
             for fname, fstr in mdf["fields"].items():
                 if fname in reserved_field_names:
@@ -674,8 +679,13 @@ class Parser:
                 )
 
         if data.get("imports") is not None:
-            for imp in data["imports"]:
-                self.handle_import(imp)
+            if isinstance(data["imports"], list):
+                for imp in data["imports"]:
+                    self.handle_import(imp)
+            else:
+                raise SyntaxError(
+                    f"Imports must be a list of paths in message defs file -> {self.current_file.absolute()}."
+                )
 
         if data.get("constants") is not None:
             for name, expr in data["constants"].items():
