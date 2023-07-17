@@ -732,6 +732,7 @@ class Parser:
         # check previously included files
         if any((msgdefs_path == f for f in self.included_files)):
             print(f"Skipping {msgdefs_path.absolute()} already parsed...")
+            os.chdir(str(cwd.absolute()))
             return
 
         print(f"Parsing {msgdefs_path.absolute()}")
