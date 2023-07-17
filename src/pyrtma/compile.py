@@ -2,6 +2,8 @@
 
 import pathlib
 from .parser import Parser
+from rich.traceback import install
+install(word_wrap=True)
 
 
 def compile(
