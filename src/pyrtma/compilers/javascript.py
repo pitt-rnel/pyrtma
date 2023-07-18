@@ -134,10 +134,6 @@ class JSDefCompiler:
         return s
 
     def generate(self, out_filepath: pathlib.Path):
-
-        if self.debug:
-            print(out_filepath)
-
         with open(out_filepath, mode="w") as f:
             # Exports
             f.write("export { RTMA } ;\n\n")

@@ -253,10 +253,6 @@ class CDefCompiler:
         return f"#endif // _{filename}_"
 
     def generate(self, out_filepath: pathlib.Path):
-
-        if self.debug:
-            print(out_filepath)
-
         with open(out_filepath, mode="w") as f:
             # Includes
             f.write(self.generate_includes())

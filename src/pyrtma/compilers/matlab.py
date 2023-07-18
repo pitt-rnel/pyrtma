@@ -223,9 +223,6 @@ class MatlabDefCompiler:
         return f"{self.struct_name}.vars = [];\n"
 
     def generate(self, out_filepath: pathlib.Path):
-        if self.debug:
-            print(out_filepath)
-
         with open(out_filepath, mode="w") as f:
             # create RTMA config generator .m function
             f.write(self.generate_fcn_header(out_filepath.stem))

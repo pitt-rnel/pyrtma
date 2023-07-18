@@ -4,6 +4,7 @@ import pathlib
 import os
 import textwrap
 import struct
+import logging
 
 # import yaml
 from ruamel import yaml
@@ -12,6 +13,7 @@ from copy import copy
 from hashlib import sha256
 from typing import List, Optional, Any, Union, Tuple, Dict
 from dataclasses import dataclass, field, is_dataclass, asdict
+from rich.logging import RichHandler
 
 
 @dataclass
@@ -287,6 +289,20 @@ class Parser:
         self.message_ids: Dict[str, MT] = {}
         self.message_defs: Dict[str, MDF] = {}
 
+        self.logger = logging.getLogger("pyrtma.parser")
+        self.logger.propagate = False
+        if self.debug:
+            self.logger.setLevel(logging.DEBUG)
+        else:
+            self.logger.setLevel(logging.INFO)
+
+        fmt = "{levelname:<6} - {message}"
+        formatter = logging.Formatter(fmt, style="{")
+        console = logging.StreamHandler()
+        console.setLevel(logging.DEBUG)
+        console.setFormatter(formatter)
+        self.logger.addHandler(console)
+
     def clear(self):
         self.current_file = pathlib.Path()
         self.included_files = []
@@ -501,8 +517,8 @@ class Parser:
                         length=length,
                     )
 
-                    print(
-                        f"WARNING: Adding {length} padding byte(s) before {s.name}.{field.name}."
+                    self.logger.warning(
+                        f"Adding {length} padding byte(s) before {s.name}.{field.name}."
                     )
                     s.fields.insert(n, padding)
                     n += 2
@@ -528,7 +544,7 @@ class Parser:
         #         length=length or None,
         #     )
         #     s.fields.append(padding)
-        #     print(f"WARNING: Adding {length} trailing padding byte(s) at end of {s.name}.")
+        #     self.logger.warning(f"WARNING: Adding {length} trailing padding byte(s) at end of {s.name}.")
 
         # Final size check using Python's builtin struct module
         assert s.size == struct.calcsize(s.format), f"{s.name} is not 64-bit aligned."
@@ -802,11 +818,13 @@ class Parser:
 
         # check previously included files
         if any((msgdefs_path == f for f in self.included_files)):
-            print(f"Skipping {msgdefs_path.absolute()} already parsed...")
+            self.logger.debug(
+                f"Skipping -> {msgdefs_path.absolute()} already parsed..."
+            )
             os.chdir(str(cwd.absolute()))
             return
 
-        print(f"Parsing {msgdefs_path.absolute()}")
+        self.logger.info(f"Parsing -> {msgdefs_path.absolute()}")
         prev_file = self.current_file
         self.current_file = msgdefs_path
         self.included_files.append(msgdefs_path)
@@ -835,10 +853,6 @@ class Parser:
             message_defs=self.message_defs,
         )
         return json.dumps(d, indent=2, cls=CustomEncoder)
-
-    def print(self, text):
-        if self.debug:
-            print(text)
 
 
 class CustomEncoder(json.JSONEncoder):

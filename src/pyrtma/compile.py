@@ -22,7 +22,6 @@ def compile(
     parser.parse(pathlib.Path(defs_file))
 
     if debug:
-        print(parser.to_json())
         with open("parser.json", "w") as f:
             f.write(parser.to_json())
 
