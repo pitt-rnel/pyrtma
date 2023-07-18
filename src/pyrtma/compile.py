@@ -2,8 +2,9 @@
 import pathlib
 import re
 
-from .parser import Parser
+from .parser import Parser, ParserError
 from rich.traceback import install
+
 install(word_wrap=True, show_locals=True)
 
 
@@ -157,4 +158,16 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    compile(**vars(args))
+    try:
+        compile(**vars(args))
+    except (ParserError, FileNotFoundError) as e:
+        print()
+        msg = " ".join(str(arg) for arg in e.args)
+        print(f"{e.__class__.__name__}: {msg}")
+        print()
+        if e.__cause__:
+            print("Details:")
+            msg = " ".join(str(arg) for arg in e.__cause__.args)
+            print(f"\t{e.__cause__.__class__.__name__}: {msg}")
+    except Exception:
+        raise

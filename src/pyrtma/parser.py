@@ -53,7 +53,55 @@ supported_types = {
 }
 
 
-class AlignmentError(Exception):
+class ParserError(Exception):
+    """Base class for all parser exceptions"""
+
+    pass
+
+
+class YAMLSyntaxError(ParserError):
+    """Raised when the parser encounters invalid YAML"""
+
+    pass
+
+
+class RTMASyntaxError(ParserError):
+    """Raised when the parser encounters invalid RTMA syntax"""
+
+    pass
+
+
+class CircularRefError(ParserError):
+    """Raised when an expression contains a circular reference"""
+
+    pass
+
+
+class ExpressionExpansionError(ParserError):
+    """Raised when an expression can not be expanded."""
+
+    pass
+
+
+class RecurisionError(ParserError):
+    """Raised when recursion limit is exceeded evaluating aliases and expressions."""
+
+    pass
+
+
+class InvalidTypeError(ParserError):
+    """Raised when a field contains the wrong type of data"""
+
+    pass
+
+
+class FileFormatError(ParserError):
+    """Raised when a field when the wrong file extension is referenced."""
+
+    pass
+
+
+class AlignmentError(ParserError):
     """Raised when a struct is not 64-bit aligned"""
 
     pass
@@ -260,7 +308,7 @@ class Parser:
             ns = getattr(self, namespace)
             for o in ns.values():
                 if name == o.name:
-                    raise SyntaxError(
+                    raise RTMASyntaxError(
                         f"Duplicate name conflict found: \n\n1: {namespace} -> {o.name} -> {o.src.absolute()}\n2: {section} -> {name} -> {self.current_file.absolute()}\n"
                     )
 
@@ -275,20 +323,24 @@ class Parser:
             try:
                 c = self.constants[symbol]
             except KeyError:
-                raise RuntimeError(
+                raise ExpressionExpansionError(
                     f"Unable to expand expression {name} -> {symbol} not defined: {self.current_file.absolute()}"
                 )
 
-            assert (
-                re.search(rf"\b{name}\b", c.expression) is None
-            ), "Circular reference in macro {d.name}."
+            if re.search(rf"\b{name}\b", c.expression) is not None:
+                raise CircularRefError(
+                    f"Circular reference in expression: {name} -> {expr}."
+                )
 
-            assert c.value is not None, f"{c.name} has not been evaluated to a value."
+            if c.value is None:
+                raise ExpressionExpansionError(
+                    f"{c.name} has not been evaluated to a value."
+                )
 
             expr = re.sub(rf"\b{c.name}\b", str(c.value), expr)
 
             if n > rdepth_limit:
-                raise RuntimeError(
+                raise RecursionError(
                     f"Recursion limit reached expanding constant expression {name} in {self.current_file.absolute()}"
                 )
 
@@ -307,10 +359,14 @@ class Parser:
         imp = Import(pathlib.Path(fname), src=self.current_file)
         self.imports.append(imp)
         if imp.file.is_dir():
-            raise TypeError(f"Imports must be yaml files, not directories. -> {self.current_file.absolute()}")
+            raise FileFormatError(
+                f"Imports must be yaml files, not directories. -> {self.current_file.absolute()}"
+            )
         if not imp.file.suffix.lower() in [".yaml", ".yml"]:
-            raise TypeError(f"Imports must be .yaml files -> {self.current_file.absolute()}")
-            
+            raise FileFormatError(
+                f"Imports must be .yaml files -> {self.current_file.absolute()}"
+            )
+
         self.parse_file(imp.file.absolute())
 
     def handle_expression(self, name: str, expression: Union[int, float, str]):
@@ -337,7 +393,7 @@ class Parser:
         self.check_duplicate_name("string_constants", name, namespaces=("constants",))
 
         if not isinstance(value, str):
-            raise SyntaxError(
+            raise RTMASyntaxError(
                 f"Values in 'string_constants' section must evaluate to string type not {type(value)}. {name}: {value} -> {self.current_file.absolute()}"
             )
 
@@ -376,47 +432,47 @@ class Parser:
                     ftype = a.type_name
 
             if ftype == prev:
-                raise RuntimeError(f"Unable to resolve alias: {ftype}")
+                raise RTMASyntaxError(f"Unable to resolve alias {alias}: {ftype}")
             else:
                 prev = ftype
 
-        raise RuntimeError(f"Recursion limit exceeded for typedef: {alias}")
+        raise RecursionError(f"Recursion limit exceeded for alias: {alias}")
 
     def handle_host_id(self, name: str, value: int):
         if not isinstance(value, int):
-            raise SyntaxError(
-                f"Values in 'host_ids' section must evaluate to int type not {type(value)}. {name}: {value}"
+            raise InvalidTypeError(
+                f"Values in 'host_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value}"
             )
 
         if value < 10 or value > 32767:
             if self.current_file.name != "core_defs.yaml":
-                raise SyntaxError(
+                raise RTMASyntaxError(
                     f"Value outside of valid range [0 - 32767] for host_id: {name}: {value}"
                 )
 
         for hid in self.host_ids.values():
             if value == hid.value:
-                raise SyntaxError(
+                raise RTMASyntaxError(
                     f"Duplicate host id conflict found for {name} and {hid.name} -> {value}\n1: {hid.src.absolute()}\n2: {self.current_file.absolute()}\n"
                 )
         self.host_ids[name] = HID(name, int(value), src=self.current_file)
 
     def handle_module_id(self, name: str, value: int):
         if not isinstance(value, int):
-            raise SyntaxError(
-                f"Values in 'module_ids' section must evaluate to int type not {type(value)}. {name}: {value} -> {self.current_file.absolute()}"
+            raise InvalidTypeError(
+                f"Values in 'module_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value} -> {self.current_file.absolute()}"
             )
 
         if value < 10 or (99 < value < 200):
             if self.current_file.name != "core_defs.yaml" and value != 0:
-                raise SyntaxError(
+                raise RTMASyntaxError(
                     f"Value outside of valid range [10 - 99 or > 200] for module_id: {name}: {value} -> {self.current_file.absolute()}"
                 )
 
         for mid in self.module_ids.values():
             if value == mid.value:
-                raise SyntaxError(
-                    f"Duplicate host id conflict found for {name} and {mid.name} -> {value}\n1: {mid.src.absolute()}\n2: {self.current_file.absolute()}\n"
+                raise RTMASyntaxError(
+                    f"Duplicate module id conflict found for {name} and {mid.name} -> {value}\n1: {mid.src.absolute()}\n2: {self.current_file.absolute()}\n"
                 )
 
         self.module_ids[name] = MID(name, int(value), src=self.current_file)
@@ -499,11 +555,11 @@ class Parser:
             valid_sections = ("fields",)
             is_struct_def = True
         else:
-            raise RuntimeError(f"Unknown struct type section {def_type}.")
+            raise RTMASyntaxError(f"Unknown struct type section {def_type}.")
 
         for section in mdf.keys():
             if section not in valid_sections:
-                raise SyntaxError(
+                raise RTMASyntaxError(
                     f"Invalid top-level section '{section}' in message or struct definition of {name} -> {self.current_file.absolute()}."
                 )
 
@@ -540,18 +596,18 @@ class Parser:
         if not is_struct_def:
             msg_id = mdf["id"]
             if not isinstance(msg_id, int):
-                raise SyntaxError(
-                    f"Message definition id must evaluate to int type not {msg_id}. {name}: {msg_id}"
+                raise InvalidTypeError(
+                    f"Message definition id must evaluate to int type not {type(msg_id).__name__}. {name}: {msg_id}"
                 )
 
             if msg_id < 0 or msg_id > 10000:
-                raise SyntaxError(
+                raise RTMASyntaxError(
                     "Value outside of valid range [0 - 10000] for module_id: {name}: {value}"
                 )
 
             for mt in self.message_ids.values():
                 if msg_id == mt.value:
-                    raise SyntaxError(
+                    raise RTMASyntaxError(
                         f"Duplicate message ids conflict found for {mt.name} and {name}: {msg_id} ->\n1: {mt.src.absolute()}\n2: {self.current_file.absolute()}\n"
                     )
 
@@ -565,7 +621,7 @@ class Parser:
             type_name = mdf["fields"]
             df = self.message_defs.get(type_name) or self.struct_defs.get(type_name)
             if df is None:
-                raise SyntaxError(
+                raise RTMASyntaxError(
                     f"Unable to find definition for {type_name} in {name} -> {self.current_file.absolute()}"
                 )
 
@@ -578,18 +634,18 @@ class Parser:
 
             for fname, fstr in mdf["fields"].items():
                 if fname in reserved_field_names:
-                    raise SyntaxError(
+                    raise RTMASyntaxError(
                         f"{fname} is a reserved field name for internal use."
                     )
 
                 if not isinstance(fstr, str):
-                    raise SyntaxError(
-                        f"Field types must be a string not type not {type(fstr)}: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                    raise InvalidTypeError(
+                        f"Field types must be a string not type not {type(fstr).__name__}: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
                     )
 
                 m = re.match(FIELD_REGEX, fstr)
                 if m is None:
-                    raise SyntaxError(
+                    raise RTMASyntaxError(
                         f"Invalid syntax for field type specification: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
                     )
 
@@ -597,12 +653,12 @@ class Parser:
                 len_str = (m.groupdict()["len_str"] or "").strip()
 
                 if ftype is None:
-                    raise SyntaxError(
+                    raise RTMASyntaxError(
                         f"Invalid syntax for field type specification: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
                     )
 
                 if len_str == "" and "[" in fstr:
-                    raise SyntaxError(
+                    raise RTMASyntaxError(
                         f"Invalid syntax for array field length: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
                     )
 
@@ -616,7 +672,7 @@ class Parser:
                 elif ftype in self.message_defs.keys():
                     ftype_obj = self.message_defs[ftype]
                 else:
-                    raise SyntaxError(
+                    raise RTMASyntaxError(
                         f"Unknown type specified ({ftype}): {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
                     )
 
@@ -658,7 +714,12 @@ class Parser:
 
     def parse_text(self, text: str):
         # Parse the yaml file
-        data = yaml.load(text, Loader=yaml.Loader)
+        try:
+            data = yaml.load(text, Loader=yaml.Loader)
+        except Exception as e:
+            raise YAMLSyntaxError(
+                f"Error encountered by YAML parser in {self.current_file.absolute()}"
+            ) from e
 
         valid_sections = (
             "imports",
@@ -674,7 +735,7 @@ class Parser:
         # Check file format
         for section in data.keys():
             if section not in valid_sections:
-                raise SyntaxError(
+                raise RTMASyntaxError(
                     f"Invalid top-level section '{section}' in message defs file -> {self.current_file.absolute()}."
                 )
 
@@ -683,7 +744,7 @@ class Parser:
                 for imp in data["imports"]:
                     self.handle_import(imp)
             else:
-                raise SyntaxError(
+                raise RTMASyntaxError(
                     f"Imports must be a list of paths in message defs file -> {self.current_file.absolute()}."
                 )
 
@@ -750,8 +811,12 @@ class Parser:
         self.current_file = msgdefs_path
         self.included_files.append(msgdefs_path)
 
-        with open(msgdefs_path, "rt") as f:
-            text = f.read()
+        try:
+            with open(msgdefs_path, "rt") as f:
+                text = f.read()
+        except FileNotFoundError as e:
+            e.args = tuple([*e.args, self.current_file.absolute()])
+            raise e
 
         self.parse_text(text)
         self.current_file = prev_file
