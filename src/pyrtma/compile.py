@@ -3,6 +3,8 @@ import pathlib
 import re
 
 from .parser import Parser
+from rich.traceback import install
+install(word_wrap=True, show_locals=True)
 
 
 def compile(

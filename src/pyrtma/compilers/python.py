@@ -141,6 +141,7 @@ class PyDefCompiler:
             fstr += f"\n{tab * 3}]"
 
         msg_id = mdf.type_id
+        msg_src = str(mdf.src.absolute()).replace("\\", "\\\\")
         template = f"""\
         @pyrtma.msg_def
         class _{mdf.name}(pyrtma.MessageData):
@@ -148,6 +149,7 @@ class PyDefCompiler:
             type_id = {msg_id}
             type_name = \"{mdf.name}\"
             type_hash = 0x{mdf.hash[:8]}
+            type_source = \"{msg_src}\"
             
 
         MDF_{mdf.name} = _{mdf.name}
