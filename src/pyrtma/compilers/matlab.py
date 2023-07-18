@@ -1,3 +1,5 @@
+import pathlib
+
 from pyrtma.parser import (
     Parser,
     ConstantExpr,
@@ -11,7 +13,6 @@ from pyrtma.parser import (
 )
 
 from typing import Any, Union
-from pathlib import Path
 from textwrap import dedent
 
 # Field type name to matlab types
@@ -221,7 +222,7 @@ class MatlabDefCompiler:
         # do nothing (for now)
         return f"{self.struct_name}.vars = [];\n"
 
-    def generate(self, out_filepath: Path):
+    def generate(self, out_filepath: pathlib.Path):
         if self.debug:
             print(out_filepath)
 

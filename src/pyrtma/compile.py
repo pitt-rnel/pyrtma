@@ -1,12 +1,14 @@
 """pyrtma.compile Message Type Compiler """
-
 import pathlib
+import re
+
 from .parser import Parser
 
 
 def compile(
     defs_file: str,
-    out_filepath: str,
+    out_dir: str,
+    out_name: str,
     python: bool = False,
     javascript: bool = False,
     matlab: bool = False,
@@ -21,9 +23,26 @@ def compile(
         with open("parser.json", "w") as f:
             f.write(parser.to_json())
 
-    # Use the same filename as the message defs file by default
-    if out_filepath == "":
-        out_filepath = defs_file
+    # Use the same directory and filename as the message defs file by default
+    if out_dir == "":
+        outpath = pathlib.Path(defs_file).parent.resolve().absolute()
+    else:
+        outpath = pathlib.Path(out_dir)
+
+    if not outpath.is_dir():
+        raise FileExistsError(f"The output location must be a directory.")
+
+    # Make the final output directory, but no anything above it.
+    outpath.mkdir(parents=False, exist_ok=True)
+
+    if out_name == "":
+        filename = pathlib.Path(defs_file).stem
+    else:
+        filename = out_name
+
+    # Check for any invalid names
+    if re.search(r"[^a-zA-Z0-9_-]", filename):
+        raise RuntimeError(f"Invalid out filename: {filename}")
 
     if python:
         print("Building python message definitions...")
@@ -31,43 +50,37 @@ def compile(
 
         compiler = PyDefCompiler(parser, debug=debug)
         ext = ".py"
-        p = pathlib.Path(out_filepath)
-        out = p.stem + ext
-        compiler.generate(str(p.parent.absolute() / out))
+        output = outpath / (filename + ext)
+        compiler.generate(output)
 
     if javascript:
         print("Building javascript message definitions...")
         from pyrtma.compilers.javascript import JSDefCompiler
 
         compiler = JSDefCompiler(parser, debug=debug)
-        p = pathlib.Path(out_filepath)
         ext = ".js"
-        out = p.stem + ext
-        compiler.generate(str(p.parent / out))
+        output = outpath / (filename + ext)
+        compiler.generate(output)
 
     if matlab:
         print("Building matlab message definitions...")
         from pyrtma.compilers.matlab import MatlabDefCompiler
 
         compiler = MatlabDefCompiler(parser, debug=debug)
-        name = "generate_RTMA_config.m"
-
-        p = pathlib.Path(out_filepath)
-        if p.is_dir():
-            out = p / name
-        else:
-            out = p.parent / name
-        compiler.generate(out)
+        # Over-ride name
+        matlab_filename = "generate_RTMA_config"
+        ext = ".m"
+        output = outpath / (matlab_filename + ext)
+        compiler.generate(output)
 
     if c_lang:
         print("Building C/C++ message definitions...")
         from pyrtma.compilers.c99 import CDefCompiler
 
-        p = pathlib.Path(out_filepath)
-        compiler = CDefCompiler(parser, filename=p.stem, debug=debug)
+        compiler = CDefCompiler(parser, filename=filename, debug=debug)
         ext = ".h"
-        out = p.stem + ext
-        compiler.generate(str(p.parent / out))
+        output = outpath / (filename + ext)
+        compiler.generate(output)
 
     print("DONE.")
 
@@ -122,8 +135,16 @@ if __name__ == "__main__":
         "-o",
         "--out",
         default="",
-        dest="out_filepath",
-        help="Output file",
+        dest="out_dir",
+        help="Output directory for compiled files.",
+    )
+
+    parser.add_argument(
+        "-n",
+        "--name",
+        default="",
+        dest="out_name",
+        help="Output file(s) base name.",
     )
 
     parser.add_argument(

@@ -1,3 +1,5 @@
+import pathlib
+
 from textwrap import dedent
 from pyrtma.parser import (
     Parser,
@@ -213,7 +215,7 @@ class PyDefCompiler:
 
         return dedent(s)
 
-    def generate(self, out_filepath: str):
+    def generate(self, out_filepath: pathlib.Path):
         if self.debug:
             print(out_filepath)
 

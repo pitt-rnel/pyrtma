@@ -1,3 +1,5 @@
+import pathlib
+
 from textwrap import dedent
 from typing import Union
 from pyrtma.parser import (
@@ -250,7 +252,7 @@ class CDefCompiler:
         filename = self.filename.replace(" ", "_").upper()
         return f"#endif // _{filename}_"
 
-    def generate(self, out_filepath: str):
+    def generate(self, out_filepath: pathlib.Path):
 
         if self.debug:
             print(out_filepath)

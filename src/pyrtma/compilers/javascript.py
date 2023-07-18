@@ -1,3 +1,5 @@
+import pathlib
+
 from typing import Union
 from pyrtma.parser import (
     Parser,
@@ -131,7 +133,7 @@ class JSDefCompiler:
 
         return s
 
-    def generate(self, out_filepath: str):
+    def generate(self, out_filepath: pathlib.Path):
 
         if self.debug:
             print(out_filepath)
