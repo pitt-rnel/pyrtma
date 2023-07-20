@@ -46,11 +46,7 @@ def print_ctype_array(arr):
 def _create_ftype_map(obj: "MessageData"):
     super(MessageData, obj).__setattr__(
         "_ftype_map",
-        {
-            k: v._type_
-            for k, v in super(MessageData, obj).__getattribute__("_fields_")
-            if hasattr(v, "_type_")
-        },
+        {k: v for k, v in super(MessageData, obj).__getattribute__("_fields_")},
     )
 
 
@@ -92,6 +88,9 @@ class RTMAJSONEncoder(json.JSONEncoder):
         if isinstance(o, ctypes.Array):
             return list(o)
 
+        if isinstance(o, bytes):
+            return [int(x) for x in o]
+
         return super().default(o)
 
 
@@ -99,7 +98,7 @@ class RTMAJSONEncoder(json.JSONEncoder):
 class MessageData(ctypes.Structure):
     type_id: ClassVar[int] = -1
     type_name: ClassVar[str] = ""
-    type_hash: str
+    type_hash: int
     type_src: str
 
     def __init__(self, *args, **kwargs):
@@ -170,8 +169,14 @@ class MessageData(ctypes.Structure):
             _create_ftype_map(self)
             ftype = super().__getattribute__("_ftype_map").get(name)
 
+        # Check attribute is not a struct field
+        if ftype is None:
+            return value
+
         # Automatically decode char types to a string
         if ftype is ctypes.c_char:
+            return value.decode()
+        elif issubclass(ftype, ctypes.Array) and ftype._type_ is ctypes.c_char:
             return value.decode()
         else:
             return value
@@ -186,6 +191,9 @@ class MessageData(ctypes.Structure):
 
         # Automatically encode a string value to bytes
         if ftype is ctypes.c_char:
+            if isinstance(value, str):
+                value = value.encode()
+        elif issubclass(ftype, ctypes.Array) and ftype._type_ is ctypes.c_char:
             if isinstance(value, str):
                 value = value.encode()
 
