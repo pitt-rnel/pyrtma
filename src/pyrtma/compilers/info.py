@@ -22,11 +22,13 @@ class InfoCompiler:
 
     def generate(self, out_filepath: pathlib.Path):
         with open(out_filepath, mode="w") as f:
-            f.write("# {out_filepath}")
+            f.write(f"# {out_filepath}\n")
             f.write("# DO NOT EDIT BY HAND. FILE IS AUTO-GENERATED.\n\n")
+            f.write(
+                "# File contains a list of message and module ids currently in use.\n\n"
+            )
             mids = list(self.parser.module_ids.values())
             mids.sort(key=lambda x: x.value)
-            f.write(f"# {self.filename} info\n\n")
             f.write("module_ids\n")
             for obj in mids:
                 f.write(f"{obj.value:4d}: {obj.name}\n")

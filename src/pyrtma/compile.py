@@ -90,7 +90,7 @@ def compile(
 
     compiler = InfoCompiler(parser, filename=filename, debug=debug)
     ext = ".txt"
-    output = outpath / (filename + "_info" + ext)
+    output = outpath / (filename + ext)
     compiler.generate(output)
 
     print("DONE.")
