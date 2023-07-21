@@ -302,6 +302,10 @@ class Parser:
         console.setFormatter(formatter)
         self.logger.addHandler(console)
 
+    def warning(self, msg: str):
+        self.logger.warning(msg)
+        input("Hit enter to continue...")
+
     def clear(self):
         self.current_file = pathlib.Path()
         self.included_files = []
@@ -381,6 +385,9 @@ class Parser:
             raise FileFormatError(
                 f"Imports must be .yaml files -> {self.current_file.absolute()}"
             )
+
+        if imp.file.suffix == ".yml":
+            self.warning(f"Please change {imp.file} to use '.yaml' extension.")
 
         self.parse_file(imp.file.absolute())
 
@@ -516,7 +523,7 @@ class Parser:
                         length=length,
                     )
 
-                    self.logger.warning(
+                    self.warning(
                         f"Adding {length} padding byte(s) before {s.name}.{field.name}."
                     )
                     s.fields.insert(n, padding)
@@ -543,7 +550,7 @@ class Parser:
         #         length=length or None,
         #     )
         #     s.fields.append(padding)
-        #     self.logger.warning(f"WARNING: Adding {length} trailing padding byte(s) at end of {s.name}.")
+        #     self.warning(f"WARNING: Adding {length} trailing padding byte(s) at end of {s.name}.")
 
         # Final size check using Python's builtin struct module
         assert s.size == struct.calcsize(s.format), f"{s.name} is not 64-bit aligned."
@@ -832,7 +839,13 @@ class Parser:
             with open(msgdefs_path, "rt") as f:
                 text = f.read()
         except FileNotFoundError as e:
-            e.args = tuple([*e.args, self.current_file.absolute()])
+            alt_ext = ".yaml" if msgdefs_path.suffix == ".yml" else ".yml"
+            alt_path = msgdefs_path.parent / (msgdefs_path.stem + alt_ext)
+            if alt_path.is_file() and alt_path.exists():
+                detail = f"\n\nCheck file extension -> Did you mean {alt_path}?"
+            else:
+                detail = ""
+            e.args = tuple([*e.args, msgdefs_path.absolute(), detail])
             raise e
 
         self.parse_text(text)
