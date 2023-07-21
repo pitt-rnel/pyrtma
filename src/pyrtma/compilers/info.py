@@ -22,6 +22,8 @@ class InfoCompiler:
 
     def generate(self, out_filepath: pathlib.Path):
         with open(out_filepath, mode="w") as f:
+            f.write("# {out_filepath}")
+            f.write("# DO NOT EDIT BY HAND. FILE IS AUTO-GENERATED.\n\n")
             mids = list(self.parser.module_ids.values())
             mids.sort(key=lambda x: x.value)
             f.write(f"# {self.filename} info\n\n")
