@@ -68,34 +68,6 @@ def _random_byte_array(length) -> bytes:
     return bytes([random.randint(0, 255) for _ in range(length)])
 
 
-def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
-    if type(obj) != type(other):
-        raise TypeError("Can not compare two different struct types.")
-
-    for name, ftype in obj._fields_:
-        if issubclass(ftype, ctypes.Structure):
-            if not is_equal(getattr(obj, name), getattr(other, name)):
-                return False
-        elif issubclass(ftype, ctypes.Array):
-            length = ftype._length_
-            etype = ftype._type_
-            for i in range(length):
-                if issubclass(etype, ctypes.Structure):
-                    if not is_equal(getattr(obj, name)[i], getattr(other, name)[i]):
-                        return False
-                elif etype is ctypes.c_char:
-                    if getattr(obj, name) != getattr(other, name):
-                        return False
-                else:
-                    if getattr(obj, name)[i] != getattr(other, name)[i]:
-                        return False
-        else:
-            if getattr(obj, name) != getattr(other, name):
-                return False
-
-    return True
-
-
 def _random_struct(obj):
     for name, ftype in obj._fields_:
         if issubclass(ftype, ctypes.Structure):
@@ -285,6 +257,12 @@ class MessageData(ctypes.Structure):
     def __str__(self):
         return self.pretty_print()
 
+    def __eq__(self, other: "MessageData") -> bool:
+        if type(self) != type(other):
+            raise TypeError(f"Can not compare {type(other)} to {type(self)}.")
+
+        return bytes(self) == bytes(other)
+
     def __getattribute__(self, name: str) -> Any:
         value = super().__getattribute__(name)
         try:
@@ -405,6 +383,12 @@ class MessageHeader(ctypes.Structure):
         obj = cls.from_dict(json.loads(s))
         return obj
 
+    def __eq__(self, other: "MessageHeader") -> bool:
+        if type(self) != type(other):
+            raise TypeError(f"Can not compare {type(other)} to {type(self)}.")
+
+        return bytes(self) == bytes(other)
+
 
 class TimeCodeMessageHeader(MessageHeader):
     _fields_ = [
@@ -432,6 +416,9 @@ class Message:
     @property
     def name(self) -> str:
         return self.data.type_name
+
+    def __eq__(self, other: "Message") -> bool:
+        return self.header == other.header and self.data == other.data
 
     def pretty_print(self, add_tabs=0):
         return (
