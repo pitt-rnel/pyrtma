@@ -13,7 +13,6 @@ from copy import copy
 from hashlib import sha256
 from typing import List, Optional, Any, Union, Tuple, Dict
 from dataclasses import dataclass, field, is_dataclass, asdict
-from rich.logging import RichHandler
 
 
 @dataclass
