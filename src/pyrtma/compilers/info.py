@@ -25,14 +25,14 @@ class InfoCompiler:
             mids = list(self.parser.module_ids.values())
             mids.sort(key=lambda x: x.value)
             f.write(f"# {self.filename} info\n\n")
-            f.write("module_ids:\n")
+            f.write("module_ids\n")
             for obj in mids:
-                f.write(f"  {obj.name}: {obj.value}\n")
+                f.write(f"{obj.value:4d}: {obj.name}\n")
             f.write("\n\n")
 
             msg_ids = list(self.parser.message_ids.values())
             msg_ids.sort(key=lambda x: x.value)
-            f.write("message_ids:\n")
+            f.write("message_ids\n")
             for obj in msg_ids:
-                f.write(f"  {obj.name}: {obj.value}\n")
+                f.write(f"{obj.value:4d}: {obj.name}\n")
             f.write("\n\n")

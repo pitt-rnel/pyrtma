@@ -88,10 +88,9 @@ def compile(
     print("Building info file...")
     from pyrtma.compilers.info import InfoCompiler
 
-    info_filename = pathlib.Path(defs_file).stem
-    compiler = InfoCompiler(parser, filename=info_filename, debug=debug)
-    ext = ".yaml"
-    output = outpath / (info_filename + "_info" + ext)
+    compiler = InfoCompiler(parser, filename=filename, debug=debug)
+    ext = ".txt"
+    output = outpath / (filename + "_info" + ext)
     compiler.generate(output)
 
     print("DONE.")
