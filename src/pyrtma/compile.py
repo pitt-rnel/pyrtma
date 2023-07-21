@@ -1,6 +1,7 @@
 """pyrtma.compile Message Type Compiler """
 import pathlib
 import re
+import sys
 
 from .parser import Parser, ParserError
 from rich.traceback import install
@@ -170,3 +171,5 @@ if __name__ == "__main__":
             print(f"\t{e.__cause__.__class__.__name__}: {msg}")
     except Exception:
         raise
+
+    sys.exit(0)
