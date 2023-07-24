@@ -52,4 +52,3 @@ class TestJSONConversion(unittest.TestCase):
             self.assertTrue(is_equal(in_msg, out_msg))
             self.assertEqual(in_msg, out_msg)
             self.assertEqual(in_str, out_str)
-            self.assertEqual(in_msg, out_msg)
