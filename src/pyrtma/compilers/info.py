@@ -31,12 +31,14 @@ class InfoCompiler:
             mids.sort(key=lambda x: x.value)
             f.write("module_ids\n")
             for obj in mids:
-                f.write(f"{obj.value:4d}: {obj.name}\n")
+                src = "/".join(obj.src.parts[-2:])
+                f.write(f"{obj.value:4d}: {obj.name:<32} # {src}\n")
             f.write("\n\n")
 
             msg_ids = list(self.parser.message_ids.values())
             msg_ids.sort(key=lambda x: x.value)
             f.write("message_ids\n")
             for obj in msg_ids:
-                f.write(f"{obj.value:4d}: {obj.name}\n")
+                src = "/".join(obj.src.parts[-2:])
+                f.write(f"{obj.value:4d}: {obj.name:<32} # {src}\n")
             f.write("\n\n")
