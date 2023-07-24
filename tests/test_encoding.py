@@ -1,95 +1,68 @@
-import ctypes
-import json
 import unittest
+import random
+import threading
+import time
+import logging
 
-from pyrtma import MessageData, msg_def
+import pyrtma
+from .test_msg_defs.test_defs import *
 
-# Choose a unique message type id number
-MT_TEST_MESSAGE = 1234
-MT_NESTED_MESSAGE = 5678
-
-
-@msg_def
-class TEST_MESSAGE(MessageData):
-    _pack_ = True
-    _fields_ = [
-        ("str_value", ctypes.c_char * 64),
-        ("int_value", ctypes.c_int),
-        ("float_value", ctypes.c_float),
-        ("double_value", ctypes.c_double),
-        ("intarr_value", ctypes.c_int * 4),
-        ("longarr_value", ctypes.c_long * 2),
-    ]
-
-    type_id: int = MT_TEST_MESSAGE
-    type_name: str = "TEST_MESSAGE"
+from pyrtma.client import Client
+import pyrtma.manager
+from pyrtma.manager import MessageManager
 
 
-@msg_def
-class NESTED_MESSAGE(MessageData):
-    _pack_ = True
-    _fields_ = [("idx", ctypes.c_int), ("nested", TEST_MESSAGE)]
+class TestEncoding(unittest.TestCase):
+    """Test sending messages through MessageManager."""
 
-    type_id: int = MT_NESTED_MESSAGE
-    type_name: str = "NESTED_MESSAGE"
+    def setUp(self):
+        self.port = random.randint(1000, 10000)  # random port
+        self.addr = f"127.0.0.1:{self.port}"
 
+        pyrtma.manager.LOG_LEVEL = logging.ERROR
+        self.manager = MessageManager(
+            ip_address="127.0.0.1",
+            port=self.port,
+            timecode=False,
+            debug=False,
+            send_msg_timing=True,
+        )
+        self.manager_thread = threading.Thread(
+            target=self.manager.run,
+        )
+        self.manager_thread.start()
+        time.sleep(0.250)
 
-class TestJSONEncoding(unittest.TestCase):
-    """
-    Test JSON encoding/decoding functionality.
-    """
+    def tearDown(self):
+        self.manager.close()
+        self.manager_thread.join()
+        for mod in self.manager.modules:
+            mod.close()
 
-    def test_whenSingleMessage_encodesToJSON(self):
-        """
-        Test if a single message can be encoded to json.
-        """
-        # Arrange
-        msg = TEST_MESSAGE()
-        msg.str_value = "test"
-        msg.int_value = 2
-        msg.float_value = 4.3
-        msg.double_value = 5.4
-        msg.intarr_value = (ctypes.c_int * 4)(6, 9, 3, 2)
-        msg.longarr_value = (ctypes.c_long * 2)(4, 7)
+    def test_message_encoding(self):
+        publisher = Client()
+        publisher.connect(self.addr)
+        subscriber = Client()
+        subscriber.connect(self.addr)
+        time.sleep(0.250)
 
-        # Act
-        result = msg.to_json()
+        for mdf in pyrtma.msg_defs.values():
+            if mdf.type_id > 1000:
+                # Subscribe from message type
+                subscriber.subscribe([mdf.type_id])
+                subscriber.wait_for_acknowledgement()
 
-        # Assert
-        result_map = json.loads(result)
-        self.assertEqual(result_map["str_value"], "test")
-        self.assertEqual(result_map["int_value"], 2)
-        self.assertAlmostEqual(result_map["float_value"], 4.3, 5)
-        self.assertEqual(result_map["double_value"], 5.4)
-        self.assertEqual(result_map["intarr_value"], [6, 9, 3, 2])
-        self.assertEqual(result_map["longarr_value"], [4, 7])
+                # Publish a random message of the subscribed type
+                in_msg = mdf.from_random()
+                publisher.send_message(in_msg)
 
-    def test_whenNestedMessage_encodesToJSON(self):
-        """
-        Test if a nested message can be encoded to json.
-        """
-        # Arrange
-        nested = TEST_MESSAGE()
-        nested.str_value = "test"
-        nested.int_value = 55
+                # Wait for the message and compare for equality of the data segment
+                out_msg = subscriber.read_message(timeout=0.020)
+                if out_msg is None:
+                    self.fail("Subscriber did not receive packet.")
+                else:
+                    self.assertEqual(in_msg, out_msg.data)
 
-        msg = NESTED_MESSAGE()
-        msg.idx = 1200
-        msg.nested = nested
-
-        print(msg.nested.str_value)
-        print(msg.nested.int_value)
-
-        # Act
-        result = msg.to_json()
-
-        # Assert
-        result_map = json.loads(result)
-        self.assertEqual(result_map["idx"], 1200)
-        nested_map = result_map["nested"]
-        self.assertEqual(nested_map["str_value"], "test")
-        self.assertEqual(nested_map["int_value"], 55)
-        self.assertEqual(nested_map["float_value"], 0.0)
-        self.assertEqual(nested_map["double_value"], 0.0)
-        self.assertEqual(nested_map["intarr_value"], [0, 0, 0, 0])
-        self.assertEqual(nested_map["longarr_value"], [0, 0])
+                # Unsubscribe from message type
+                subscriber.unsubscribe([mdf.type_id])
+                subscriber.wait_for_acknowledgement()

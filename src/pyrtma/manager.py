@@ -19,6 +19,8 @@ from typing import Dict, List, Tuple, Set, Type, Union, Optional
 from dataclasses import dataclass
 from collections import defaultdict, Counter
 
+LOG_LEVEL = logging.INFO
+
 
 @dataclass
 class Module:
@@ -89,9 +91,6 @@ class MessageManager:
         self._debug = debug
         self.b_send_msg_timing = send_msg_timing
         self.logger = logging.getLogger(f"MessageManager@{ip_address}:{port}")
-        self.console_log_level = (
-            logging.INFO
-        )  # should eventually change this to WARNING or INFO. Could also tie to _debug property
 
         if ip_address == socket.INADDR_ANY:
             ip_address = ""  # bind and Module require a string input, '' is treated as INADDR_ANY by bind
@@ -146,14 +145,14 @@ class MessageManager:
     def _configure_logging(self) -> None:
         # Logging Configuration
         self.logger.propagate = False
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(LOG_LEVEL)
         formatter = logging.Formatter(
             "%(levelname)s - %(asctime)s - %(name)s - %(message)s"
         )
 
         # Console Log
         console = logging.StreamHandler()
-        console.setLevel(self.console_log_level)
+        console.setLevel(LOG_LEVEL)
         console.setFormatter(formatter)
         self.logger.addHandler(console)
 

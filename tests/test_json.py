@@ -1,6 +1,8 @@
 import pyrtma
-import climber_message
 import ctypes
+import unittest
+
+from .test_msg_defs.test_defs import *
 
 
 def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
@@ -31,21 +33,23 @@ def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
     return True
 
 
-def test_json():
-    for mdf in pyrtma.msg_defs.values():
-        # Fill the message with random data
-        in_msg = mdf.from_random()
+class TestJSONConversion(unittest.TestCase):
+    def test_json(self):
+        for mdf in pyrtma.msg_defs.values():
+            # Fill the message with random data
+            in_msg = mdf.from_random()
 
-        # Convert to json string
-        in_str = in_msg.to_json()
+            # Convert to json string
+            in_str = in_msg.to_json()
 
-        # Create a message from the json string
-        out_msg = mdf.from_json(in_str)
+            # Create a message from the json string
+            out_msg = mdf.from_json(in_str)
 
-        # Convert the output back to json
-        out_str = out_msg.to_json()
+            # Convert the output back to json
+            out_str = out_msg.to_json()
 
-        # Check for equality in all respects
-        assert is_equal(in_msg, out_msg)
-        assert in_str == out_str
-        assert in_msg == out_msg
+            # Check for equality in all respects
+            self.assertTrue(is_equal(in_msg, out_msg))
+            self.assertEqual(in_msg, out_msg)
+            self.assertEqual(in_str, out_str)
+            self.assertEqual(in_msg, out_msg)
