@@ -460,6 +460,12 @@ class Client(object):
 
         # Read Data Section
         data = header.get_data()
+
+        if data.size != header.num_data_bytes:
+            raise RuntimeError(
+                f"Received message header indicating a message data size that does not match the expected size of message type {data.type_name}. Message definitions may be out of sync across systems."
+            )
+
         if header.num_data_bytes:
             try:
                 nbytes = self._sock.recv_into(data, data.size, socket.MSG_WAITALL)
