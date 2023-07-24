@@ -7,7 +7,7 @@ import struct
 import logging
 
 # import yaml
-from ruamel import yaml
+from ruamel.yaml import YAML
 
 from copy import copy
 from hashlib import sha256
@@ -68,6 +68,30 @@ class YAMLSyntaxError(ParserError):
 
 class RTMASyntaxError(ParserError):
     """Raised when the parser encounters invalid RTMA syntax"""
+
+    pass
+
+
+class HostIDError(ParserError):
+    """Raised when the a host id is already in use"""
+
+    pass
+
+
+class ModuleIDError(ParserError):
+    """Raised when the a module id is already in use"""
+
+    pass
+
+
+class DuplicateNameError(ParserError):
+    """Raised when the a name is already in use"""
+
+    pass
+
+
+class MessageIDError(ParserError):
+    """Raised when the a message id is already in use"""
 
     pass
 
@@ -327,7 +351,7 @@ class Parser:
             ns = getattr(self, namespace)
             for o in ns.values():
                 if name == o.name:
-                    raise RTMASyntaxError(
+                    raise DuplicateNameError(
                         f"Duplicate name conflict found: \n\n1: {namespace} -> {o.name} -> {o.src.absolute()}\n2: {section} -> {name} -> {self.current_file.absolute()}\n"
                     )
 
@@ -392,6 +416,18 @@ class Parser:
         self.parse_file(imp.file.absolute())
 
     def handle_expression(self, name: str, expression: Union[int, float, str]):
+        self.check_duplicate_name(
+            "constants",
+            name,
+            namespaces=(
+                "constants",
+                "string_constants",
+                "aliases",
+                "struct_defs",
+                "message_defs",
+            ),
+        )
+
         # Expand numerical expression now
         if isinstance(expression, (int, float)):
             self.constants[name] = ConstantExpr(
@@ -412,7 +448,17 @@ class Parser:
             )
 
     def handle_string(self, name: str, value: str):
-        self.check_duplicate_name("string_constants", name, namespaces=("constants",))
+        self.check_duplicate_name(
+            "string_constants",
+            name,
+            namespaces=(
+                "constants",
+                "string_constants",
+                "aliases",
+                "struct_defs",
+                "message_defs",
+            ),
+        )
 
         if not isinstance(value, str):
             raise RTMASyntaxError(
@@ -426,7 +472,15 @@ class Parser:
     def handle_alias(self, alias: str, ftype: str):
         """Find the base type ultimately represented by the typedef alias"""
         self.check_duplicate_name(
-            "aliases", alias, namespaces=("struct_defs", "message_defs")
+            "aliases",
+            alias,
+            namespaces=(
+                "constants",
+                "string_constants",
+                "aliases",
+                "struct_defs",
+                "message_defs",
+            ),
         )
 
         n = 0
@@ -461,6 +515,8 @@ class Parser:
         raise RecursionError(f"Recursion limit exceeded for alias: {alias}")
 
     def handle_host_id(self, name: str, value: int):
+        self.check_duplicate_name("host_ids", name, namespaces=("host_ids",))
+
         if not isinstance(value, int):
             raise InvalidTypeError(
                 f"Values in 'host_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value}"
@@ -474,12 +530,14 @@ class Parser:
 
         for hid in self.host_ids.values():
             if value == hid.value:
-                raise RTMASyntaxError(
+                raise HostIDError(
                     f"Duplicate host id conflict found for {name} and {hid.name} -> {value}\n1: {hid.src.absolute()}\n2: {self.current_file.absolute()}\n"
                 )
         self.host_ids[name] = HID(name, int(value), src=self.current_file)
 
     def handle_module_id(self, name: str, value: int):
+        self.check_duplicate_name("module_ids", name, namespaces=("module_ids",))
+
         if not isinstance(value, int):
             raise InvalidTypeError(
                 f"Values in 'module_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value} -> {self.current_file.absolute()}"
@@ -493,7 +551,7 @@ class Parser:
 
         for mid in self.module_ids.values():
             if value == mid.value:
-                raise RTMASyntaxError(
+                raise ModuleIDError(
                     f"Duplicate module id conflict found for {name} and {mid.name} -> {value}\n1: {mid.src.absolute()}\n2: {self.current_file.absolute()}\n"
                 )
 
@@ -561,8 +619,9 @@ class Parser:
             name,
             namespaces=(
                 "constants",
+                "string_constants",
                 "aliases",
-                "struct_defs" if "msg_defs" else "msg_defs",
+                "struct_defs",
                 "message_defs",
             ),
         )
@@ -610,9 +669,6 @@ class Parser:
             obj = SDF(raw, hash, name, src=self.current_file)
         else:
             obj = MDF(raw, hash, name, type_id=mdf["id"], src=self.current_file)
-            if is_signal_def:
-                self.message_defs[name] = obj
-                return
 
         # Check and validate message id
         if not is_struct_def:
@@ -629,11 +685,15 @@ class Parser:
 
             for mt in self.message_ids.values():
                 if msg_id == mt.value:
-                    raise RTMASyntaxError(
+                    raise MessageIDError(
                         f"Duplicate message ids conflict found for {mt.name} and {name}: {msg_id} ->\n1: {mt.src.absolute()}\n2: {self.current_file.absolute()}\n"
                     )
 
             self.message_ids[name] = MT(name, msg_id, src=self.current_file)
+
+            if is_signal_def:
+                self.message_defs[name] = obj
+                return
 
         # Pattern to parse field specs
         FIELD_REGEX = r"\s*(?P<ftype>[\s\w]*)(\[(?P<len_str>.*)\])?"
@@ -737,7 +797,8 @@ class Parser:
     def parse_text(self, text: str):
         # Parse the yaml file
         try:
-            data = yaml.load(text, Loader=yaml.Loader)
+            yaml = YAML(typ="unsafe", pure=True)
+            data = yaml.load(text)
         except Exception as e:
             raise YAMLSyntaxError(
                 f"Error encountered by YAML parser in {self.current_file.absolute()}"
