@@ -85,11 +85,19 @@ def compile(
         output = outpath / (filename + ext)
         compiler.generate(output)
 
+    print("Building combined yaml file...")
+    from pyrtma.compilers.yaml import YAMLCompiler
+
+    compiler = YAMLCompiler(parser, filename=filename, debug=debug)
+    ext = ".yaml"
+    output = outpath / (filename + "_combined" + ext)
+    compiler.generate(output)
+
     print("Building info file...")
     from pyrtma.compilers.info import InfoCompiler
 
     compiler = InfoCompiler(parser, filename=filename, debug=debug)
-    ext = ".txt"
+    ext = "txt"
     output = outpath / (filename + ext)
     compiler.generate(output)
 
