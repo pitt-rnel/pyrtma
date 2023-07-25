@@ -862,7 +862,7 @@ class Parser:
                 self.handle_def("message_defs", name, mdf)
 
     def check_key_value_separation(self, text: str):
-        for n, line in enumerate(text.splitlines()):
+        for n, line in enumerate(text.splitlines(), start=1):
             if ":" in line:
                 if re.search(r"(:\s+)|(:$)", line) is None:
                     raise RTMASyntaxError(
