@@ -795,6 +795,8 @@ class Parser:
             self.message_defs[name] = obj
 
     def parse_text(self, text: str):
+        self.check_key_value_separation(text)
+
         # Parse the yaml file
         try:
             yaml = YAML(typ="unsafe", pure=True)
@@ -858,6 +860,14 @@ class Parser:
         if data.get("message_defs") is not None:
             for name, mdf in data["message_defs"].items():
                 self.handle_def("message_defs", name, mdf)
+
+    def check_key_value_separation(self, text: str):
+        for n, line in enumerate(text.splitlines()):
+            if ":" in line:
+                if re.search(r"(:\s+)|(:$)", line) is None:
+                    raise RTMASyntaxError(
+                        f"Key-Value pairs must be separated with a ':' followed by a space. Add a space after the colon.\n{self.current_file.absolute()}: line {n}\n{line}"
+                    )
 
     def parse(self, msgdefs_file: os.PathLike):
         # Get the current pwd
