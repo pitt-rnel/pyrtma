@@ -34,6 +34,8 @@ python -m pyrtma.manager -a "127.0.0.1"
 
 Message definitions are created in a .yaml file.
 
+The ruamel.yaml parser library is used internally (https://yaml.readthedocs.io/en/latest/)
+
 Notes about yaml format:
 
 - Whitespace sensitive. Use either 2 or 4 spaces for tab not '\t'
