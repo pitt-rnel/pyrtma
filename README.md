@@ -30,13 +30,14 @@ pip install -e .
 python -m pyrtma.manager -a "127.0.0.1"
 ```
 
-### Create a message in message.h
+### Create a message in message.yaml
 
 Message definitions are created in a .yaml file.
 
 Notes about yaml format:
 
 - Whitespace sensitive. Use either 2 or 4 spaces for tab not '\t'
+- Key-values must be separated by a colon followed by a space, (Key: Value, not Key:Value)
 - Must follow the top-level headers shown below.
 - Unused sections should be marked `null`
 - Use **(.yaml)** extension not **(.yml)**
