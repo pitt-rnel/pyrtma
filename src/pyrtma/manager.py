@@ -45,7 +45,7 @@ class Module:
         # Just send a header
         header = self.header_cls()
         header.msg_type = MT_ACKNOWLEDGE
-        header.send_time = time.time()
+        header.send_time = time.perf_counter()
         header.src_mod_id = MID_MESSAGE_MANAGER
         header.dest_mod_id = self.id
         header.num_data_bytes = 0
@@ -111,7 +111,7 @@ class MessageManager:
 
         # dictionary of message type ids and message counts, reset each time timing_message is sent
         self.message_counts = Counter()
-        self.t_last_message_count = time.time()
+        self.t_last_message_count = time.perf_counter()
         self.min_timing_message_period = 0.9
 
         # Disable Nagle Algorithm
@@ -323,11 +323,15 @@ class MessageManager:
                                 f"Connection Error on write to {module!s} - {err!s}"
                             )
                             print("x", end="", flush=True)
-                            self.send_failed_message(module, header, time.time(), wlist)
+                            self.send_failed_message(
+                                module, header, time.perf_counter(), wlist
+                            )
                         return
                     else:
                         print("x", end="", flush=True)
-                        self.send_failed_message(module, header, time.time(), wlist)
+                        self.send_failed_message(
+                            module, header, time.perf_counter(), wlist
+                        )
                         return
             return  # if specified dest_mod_id is not in subscribers, do not send message (other than to loggers)
 
@@ -341,10 +345,10 @@ class MessageManager:
                         f"Connection Error on write to {module!s} - {err!s}"
                     )
                     print("x", end="", flush=True)
-                    self.send_failed_message(module, header, time.time(), wlist)
+                    self.send_failed_message(module, header, time.perf_counter(), wlist)
             else:
                 print("x", end="", flush=True)
-                self.send_failed_message(module, header, time.time(), wlist)
+                self.send_failed_message(module, header, time.perf_counter(), wlist)
 
     def send_to_loggers(
         self, header: MessageHeader, payload, wlist: List[socket.socket]
@@ -359,7 +363,7 @@ class MessageManager:
                 self.logger.error(f"Connection Error on write to {module!s} - {err!s}")
                 print("x", end="", flush=True)
                 self.send_failed_message(
-                    module, header, time.time(), wlist
+                    module, header, time.perf_counter(), wlist
                 )  # this could result in inifite recursion, this is prevented by send_failed_message returning if failed message type is failed_message.
 
     def send_ack(self, src_module: Module, wlist: List[socket.socket]):
@@ -367,7 +371,7 @@ class MessageManager:
 
         header = self.header_cls()
         header.msg_type = MT_ACKNOWLEDGE
-        header.send_time = time.time()
+        header.send_time = time.perf_counter()
         header.src_mod_id = MID_MESSAGE_MANAGER
         header.dest_mod_id = src_module.id
         header.num_data_bytes = 0
@@ -377,7 +381,7 @@ class MessageManager:
         except ConnectionError as err:
             self.logger.error(f"Connection Error on write to {src_module!s} - {err!s}")
             print("x", end="", flush=True)
-            self.send_failed_message(src_module, header, time.time(), wlist)
+            self.send_failed_message(src_module, header, time.perf_counter(), wlist)
 
         # Always forward to logger modules
         self.send_to_loggers(header, b"", wlist)
@@ -393,7 +397,7 @@ class MessageManager:
         data = MDF_FAILED_MESSAGE()
 
         header.msg_type = MT_FAILED_MESSAGE
-        header.send_time = time.time()
+        header.send_time = time.perf_counter()
         header.src_mod_id = MID_MESSAGE_MANAGER
         header.num_data_bytes = ctypes.sizeof(data)
 
@@ -417,11 +421,11 @@ class MessageManager:
         data = MDF_TIMING_MESSAGE()
 
         header.msg_type = MT_TIMING_MESSAGE
-        header.send_time = time.time()
+        header.send_time = time.perf_counter()
         header.src_mod_id = MID_MESSAGE_MANAGER
         header.num_data_bytes = ctypes.sizeof(data)
 
-        data.send_time = time.time()
+        data.send_time = time.perf_counter()
 
         for mt, count in self.message_counts.items():
             data.timing[mt] = count
@@ -473,11 +477,11 @@ class MessageManager:
         self.message_counts[hdr.msg_type] += 1
         if (
             self.b_send_msg_timing
-            and (time.time() - self.t_last_message_count)
+            and (time.perf_counter() - self.t_last_message_count)
             > self.min_timing_message_period
         ):
             self.send_timing_message(wlist)
-            self.t_last_message_count = time.time()
+            self.t_last_message_count = time.perf_counter()
 
     def close(self):
         self._keep_running = False
