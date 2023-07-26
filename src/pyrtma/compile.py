@@ -97,7 +97,7 @@ def compile(
     from pyrtma.compilers.info import InfoCompiler
 
     compiler = InfoCompiler(parser, filename=filename, debug=debug)
-    ext = "txt"
+    ext = ".txt"
     output = outpath / (filename + ext)
     compiler.generate(output)
 
