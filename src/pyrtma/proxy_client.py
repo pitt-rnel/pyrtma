@@ -8,8 +8,7 @@ import time
 import os
 import ctypes
 
-from ._core import *
-from .constants import *
+from .message import *
 from .client import (
     ClientError,
     MessageManagerNotFound,
@@ -210,7 +209,7 @@ class ProxyClient(object):
                 self._connected = False
                 raise ConnectionLost
 
-            header.recv_time = time.time()
+            header.recv_time = time.perf_counter()
         except ConnectionError:
             raise ConnectionLost
 
