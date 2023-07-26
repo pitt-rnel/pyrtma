@@ -17,6 +17,8 @@ def compile(
     javascript: bool = False,
     matlab: bool = False,
     c_lang: bool = False,
+    info: bool = False,
+    combined: bool = False,
     debug: bool = False,
 ):
     parser = Parser(debug=debug)
@@ -85,21 +87,23 @@ def compile(
         output = outpath / (filename + ext)
         compiler.generate(output)
 
-    print("Building combined yaml file...")
-    from pyrtma.compilers.yaml import YAMLCompiler
+    if combined:
+        print("Building combined yaml file...")
+        from pyrtma.compilers.yaml import YAMLCompiler
 
-    compiler = YAMLCompiler(parser, filename=filename, debug=debug)
-    ext = ".yaml"
-    output = outpath / (filename + "_combined" + ext)
-    compiler.generate(output)
+        compiler = YAMLCompiler(parser, filename=filename, debug=debug)
+        ext = ".yaml"
+        output = outpath / (filename + "_combined" + ext)
+        compiler.generate(output)
 
-    print("Building info file...")
-    from pyrtma.compilers.info import InfoCompiler
+    if info:
+        print("Building info file...")
+        from pyrtma.compilers.info import InfoCompiler
 
-    compiler = InfoCompiler(parser, filename=filename, debug=debug)
-    ext = ".txt"
-    output = outpath / (filename + ext)
-    compiler.generate(output)
+        compiler = InfoCompiler(parser, filename=filename, debug=debug)
+        ext = ".txt"
+        output = outpath / (filename + ext)
+        compiler.generate(output)
 
     print("DONE.")
 
@@ -148,6 +152,20 @@ if __name__ == "__main__":
         dest="matlab",
         action="store_true",
         help="Output matlab .m file",
+    )
+
+    parser.add_argument(
+        "--info",
+        dest="info",
+        action="store_true",
+        help="Output info .txt file",
+    )
+
+    parser.add_argument(
+        "--combined",
+        dest="combined",
+        action="store_true",
+        help="Output combined yaml file",
     )
 
     parser.add_argument(
