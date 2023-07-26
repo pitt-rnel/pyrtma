@@ -383,7 +383,7 @@ class Client(object):
         header = self._header_cls()
         header.msg_type = msg_data.type_id
         header.msg_count = self._msg_count
-        header.send_time = time.time()
+        header.send_time = time.perf_counter()
         header.recv_time = 0.0
         header.src_host_id = self._host_id
         header.src_mod_id = self._module_id
@@ -459,7 +459,7 @@ class Client(object):
                     self._connected = False
                     raise ConnectionLost
 
-                header.recv_time = time.time()
+                header.recv_time = time.perf_counter()
             except ConnectionError:
                 raise ConnectionLost
         else:
