@@ -90,7 +90,7 @@ class PyDefCompiler:
                 elif field.type_name in self.parser.message_defs.keys():
                     ftype = f"MDF_{field.type_name}"
                 elif field.type_name in self.parser.struct_defs.keys():
-                    ftype = f"_{field.type_name}"
+                    ftype = f"{field.type_name}"
                 elif field.type_name in self.parser.aliases.keys():
                     ftype = f"{field.type_name}"
                 else:
@@ -104,7 +104,7 @@ class PyDefCompiler:
             fstr += f"\n{tab * 3}]"
 
         template = f"""\
-        class _{sdf.name}(ctypes.Structure):
+        class {sdf.name}(ctypes.Structure):
             _fields_ = {fstr}
         """
         return dedent(template)
@@ -127,7 +127,7 @@ class PyDefCompiler:
                 elif field.type_name in self.parser.message_defs.keys():
                     ftype = f"_{field.type_name}"
                 elif field.type_name in self.parser.struct_defs.keys():
-                    ftype = f"_{field.type_name}"
+                    ftype = f"{field.type_name}"
                 elif field.type_name in self.parser.aliases.keys():
                     ftype = f"{field.type_name}"
                 else:
@@ -143,7 +143,7 @@ class PyDefCompiler:
         msg_id = mdf.type_id
         msg_src = str(mdf.src.absolute()).replace("\\", "\\\\")
         template = f"""\
-        @pyrtma.msg_def
+        @pyrtma.message_def
         class _{mdf.name}(pyrtma.MessageData):
             _fields_ = {fstr}
             type_id = {msg_id}
@@ -160,7 +160,6 @@ class PyDefCompiler:
         s = """\
         import ctypes
         import pyrtma
-        from pyrtma.constants import *
         """
         return dedent(s)
 
@@ -190,7 +189,7 @@ class PyDefCompiler:
 
         s += "class _SDF:\n"
         for obj in self.parser.struct_defs.values():
-            s += f"    {obj.name} = _{obj.name}\n"
+            s += f"    {obj.name} = {obj.name}\n"
         s += "\n" * 2
 
         s += "class _MT:\n"

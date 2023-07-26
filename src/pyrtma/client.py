@@ -8,11 +8,11 @@ import time
 import os
 import ctypes
 
-from ._core import *
-from .constants import *
+from .message import *
+from .core_defs import *
 
 from functools import wraps
-from typing import List, Optional, Tuple, Type, Union, Dict
+from typing import List, Optional, Tuple, Type, Union
 
 __all__ = [
     "ClientError",
@@ -64,6 +64,12 @@ class InvalidDestinationModule(ClientError):
 
 class InvalidDestinationHost(ClientError):
     """Raised when client tries to send to an invalid host."""
+
+    pass
+
+
+class MessageDefinitionError(ClientError):
+    """Raised when client receives a message that does not match the current definition"""
 
     pass
 
@@ -156,7 +162,7 @@ class Client(object):
 
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-        msg = CONNECT()
+        msg = MDF_CONNECT()
         msg.logger_status = int(logger_status)
         msg.daemon_status = int(daemon_status)
 
@@ -220,7 +226,7 @@ class Client(object):
 
         This method also sends the client's process ID to message manager.
         """
-        msg = MODULE_READY()
+        msg = MDF_MODULE_READY()
         msg.pid = os.getpid()
         self.send_message(msg)
 
@@ -229,13 +235,13 @@ class Client(object):
             msg_list = [msg_list]
 
         if ctrl_msg == "Subscribe":
-            msg = SUBSCRIBE()
+            msg = MDF_SUBSCRIBE()
         elif ctrl_msg == "Unsubscribe":
-            msg = UNSUBSCRIBE()
+            msg = MDF_UNSUBSCRIBE()
         elif ctrl_msg == "PauseSubscription":
-            msg = PAUSE_SUBSCRIPTION()
+            msg = MDF_PAUSE_SUBSCRIPTION()
         elif ctrl_msg == "ResumeSubscription":
-            msg = RESUME_SUBSCRIPTION()
+            msg = MDF_RESUME_SUBSCRIPTION()
         else:
             raise TypeError("Unknown control message type.")
 
@@ -384,6 +390,7 @@ class Client(object):
         header.dest_host_id = dest_host_id
         header.dest_mod_id = dest_mod_id
         header.num_data_bytes = ctypes.sizeof(msg_data)
+        header.version = msg_data.type_hash
 
         if timeout >= 0:
             readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
@@ -412,7 +419,7 @@ class Client(object):
 
     @requires_connection
     def read_message(
-        self, timeout: Union[int, float] = -1, ack=False
+        self, timeout: Union[int, float] = -1, ack=False, sync_check=False
     ) -> Optional[Message]:
         """Read a message
 
@@ -462,8 +469,15 @@ class Client(object):
         data = header.get_data()
 
         if data.size != header.num_data_bytes:
-            raise RuntimeError(
+            raise MessageDefinitionError(
                 f"Received message header indicating a message data size that does not match the expected size of message type {data.type_name}. Message definitions may be out of sync across systems."
+            )
+
+        # Note: Ignore the sync check if header.version is not filled in
+        # This can removed once all clients support this field.
+        if sync_check and header.version != 0 and header.version != data.type_hash:
+            raise MessageDefinitionError(
+                f"Received message header indicating a message version that does not match the expected version of message type {data.type_name}. Message definitions may be out of sync across systems."
             )
 
         if header.num_data_bytes:

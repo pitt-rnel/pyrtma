@@ -303,7 +303,7 @@ class Parser:
         self.debug = debug
 
         self.yaml_dict = dict(
-            imports=None,
+            imports={},
             constants={},
             string_constants={},
             host_ids={},
@@ -344,7 +344,7 @@ class Parser:
     def clear(self):
         self.current_file = pathlib.Path()
         self.yaml_dict = dict(
-            imports=None,
+            imports={},
             constants={},
             string_constants={},
             host_ids={},

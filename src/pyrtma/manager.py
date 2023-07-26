@@ -12,8 +12,8 @@ import random
 import ctypes
 import os
 
-from ._core import *
-from .constants import *
+from .message import *
+from .core_defs import *
 
 from typing import Dict, List, Tuple, Set, Type, Union, Optional
 from dataclasses import dataclass
@@ -222,12 +222,12 @@ class MessageManager:
         self.remove_module(src_module)
 
     def add_subscription(self, src_module: Module, msg: Message):
-        sub = SUBSCRIBE.from_buffer(msg.data)
+        sub = MDF_SUBSCRIBE.from_buffer(msg.data)
         self.subscriptions[sub.msg_type].add(src_module)
         self.logger.info(f"SUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
 
     def remove_subscription(self, src_module: Module, msg: Message):
-        sub = UNSUBSCRIBE.from_buffer(msg.data)
+        sub = MDF_UNSUBSCRIBE.from_buffer(msg.data)
         # Silently let modules unsubscribe from messages that they are not subscribed to.
         self.subscriptions[sub.msg_type].discard(src_module)
         self.logger.info(f"UNSUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
@@ -239,7 +239,7 @@ class MessageManager:
         self.remove_subscription(src_module, msg)
 
     def register_module_ready(self, src_module: Module, msg: Message):
-        mr = MODULE_READY.from_buffer(msg.data)
+        mr = MDF_MODULE_READY.from_buffer(msg.data)
         src_module.pid = mr.pid
 
     def read_message(self, sock: socket.socket) -> bool:
@@ -390,7 +390,7 @@ class MessageManager:
         wlist: List[socket.socket],
     ):
         header = self.header_cls()
-        data = FAILED_MESSAGE()
+        data = MDF_FAILED_MESSAGE()
 
         header.msg_type = MT_FAILED_MESSAGE
         header.send_time = time.time()
@@ -414,7 +414,7 @@ class MessageManager:
 
     def send_timing_message(self, wlist: List[socket.socket]):
         header = self.header_cls()
-        data = TIMING_MESSAGE()
+        data = MDF_TIMING_MESSAGE()
 
         header.msg_type = MT_TIMING_MESSAGE
         header.send_time = time.time()
