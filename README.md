@@ -34,7 +34,7 @@ python -m pyrtma.manager -a "127.0.0.1"
 
 Message definitions are created in a .yaml file.
 
-The ruamel.yaml parser library is used internally (https://yaml.readthedocs.io/en/latest/)
+The ruamel.yaml parser library is used internally (<https://yaml.readthedocs.io/en/latest/>)
 
 Notes about yaml format:
 
@@ -45,6 +45,7 @@ Notes about yaml format:
 - Use **(.yaml)** extension not **(.yml)**
 
 List of supported native data types:
+
 - char
 - unsigned char
 - byte
@@ -145,83 +146,30 @@ The msg_defs directory should now have message def files created for each langua
 
 The rtma objects are compiled into objects suitable for each language.
 
-## Example Pub/Sub
+## Examples
 
-### Create a publisher module in publisher.py
+See `/examples/example.py` for pub/sub demo appp
 
-```python
-# publisher.py
-import message
-import pyrtma
-import time
-
-mod = pyrtma.Client(module_id=message.MID_PERSON_PUBLISHER)
-
-# Connect to the manager
-mod.connect(server_name="127.0.0.1:7111")
-
-# Create an instance of the person message and populate with data
-msg = message.MDF_PERSON_MESSAGE()
-msg.name = "Alice"  # str gets converted to c_char
-msg.age = 42
-
-# Send the person message every second
-while True:
-    print("Sending message")
-    mod.send_message(msg)
-    time.sleep(1)
-```
-
-### Create a subscriber module in subscriber.py
-
-```python
-# subscriber.py
-import message
-import pyrtma
-
-# Keeping module_id blank makes Manager dynamically create a module id.
-# This is default behavior.
-mod = pyrtma.Client()
-
-# Connect to the manager
-mod.connect(server_name="127.0.0.1:7111")
-
-# Subscribe to the person message and pyrtma's exit message (when manager is closed)
-mod.subscribe([message.MT_PERSON_MESSAGE, pyrtma.MT_EXIT])
-
-while True:
-    try:
-        # Read a message. We can specify a time. -1 means it will block until
-        # a message is received
-        msg = mod.read_message(timeout=-1)
-        if msg is not None:
-
-            # Find out what kind of message we received
-            # We can check the message id
-            if msg.type_id == message.MDF_PERSON_MESSAGE.type_id:
-                name = msg.data.name  # c_char get converted to str
-                age = msg.data.age
-                print(f"Hello my name is {name} and I am {age} years old")
-
-            # Or we can check the message name
-            elif msg.name == "EXIT":
-                print("Goodbye.")
-                break
-
-    except KeyboardInterrupt:
-        break
-```
-
-### Launch the publisher
+Compile the example message defintions:
 
 ```shell
-python examples/publisher.py
+python -m pyrtma.compile -i ./examples/msg_defs/message.yaml --py
 ```
 
-### Launch the subscriber
-
-You should see the message 'Hello my name is Alice and I am 42 years old' print in your shell
+Start the demo MessageManager server
 
 ```shell
-python examples/subscriber.py
+python -m pyrtma.manager
+```
+
+Start the publisher in one console:
+
+```shell
+python ./examples/example.py --pub
+```
+
+Start the subscriber in another:
+
+```shell
+python ./examples/example.py --sub
 ```
