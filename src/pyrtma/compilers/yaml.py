@@ -23,4 +23,12 @@ class YAMLCompiler:
         yaml.default_flow_style = False
         my_represent_none = NullRepresenter()
         yaml.representer.add_representer(type(None), my_represent_none)
-        yaml.dump(self.parser.yaml_dict, out_filepath)
+
+        d = {}
+        for k, v in self.parser.yaml_dict.items():
+            if isinstance(v, dict) and len(v) == 0:
+                d[k] = None
+            else:
+                d[k] = v
+
+        yaml.dump(d, out_filepath)
