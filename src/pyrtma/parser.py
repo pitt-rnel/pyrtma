@@ -302,6 +302,17 @@ class Parser:
         self.current_file = pathlib.Path()
         self.debug = debug
 
+        self.yaml_dict = dict(
+            imports=None,
+            constants={},
+            string_constants={},
+            host_ids={},
+            module_ids={},
+            aliases={},
+            struct_defs={},
+            message_defs={},
+        )
+
         self.imports: List[Import] = []
         self.constants: Dict[str, ConstantExpr] = {}
         self.string_constants: Dict[str, ConstantString] = {}
@@ -332,6 +343,16 @@ class Parser:
 
     def clear(self):
         self.current_file = pathlib.Path()
+        self.yaml_dict = dict(
+            imports=None,
+            constants={},
+            string_constants={},
+            host_ids={},
+            module_ids={},
+            aliases={},
+            struct_defs={},
+            message_defs={},
+        )
         self.included_files = []
         self.imports = []
         self.constants = {}
@@ -836,30 +857,37 @@ class Parser:
         if data.get("constants") is not None:
             for name, expr in data["constants"].items():
                 self.handle_expression(name, expr)
+            self.yaml_dict["constants"].update(data["constants"])
 
         if data.get("string_constants") is not None:
             for name, str_const in data["string_constants"].items():
                 self.handle_string(name, str_const)
+            self.yaml_dict["string_constants"].update(data["string_constants"])
 
         if data.get("aliases") is not None:
             for alias, ftype in data["aliases"].items():
                 self.handle_alias(alias, ftype)
+            self.yaml_dict["aliases"].update(data["aliases"])
 
         if data.get("host_ids") is not None:
             for name, value in data["host_ids"].items():
                 self.handle_host_id(name, value)
+            self.yaml_dict["host_ids"].update(data["host_ids"])
 
         if data.get("module_ids") is not None:
             for name, value in data["module_ids"].items():
                 self.handle_module_id(name, value)
+            self.yaml_dict["module_ids"].update(data["module_ids"])
 
         if data.get("struct_defs") is not None:
             for name, sdf in data["struct_defs"].items():
                 self.handle_def("struct_defs", name, sdf)
+            self.yaml_dict["struct_defs"].update(data["struct_defs"])
 
         if data.get("message_defs") is not None:
             for name, mdf in data["message_defs"].items():
                 self.handle_def("message_defs", name, mdf)
+            self.yaml_dict["message_defs"].update(data["message_defs"])
 
     def check_key_value_separation(self, text: str):
         for n, line in enumerate(text.splitlines(), start=1):
