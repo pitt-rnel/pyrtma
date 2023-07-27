@@ -125,7 +125,7 @@ class PyDefCompiler:
                 if field.type_name in type_map.keys():
                     ftype = type_map[field.type_name]
                 elif field.type_name in self.parser.message_defs.keys():
-                    ftype = f"_{field.type_name}"
+                    ftype = f"MDF_{field.type_name}"
                 elif field.type_name in self.parser.struct_defs.keys():
                     ftype = f"{field.type_name}"
                 elif field.type_name in self.parser.aliases.keys():
@@ -144,15 +144,13 @@ class PyDefCompiler:
         msg_src = str(mdf.src.absolute()).replace("\\", "\\\\")
         template = f"""\
         @pyrtma.message_def
-        class _{mdf.name}(pyrtma.MessageData):
+        class MDF_{mdf.name}(pyrtma.MessageData):
             _fields_ = {fstr}
             type_id = {msg_id}
             type_name = \"{mdf.name}\"
             type_hash = 0x{mdf.hash[:8]}
             type_source = \"{msg_src}\"
             
-
-        MDF_{mdf.name} = _{mdf.name}
         """
         return dedent(template)
 
@@ -199,7 +197,7 @@ class PyDefCompiler:
 
         s += "class _MDF:\n"
         for obj in self.parser.message_defs.values():
-            s += f"    {obj.name} = _{obj.name}\n"
+            s += f"    {obj.name} = MDF_{obj.name}\n"
         s += "\n" * 2
 
         s += "class _RTMA:\n"
