@@ -373,7 +373,7 @@ class Parser:
             for o in ns.values():
                 if name == o.name:
                     raise DuplicateNameError(
-                        f"Duplicate name conflict found: \n\n1: {namespace} -> {o.name} -> {o.src.absolute()}\n2: {section} -> {name} -> {self.current_file.absolute()}\n"
+                        f"Duplicate name conflict found: \n\n1: {namespace} -> {o.name} -> {o.src.absolute()}\n2: {section} -> {name} -> {self.current_file}\n"
                     )
 
     def expand_expression(self, name: str, expr: str) -> Tuple[str, int]:
@@ -388,7 +388,7 @@ class Parser:
                 c = self.constants[symbol]
             except KeyError:
                 raise ExpressionExpansionError(
-                    f"Unable to expand expression {name} -> {symbol} not defined: {self.current_file.absolute()}"
+                    f"Unable to expand expression {name} -> {symbol} not defined: {self.current_file}"
                 )
 
             if re.search(rf"\b{name}\b", c.expression) is not None:
@@ -405,7 +405,7 @@ class Parser:
 
             if n > rdepth_limit:
                 raise RecursionError(
-                    f"Recursion limit reached expanding constant expression {name} in {self.current_file.absolute()}"
+                    f"Recursion limit reached expanding constant expression {name} in {self.current_file}"
                 )
 
             # Try to match another macro symbol
@@ -424,12 +424,10 @@ class Parser:
         self.imports.append(imp)
         if imp.file.is_dir():
             raise FileFormatError(
-                f"Imports must be yaml files, not directories. -> {self.current_file.absolute()}"
+                f"Imports must be yaml files, not directories. -> {self.current_file}"
             )
         if not imp.file.suffix.lower() in [".yaml", ".yml"]:
-            raise FileFormatError(
-                f"Imports must be .yaml files -> {self.current_file.absolute()}"
-            )
+            raise FileFormatError(f"Imports must be .yaml files -> {self.current_file}")
 
         if imp.file.suffix == ".yml":
             self.warning(f"Please change {imp.file} to use '.yaml' extension.")
@@ -483,7 +481,7 @@ class Parser:
 
         if not isinstance(value, str):
             raise RTMASyntaxError(
-                f"Values in 'string_constants' section must evaluate to string type not {type(value)}. {name}: {value} -> {self.current_file.absolute()}"
+                f"Values in 'string_constants' section must evaluate to string type not {type(value)}. {name}: {value} -> {self.current_file}"
             )
 
         self.string_constants[name] = ConstantString(
@@ -552,7 +550,7 @@ class Parser:
         for hid in self.host_ids.values():
             if value == hid.value:
                 raise HostIDError(
-                    f"Duplicate host id conflict found for {name} and {hid.name} -> {value}\n1: {hid.src.absolute()}\n2: {self.current_file.absolute()}\n"
+                    f"Duplicate host id conflict found for {name} and {hid.name} -> {value}\n1: {hid.src.absolute()}\n2: {self.current_file}\n"
                 )
         self.host_ids[name] = HID(name, int(value), src=self.current_file)
 
@@ -561,19 +559,19 @@ class Parser:
 
         if not isinstance(value, int):
             raise InvalidTypeError(
-                f"Values in 'module_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value} -> {self.current_file.absolute()}"
+                f"Values in 'module_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value} -> {self.current_file}"
             )
 
         if value < 10 or (99 < value < 200):
             if self.current_file.name != "core_defs.yaml" and value != 0:
                 raise RTMASyntaxError(
-                    f"Value outside of valid range [10 - 99 or > 200] for module_id: {name}: {value} -> {self.current_file.absolute()}"
+                    f"Value outside of valid range [10 - 99 or > 200] for module_id: {name}: {value} -> {self.current_file}"
                 )
 
         for mid in self.module_ids.values():
             if value == mid.value:
                 raise ModuleIDError(
-                    f"Duplicate module id conflict found for {name} and {mid.name} -> {value}\n1: {mid.src.absolute()}\n2: {self.current_file.absolute()}\n"
+                    f"Duplicate module id conflict found for {name} and {mid.name} -> {value}\n1: {mid.src.absolute()}\n2: {self.current_file}\n"
                 )
 
         self.module_ids[name] = MID(name, int(value), src=self.current_file)
@@ -634,108 +632,52 @@ class Parser:
         # Final size check using Python's builtin struct module
         assert s.size == struct.calcsize(s.format), f"{s.name} is not 64-bit aligned."
 
-    def handle_def(self, def_type: str, name: str, mdf: Dict[str, Any]):
-        self.check_duplicate_name(
-            def_type,
-            name,
-            namespaces=(
-                "constants",
-                "string_constants",
-                "aliases",
-                "struct_defs",
-                "message_defs",
-            ),
-        )
+    def validate_msg_id(self, name: str, msg_id: int):
+        if not isinstance(msg_id, int):
+            raise InvalidTypeError(
+                f"Message definition id must evaluate to int type not {type(msg_id).__name__}. {name}: {msg_id}"
+            )
 
-        is_signal_def = mdf["fields"] is None
-        is_struct_def = False
+        if msg_id < 0 or msg_id > 10000:
+            raise RTMASyntaxError(
+                "Value outside of valid range [0 - 10000] for module_id: {name}: {value}"
+            )
 
-        # Check the schema
-        if def_type == "message_defs":
-            valid_sections = ("id", "fields")
-        elif def_type == "struct_defs":
-            valid_sections = ("fields",)
-            is_struct_def = True
-        else:
-            raise RTMASyntaxError(f"Unknown struct type section {def_type}.")
-
-        for section in mdf.keys():
-            if section not in valid_sections:
-                raise RTMASyntaxError(
-                    f"Invalid top-level section '{section}' in message or struct definition of {name} -> {self.current_file.absolute()}."
+        for mt in self.message_ids.values():
+            if msg_id == mt.value:
+                raise MessageIDError(
+                    f"Duplicate message ids conflict found for {mt.name} and {name}: {msg_id} ->\n1: {mt.src.absolute()}\n2: {self.current_file}\n"
                 )
 
-        # Create a string representation of the defintion to hash
-        if is_signal_def:
-            raw = f"{name}:\n  id: {mdf['id']}\n  fields: null"
-        elif is_struct_def:
-            if isinstance(mdf["fields"], str):
-                f = f"    fields: {mdf['fields']}"
-            else:
-                f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
-            f = "\n".join(f)
-            raw = f"{name}:\n  fields:\n{f}"
-        else:
-            if isinstance(mdf["fields"], str):
-                f = f"    fields: {mdf['fields']}"
-            else:
-                f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
-            f = "\n".join(f)
-            raw = f"{name}:\n  id: {mdf['id']}\n  fields:\n{f}"
+    def validate_msg_def(self, mdf):
+        # Check number of fields > 0
+        assert (
+            len(mdf.fields) > 0
+        ), f"Message and Struct definitions must have at least one field: {mdf.name} -> {self.current_file}"
 
-        raw = textwrap.dedent(raw)
-        hash = sha256(raw.encode()).hexdigest()
+        # Check memory alignment layout
+        self.check_alignment(mdf, auto_pad=True)
 
-        if is_struct_def:
-            obj = SDF(raw, hash, name, src=self.current_file)
-        else:
-            obj = MDF(raw, hash, name, type_id=mdf["id"], src=self.current_file)
-
-        # Check and validate message id
-        if not is_struct_def:
-            msg_id = mdf["id"]
-            if not isinstance(msg_id, int):
-                raise InvalidTypeError(
-                    f"Message definition id must evaluate to int type not {type(msg_id).__name__}. {name}: {msg_id}"
-                )
-
-            if msg_id < 0 or msg_id > 10000:
-                raise RTMASyntaxError(
-                    "Value outside of valid range [0 - 10000] for module_id: {name}: {value}"
-                )
-
-            for mt in self.message_ids.values():
-                if msg_id == mt.value:
-                    raise MessageIDError(
-                        f"Duplicate message ids conflict found for {mt.name} and {name}: {msg_id} ->\n1: {mt.src.absolute()}\n2: {self.current_file.absolute()}\n"
-                    )
-
-            self.message_ids[name] = MT(name, msg_id, src=self.current_file)
-
-            if is_signal_def:
-                self.message_defs[name] = obj
-                return
-
+    def add_fields(self, mdf: Union[SDF, MDF], fields: Union[Dict, str]):
         # Pattern to parse field specs
         FIELD_REGEX = r"\s*(?P<ftype>[\s\w]*)(\[(?P<len_str>.*)\])?"
 
         # Copy fields from another definition
-        if isinstance(mdf["fields"], str):
-            type_name = mdf["fields"]
+        if isinstance(fields, str):
+            type_name = fields
             df = self.message_defs.get(type_name) or self.struct_defs.get(type_name)
             if df is None:
                 raise RTMASyntaxError(
-                    f"Unable to find definition for {type_name} in {name} -> {self.current_file.absolute()}"
+                    f"Unable to find definition for {type_name} in {mdf.name} -> {self.current_file}"
                 )
 
             for field in df.fields:
-                obj.fields.append(copy(field))
-
+                mdf.fields.append(copy(field))
         else:
             # Parse field specs into Field objects
             reserved_field_names = ("type_id", "type_name", "type_hash", "type_source")
 
-            for fname, fstr in mdf["fields"].items():
+            for fname, fstr in fields.items():
                 if fname in reserved_field_names:
                     raise RTMASyntaxError(
                         f"{fname} is a reserved field name for internal use."
@@ -743,13 +685,13 @@ class Parser:
 
                 if not isinstance(fstr, str):
                     raise InvalidTypeError(
-                        f"Field types must be a string not type not {type(fstr).__name__}: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                        f"Field types must be a string not type not {type(fstr).__name__}: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
                     )
 
                 m = re.match(FIELD_REGEX, fstr)
                 if m is None:
                     raise RTMASyntaxError(
-                        f"Invalid syntax for field type specification: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                        f"Invalid syntax for field type specification: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
                     )
 
                 ftype = m.groupdict()["ftype"].strip()
@@ -757,12 +699,12 @@ class Parser:
 
                 if ftype is None:
                     raise RTMASyntaxError(
-                        f"Invalid syntax for field type specification: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                        f"Invalid syntax for field type specification: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
                     )
 
                 if len_str == "" and "[" in fstr:
                     raise RTMASyntaxError(
-                        f"Invalid syntax for array field length: {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                        f"Invalid syntax for array field length: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
                     )
 
                 # Check for a valid type
@@ -776,18 +718,20 @@ class Parser:
                     ftype_obj = self.message_defs[ftype]
                 else:
                     raise RTMASyntaxError(
-                        f"Unknown type specified ({ftype}): {name}=> {fname}: {fstr} -> {self.current_file.absolute()}"
+                        f"Unknown type specified ({ftype}): {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
                     )
 
                 # Check for invalid signal def usage
                 if ftype in self.message_defs.keys():
                     assert (
                         len(self.message_defs[ftype].fields) != 0
-                    ), f"Signal definitions can not be used as field types: {name}=> {fname}:{fstr} -> {self.current_file.absolute()}"
+                    ), f"Signal definitions can not be used as field types: {mdf.name}=> {fname}:{fstr} -> {self.current_file}"
 
                 # Expand the length string if needed
                 if len_str:
-                    expanded, flen = self.expand_expression(f"{name}->{fname}", len_str)
+                    expanded, flen = self.expand_expression(
+                        f"{mdf.name}->{fname}", len_str
+                    )
                     new_field = Field(
                         name=fname,
                         type_name=ftype,
@@ -799,21 +743,164 @@ class Parser:
                 else:
                     new_field = Field(name=fname, type_name=ftype, type_obj=ftype_obj)
 
-                obj.fields.append(new_field)
+                mdf.fields.append(new_field)
 
-        # Check number of fields > 0
-        assert (
-            len(obj.fields) > 0
-        ), f"Message and Struct definitions must have at least one field: {name} -> {self.current_file.absolute()}"
+        self.validate_msg_def(mdf)
 
-        # Check memory alignment layout
-        self.check_alignment(obj, auto_pad=True)
+    def handle_signal(self, name: str, mdf: Dict[str, Any]):
+        # Create a string representation of the defintion to hash
+        raw = f"{name}:\n  id: {mdf['id']}\n  fields: null"
+        raw = textwrap.dedent(raw)
+        hash = sha256(raw.encode()).hexdigest()
 
-        # Store the definition
-        if isinstance(obj, SDF):
-            self.struct_defs[name] = obj
+        # Check and validate message id
+        msg_id = mdf["id"]
+        self.validate_msg_id(name, msg_id)
+        self.message_ids[name] = MT(name, msg_id, src=self.current_file)
+
+        # Create the MDF data class
+        obj = MDF(raw, hash, name, type_id=mdf["id"], src=self.current_file)
+
+        # Store the new definition
+        self.message_defs[name] = obj
+        return
+
+    def handle_struct(self, name: str, sdf: Dict[str, Any]):
+        self.check_duplicate_name(
+            "struct_defs",
+            name,
+            namespaces=(
+                "constants",
+                "string_constants",
+                "aliases",
+                "struct_defs",
+                "message_defs",
+            ),
+        )
+
+        # Check for correct section headers
+        valid_sections = ("fields",)
+        for section in sdf.keys():
+            if section not in valid_sections:
+                raise RTMASyntaxError(
+                    f"Invalid top-level section '{section}' in message or struct definition of {name} -> {self.current_file}."
+                )
+
+        # Create a string representation of the defintion to hash
+        if isinstance(sdf["fields"], str):
+            f = f"    fields: {sdf['fields']}"
         else:
-            self.message_defs[name] = obj
+            f = [f"    {fname}: {ftype}" for fname, ftype in sdf["fields"].items()]
+        f = "\n".join(f)
+
+        raw = f"{name}:\n  fields:\n{f}"
+        raw = textwrap.dedent(raw)
+        hash = sha256(raw.encode()).hexdigest()
+
+        # Create the SDF data class
+        obj = SDF(raw, hash, name, src=self.current_file)
+
+        # Parse and the fields of the definition
+        self.add_fields(obj, sdf["fields"])
+
+        # Store the new defintion
+        self.struct_defs[name] = obj
+
+    def handle_message_def(self, name: str, mdf: Dict[str, Any]):
+        self.check_duplicate_name(
+            "message_defs",
+            name,
+            namespaces=(
+                "constants",
+                "string_constants",
+                "aliases",
+                "struct_defs",
+                "message_defs",
+            ),
+        )
+
+        if name == "_RESERVED_":
+            self.handle_reserve(name, mdf)
+            return
+
+        # Check for correct section headers
+        valid_sections = ("id", "fields")
+        for section in mdf.keys():
+            if section not in valid_sections:
+                raise RTMASyntaxError(
+                    f"Invalid top-level section '{section}' in message or struct definition of {name} -> {self.current_file}."
+                )
+
+        # Check for a signal def
+        if mdf["fields"] is None:
+            self.handle_signal(name, mdf)
+            return
+
+        # Create a string representation of the defintion to hash
+        if isinstance(mdf["fields"], str):
+            f = f"    fields: {mdf['fields']}"
+        else:
+            f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
+        f = "\n".join(f)
+        raw = f"{name}:\n  id: {mdf['id']}\n  fields:\n{f}"
+
+        raw = textwrap.dedent(raw)
+        hash = sha256(raw.encode()).hexdigest()
+
+        # Create the MDF data class
+        obj = MDF(raw, hash, name, type_id=mdf["id"], src=self.current_file)
+
+        # Check and validate message id
+        msg_id = mdf["id"]
+        self.validate_msg_id(name, msg_id)
+        self.message_ids[name] = MT(name, msg_id, src=self.current_file)
+
+        # Parse and the fields of the definition
+        self.add_fields(obj, mdf["fields"])
+
+        # Store the new defintion
+        self.message_defs[name] = obj
+
+    def handle_reserve(self, name: str, mdf: Dict[str, List]):
+        for section in mdf.keys():
+            if section not in ("id",):
+                raise RTMASyntaxError(
+                    f"Invalid top-level section '{section}' in message_def {name} -> {self.current_file}. Only 'id' is allowed."
+                )
+
+        if not isinstance(mdf["id"], list):
+            raise InvalidTypeError("_RESERVED_.id must be type list.")
+
+        reserved = []
+        for e in mdf["id"]:
+            if isinstance(e, int):
+                reserved.append(e)
+            elif isinstance(e, str):
+                m = re.search(
+                    r"\s*(?P<start>[0-9]+)\s*(:|\-|to)\s*(?P<end>[0-9]+)\s*", e
+                )
+                if m is None:
+                    raise RTMASyntaxError(f"_RESERVED_.id has invalid entry: {e}")
+
+                start = int(m.groupdict()["start"])
+                end = int(m.groupdict()["end"])
+
+                if start > end:
+                    raise RTMASyntaxError(f"_RESERVED_.id has an invalid range: {e}")
+
+                if ((end + 1) - start) > 100:
+                    raise RTMASyntaxError(
+                        f"_RESERVED_.id has an spans too large a range (100 max): {e}"
+                    )
+
+                reserved.extend(list(range(start, end + 1)))
+            else:
+                raise RTMASyntaxError(f"_RESERVED_.id has an invalid entry: {e}")
+
+        # Generate reserved defintion placeholders
+        for id in reserved:
+            name = f"_RESERVED_{id:06d}"
+            self.handle_signal(name, dict(id=id, fields=None))
 
     def parse_text(self, text: str):
         self.check_key_value_separation(text)
@@ -824,7 +911,7 @@ class Parser:
             data = yaml.load(text)
         except Exception as e:
             raise YAMLSyntaxError(
-                f"Error encountered by YAML parser in {self.current_file.absolute()}"
+                f"Error encountered by YAML parser in {self.current_file}"
             ) from e
 
         valid_sections = (
@@ -842,7 +929,7 @@ class Parser:
         for section in data.keys():
             if section not in valid_sections:
                 raise RTMASyntaxError(
-                    f"Invalid top-level section '{section}' in message defs file -> {self.current_file.absolute()}."
+                    f"Invalid top-level section '{section}' in message defs file -> {self.current_file}."
                 )
 
         if data.get("imports") is not None:
@@ -851,7 +938,7 @@ class Parser:
                     self.handle_import(imp)
             else:
                 raise RTMASyntaxError(
-                    f"Imports must be a list of paths in message defs file -> {self.current_file.absolute()}."
+                    f"Imports must be a list of paths in message defs file -> {self.current_file}."
                 )
 
         if data.get("constants") is not None:
@@ -881,12 +968,12 @@ class Parser:
 
         if data.get("struct_defs") is not None:
             for name, sdf in data["struct_defs"].items():
-                self.handle_def("struct_defs", name, sdf)
+                self.handle_struct(name, sdf)
             self.yaml_dict["struct_defs"].update(data["struct_defs"])
 
         if data.get("message_defs") is not None:
             for name, mdf in data["message_defs"].items():
-                self.handle_def("message_defs", name, mdf)
+                self.handle_message_def(name, mdf)
             self.yaml_dict["message_defs"].update(data["message_defs"])
 
     def check_key_value_separation(self, text: str):
@@ -894,7 +981,7 @@ class Parser:
             if ":" in line:
                 if re.search(r"(:\s+)|(:$)", line) is None:
                     raise RTMASyntaxError(
-                        f"Key-Value pairs must be separated with a ':' followed by a space. Add a space after the colon.\n{self.current_file.absolute()}: line {n}\n{line}"
+                        f"Key-Value pairs must be separated with a ':' followed by a space. Add a space after the colon.\n{self.current_file}: line {n}\n{line}"
                     )
 
     def parse(self, msgdefs_file: os.PathLike):
@@ -931,7 +1018,7 @@ class Parser:
 
         self.logger.info(f"Parsing -> {msgdefs_path.absolute()}")
         prev_file = self.current_file
-        self.current_file = msgdefs_path
+        self.current_file = msgdefs_path.absolute()
         self.included_files.append(msgdefs_path)
 
         try:
