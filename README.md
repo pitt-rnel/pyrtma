@@ -42,6 +42,7 @@ Notes about yaml format:
 - Key-values must be separated by a colon followed by a space, (Key: Value, not Key:Value)
 - Must follow the top-level headers shown below.
 - Unused sections should be marked `null`
+- Names must start with letter. (no _ or numeric prefixes allowed)
 - Use **(.yaml)** extension not **(.yml)**
 
 List of supported native data types:
