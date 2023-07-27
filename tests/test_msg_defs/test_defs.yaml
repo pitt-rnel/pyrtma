@@ -1660,3 +1660,6 @@ message_defs:
       duration: double
       type: int
       padding: int
+
+  _RESERVED_:
+    id: [4300, 4360 to 4370, 4371 - 4375, 4376:4378]

@@ -481,6 +481,68 @@ class TestParser(unittest.TestCase):
             self.parser.parse(self.tmp.path)
 
     def test_rtma_syntax(self):
+        # Bad Name
+        text = textwrap.dedent(
+            """
+            struct_defs:
+                _A:
+                    fields:
+                        i: int
+            """
+        )
+        self.tmp.write(text)
+        with self.assertRaises(pyrtma.parser.RTMASyntaxError):
+            self.parser.parse(self.tmp.path)
+
+        # Bad Name
+        text = textwrap.dedent(
+            """
+            message_defs:
+                _A:
+                    fields:
+                        i: int
+            """
+        )
+        self.tmp.write(text)
+        with self.assertRaises(pyrtma.parser.RTMASyntaxError):
+            self.parser.parse(self.tmp.path)
+
+        # Bad Name
+        text = textwrap.dedent(
+            """
+            constants:
+                _A: 10
+            """
+        )
+        self.tmp.write(text)
+        with self.assertRaises(pyrtma.parser.RTMASyntaxError):
+            self.parser.parse(self.tmp.path)
+
+        # Bad Name
+        text = textwrap.dedent(
+            """
+            aliases:
+                _A: int
+            """
+        )
+        self.tmp.write(text)
+        with self.assertRaises(pyrtma.parser.RTMASyntaxError):
+            self.parser.parse(self.tmp.path)
+
+        # Illegal field aname
+        text = textwrap.dedent(
+            """
+            message_defs:
+                A:
+                    id: 88
+                    fields:
+                        type_name: int
+            """
+        )
+        self.tmp.write(text)
+        with self.assertRaises(pyrtma.parser.RTMASyntaxError):
+            self.parser.parse(self.tmp.path)
+
         # Bad Indentation
         text = textwrap.dedent(
             """
@@ -524,6 +586,50 @@ class TestParser(unittest.TestCase):
             """
             module_ids:
                 A: abc
+            """
+        )
+        self.tmp.write(text)
+        with self.assertRaises(pyrtma.parser.InvalidTypeError):
+            self.parser.parse(self.tmp.path)
+
+    def test_reserve_syntax(self):
+        text = textwrap.dedent(
+            """
+            message_defs:
+                _RESERVED_:
+                    fields:
+                        i: int
+            """
+        )
+        self.tmp.write(text)
+        with self.assertRaises(pyrtma.parser.RTMASyntaxError):
+            self.parser.parse(self.tmp.path)
+
+        text = textwrap.dedent(
+            """
+            message_defs:
+                _RESERVED_: 1
+            """
+        )
+        self.tmp.write(text)
+        with self.assertRaises(pyrtma.parser.InvalidTypeError):
+            self.parser.parse(self.tmp.path)
+
+        text = textwrap.dedent(
+            """
+            message_defs:
+                _RESERVED_: [1:2:10]
+            """
+        )
+        self.tmp.write(text)
+        with self.assertRaises(pyrtma.parser.InvalidTypeError):
+            self.parser.parse(self.tmp.path)
+
+        text = textwrap.dedent(
+            """
+            message_defs:
+                _RESERVED_:
+                    id: 1
             """
         )
         self.tmp.write(text)
