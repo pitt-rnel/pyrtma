@@ -72,10 +72,8 @@ def compile(
         from pyrtma.compilers.matlab import MatlabDefCompiler
 
         compiler = MatlabDefCompiler(parser, debug=debug)
-        # Over-ride name
-        matlab_filename = "generate_RTMA_config"
         ext = ".m"
-        output = outpath / (matlab_filename + ext)
+        output = outpath / (filename + ext)
         compiler.generate(output)
 
     if c_lang:
