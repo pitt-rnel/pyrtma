@@ -5,6 +5,7 @@ import os
 import textwrap
 import struct
 import logging
+import string
 
 # import yaml
 from ruamel.yaml import YAML
@@ -435,6 +436,7 @@ class Parser:
         self.parse_file(imp.file.absolute())
 
     def handle_expression(self, name: str, expression: Union[int, float, str]):
+        self.check_name(name)
         self.check_duplicate_name(
             "constants",
             name,
@@ -446,6 +448,11 @@ class Parser:
                 "message_defs",
             ),
         )
+
+        if not isinstance(expression, (int, float, str)):
+            raise InvalidTypeError(
+                f"Values in 'constants' section must be of type int, float, or string not{type(expression).__name__}. {name} -> {self.current_file}"
+            )
 
         # Expand numerical expression now
         if isinstance(expression, (int, float)):
@@ -467,6 +474,7 @@ class Parser:
             )
 
     def handle_string(self, name: str, value: str):
+        self.check_name(name)
         self.check_duplicate_name(
             "string_constants",
             name,
@@ -490,6 +498,12 @@ class Parser:
 
     def handle_alias(self, alias: str, ftype: str):
         """Find the base type ultimately represented by the typedef alias"""
+        if not isinstance(ftype, str):
+            raise InvalidTypeError(
+                f"Values in 'aliases' section must be a string not {type(ftype).__name__}.\n{alias} -> {self.current_file}"
+            )
+
+        self.check_name(alias)
         self.check_duplicate_name(
             "aliases",
             alias,
@@ -534,6 +548,7 @@ class Parser:
         raise RecursionError(f"Recursion limit exceeded for alias: {alias}")
 
     def handle_host_id(self, name: str, value: int):
+        self.check_name(name)
         self.check_duplicate_name("host_ids", name, namespaces=("host_ids",))
 
         if not isinstance(value, int):
@@ -555,6 +570,7 @@ class Parser:
         self.host_ids[name] = HID(name, int(value), src=self.current_file)
 
     def handle_module_id(self, name: str, value: int):
+        self.check_name(name)
         self.check_duplicate_name("module_ids", name, namespaces=("module_ids",))
 
         if not isinstance(value, int):
@@ -673,7 +689,7 @@ class Parser:
 
             for field in df.fields:
                 mdf.fields.append(copy(field))
-        else:
+        elif isinstance(fields, dict):
             # Parse field specs into Field objects
             reserved_field_names = ("type_id", "type_name", "type_hash", "type_source")
 
@@ -744,6 +760,10 @@ class Parser:
                     new_field = Field(name=fname, type_name=ftype, type_obj=ftype_obj)
 
                 mdf.fields.append(new_field)
+        else:
+            raise InvalidTypeError(
+                f"Invalid object for field spec of {type(mdf).__name__}. {mdf.name} -> {self.current_file}"
+            )
 
         self.validate_msg_def(mdf)
 
@@ -766,6 +786,9 @@ class Parser:
         return
 
     def handle_struct(self, name: str, sdf: Dict[str, Any]):
+        # Check for valid name
+        self.check_name(name)
+
         self.check_duplicate_name(
             "struct_defs",
             name,
@@ -777,6 +800,11 @@ class Parser:
                 "message_defs",
             ),
         )
+
+        if not isinstance(sdf, dict):
+            raise InvalidTypeError(
+                f"Invalid object type for struct def {name} of {type(sdf).__name__} -> {self.current_file}"
+            )
 
         # Check for correct section headers
         valid_sections = ("fields",)
@@ -806,7 +834,20 @@ class Parser:
         # Store the new defintion
         self.struct_defs[name] = obj
 
+    def check_name(self, name: str):
+        """Check that names start with a letter."""
+        if name == "_RESERVED_":
+            return
+
+        if not name.startswith(tuple(c for c in string.ascii_letters)):
+            raise RTMASyntaxError(
+                f"Invalid name {name} in {self.current_file}. Names can only start with letters"
+            )
+
     def handle_message_def(self, name: str, mdf: Dict[str, Any]):
+        # Check for valid name
+        self.check_name(name)
+
         self.check_duplicate_name(
             "message_defs",
             name,
@@ -818,6 +859,11 @@ class Parser:
                 "message_defs",
             ),
         )
+
+        if not isinstance(mdf, dict):
+            raise InvalidTypeError(
+                f"Invalid object type for message def {name} of {type(mdf).__name__} -> {self.current_file}"
+            )
 
         if name == "_RESERVED_":
             self.handle_reserve(name, mdf)
@@ -865,11 +911,11 @@ class Parser:
         for section in mdf.keys():
             if section not in ("id",):
                 raise RTMASyntaxError(
-                    f"Invalid top-level section '{section}' in message_def {name} -> {self.current_file}. Only 'id' is allowed."
+                    f"Invalid top-level section '{section}'. Only 'id is allowed in {name} -> {self.current_file}"
                 )
 
         if not isinstance(mdf["id"], list):
-            raise InvalidTypeError("_RESERVED_.id must be type list.")
+            raise InvalidTypeError("_RESERVED_.id must be a list.")
 
         reserved = []
         for e in mdf["id"]:
