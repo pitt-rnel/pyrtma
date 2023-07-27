@@ -103,47 +103,53 @@ class MatlabDefCompiler:
             prefix = "MID_"
         elif isinstance(c, MT):
             prefix = "MT_"
-        return self.generate_field("defines", f"{prefix}{c.name}", c.value)
+        return self.generate_field(
+            "defines", f"{prefix}{self.sanitize_name(c.name)}", c.value
+        )
 
     def generate_constant_string(self, c: ConstantString):
-        return self.generate_field("defines", c.name, c.value)
+        return self.generate_field("defines", self.sanitize_name(c.name), c.value)
 
     def generate_host_id(self, hid: HID) -> str:
-        return self.generate_field("HID", hid.name, hid.value)
+        return self.generate_field("HID", self.sanitize_name(hid.name), hid.value)
 
     def generate_module_id(self, mid: MID) -> str:
-        return self.generate_field("MID", mid.name, mid.value)
+        return self.generate_field("MID", self.sanitize_name(mid.name), mid.value)
 
     def generate_msg_type_id(self, mt: MT) -> str:
-        return self.generate_field("MT", mt.name, mt.value)
+        return self.generate_field("MT", self.sanitize_name(mt.name), mt.value)
 
     def generate_type_alias(self, td: TypeAlias) -> str:
+        name = self.sanitize_name(td.name)
+        type_name = self.sanitize_name(td.type_name)
         if td.type_name in type_map.keys():
             s = type_map[td.type_name]
-            return f"{self.struct_name}.typedefs.{td.name} = {s}(0);\n"
+            return f"{self.struct_name}.typedefs.{name} = {s}(0);\n"
 
         if td.type_name in self.parser.aliases.keys():
-            return f"{self.struct_name}.typedefs.{td.name} = RTMA.typedefs.{td.type_name};\n"
+            return f"{self.struct_name}.typedefs.{name} = RTMA.typedefs.{type_name};\n"
 
         if td.type_name in self.parser.struct_defs.keys():
-            return f"{self.struct_name}.typedefs.{td.name} = RTMA.typedefs.{td.type_name};\n"
+            return f"{self.struct_name}.typedefs.{name} = RTMA.typedefs.{type_name};\n"
 
         if td.type_name in self.parser.message_defs.keys():
-            return f"{self.struct_name}.MDF.{td.name} = RTMA.MDF.{td.type_name};\n"
+            return f"{self.struct_name}.MDF.{name} = RTMA.MDF.{type_name};\n"
 
-        raise RuntimeError(f"No type found for alias: {td.name}")
+        raise RuntimeError(f"No type found for alias: {name}")
 
     def generate_struct(
         self, struct: Union[SDF, MDF], top_field: str = "typedefs"
     ) -> str:
         f = []
 
-        if isinstance(struct, MDF) and len(struct.fields) == 0:
-            f.append(f"% {struct.name} (Signal)")
-        else:
-            f.append(f"% {struct.name}")
+        name = self.sanitize_name(struct.name)
 
-        f.append(f"{self.struct_name}.{top_field}.{struct.name} = struct();")
+        if isinstance(struct, MDF) and len(struct.fields) == 0:
+            f.append(f"% {name} (Signal)")
+        else:
+            f.append(f"% {name}")
+
+        f.append(f"{self.struct_name}.{top_field}.{name} = struct();")
 
         for field in struct.fields:
             if field.type_name in type_map.keys():
@@ -156,15 +162,15 @@ class MatlabDefCompiler:
             elif field.type_name in self.parser.aliases.keys():
                 ftype = f"{self.struct_name}.typedefs.{field.type_name}"
             else:
-                raise RuntimeError(f"Unknown field name {field.name} in {struct.name}")
+                raise RuntimeError(f"Unknown field name {field.name} in {name}")
 
             if field.length is not None:
                 f.append(
-                    f"{self.struct_name}.{top_field}.{struct.name}.{field.name} = repmat({ftype}, 1, {field.length});"
+                    f"{self.struct_name}.{top_field}.{name}.{field.name} = repmat({ftype}, 1, {field.length});"
                 )
             else:
                 f.append(
-                    f"{self.struct_name}.{top_field}.{struct.name}.{field.name} = {ftype};"
+                    f"{self.struct_name}.{top_field}.{name}.{field.name} = {ftype};"
                 )
 
         return "\n".join(f)
@@ -176,7 +182,7 @@ class MatlabDefCompiler:
         return f"{self.struct_name}.MESSAGE_HEADER = {self.struct_name}.typedefs.RTMA_MSG_HEADER;\n"
 
     def generate_hash_id(self, mdf: MDF) -> str:
-        return f'{self.struct_name}.hash.{mdf.name} = "{mdf.hash[:8]}";\n'
+        return f'{self.struct_name}.hash.{self.sanitize_name(mdf.name)} = "{mdf.hash[:8]}";\n'
 
     def generate_mex_opcodes(self) -> str:
         # these are copied from MatlabRTMA.h
