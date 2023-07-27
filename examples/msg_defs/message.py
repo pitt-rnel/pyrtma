@@ -36,7 +36,6 @@ MSG_COUNT = ctypes.c_int
 AGE_TYPE = ctypes.c_int
 
 
-
 # Host IDs
 LOCAL_HOST = 0
 ALL_HOSTS = 32767
@@ -68,6 +67,18 @@ MT_ANOTHER_EXAMPLE = 5678
 MT_USER_SIGNAL = 2468
 MT_PERSON_LIST = 1357
 MT_EMPLOYEES = 1368
+MT__RESERVED_001000 = 1000
+MT__RESERVED_001002 = 1002
+MT__RESERVED_001003 = 1003
+MT__RESERVED_001004 = 1004
+MT__RESERVED_001005 = 1005
+MT__RESERVED_001006 = 1006
+MT__RESERVED_001007 = 1007
+MT__RESERVED_001008 = 1008
+MT__RESERVED_001009 = 1009
+MT__RESERVED_001010 = 1010
+MT__RESERVED_001011 = 1011
+MT__RESERVED_001012 = 1012
 
 
 # Struct Definitions
@@ -84,298 +95,318 @@ class RTMA_MSG_HEADER(ctypes.Structure):
         ("num_data_bytes", ctypes.c_int),
         ("remaining_bytes", ctypes.c_int),
         ("is_dynamic", ctypes.c_int),
-        ("reserved", ctypes.c_int)
+        ("reserved", ctypes.c_int),
     ]
 
 
 class TEST_STRUCT(ctypes.Structure):
-    _fields_ = [
-        ("value_str", ctypes.c_char * 32),
-        ("value_int", ctypes.c_int)
-    ]
+    _fields_ = [("value_str", ctypes.c_char * 32), ("value_int", ctypes.c_int)]
 
 
 # Message Definitions
 @pyrtma.message_def
-class _EXIT(pyrtma.MessageData):
+class MDF_EXIT(pyrtma.MessageData):
     _fields_ = []
     type_id = 0
     type_name = "EXIT"
-    type_hash = 0x095e0546
+    type_hash = 0x095E0546
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_EXIT = _EXIT
-
-
 @pyrtma.message_def
-class _KILL(pyrtma.MessageData):
+class MDF_KILL(pyrtma.MessageData):
     _fields_ = []
     type_id = 1
     type_name = "KILL"
-    type_hash = 0x82fc702d
+    type_hash = 0x82FC702D
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_KILL = _KILL
-
-
 @pyrtma.message_def
-class _ACKNOWLEDGE(pyrtma.MessageData):
+class MDF_ACKNOWLEDGE(pyrtma.MessageData):
     _fields_ = []
     type_id = 2
     type_name = "ACKNOWLEDGE"
-    type_hash = 0xb725b581
+    type_hash = 0xB725B581
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_ACKNOWLEDGE = _ACKNOWLEDGE
-
-
 @pyrtma.message_def
-class _CONNECT(pyrtma.MessageData):
-    _fields_ = [
-        ("logger_status", ctypes.c_short),
-        ("daemon_status", ctypes.c_short)
-    ]
+class MDF_CONNECT(pyrtma.MessageData):
+    _fields_ = [("logger_status", ctypes.c_short), ("daemon_status", ctypes.c_short)]
     type_id = 13
     type_name = "CONNECT"
-    type_hash = 0x6f2e3ca5
+    type_hash = 0x6F2E3CA5
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_CONNECT = _CONNECT
-
-
 @pyrtma.message_def
-class _DISCONNECT(pyrtma.MessageData):
+class MDF_DISCONNECT(pyrtma.MessageData):
     _fields_ = []
     type_id = 14
     type_name = "DISCONNECT"
-    type_hash = 0xd0126bf9
+    type_hash = 0xD0126BF9
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_DISCONNECT = _DISCONNECT
-
-
 @pyrtma.message_def
-class _SUBSCRIBE(pyrtma.MessageData):
-    _fields_ = [
-        ("msg_type", MSG_TYPE)
-    ]
+class MDF_SUBSCRIBE(pyrtma.MessageData):
+    _fields_ = [("msg_type", MSG_TYPE)]
     type_id = 15
     type_name = "SUBSCRIBE"
-    type_hash = 0xf5b437c8
+    type_hash = 0xF5B437C8
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_SUBSCRIBE = _SUBSCRIBE
-
-
 @pyrtma.message_def
-class _UNSUBSCRIBE(pyrtma.MessageData):
-    _fields_ = [
-        ("msg_type", MSG_TYPE)
-    ]
+class MDF_UNSUBSCRIBE(pyrtma.MessageData):
+    _fields_ = [("msg_type", MSG_TYPE)]
     type_id = 16
     type_name = "UNSUBSCRIBE"
-    type_hash = 0x193fb9e0
+    type_hash = 0x193FB9E0
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_UNSUBSCRIBE = _UNSUBSCRIBE
-
-
 @pyrtma.message_def
-class _PAUSE_SUBSCRIPTION(pyrtma.MessageData):
-    _fields_ = [
-        ("msg_type", MSG_TYPE)
-    ]
+class MDF_PAUSE_SUBSCRIPTION(pyrtma.MessageData):
+    _fields_ = [("msg_type", MSG_TYPE)]
     type_id = 85
     type_name = "PAUSE_SUBSCRIPTION"
-    type_hash = 0x22338a6d
+    type_hash = 0x22338A6D
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_PAUSE_SUBSCRIPTION = _PAUSE_SUBSCRIPTION
-
-
 @pyrtma.message_def
-class _RESUME_SUBSCRIPTION(pyrtma.MessageData):
-    _fields_ = [
-        ("msg_type", MSG_TYPE)
-    ]
+class MDF_RESUME_SUBSCRIPTION(pyrtma.MessageData):
+    _fields_ = [("msg_type", MSG_TYPE)]
     type_id = 86
     type_name = "RESUME_SUBSCRIPTION"
-    type_hash = 0xc56a97f2
+    type_hash = 0xC56A97F2
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_RESUME_SUBSCRIPTION = _RESUME_SUBSCRIPTION
-
-
 @pyrtma.message_def
-class _FAIL_SUBSCRIBE(pyrtma.MessageData):
+class MDF_FAIL_SUBSCRIBE(pyrtma.MessageData):
     _fields_ = [
         ("mod_id", MODULE_ID),
         ("reserved", ctypes.c_short),
-        ("msg_type", MSG_TYPE)
+        ("msg_type", MSG_TYPE),
     ]
     type_id = 6
     type_name = "FAIL_SUBSCRIBE"
-    type_hash = 0x9ad70a15
+    type_hash = 0x9AD70A15
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_FAIL_SUBSCRIBE = _FAIL_SUBSCRIBE
-
-
 @pyrtma.message_def
-class _FAILED_MESSAGE(pyrtma.MessageData):
+class MDF_FAILED_MESSAGE(pyrtma.MessageData):
     _fields_ = [
         ("dest_mod_id", MODULE_ID),
         ("reserved", ctypes.c_short * 3),
         ("time_of_failure", ctypes.c_double),
-        ("msg_header", RTMA_MSG_HEADER)
+        ("msg_header", RTMA_MSG_HEADER),
     ]
     type_id = 8
     type_name = "FAILED_MESSAGE"
-    type_hash = 0xdca545b2
+    type_hash = 0xDCA545B2
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_FAILED_MESSAGE = _FAILED_MESSAGE
-
-
 @pyrtma.message_def
-class _FORCE_DISCONNECT(pyrtma.MessageData):
-    _fields_ = [
-        ("mod_id", ctypes.c_int)
-    ]
+class MDF_FORCE_DISCONNECT(pyrtma.MessageData):
+    _fields_ = [("mod_id", ctypes.c_int)]
     type_id = 82
     type_name = "FORCE_DISCONNECT"
-    type_hash = 0xc37c54e8
+    type_hash = 0xC37C54E8
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_FORCE_DISCONNECT = _FORCE_DISCONNECT
-
-
 @pyrtma.message_def
-class _MODULE_READY(pyrtma.MessageData):
-    _fields_ = [
-        ("mod_id", ctypes.c_int)
-    ]
+class MDF_MODULE_READY(pyrtma.MessageData):
+    _fields_ = [("mod_id", ctypes.c_int)]
     type_id = 26
     type_name = "MODULE_READY"
-    type_hash = 0xcc0a3aad
+    type_hash = 0xCC0A3AAD
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_MODULE_READY = _MODULE_READY
-
-
 @pyrtma.message_def
-class _SAVE_MESSAGE_LOG(pyrtma.MessageData):
-    _fields_ = [
-        ("pathname", ctypes.c_char * 256),
-        ("pathname_length", ctypes.c_int)
-    ]
+class MDF_SAVE_MESSAGE_LOG(pyrtma.MessageData):
+    _fields_ = [("pathname", ctypes.c_char * 256), ("pathname_length", ctypes.c_int)]
     type_id = 56
     type_name = "SAVE_MESSAGE_LOG"
-    type_hash = 0x515569e9
+    type_hash = 0x515569E9
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_SAVE_MESSAGE_LOG = _SAVE_MESSAGE_LOG
-
-
 @pyrtma.message_def
-class _TIMING_MESSAGE(pyrtma.MessageData):
+class MDF_TIMING_MESSAGE(pyrtma.MessageData):
     _fields_ = [
         ("timing", ctypes.c_ushort * 10000),
         ("ModulePID", ctypes.c_int * 200),
-        ("send_time", ctypes.c_double)
+        ("send_time", ctypes.c_double),
     ]
     type_id = 80
     type_name = "TIMING_MESSAGE"
-    type_hash = 0x3595c23e
+    type_hash = 0x3595C23E
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_TIMING_MESSAGE = _TIMING_MESSAGE
-
-
 @pyrtma.message_def
-class _PERSON_MESSAGE(pyrtma.MessageData):
-    _fields_ = [
-        ("name", ctypes.c_char * 32),
-        ("age", AGE_TYPE)
-    ]
+class MDF_PERSON_MESSAGE(pyrtma.MessageData):
+    _fields_ = [("name", ctypes.c_char * 32), ("age", AGE_TYPE)]
     type_id = 1234
     type_name = "PERSON_MESSAGE"
-    type_hash = 0x3a9c5c31
+    type_hash = 0x3A9C5C31
     type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
 
 
-MDF_PERSON_MESSAGE = _PERSON_MESSAGE
-
-
 @pyrtma.message_def
-class _ANOTHER_EXAMPLE(pyrtma.MessageData):
+class MDF_ANOTHER_EXAMPLE(pyrtma.MessageData):
     _fields_ = [
         ("value_struct", TEST_STRUCT),
         ("value_float", ctypes.c_float),
-        ("value_double", ctypes.c_double)
+        ("value_double", ctypes.c_double),
     ]
     type_id = 5678
     type_name = "ANOTHER_EXAMPLE"
-    type_hash = 0x76c035b3
+    type_hash = 0x76C035B3
     type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
 
 
-MDF_ANOTHER_EXAMPLE = _ANOTHER_EXAMPLE
-
-
 @pyrtma.message_def
-class _USER_SIGNAL(pyrtma.MessageData):
+class MDF_USER_SIGNAL(pyrtma.MessageData):
     _fields_ = []
     type_id = 2468
     type_name = "USER_SIGNAL"
-    type_hash = 0xd79169aa
+    type_hash = 0xD79169AA
     type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
 
 
-MDF_USER_SIGNAL = _USER_SIGNAL
-
-
 @pyrtma.message_def
-class _PERSON_LIST(pyrtma.MessageData):
-    _fields_ = [
-        ("person", _PERSON_MESSAGE * 32)
-    ]
+class MDF_PERSON_LIST(pyrtma.MessageData):
+    _fields_ = [("person", MDF_PERSON_MESSAGE * 32)]
     type_id = 1357
     type_name = "PERSON_LIST"
-    type_hash = 0x8f180975
+    type_hash = 0x8F180975
     type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
-
-
-MDF_PERSON_LIST = _PERSON_LIST
 
 
 @pyrtma.message_def
-class _EMPLOYEES(pyrtma.MessageData):
-    _fields_ = [
-        ("person", _PERSON_MESSAGE * 32)
-    ]
+class MDF_EMPLOYEES(pyrtma.MessageData):
+    _fields_ = [("person", MDF_PERSON_MESSAGE * 32)]
     type_id = 1368
     type_name = "EMPLOYEES"
-    type_hash = 0xcbe5197a
+    type_hash = 0xCBE5197A
     type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
 
 
-MDF_EMPLOYEES = _EMPLOYEES
+@pyrtma.message_def
+class MDF__RESERVED_001000(pyrtma.MessageData):
+    _fields_ = []
+    type_id = 1000
+    type_name = "_RESERVED_001000"
+    type_hash = 0x08E66D54
+    type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001002(pyrtma.MessageData):
+    _fields_ = []
+    type_id = 1002
+    type_name = "_RESERVED_001002"
+    type_hash = 0xBD402EAA
+    type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001003(pyrtma.MessageData):
+    _fields_ = []
+    type_id = 1003
+    type_name = "_RESERVED_001003"
+    type_hash = 0x4D10FC66
+    type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001004(pyrtma.MessageData):
+    _fields_ = []
+    type_id = 1004
+    type_name = "_RESERVED_001004"
+    type_hash = 0x1F3379B5
+    type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001005(pyrtma.MessageData):
+    _fields_ = []
+    type_id = 1005
+    type_name = "_RESERVED_001005"
+    type_hash = 0x2A5253B3
+    type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001006(pyrtma.MessageData):
+    _fields_ = []
+    type_id = 1006
+    type_name = "_RESERVED_001006"
+    type_hash = 0xE67B66D3
+    type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001007(pyrtma.MessageData):
+    _fields_ = []
+    type_id = 1007
+    type_name = "_RESERVED_001007"
+    type_hash = 0x8DC1AAE8
+    type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001008(pyrtma.MessageData):
+    _fields_ = []
+    type_id = 1008
+    type_name = "_RESERVED_001008"
+    type_hash = 0x3ABE111F
+    type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001009(pyrtma.MessageData):
+    _fields_ = []
+    type_id = 1009
+    type_name = "_RESERVED_001009"
+    type_hash = 0x1E42BAA4
+    type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001010(pyrtma.MessageData):
+    _fields_ = []
+    type_id = 1010
+    type_name = "_RESERVED_001010"
+    type_hash = 0xAE4C92D4
+    type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001011(pyrtma.MessageData):
+    _fields_ = []
+    type_id = 1011
+    type_name = "_RESERVED_001011"
+    type_hash = 0x27E03BD7
+    type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001012(pyrtma.MessageData):
+    _fields_ = []
+    type_id = 1012
+    type_name = "_RESERVED_001012"
+    type_hash = 0x925028C4
+    type_source = "D:\\GIT\\pyrtma\\examples\\msg_defs\\message.yaml"
 
 
 # Collect all info into one object
@@ -443,29 +474,53 @@ class _MT:
     USER_SIGNAL = 2468
     PERSON_LIST = 1357
     EMPLOYEES = 1368
+    _RESERVED_001000 = 1000
+    _RESERVED_001002 = 1002
+    _RESERVED_001003 = 1003
+    _RESERVED_001004 = 1004
+    _RESERVED_001005 = 1005
+    _RESERVED_001006 = 1006
+    _RESERVED_001007 = 1007
+    _RESERVED_001008 = 1008
+    _RESERVED_001009 = 1009
+    _RESERVED_001010 = 1010
+    _RESERVED_001011 = 1011
+    _RESERVED_001012 = 1012
 
 
 class _MDF:
-    EXIT = _EXIT
-    KILL = _KILL
-    ACKNOWLEDGE = _ACKNOWLEDGE
-    CONNECT = _CONNECT
-    DISCONNECT = _DISCONNECT
-    SUBSCRIBE = _SUBSCRIBE
-    UNSUBSCRIBE = _UNSUBSCRIBE
-    PAUSE_SUBSCRIPTION = _PAUSE_SUBSCRIPTION
-    RESUME_SUBSCRIPTION = _RESUME_SUBSCRIPTION
-    FAIL_SUBSCRIBE = _FAIL_SUBSCRIBE
-    FAILED_MESSAGE = _FAILED_MESSAGE
-    FORCE_DISCONNECT = _FORCE_DISCONNECT
-    MODULE_READY = _MODULE_READY
-    SAVE_MESSAGE_LOG = _SAVE_MESSAGE_LOG
-    TIMING_MESSAGE = _TIMING_MESSAGE
-    PERSON_MESSAGE = _PERSON_MESSAGE
-    ANOTHER_EXAMPLE = _ANOTHER_EXAMPLE
-    USER_SIGNAL = _USER_SIGNAL
-    PERSON_LIST = _PERSON_LIST
-    EMPLOYEES = _EMPLOYEES
+    EXIT = MDF_EXIT
+    KILL = MDF_KILL
+    ACKNOWLEDGE = MDF_ACKNOWLEDGE
+    CONNECT = MDF_CONNECT
+    DISCONNECT = MDF_DISCONNECT
+    SUBSCRIBE = MDF_SUBSCRIBE
+    UNSUBSCRIBE = MDF_UNSUBSCRIBE
+    PAUSE_SUBSCRIPTION = MDF_PAUSE_SUBSCRIPTION
+    RESUME_SUBSCRIPTION = MDF_RESUME_SUBSCRIPTION
+    FAIL_SUBSCRIBE = MDF_FAIL_SUBSCRIBE
+    FAILED_MESSAGE = MDF_FAILED_MESSAGE
+    FORCE_DISCONNECT = MDF_FORCE_DISCONNECT
+    MODULE_READY = MDF_MODULE_READY
+    SAVE_MESSAGE_LOG = MDF_SAVE_MESSAGE_LOG
+    TIMING_MESSAGE = MDF_TIMING_MESSAGE
+    PERSON_MESSAGE = MDF_PERSON_MESSAGE
+    ANOTHER_EXAMPLE = MDF_ANOTHER_EXAMPLE
+    USER_SIGNAL = MDF_USER_SIGNAL
+    PERSON_LIST = MDF_PERSON_LIST
+    EMPLOYEES = MDF_EMPLOYEES
+    _RESERVED_001000 = MDF__RESERVED_001000
+    _RESERVED_001002 = MDF__RESERVED_001002
+    _RESERVED_001003 = MDF__RESERVED_001003
+    _RESERVED_001004 = MDF__RESERVED_001004
+    _RESERVED_001005 = MDF__RESERVED_001005
+    _RESERVED_001006 = MDF__RESERVED_001006
+    _RESERVED_001007 = MDF__RESERVED_001007
+    _RESERVED_001008 = MDF__RESERVED_001008
+    _RESERVED_001009 = MDF__RESERVED_001009
+    _RESERVED_001010 = MDF__RESERVED_001010
+    _RESERVED_001011 = MDF__RESERVED_001011
+    _RESERVED_001012 = MDF__RESERVED_001012
 
 
 class _RTMA:

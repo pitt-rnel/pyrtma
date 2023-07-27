@@ -134,6 +134,11 @@ message_defs:
     EMPLOYEES:
         id: 1368
         fields: PERSON_LIST
+
+    # A block of message ids can be reserved by a file for future use
+    # Ranges are inclusive on both ends
+    _RESERVED_:
+        id: [1000, 1002:1005, 1006 - 1008, 1009 to 1012]
 ```
 
 Run the following command to compile the yaml file into Python, C, Matlab, or Javascript files. This will output a message.(py|h|m|js) file.
