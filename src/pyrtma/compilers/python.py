@@ -150,7 +150,6 @@ class PyDefCompiler:
             type_name = \"{mdf.name}\"
             type_hash = 0x{mdf.hash[:8]}
             type_source = \"{msg_src}\"
-            
         """
         return dedent(template)
 
