@@ -114,7 +114,7 @@ message_defs:
   MODULE_READY:
     id: 26
     fields:
-      mod_id: int
+      pid: int
 
   SAVE_MESSAGE_LOG:
     id: 56

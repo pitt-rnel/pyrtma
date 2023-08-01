@@ -77,7 +77,7 @@ class RTMA_MSG_HEADER(ctypes.Structure):
 
 # Message Definitions
 @pyrtma.message_def
-class _EXIT(pyrtma.MessageData):
+class MDF_EXIT(pyrtma.MessageData):
     _fields_ = []
     type_id = 0
     type_name = "EXIT"
@@ -85,11 +85,8 @@ class _EXIT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_EXIT = _EXIT
-
-
 @pyrtma.message_def
-class _KILL(pyrtma.MessageData):
+class MDF_KILL(pyrtma.MessageData):
     _fields_ = []
     type_id = 1
     type_name = "KILL"
@@ -97,11 +94,8 @@ class _KILL(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_KILL = _KILL
-
-
 @pyrtma.message_def
-class _ACKNOWLEDGE(pyrtma.MessageData):
+class MDF_ACKNOWLEDGE(pyrtma.MessageData):
     _fields_ = []
     type_id = 2
     type_name = "ACKNOWLEDGE"
@@ -109,11 +103,8 @@ class _ACKNOWLEDGE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_ACKNOWLEDGE = _ACKNOWLEDGE
-
-
 @pyrtma.message_def
-class _CONNECT(pyrtma.MessageData):
+class MDF_CONNECT(pyrtma.MessageData):
     _fields_ = [
         ("logger_status", ctypes.c_short),
         ("daemon_status", ctypes.c_short)
@@ -124,11 +115,8 @@ class _CONNECT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_CONNECT = _CONNECT
-
-
 @pyrtma.message_def
-class _DISCONNECT(pyrtma.MessageData):
+class MDF_DISCONNECT(pyrtma.MessageData):
     _fields_ = []
     type_id = 14
     type_name = "DISCONNECT"
@@ -136,11 +124,8 @@ class _DISCONNECT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_DISCONNECT = _DISCONNECT
-
-
 @pyrtma.message_def
-class _SUBSCRIBE(pyrtma.MessageData):
+class MDF_SUBSCRIBE(pyrtma.MessageData):
     _fields_ = [
         ("msg_type", MSG_TYPE)
     ]
@@ -150,11 +135,8 @@ class _SUBSCRIBE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_SUBSCRIBE = _SUBSCRIBE
-
-
 @pyrtma.message_def
-class _UNSUBSCRIBE(pyrtma.MessageData):
+class MDF_UNSUBSCRIBE(pyrtma.MessageData):
     _fields_ = [
         ("msg_type", MSG_TYPE)
     ]
@@ -164,11 +146,8 @@ class _UNSUBSCRIBE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_UNSUBSCRIBE = _UNSUBSCRIBE
-
-
 @pyrtma.message_def
-class _PAUSE_SUBSCRIPTION(pyrtma.MessageData):
+class MDF_PAUSE_SUBSCRIPTION(pyrtma.MessageData):
     _fields_ = [
         ("msg_type", MSG_TYPE)
     ]
@@ -178,11 +157,8 @@ class _PAUSE_SUBSCRIPTION(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_PAUSE_SUBSCRIPTION = _PAUSE_SUBSCRIPTION
-
-
 @pyrtma.message_def
-class _RESUME_SUBSCRIPTION(pyrtma.MessageData):
+class MDF_RESUME_SUBSCRIPTION(pyrtma.MessageData):
     _fields_ = [
         ("msg_type", MSG_TYPE)
     ]
@@ -192,11 +168,8 @@ class _RESUME_SUBSCRIPTION(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_RESUME_SUBSCRIPTION = _RESUME_SUBSCRIPTION
-
-
 @pyrtma.message_def
-class _FAIL_SUBSCRIBE(pyrtma.MessageData):
+class MDF_FAIL_SUBSCRIBE(pyrtma.MessageData):
     _fields_ = [
         ("mod_id", MODULE_ID),
         ("reserved", ctypes.c_short),
@@ -208,11 +181,8 @@ class _FAIL_SUBSCRIBE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_FAIL_SUBSCRIBE = _FAIL_SUBSCRIBE
-
-
 @pyrtma.message_def
-class _FAILED_MESSAGE(pyrtma.MessageData):
+class MDF_FAILED_MESSAGE(pyrtma.MessageData):
     _fields_ = [
         ("dest_mod_id", MODULE_ID),
         ("reserved", ctypes.c_short * 3),
@@ -225,11 +195,8 @@ class _FAILED_MESSAGE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_FAILED_MESSAGE = _FAILED_MESSAGE
-
-
 @pyrtma.message_def
-class _FORCE_DISCONNECT(pyrtma.MessageData):
+class MDF_FORCE_DISCONNECT(pyrtma.MessageData):
     _fields_ = [
         ("mod_id", ctypes.c_int)
     ]
@@ -239,25 +206,19 @@ class _FORCE_DISCONNECT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_FORCE_DISCONNECT = _FORCE_DISCONNECT
-
-
 @pyrtma.message_def
-class _MODULE_READY(pyrtma.MessageData):
+class MDF_MODULE_READY(pyrtma.MessageData):
     _fields_ = [
-        ("mod_id", ctypes.c_int)
+        ("pid", ctypes.c_int)
     ]
     type_id = 26
     type_name = "MODULE_READY"
-    type_hash = 0xcc0a3aad
+    type_hash = 0x0df81813
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_MODULE_READY = _MODULE_READY
-
-
 @pyrtma.message_def
-class _SAVE_MESSAGE_LOG(pyrtma.MessageData):
+class MDF_SAVE_MESSAGE_LOG(pyrtma.MessageData):
     _fields_ = [
         ("pathname", ctypes.c_char * 256),
         ("pathname_length", ctypes.c_int)
@@ -268,11 +229,8 @@ class _SAVE_MESSAGE_LOG(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-MDF_SAVE_MESSAGE_LOG = _SAVE_MESSAGE_LOG
-
-
 @pyrtma.message_def
-class _TIMING_MESSAGE(pyrtma.MessageData):
+class MDF_TIMING_MESSAGE(pyrtma.MessageData):
     _fields_ = [
         ("timing", ctypes.c_ushort * 10000),
         ("ModulePID", ctypes.c_int * 200),
@@ -282,9 +240,6 @@ class _TIMING_MESSAGE(pyrtma.MessageData):
     type_name = "TIMING_MESSAGE"
     type_hash = 0x3595c23e
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
-
-
-MDF_TIMING_MESSAGE = _TIMING_MESSAGE
 
 
 # Collect all info into one object
@@ -343,21 +298,21 @@ class _MT:
 
 
 class _MDF:
-    EXIT = _EXIT
-    KILL = _KILL
-    ACKNOWLEDGE = _ACKNOWLEDGE
-    CONNECT = _CONNECT
-    DISCONNECT = _DISCONNECT
-    SUBSCRIBE = _SUBSCRIBE
-    UNSUBSCRIBE = _UNSUBSCRIBE
-    PAUSE_SUBSCRIPTION = _PAUSE_SUBSCRIPTION
-    RESUME_SUBSCRIPTION = _RESUME_SUBSCRIPTION
-    FAIL_SUBSCRIBE = _FAIL_SUBSCRIBE
-    FAILED_MESSAGE = _FAILED_MESSAGE
-    FORCE_DISCONNECT = _FORCE_DISCONNECT
-    MODULE_READY = _MODULE_READY
-    SAVE_MESSAGE_LOG = _SAVE_MESSAGE_LOG
-    TIMING_MESSAGE = _TIMING_MESSAGE
+    EXIT = MDF_EXIT
+    KILL = MDF_KILL
+    ACKNOWLEDGE = MDF_ACKNOWLEDGE
+    CONNECT = MDF_CONNECT
+    DISCONNECT = MDF_DISCONNECT
+    SUBSCRIBE = MDF_SUBSCRIBE
+    UNSUBSCRIBE = MDF_UNSUBSCRIBE
+    PAUSE_SUBSCRIPTION = MDF_PAUSE_SUBSCRIPTION
+    RESUME_SUBSCRIPTION = MDF_RESUME_SUBSCRIPTION
+    FAIL_SUBSCRIBE = MDF_FAIL_SUBSCRIBE
+    FAILED_MESSAGE = MDF_FAILED_MESSAGE
+    FORCE_DISCONNECT = MDF_FORCE_DISCONNECT
+    MODULE_READY = MDF_MODULE_READY
+    SAVE_MESSAGE_LOG = MDF_SAVE_MESSAGE_LOG
+    TIMING_MESSAGE = MDF_TIMING_MESSAGE
 
 
 class _RTMA:
