@@ -515,7 +515,6 @@ class MDF_EXIT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_KILL(pyrtma.MessageData):
     _fields_ = []
@@ -525,7 +524,6 @@ class MDF_KILL(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_ACKNOWLEDGE(pyrtma.MessageData):
     _fields_ = []
@@ -533,7 +531,6 @@ class MDF_ACKNOWLEDGE(pyrtma.MessageData):
     type_name = "ACKNOWLEDGE"
     type_hash = 0xb725b581
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -548,7 +545,6 @@ class MDF_CONNECT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_DISCONNECT(pyrtma.MessageData):
     _fields_ = []
@@ -556,7 +552,6 @@ class MDF_DISCONNECT(pyrtma.MessageData):
     type_name = "DISCONNECT"
     type_hash = 0xd0126bf9
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -570,7 +565,6 @@ class MDF_SUBSCRIBE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_UNSUBSCRIBE(pyrtma.MessageData):
     _fields_ = [
@@ -580,7 +574,6 @@ class MDF_UNSUBSCRIBE(pyrtma.MessageData):
     type_name = "UNSUBSCRIBE"
     type_hash = 0x193fb9e0
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -594,7 +587,6 @@ class MDF_PAUSE_SUBSCRIPTION(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_RESUME_SUBSCRIPTION(pyrtma.MessageData):
     _fields_ = [
@@ -604,7 +596,6 @@ class MDF_RESUME_SUBSCRIPTION(pyrtma.MessageData):
     type_name = "RESUME_SUBSCRIPTION"
     type_hash = 0xc56a97f2
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -618,7 +609,6 @@ class MDF_FAIL_SUBSCRIBE(pyrtma.MessageData):
     type_name = "FAIL_SUBSCRIBE"
     type_hash = 0x9ad70a15
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -635,7 +625,6 @@ class MDF_FAILED_MESSAGE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_FORCE_DISCONNECT(pyrtma.MessageData):
     _fields_ = [
@@ -645,7 +634,6 @@ class MDF_FORCE_DISCONNECT(pyrtma.MessageData):
     type_name = "FORCE_DISCONNECT"
     type_hash = 0xc37c54e8
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -659,7 +647,6 @@ class MDF_MODULE_READY(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_SAVE_MESSAGE_LOG(pyrtma.MessageData):
     _fields_ = [
@@ -670,7 +657,6 @@ class MDF_SAVE_MESSAGE_LOG(pyrtma.MessageData):
     type_name = "SAVE_MESSAGE_LOG"
     type_hash = 0x515569e9
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -686,7 +672,6 @@ class MDF_TIMING_MESSAGE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\src\\pyrtma\\core_defs\\core_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_VR_REQUEST_STATE(pyrtma.MessageData):
     _fields_ = [
@@ -696,7 +681,6 @@ class MDF_MUJOCO_VR_REQUEST_STATE(pyrtma.MessageData):
     type_name = "MUJOCO_VR_REQUEST_STATE"
     type_hash = 0xa905b1ea
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
-
 
 
 @pyrtma.message_def
@@ -722,7 +706,6 @@ class MDF_MUJOCO_VR_REPLY_STATE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_VR_MOCAP_MOVE(pyrtma.MessageData):
     _fields_ = [
@@ -737,7 +720,6 @@ class MDF_MUJOCO_VR_MOCAP_MOVE(pyrtma.MessageData):
     type_name = "MUJOCO_VR_MOCAP_MOVE"
     type_hash = 0x9374bf04
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
-
 
 
 @pyrtma.message_def
@@ -755,7 +737,6 @@ class MDF_MUJOCO_VR_MOTOR_MOVE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_VR_REQUEST_MODEL_INFO(pyrtma.MessageData):
     _fields_ = [
@@ -765,7 +746,6 @@ class MDF_MUJOCO_VR_REQUEST_MODEL_INFO(pyrtma.MessageData):
     type_name = "MUJOCO_VR_REQUEST_MODEL_INFO"
     type_hash = 0xdb6cfb78
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
-
 
 
 @pyrtma.message_def
@@ -810,7 +790,6 @@ class MDF_MUJOCO_VR_REPLY_MODEL_INFO(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_VR_REQUEST_LINK_STATE(pyrtma.MessageData):
     _fields_ = [
@@ -820,7 +799,6 @@ class MDF_MUJOCO_VR_REQUEST_LINK_STATE(pyrtma.MessageData):
     type_name = "MUJOCO_VR_REQUEST_LINK_STATE"
     type_hash = 0x617b3b37
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
-
 
 
 @pyrtma.message_def
@@ -845,7 +823,6 @@ class MDF_MUJOCO_VR_REPLY_LINK_STATE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_VR_LINK(pyrtma.MessageData):
     _fields_ = [
@@ -861,7 +838,6 @@ class MDF_MUJOCO_VR_LINK(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_VR_LINK_RESET(pyrtma.MessageData):
     _fields_ = [
@@ -874,7 +850,6 @@ class MDF_MUJOCO_VR_LINK_RESET(pyrtma.MessageData):
     type_name = "MUJOCO_VR_LINK_RESET"
     type_hash = 0xd0f43398
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
-
 
 
 @pyrtma.message_def
@@ -894,7 +869,6 @@ class MDF_MUJOCO_VR_FLOATBODY_MOVE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_VR_RESET(pyrtma.MessageData):
     _fields_ = []
@@ -904,7 +878,6 @@ class MDF_MUJOCO_VR_RESET(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_VR_RELOAD(pyrtma.MessageData):
     _fields_ = []
@@ -912,7 +885,6 @@ class MDF_MUJOCO_VR_RELOAD(pyrtma.MessageData):
     type_name = "MUJOCO_VR_RELOAD"
     type_hash = 0xdb7ff347
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
-
 
 
 @pyrtma.message_def
@@ -926,7 +898,6 @@ class MDF_MUJOCO_VR_LOAD_MODEL(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_VR_PAUSE(pyrtma.MessageData):
     _fields_ = []
@@ -936,7 +907,6 @@ class MDF_MUJOCO_VR_PAUSE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_VR_RESUME(pyrtma.MessageData):
     _fields_ = []
@@ -944,7 +914,6 @@ class MDF_MUJOCO_VR_RESUME(pyrtma.MessageData):
     type_name = "MUJOCO_VR_RESUME"
     type_hash = 0xf06db61e
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
-
 
 
 @pyrtma.message_def
@@ -960,7 +929,6 @@ class MDF_MUJOCO_VR_MOTOR_CTRL(pyrtma.MessageData):
     type_name = "MUJOCO_VR_MOTOR_CTRL"
     type_hash = 0x859e58ef
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
-
 
 
 @pyrtma.message_def
@@ -982,7 +950,6 @@ class MDF_MUJOCO_VR_MOTOR_CONFIG(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_VR_SET_RGBA(pyrtma.MessageData):
     _fields_ = [
@@ -997,7 +964,6 @@ class MDF_MUJOCO_VR_SET_RGBA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_VR_MSG(pyrtma.MessageData):
     _fields_ = [
@@ -1008,7 +974,6 @@ class MDF_MUJOCO_VR_MSG(pyrtma.MessageData):
     type_name = "MUJOCO_VR_MSG"
     type_hash = 0x91b7bc32
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs_2.yaml"
-
 
 
 @pyrtma.message_def
@@ -1022,7 +987,6 @@ class MDF_JSON_CONFIG(pyrtma.MessageData):
     type_name = "JSON_CONFIG"
     type_hash = 0x66be0697
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1040,7 +1004,6 @@ class MDF_FINISHED_COMMAND(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CONTROL_SPACE_FEEDBACK(pyrtma.MessageData):
     _fields_ = [
@@ -1052,7 +1015,6 @@ class MDF_CONTROL_SPACE_FEEDBACK(pyrtma.MessageData):
     type_name = "CONTROL_SPACE_FEEDBACK"
     type_hash = 0x33e67b66
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1070,7 +1032,6 @@ class MDF_CONTROL_SPACE_COMMAND(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MPL_RAW_PERCEPT(pyrtma.MessageData):
     _fields_ = [
@@ -1086,7 +1047,6 @@ class MDF_MPL_RAW_PERCEPT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_BIAS_COMMAND(pyrtma.MessageData):
     _fields_ = [
@@ -1100,7 +1060,6 @@ class MDF_BIAS_COMMAND(pyrtma.MessageData):
     type_name = "BIAS_COMMAND"
     type_hash = 0xd150fe3e
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1121,7 +1080,6 @@ class MDF_MPL_REBIASED_SENSORDATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CONTROL_SPACE_FEEDBACK_RHR_GRIPPER(pyrtma.MessageData):
     _fields_ = []
@@ -1129,7 +1087,6 @@ class MDF_CONTROL_SPACE_FEEDBACK_RHR_GRIPPER(pyrtma.MessageData):
     type_name = "CONTROL_SPACE_FEEDBACK_RHR_GRIPPER"
     type_hash = 0x2dfe82b1
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1144,7 +1101,6 @@ class MDF_CONTROL_SPACE_POS_COMMAND(pyrtma.MessageData):
     type_name = "CONTROL_SPACE_POS_COMMAND"
     type_hash = 0x2356d92e
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1169,7 +1125,6 @@ class MDF_MPL_SEGMENT_PERCEPTS(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_WAM_FEEDBACK(pyrtma.MessageData):
     _fields_ = [
@@ -1180,7 +1135,6 @@ class MDF_WAM_FEEDBACK(pyrtma.MessageData):
     type_name = "WAM_FEEDBACK"
     type_hash = 0x7ac8375a
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1197,7 +1151,6 @@ class MDF_IMPEDANCE_COMMAND(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_EXECUTIVE_CTRL(pyrtma.MessageData):
     _fields_ = [
@@ -1209,7 +1162,6 @@ class MDF_EXECUTIVE_CTRL(pyrtma.MessageData):
     type_name = "EXECUTIVE_CTRL"
     type_hash = 0x51b3116c
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1230,7 +1182,6 @@ class MDF_CURSOR_FEEDBACK(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_VISUAL_GRATING_BUILD(pyrtma.MessageData):
     _fields_ = [
@@ -1246,7 +1197,6 @@ class MDF_VISUAL_GRATING_BUILD(pyrtma.MessageData):
     type_name = "VISUAL_GRATING_BUILD"
     type_hash = 0xafe0b860
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1279,7 +1229,6 @@ class MDF_VISUAL_GRATING_RESPONSE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_GRIP_COMMAND(pyrtma.MessageData):
     _fields_ = [
@@ -1296,7 +1245,6 @@ class MDF_GRIP_COMMAND(pyrtma.MessageData):
     type_name = "GRIP_COMMAND"
     type_hash = 0xbf72edd9
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1316,7 +1264,6 @@ class MDF_GRIP_FINISHED_COMMAND(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_GRIPPER_FEEDBACK(pyrtma.MessageData):
     _fields_ = [
@@ -1330,7 +1277,6 @@ class MDF_GRIPPER_FEEDBACK(pyrtma.MessageData):
     type_name = "GRIPPER_FEEDBACK"
     type_hash = 0x04151851
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1348,7 +1294,6 @@ class MDF_MUJOCO_SENSOR(pyrtma.MessageData):
     type_name = "MUJOCO_SENSOR"
     type_hash = 0x039a0342
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1370,7 +1315,6 @@ class MDF_MUJOCO_CMD(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_MOVE(pyrtma.MessageData):
     _fields_ = [
@@ -1382,7 +1326,6 @@ class MDF_MUJOCO_MOVE(pyrtma.MessageData):
     type_name = "MUJOCO_MOVE"
     type_hash = 0xae45f2c1
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1397,7 +1340,6 @@ class MDF_MUJOCO_MSG(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MUJOCO_GHOST_COLOR(pyrtma.MessageData):
     _fields_ = [
@@ -1407,7 +1349,6 @@ class MDF_MUJOCO_GHOST_COLOR(pyrtma.MessageData):
     type_name = "MUJOCO_GHOST_COLOR"
     type_hash = 0x17b273a2
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1422,7 +1363,6 @@ class MDF_MUJOCO_OBJMOVE(pyrtma.MessageData):
     type_name = "MUJOCO_OBJMOVE"
     type_hash = 0x79c166d4
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1440,7 +1380,6 @@ class MDF_OPENHAND_CMD(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_OPENHAND_SENS(pyrtma.MessageData):
     _fields_ = [
@@ -1452,7 +1391,6 @@ class MDF_OPENHAND_SENS(pyrtma.MessageData):
     type_name = "OPENHAND_SENS"
     type_hash = 0xaa0efa7a
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1472,7 +1410,6 @@ class MDF_PRENSILIA_SENS(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_PRENSILIA_CMD(pyrtma.MessageData):
     _fields_ = [
@@ -1484,7 +1421,6 @@ class MDF_PRENSILIA_CMD(pyrtma.MessageData):
     type_name = "PRENSILIA_CMD"
     type_hash = 0x49b7b23a
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1504,7 +1440,6 @@ class MDF_TABLE_LOAD_CELLS(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_REZERO_GRIPPER_SENSORS(pyrtma.MessageData):
     _fields_ = []
@@ -1512,7 +1447,6 @@ class MDF_REZERO_GRIPPER_SENSORS(pyrtma.MessageData):
     type_name = "REZERO_GRIPPER_SENSORS"
     type_hash = 0x8a1d75fd
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1529,7 +1463,6 @@ class MDF_SINGLETACT_DATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_GET_USER_RESPONSE(pyrtma.MessageData):
     _fields_ = []
@@ -1537,7 +1470,6 @@ class MDF_GET_USER_RESPONSE(pyrtma.MessageData):
     type_name = "GET_USER_RESPONSE"
     type_hash = 0xba8bf5d0
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1549,7 +1481,6 @@ class MDF_USER_RESPONSE_L(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_USER_RESPONSE_R(pyrtma.MessageData):
     _fields_ = []
@@ -1557,7 +1488,6 @@ class MDF_USER_RESPONSE_R(pyrtma.MessageData):
     type_name = "USER_RESPONSE_R"
     type_hash = 0x5c5e79e3
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1575,7 +1505,6 @@ class MDF_RAW_SPIKECOUNT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_SPM_SPIKECOUNT(pyrtma.MessageData):
     _fields_ = [
@@ -1590,7 +1519,6 @@ class MDF_SPM_SPIKECOUNT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_SPIKE_SNIPPET(pyrtma.MessageData):
     _fields_ = [
@@ -1600,7 +1528,6 @@ class MDF_SPIKE_SNIPPET(pyrtma.MessageData):
     type_name = "SPIKE_SNIPPET"
     type_hash = 0x29c42fa4
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1617,7 +1544,6 @@ class MDF_RAW_CTSDATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_SPM_CTSDATA(pyrtma.MessageData):
     _fields_ = [
@@ -1631,7 +1557,6 @@ class MDF_SPM_CTSDATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_REJECTED_SNIPPET(pyrtma.MessageData):
     _fields_ = [
@@ -1641,7 +1566,6 @@ class MDF_REJECTED_SNIPPET(pyrtma.MessageData):
     type_name = "REJECTED_SNIPPET"
     type_hash = 0xc469dd13
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1656,7 +1580,6 @@ class MDF_RAW_DIGITAL_EVENT(pyrtma.MessageData):
     type_name = "RAW_DIGITAL_EVENT"
     type_hash = 0x0fe8f4be
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1676,7 +1599,6 @@ class MDF_SPM_DIGITAL_EVENT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_STIM_SYNC_EVENT(pyrtma.MessageData):
     _fields_ = [
@@ -1690,7 +1612,6 @@ class MDF_STIM_SYNC_EVENT(pyrtma.MessageData):
     type_name = "STIM_SYNC_EVENT"
     type_hash = 0x5ca0e471
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1708,7 +1629,6 @@ class MDF_STIM_UPDATE_EVENT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CENTRALRECORD(pyrtma.MessageData):
     _fields_ = [
@@ -1721,7 +1641,6 @@ class MDF_CENTRALRECORD(pyrtma.MessageData):
     type_name = "CENTRALRECORD"
     type_hash = 0xccbd685c
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1738,7 +1657,6 @@ class MDF_RAW_ANALOGDATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_SPM_ANALOGDATA(pyrtma.MessageData):
     _fields_ = [
@@ -1750,7 +1668,6 @@ class MDF_SPM_ANALOGDATA(pyrtma.MessageData):
     type_name = "SPM_ANALOGDATA"
     type_hash = 0xb95489a0
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1768,7 +1685,6 @@ class MDF_RAW_SPIKECOUNT_N256(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_RAW_CTSDATA_N256(pyrtma.MessageData):
     _fields_ = [
@@ -1781,7 +1697,6 @@ class MDF_RAW_CTSDATA_N256(pyrtma.MessageData):
     type_name = "RAW_CTSDATA_N256"
     type_hash = 0x774eea69
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1799,7 +1714,6 @@ class MDF_MECH_SYNC_EVENT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_SAMPLE_GENERATED(pyrtma.MessageData):
     _fields_ = [
@@ -1810,7 +1724,6 @@ class MDF_SAMPLE_GENERATED(pyrtma.MessageData):
     type_name = "SAMPLE_GENERATED"
     type_hash = 0x8251d87a
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1827,7 +1740,6 @@ class MDF_XIPP_EMG_DATA_RAW(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MYO_EMG_DATA(pyrtma.MessageData):
     _fields_ = [
@@ -1839,7 +1751,6 @@ class MDF_MYO_EMG_DATA(pyrtma.MessageData):
     type_name = "MYO_EMG_DATA"
     type_hash = 0xebd682da
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1857,7 +1768,6 @@ class MDF_MYO_KIN_DATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_INPUT_DOF_DATA(pyrtma.MessageData):
     _fields_ = [
@@ -1869,7 +1779,6 @@ class MDF_INPUT_DOF_DATA(pyrtma.MessageData):
     type_name = "INPUT_DOF_DATA"
     type_hash = 0x62e1c089
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1890,7 +1799,6 @@ class MDF_DATAGLOVE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_OPTITRACK_RIGID_BODY(pyrtma.MessageData):
     _fields_ = [
@@ -1906,7 +1814,6 @@ class MDF_OPTITRACK_RIGID_BODY(pyrtma.MessageData):
     type_name = "OPTITRACK_RIGID_BODY"
     type_hash = 0x249f100e
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -1938,7 +1845,6 @@ class MDF_TASK_STATE_CONFIG(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_PHASE_RESULT(pyrtma.MessageData):
     _fields_ = [
@@ -1968,7 +1874,6 @@ class MDF_PHASE_RESULT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_EXTRACTION_RESPONSE(pyrtma.MessageData):
     _fields_ = [
@@ -1982,7 +1887,6 @@ class MDF_EXTRACTION_RESPONSE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_NORMALIZATION_FACTOR(pyrtma.MessageData):
     _fields_ = [
@@ -1994,7 +1898,6 @@ class MDF_NORMALIZATION_FACTOR(pyrtma.MessageData):
     type_name = "NORMALIZATION_FACTOR"
     type_hash = 0xf1331a30
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2013,7 +1916,6 @@ class MDF_TRIAL_METADATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_EXTRACTION_REQUEST(pyrtma.MessageData):
     _fields_ = []
@@ -2021,7 +1923,6 @@ class MDF_EXTRACTION_REQUEST(pyrtma.MessageData):
     type_name = "EXTRACTION_REQUEST"
     type_hash = 0xc5e9a882
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2036,7 +1937,6 @@ class MDF_UPDATE_UNIT_STATE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_DISABLED_UNITS(pyrtma.MessageData):
     _fields_ = [
@@ -2049,7 +1949,6 @@ class MDF_DISABLED_UNITS(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_TRIAL_END(pyrtma.MessageData):
     _fields_ = []
@@ -2057,7 +1956,6 @@ class MDF_TRIAL_END(pyrtma.MessageData):
     type_name = "TRIAL_END"
     type_hash = 0xe939aeee
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2072,7 +1970,6 @@ class MDF_REP_START(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_REP_END(pyrtma.MessageData):
     _fields_ = []
@@ -2080,7 +1977,6 @@ class MDF_REP_END(pyrtma.MessageData):
     type_name = "REP_END"
     type_hash = 0xc5a8c883
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2095,7 +1991,6 @@ class MDF_EXEC_SCORE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_FLIP_THAT_BUCKET_DATA(pyrtma.MessageData):
     _fields_ = [
@@ -2106,7 +2001,6 @@ class MDF_FLIP_THAT_BUCKET_DATA(pyrtma.MessageData):
     type_name = "FLIP_THAT_BUCKET_DATA"
     type_hash = 0x2f8be5c6
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2123,7 +2017,6 @@ class MDF_SET_START(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_SET_END(pyrtma.MessageData):
     _fields_ = [
@@ -2138,7 +2031,6 @@ class MDF_SET_END(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_BLOCK_START(pyrtma.MessageData):
     _fields_ = [
@@ -2150,7 +2042,6 @@ class MDF_BLOCK_START(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_BLOCK_END(pyrtma.MessageData):
     _fields_ = []
@@ -2158,7 +2049,6 @@ class MDF_BLOCK_END(pyrtma.MessageData):
     type_name = "BLOCK_END"
     type_hash = 0x32334bde
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2180,7 +2070,6 @@ class MDF_SET_METADATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_EXEC_PAUSE(pyrtma.MessageData):
     _fields_ = [
@@ -2193,7 +2082,6 @@ class MDF_EXEC_PAUSE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_EM_ADAPT_NOW(pyrtma.MessageData):
     _fields_ = []
@@ -2201,7 +2089,6 @@ class MDF_EM_ADAPT_NOW(pyrtma.MessageData):
     type_name = "EM_ADAPT_NOW"
     type_hash = 0xf4c724ce
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2217,7 +2104,6 @@ class MDF_EM_CONFIGURATION(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_TDMS_CREATE(pyrtma.MessageData):
     _fields_ = [
@@ -2229,7 +2115,6 @@ class MDF_TDMS_CREATE(pyrtma.MessageData):
     type_name = "TDMS_CREATE"
     type_hash = 0xc871d6ed
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2249,7 +2134,6 @@ class MDF_RF_REPORT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_PICDISPLAY(pyrtma.MessageData):
     _fields_ = [
@@ -2260,7 +2144,6 @@ class MDF_PICDISPLAY(pyrtma.MessageData):
     type_name = "PICDISPLAY"
     type_hash = 0x80770904
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2277,7 +2160,6 @@ class MDF_STIMDATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_SEAIO_OUT(pyrtma.MessageData):
     _fields_ = [
@@ -2288,7 +2170,6 @@ class MDF_SEAIO_OUT(pyrtma.MessageData):
     type_name = "SEAIO_OUT"
     type_hash = 0x82125073
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2308,7 +2189,6 @@ class MDF_ATIforcesensor(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_TACTOR_CMD(pyrtma.MessageData):
     _fields_ = []
@@ -2316,7 +2196,6 @@ class MDF_TACTOR_CMD(pyrtma.MessageData):
     type_name = "TACTOR_CMD"
     type_hash = 0x94f231b3
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2332,7 +2211,6 @@ class MDF_HSTLOG(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_STIM_INTERVAL(pyrtma.MessageData):
     _fields_ = [
@@ -2344,7 +2222,6 @@ class MDF_STIM_INTERVAL(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_USER_SHOT_L(pyrtma.MessageData):
     _fields_ = []
@@ -2354,7 +2231,6 @@ class MDF_USER_SHOT_L(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_USER_SHOT_R(pyrtma.MessageData):
     _fields_ = []
@@ -2362,7 +2238,6 @@ class MDF_USER_SHOT_R(pyrtma.MessageData):
     type_name = "USER_SHOT_R"
     type_hash = 0xf6e9e29a
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2378,7 +2253,6 @@ class MDF_STIM_THRESH(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_GAME_ROUND_INFO(pyrtma.MessageData):
     _fields_ = [
@@ -2389,7 +2263,6 @@ class MDF_GAME_ROUND_INFO(pyrtma.MessageData):
     type_name = "GAME_ROUND_INFO"
     type_hash = 0x3c98bc4c
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2403,7 +2276,6 @@ class MDF_USER_SHOT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_GAME_HEARTBEAT_REQUEST(pyrtma.MessageData):
     _fields_ = []
@@ -2413,7 +2285,6 @@ class MDF_GAME_HEARTBEAT_REQUEST(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_GAME_HEARTBEAT_RESPONSE(pyrtma.MessageData):
     _fields_ = []
@@ -2421,7 +2292,6 @@ class MDF_GAME_HEARTBEAT_RESPONSE(pyrtma.MessageData):
     type_name = "GAME_HEARTBEAT_RESPONSE"
     type_hash = 0x3de2b158
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2435,7 +2305,6 @@ class MDF_PLAYSOUND(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_PLAYVIDEO(pyrtma.MessageData):
     _fields_ = [
@@ -2447,7 +2316,6 @@ class MDF_PLAYVIDEO(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_START_TIMED_RECORDING(pyrtma.MessageData):
     _fields_ = [
@@ -2457,7 +2325,6 @@ class MDF_START_TIMED_RECORDING(pyrtma.MessageData):
     type_name = "START_TIMED_RECORDING"
     type_hash = 0xc33e869c
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2473,7 +2340,6 @@ class MDF_AJA_CONFIG(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_AJA_TIMECODE(pyrtma.MessageData):
     _fields_ = [
@@ -2484,7 +2350,6 @@ class MDF_AJA_TIMECODE(pyrtma.MessageData):
     type_name = "AJA_TIMECODE"
     type_hash = 0x7096caec
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2500,7 +2365,6 @@ class MDF_AJA_STATUS(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_AJA_STATUS_REQUEST(pyrtma.MessageData):
     _fields_ = []
@@ -2508,7 +2372,6 @@ class MDF_AJA_STATUS_REQUEST(pyrtma.MessageData):
     type_name = "AJA_STATUS_REQUEST"
     type_hash = 0x31f5b0ef
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2525,7 +2388,6 @@ class MDF_FOFIX_PROMPT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_FOFIX_INPUT(pyrtma.MessageData):
     _fields_ = [
@@ -2538,7 +2400,6 @@ class MDF_FOFIX_INPUT(pyrtma.MessageData):
     type_name = "FOFIX_INPUT"
     type_hash = 0x85ea0a37
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2555,7 +2416,6 @@ class MDF_FOFIX_MISSED(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_FOFIX_STIM(pyrtma.MessageData):
     _fields_ = [
@@ -2568,7 +2428,6 @@ class MDF_FOFIX_STIM(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_FOFIX_KEY(pyrtma.MessageData):
     _fields_ = [
@@ -2579,7 +2438,6 @@ class MDF_FOFIX_KEY(pyrtma.MessageData):
     type_name = "FOFIX_KEY"
     type_hash = 0xf4baaed3
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2601,7 +2459,6 @@ class MDF_CERESTIM_CONFIG_MODULE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CERESTIM_CONFIG_CHAN_PRESAFETY(pyrtma.MessageData):
     _fields_ = [
@@ -2617,7 +2474,6 @@ class MDF_CERESTIM_CONFIG_CHAN_PRESAFETY(pyrtma.MessageData):
     type_name = "CERESTIM_CONFIG_CHAN_PRESAFETY"
     type_hash = 0x657e8ea3
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2637,7 +2493,6 @@ class MDF_CERESTIM_CONFIG_CHAN(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CERESTIM_ERROR(pyrtma.MessageData):
     _fields_ = [
@@ -2650,7 +2505,6 @@ class MDF_CERESTIM_ERROR(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CERESTIM_ALIVE(pyrtma.MessageData):
     _fields_ = []
@@ -2660,7 +2514,6 @@ class MDF_CERESTIM_ALIVE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CS_TRAIN_END(pyrtma.MessageData):
     _fields_ = []
@@ -2668,7 +2521,6 @@ class MDF_CS_TRAIN_END(pyrtma.MessageData):
     type_name = "CS_TRAIN_END"
     type_hash = 0x3be6b63c
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2690,7 +2542,6 @@ class MDF_CERESTIM_CONFIG_CHAN_PRESAFETY_ARBITRARY(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CERESTIM_CONFIG_CHAN_ARBITRARY(pyrtma.MessageData):
     _fields_ = [
@@ -2706,7 +2557,6 @@ class MDF_CERESTIM_CONFIG_CHAN_ARBITRARY(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CS_ARBITRARY_CLOSE(pyrtma.MessageData):
     _fields_ = []
@@ -2714,7 +2564,6 @@ class MDF_CS_ARBITRARY_CLOSE(pyrtma.MessageData):
     type_name = "CS_ARBITRARY_CLOSE"
     type_hash = 0x62bab05e
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2736,7 +2585,6 @@ class MDF_STIM_VOLTAGE_MONITOR_DATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_STIM_VOLTAGE_MONITOR_DIGITAL_DATA(pyrtma.MessageData):
     _fields_ = [
@@ -2751,7 +2599,6 @@ class MDF_STIM_VOLTAGE_MONITOR_DIGITAL_DATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_VOLTAGE_MONITOR_STATUS(pyrtma.MessageData):
     _fields_ = [
@@ -2762,7 +2609,6 @@ class MDF_VOLTAGE_MONITOR_STATUS(pyrtma.MessageData):
     type_name = "VOLTAGE_MONITOR_STATUS"
     type_hash = 0xd8deb26e
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2776,7 +2622,6 @@ class MDF_STIM_DUTYCYCLE_TIME(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_STIM_TRIAL_DURATION(pyrtma.MessageData):
     _fields_ = [
@@ -2786,7 +2631,6 @@ class MDF_STIM_TRIAL_DURATION(pyrtma.MessageData):
     type_name = "STIM_TRIAL_DURATION"
     type_hash = 0x526edf6a
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2800,7 +2644,6 @@ class MDF_CERESTIM_HEARTBEAT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CERESTIM_HEARTBEAT_RQST(pyrtma.MessageData):
     _fields_ = []
@@ -2808,7 +2651,6 @@ class MDF_CERESTIM_HEARTBEAT_RQST(pyrtma.MessageData):
     type_name = "CERESTIM_HEARTBEAT_RQST"
     type_hash = 0x2b0a6017
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2820,7 +2662,6 @@ class MDF_CERESTIM_SAFETY_ALIVE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CERESTIM_SAFETY_ALIVE_RQST(pyrtma.MessageData):
     _fields_ = []
@@ -2828,7 +2669,6 @@ class MDF_CERESTIM_SAFETY_ALIVE_RQST(pyrtma.MessageData):
     type_name = "CERESTIM_SAFETY_ALIVE_RQST"
     type_hash = 0xcda394a5
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2840,7 +2680,6 @@ class MDF_NATURAL_RESPONSE(pyrtma.MessageData):
     type_name = "NATURAL_RESPONSE"
     type_hash = 0x275f91d6
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2856,7 +2695,6 @@ class MDF_DEPTH_RESPONSE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_PAIN_RESPONSE(pyrtma.MessageData):
     _fields_ = [
@@ -2866,7 +2704,6 @@ class MDF_PAIN_RESPONSE(pyrtma.MessageData):
     type_name = "PAIN_RESPONSE"
     type_hash = 0x6a633f6e
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2880,7 +2717,6 @@ class MDF_OVERALL_INTENSITY_RESPONSE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_OTHER_RESPONSE(pyrtma.MessageData):
     _fields_ = [
@@ -2892,7 +2728,6 @@ class MDF_OTHER_RESPONSE(pyrtma.MessageData):
     type_name = "OTHER_RESPONSE"
     type_hash = 0xa1e76823
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2909,7 +2744,6 @@ class MDF_MECH_RESPONSE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MOVE_RESPONSE(pyrtma.MessageData):
     _fields_ = [
@@ -2922,7 +2756,6 @@ class MDF_MOVE_RESPONSE(pyrtma.MessageData):
     type_name = "MOVE_RESPONSE"
     type_hash = 0x53835705
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2939,7 +2772,6 @@ class MDF_TINGLE_RESPONSE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_TEMP_RESPONSE(pyrtma.MessageData):
     _fields_ = [
@@ -2950,7 +2782,6 @@ class MDF_TEMP_RESPONSE(pyrtma.MessageData):
     type_name = "TEMP_RESPONSE"
     type_hash = 0x140b73c5
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2967,7 +2798,6 @@ class MDF_DIR_PIXEL_COORDS(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_PIXEL_COORDS(pyrtma.MessageData):
     _fields_ = [
@@ -2980,7 +2810,6 @@ class MDF_PIXEL_COORDS(pyrtma.MessageData):
     type_name = "PIXEL_COORDS"
     type_hash = 0x1393ba61
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -2996,7 +2825,6 @@ class MDF_HOTSPOT_COORDS(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CLEAR_LINE(pyrtma.MessageData):
     _fields_ = [
@@ -3006,7 +2834,6 @@ class MDF_CLEAR_LINE(pyrtma.MessageData):
     type_name = "CLEAR_LINE"
     type_hash = 0x8a0d6c36
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3020,7 +2847,6 @@ class MDF_CLEAR_HOTSPOT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_ADD_SENSATION(pyrtma.MessageData):
     _fields_ = []
@@ -3028,7 +2854,6 @@ class MDF_ADD_SENSATION(pyrtma.MessageData):
     type_name = "ADD_SENSATION"
     type_hash = 0xee9958c1
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3046,7 +2871,6 @@ class MDF_SLIDER_DATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_USER_DEFINED_STIM(pyrtma.MessageData):
     _fields_ = [
@@ -3058,7 +2882,6 @@ class MDF_USER_DEFINED_STIM(pyrtma.MessageData):
     type_name = "USER_DEFINED_STIM"
     type_hash = 0xa2e9e802
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3086,7 +2909,6 @@ class MDF_USER_BEHAVIOUR(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_STOP_STIM(pyrtma.MessageData):
     _fields_ = [
@@ -3098,7 +2920,6 @@ class MDF_STOP_STIM(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_PAUSE_TRIAL(pyrtma.MessageData):
     _fields_ = [
@@ -3108,7 +2929,6 @@ class MDF_PAUSE_TRIAL(pyrtma.MessageData):
     type_name = "PAUSE_TRIAL"
     type_hash = 0xc7eeb83c
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3125,7 +2945,6 @@ class MDF_CST_LAMBDA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_CST_SETTINGS(pyrtma.MessageData):
     _fields_ = [
@@ -3137,7 +2956,6 @@ class MDF_CST_SETTINGS(pyrtma.MessageData):
     type_name = "CST_SETTINGS"
     type_hash = 0x2bf099f4
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3152,7 +2970,6 @@ class MDF_STIM_PRES_CONFIG(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_STIM_PRES_PHASE_END(pyrtma.MessageData):
     _fields_ = [
@@ -3162,7 +2979,6 @@ class MDF_STIM_PRES_PHASE_END(pyrtma.MessageData):
     type_name = "STIM_PRES_PHASE_END"
     type_hash = 0xc90a3f28
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3179,7 +2995,6 @@ class MDF_STIM_PRESENT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_STIM_PRES_STATUS(pyrtma.MessageData):
     _fields_ = [
@@ -3192,7 +3007,6 @@ class MDF_STIM_PRES_STATUS(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_STIM_CONFIG_TYPE(pyrtma.MessageData):
     _fields_ = [
@@ -3202,7 +3016,6 @@ class MDF_STIM_CONFIG_TYPE(pyrtma.MessageData):
     type_name = "STIM_CONFIG_TYPE"
     type_hash = 0xc7513c8a
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3217,7 +3030,6 @@ class MDF_DEKA_ACI_RESPONSE(pyrtma.MessageData):
     type_name = "DEKA_ACI_RESPONSE"
     type_hash = 0x5d5cea8f
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3239,7 +3051,6 @@ class MDF_DEKA_SENSOR(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_DEKA_CAN_TOGGLE(pyrtma.MessageData):
     _fields_ = [
@@ -3250,7 +3061,6 @@ class MDF_DEKA_CAN_TOGGLE(pyrtma.MessageData):
     type_name = "DEKA_CAN_TOGGLE"
     type_hash = 0x9851db7d
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3265,7 +3075,6 @@ class MDF_DEKA_CAN_GRIP_TOGGLE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_DEKA_CAN_EXIT(pyrtma.MessageData):
     _fields_ = [
@@ -3276,7 +3085,6 @@ class MDF_DEKA_CAN_EXIT(pyrtma.MessageData):
     type_name = "DEKA_CAN_EXIT"
     type_hash = 0x57f16f40
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3301,7 +3109,6 @@ class MDF_DEKA_HAND_SENSOR(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_DEKA_HAND_JSTICK_CMD(pyrtma.MessageData):
     _fields_ = [
@@ -3312,7 +3119,6 @@ class MDF_DEKA_HAND_JSTICK_CMD(pyrtma.MessageData):
     type_name = "DEKA_HAND_JSTICK_CMD"
     type_hash = 0x38e6eafb
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3330,7 +3136,6 @@ class MDF_RH_GRIPPER_SENSOR(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_KUKA_JOINT_COMMAND(pyrtma.MessageData):
     _fields_ = [
@@ -3346,7 +3151,6 @@ class MDF_KUKA_JOINT_COMMAND(pyrtma.MessageData):
     type_name = "KUKA_JOINT_COMMAND"
     type_hash = 0x44c06dec
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3371,7 +3175,6 @@ class MDF_KUKA_FEEDBACK(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_KUKA_EXIT(pyrtma.MessageData):
     _fields_ = [
@@ -3382,7 +3185,6 @@ class MDF_KUKA_EXIT(pyrtma.MessageData):
     type_name = "KUKA_EXIT"
     type_hash = 0x762b7d36
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3396,7 +3198,6 @@ class MDF_KUKA_PTP_JOINT(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_KUKA_DEBUG(pyrtma.MessageData):
     _fields_ = [
@@ -3406,7 +3207,6 @@ class MDF_KUKA_DEBUG(pyrtma.MessageData):
     type_name = "KUKA_DEBUG"
     type_hash = 0x951fce38
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3419,7 +3219,6 @@ class MDF_VEML7700_SYNC(pyrtma.MessageData):
     type_name = "VEML7700_SYNC"
     type_hash = 0xfc1f71eb
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3435,7 +3234,6 @@ class MDF_VEML7700_DATA(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_VEML7700_PING(pyrtma.MessageData):
     _fields_ = []
@@ -3443,7 +3241,6 @@ class MDF_VEML7700_PING(pyrtma.MessageData):
     type_name = "VEML7700_PING"
     type_hash = 0x3ffa1271
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3455,7 +3252,6 @@ class MDF_VEML7700_PONG(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_VEML7700_START(pyrtma.MessageData):
     _fields_ = []
@@ -3463,7 +3259,6 @@ class MDF_VEML7700_START(pyrtma.MessageData):
     type_name = "VEML7700_START"
     type_hash = 0xf328ce11
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3475,7 +3270,6 @@ class MDF_VEML7700_STOP(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_VEML7700_RESET(pyrtma.MessageData):
     _fields_ = []
@@ -3485,7 +3279,6 @@ class MDF_VEML7700_RESET(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_VEML7700_CONNECT(pyrtma.MessageData):
     _fields_ = []
@@ -3493,7 +3286,6 @@ class MDF_VEML7700_CONNECT(pyrtma.MessageData):
     type_name = "VEML7700_CONNECT"
     type_hash = 0xe46f8aa5
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3509,7 +3301,6 @@ class MDF_MECH_STIM_CONFIGURE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MECH_STIM_RESET(pyrtma.MessageData):
     _fields_ = []
@@ -3517,7 +3308,6 @@ class MDF_MECH_STIM_RESET(pyrtma.MessageData):
     type_name = "MECH_STIM_RESET"
     type_hash = 0xdd701d58
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3529,7 +3319,6 @@ class MDF_MECH_STIM_STAGE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MECH_STIM_WAITING(pyrtma.MessageData):
     _fields_ = []
@@ -3537,7 +3326,6 @@ class MDF_MECH_STIM_WAITING(pyrtma.MessageData):
     type_name = "MECH_STIM_WAITING"
     type_hash = 0x620383b4
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3549,7 +3337,6 @@ class MDF_MECH_STIM_TRIGGER(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MECH_STIM_CANCEL(pyrtma.MessageData):
     _fields_ = []
@@ -3557,7 +3344,6 @@ class MDF_MECH_STIM_CANCEL(pyrtma.MessageData):
     type_name = "MECH_STIM_CANCEL"
     type_hash = 0x8b50f7e0
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3569,7 +3355,6 @@ class MDF_MECH_STIM_DONE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF_MECH_STIM_ERROR(pyrtma.MessageData):
     _fields_ = []
@@ -3577,7 +3362,6 @@ class MDF_MECH_STIM_ERROR(pyrtma.MessageData):
     type_name = "MECH_STIM_ERROR"
     type_hash = 0x5518c5d1
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3597,7 +3381,6 @@ class MDF_UC_MECH_STIM_CONFIGURE(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF__RESERVED_004300(pyrtma.MessageData):
     _fields_ = []
@@ -3605,7 +3388,6 @@ class MDF__RESERVED_004300(pyrtma.MessageData):
     type_name = "_RESERVED_004300"
     type_hash = 0xce2b74c1
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3617,7 +3399,6 @@ class MDF__RESERVED_004360(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF__RESERVED_004361(pyrtma.MessageData):
     _fields_ = []
@@ -3625,7 +3406,6 @@ class MDF__RESERVED_004361(pyrtma.MessageData):
     type_name = "_RESERVED_004361"
     type_hash = 0xca551012
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3637,7 +3417,6 @@ class MDF__RESERVED_004362(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF__RESERVED_004363(pyrtma.MessageData):
     _fields_ = []
@@ -3645,7 +3424,6 @@ class MDF__RESERVED_004363(pyrtma.MessageData):
     type_name = "_RESERVED_004363"
     type_hash = 0x6a1be0d0
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3657,7 +3435,6 @@ class MDF__RESERVED_004364(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF__RESERVED_004365(pyrtma.MessageData):
     _fields_ = []
@@ -3665,7 +3442,6 @@ class MDF__RESERVED_004365(pyrtma.MessageData):
     type_name = "_RESERVED_004365"
     type_hash = 0x862615bb
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3677,7 +3453,6 @@ class MDF__RESERVED_004366(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF__RESERVED_004367(pyrtma.MessageData):
     _fields_ = []
@@ -3685,7 +3460,6 @@ class MDF__RESERVED_004367(pyrtma.MessageData):
     type_name = "_RESERVED_004367"
     type_hash = 0x442abb7f
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3697,7 +3471,6 @@ class MDF__RESERVED_004368(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF__RESERVED_004369(pyrtma.MessageData):
     _fields_ = []
@@ -3705,7 +3478,6 @@ class MDF__RESERVED_004369(pyrtma.MessageData):
     type_name = "_RESERVED_004369"
     type_hash = 0xc91af2b3
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3717,7 +3489,6 @@ class MDF__RESERVED_004370(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF__RESERVED_004371(pyrtma.MessageData):
     _fields_ = []
@@ -3725,7 +3496,6 @@ class MDF__RESERVED_004371(pyrtma.MessageData):
     type_name = "_RESERVED_004371"
     type_hash = 0x09248dd4
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3737,7 +3507,6 @@ class MDF__RESERVED_004372(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF__RESERVED_004373(pyrtma.MessageData):
     _fields_ = []
@@ -3745,7 +3514,6 @@ class MDF__RESERVED_004373(pyrtma.MessageData):
     type_name = "_RESERVED_004373"
     type_hash = 0xa9e362d1
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3757,7 +3525,6 @@ class MDF__RESERVED_004374(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF__RESERVED_004375(pyrtma.MessageData):
     _fields_ = []
@@ -3765,7 +3532,6 @@ class MDF__RESERVED_004375(pyrtma.MessageData):
     type_name = "_RESERVED_004375"
     type_hash = 0xb01fbb58
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 @pyrtma.message_def
@@ -3777,7 +3543,6 @@ class MDF__RESERVED_004376(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF__RESERVED_004377(pyrtma.MessageData):
     _fields_ = []
@@ -3787,7 +3552,6 @@ class MDF__RESERVED_004377(pyrtma.MessageData):
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
 
 
-
 @pyrtma.message_def
 class MDF__RESERVED_004378(pyrtma.MessageData):
     _fields_ = []
@@ -3795,7 +3559,6 @@ class MDF__RESERVED_004378(pyrtma.MessageData):
     type_name = "_RESERVED_004378"
     type_hash = 0xd323d536
     type_source = "D:\\GIT\\pyrtma\\tests\\test_msg_defs\\test_defs.yaml"
-
 
 
 # Collect all info into one object
