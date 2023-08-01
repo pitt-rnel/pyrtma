@@ -393,17 +393,20 @@ class MessageManager:
         time_of_failure: float,
         wlist: List[socket.socket],
     ):
-        header = self.header_cls()
+        out_header = self.header_cls()
         data = MDF_FAILED_MESSAGE()
 
-        header.msg_type = MT_FAILED_MESSAGE
-        header.send_time = time.perf_counter()
-        header.src_mod_id = MID_MESSAGE_MANAGER
-        header.num_data_bytes = ctypes.sizeof(data)
+        out_header.msg_type = MT_FAILED_MESSAGE
+        out_header.send_time = time.perf_counter()
+        out_header.src_mod_id = MID_MESSAGE_MANAGER
+        out_header.num_data_bytes = ctypes.sizeof(data)
 
         data.dest_mod_id = dest_module.id
         data.time_of_failure = time_of_failure
-        data.msg_header = header
+
+        # Copy the values into the RTMA_MSG_HEADER
+        for fname, ftype in data.msg_header._fields_:
+            setattr(data.msg_header, fname, getattr(header, fname))
 
         if (
             data.msg_header.msg_type == MT_FAILED_MESSAGE
@@ -411,10 +414,10 @@ class MessageManager:
             return
 
         # send to logger modules AND modules subscribed to FAILED_MESSAGE
-        self.forward_message(header, data, wlist)
+        self.forward_message(out_header, data, wlist)
 
         # add to message count
-        self.message_counts[header.msg_type] += 1
+        self.message_counts[out_header.msg_type] += 1
 
     def send_timing_message(self, wlist: List[socket.socket]):
         header = self.header_cls()
