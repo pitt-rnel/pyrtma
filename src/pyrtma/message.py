@@ -16,10 +16,38 @@ __all__ = [
     "get_header_cls",
     "msg_defs",
     "message_def",
+    "RTMAMessageError",
+    "UnknownMessageType",
+    "JSONDecodingError",
+    "InvalidMessageDefinition",
 ]
 
 # Main Map of all internal message types
 msg_defs: Dict[int, Type["MessageData"]] = {}
+
+
+class RTMAMessageError(Exception):
+    """Base exception for message errors."""
+
+    pass
+
+
+class UnknownMessageType(RTMAMessageError):
+    """Raised when there is no message definition."""
+
+    pass
+
+
+class JSONDecodingError(RTMAMessageError):
+    """Raised when there is an error decoding a message from json."""
+
+    pass
+
+
+class InvalidMessageDefinition(RTMAMessageError):
+    """Raised when there is message definition is out of sync with sent data."""
+
+    pass
 
 
 def message_def(msg_cls: Type["MessageData"], *args, **kwargs):
@@ -91,7 +119,12 @@ class MessageHeader(_RTMA_MSG_HEADER):
 
     @property
     def get_data(self) -> Type["MessageData"]:
-        return msg_defs[self.msg_type]
+        try:
+            return msg_defs[self.msg_type]
+        except KeyError as e:
+            raise UnknownMessageType(
+                f"There is no message definition associated with id:{self.msg_type}"
+            ) from e
 
     def to_json(self, minify: bool = False, **kwargs) -> str:
         if minify:
@@ -104,8 +137,13 @@ class MessageHeader(_RTMA_MSG_HEADER):
     @classmethod
     def from_dict(cls, data):
         obj = cls()
-        _json_decode(obj, data)
-        return obj
+        try:
+            _json_decode(obj, data)
+            return obj
+        except Exception as e:
+            raise JSONDecodingError(
+                f"Unable to decode MessageHeader object from {data}."
+            )
 
     @classmethod
     def from_json(cls, s):
@@ -252,8 +290,11 @@ class MessageData(ctypes.Structure):
     @classmethod
     def from_dict(cls, data):
         obj = cls()
-        _json_decode(obj, data)
-        return obj
+        try:
+            _json_decode(obj, data)
+            return obj
+        except Exception as e:
+            raise JSONDecodingError(f"Unable to decode {obj.type_name} from {data}.")
 
     @classmethod
     def from_json(cls, s):
@@ -301,6 +342,14 @@ class Message:
 
         # Decode message data segment
         msg_cls = hdr.get_data()
+
+        # Note: Ignore the sync check if header.version is not filled in
+        # This can removed once all clients support this field.
+        if hdr.version != 0 and hdr.version != msg_cls.type_hash:
+            raise InvalidMessageDefinition(
+                f"Client's message definition does not match senders version: {msg_cls.type_name}"
+            )
+
         msg_data = msg_cls.from_dict(d["data"])
 
         obj = cls(hdr, msg_data)

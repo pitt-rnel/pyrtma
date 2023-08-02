@@ -5,6 +5,7 @@ import errno
 import struct
 
 from pyrtma.proxy_client import ProxyClient
+from pyrtma.message import RTMAMessageError
 
 from socket import error as SocketError
 from socketserver import TCPServer
@@ -48,6 +49,17 @@ class RTMAWebSocketHandler(WebSocketHandler):
         # Establish an RTMA connetion with MessageManger
         self.proxy.connect(self.mm_ip)
 
+        print("New Client:")
+        print(
+            f"ws:{self.request.getsockname()[0]}:{self.request.getsockname()[1]} -> {self.request.getpeername()[0]}:{self.request.getpeername()[1]}"
+        )
+
+        print(
+            f"rtma:{self.proxy.sock.getsockname()[0]}:{self.proxy.sock.getsockname()[1]} -> {self.proxy.sock.getpeername()[0]}:{self.proxy.sock.getpeername()[1]}"
+        )
+        print()
+
+        # Message Loop
         while self.keep_alive and self.proxy.connected:
             rd, _, _ = select.select([self.rfile, self.proxy.sock], [], [], 0.100)
 
@@ -55,18 +67,31 @@ class RTMAWebSocketHandler(WebSocketHandler):
                 self.read_ws_message()
 
             if self.proxy.sock in rd:
-                msg = self.proxy.read_message()
-                print(msg.header.pretty_print())
+                try:
+                    msg = self.proxy.read_message()
+                except RTMAMessageError as e:
+                    logger.error(e, stack_info=False)
+                    break
+
                 if msg is not None:
                     # Pass message thru websocket as json
-                    self.send_message(msg.to_json())
+                    _, wd, _ = select.select([], [self.rfile], [], 0)
+                    if self.rfile in wd:
+                        self.send_message(msg.to_json())
+                    else:
+                        print("X")
 
     def pong_received(self, msg: str):
         logger.info("Websocket PONG received.")
 
     def process_json_message(self, message: str):
         """Called when a client receives a message over websocket."""
-        msg = pyrtma.Message.from_json(message)
+        try:
+            msg = pyrtma.Message.from_json(message)
+        except RTMAMessageError as e:
+            logger.error(e, stack_info=False)
+            return
+
         self.proxy.forward_message(msg.header, msg.data or None)
 
     def read_ws_message(self) -> Optional[str]:
@@ -227,7 +252,7 @@ if __name__ == "__main__":
 
     import sys
 
-    sys.path.append(str(base))
+    sys.path.insert(0, (str(base.absolute())))
     importlib.import_module(fname)
 
     websocket_server.run_forever()

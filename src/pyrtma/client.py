@@ -68,12 +68,6 @@ class InvalidDestinationHost(ClientError):
     pass
 
 
-class MessageDefinitionError(ClientError):
-    """Raised when client receives a message that does not match the current definition"""
-
-    pass
-
-
 def requires_connection(func):
     """Decorator wrapper for Client methods that require a connection"""
 
@@ -467,14 +461,14 @@ class Client(object):
         data = header.get_data()
 
         if data.size != header.num_data_bytes:
-            raise MessageDefinitionError(
+            raise InvalidMessageDefinition(
                 f"Received message header indicating a message data size that does not match the expected size of message type {data.type_name}. Message definitions may be out of sync across systems."
             )
 
         # Note: Ignore the sync check if header.version is not filled in
         # This can removed once all clients support this field.
         if sync_check and header.version != 0 and header.version != data.type_hash:
-            raise MessageDefinitionError(
+            raise InvalidMessageDefinition(
                 f"Received message header indicating a message version that does not match the expected version of message type {data.type_name}. Message definitions may be out of sync across systems."
             )
 

@@ -5,7 +5,6 @@ Includes :py:class:`~Client` class and associated exception classes
 import socket
 import select
 import time
-import os
 import ctypes
 
 from .message import *
@@ -17,7 +16,7 @@ from .client import (
 )
 
 from functools import wraps
-from typing import List, Optional, Tuple, Type, Union, Dict
+from typing import Optional, Tuple, Type
 
 __all__ = [
     "ProxyClient",
@@ -215,6 +214,19 @@ class ProxyClient(object):
 
         # Read Data Section
         data = header.get_data()
+
+        if data.size != header.num_data_bytes:
+            raise InvalidMessageDefinition(
+                f"Received message header indicating a message data size that does not match the expected size of message type {data.type_name}. Message definitions may be out of sync across systems."
+            )
+
+        # Note: Ignore the sync check if header.version is not filled in
+        # This can removed once all clients support this field.
+        if header.version != 0 and header.version != data.type_hash:
+            raise InvalidMessageDefinition(
+                f"Received message header indicating a message version that does not match the expected version of message type {data.type_name}. Message definitions may be out of sync across systems."
+            )
+
         if header.num_data_bytes:
             try:
                 nbytes = self.sock.recv_into(data, data.size, socket.MSG_WAITALL)
