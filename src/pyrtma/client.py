@@ -320,18 +320,6 @@ class Client(object):
         if dest_host_id < 0 or dest_host_id > MAX_HOSTS:
             raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
 
-        # Assume that msg_type, num_data_bytes, data - have been filled in
-        header = self._header_cls()
-        header.msg_type = signal_type
-        header.msg_count = self._msg_count
-        header.send_time = time.time()
-        header.recv_time = 0.0
-        header.src_host_id = self._host_id
-        header.src_mod_id = self._module_id
-        header.dest_host_id = dest_host_id
-        header.dest_mod_id = dest_mod_id
-        header.num_data_bytes = 0
-
         if timeout >= 0:
             readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
         else:
@@ -340,6 +328,17 @@ class Client(object):
             )  # blocking
 
         if writefds:
+            header = self._header_cls()
+            header.msg_type = signal_type
+            header.msg_count = self._msg_count
+            header.send_time = time.perf_counter()
+            header.recv_time = 0.0
+            header.src_host_id = self._host_id
+            header.src_mod_id = self._module_id
+            header.dest_host_id = dest_host_id
+            header.dest_mod_id = dest_mod_id
+            header.num_data_bytes = 0
+
             self._sendall(header)
 
             self._msg_count += 1
@@ -379,19 +378,6 @@ class Client(object):
         if dest_host_id < 0 or dest_host_id > MAX_HOSTS:
             raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
 
-        # Assume that msg_type, num_data_bytes, data - have been filled in
-        header = self._header_cls()
-        header.msg_type = msg_data.type_id
-        header.msg_count = self._msg_count
-        header.send_time = time.perf_counter()
-        header.recv_time = 0.0
-        header.src_host_id = self._host_id
-        header.src_mod_id = self._module_id
-        header.dest_host_id = dest_host_id
-        header.dest_mod_id = dest_mod_id
-        header.num_data_bytes = ctypes.sizeof(msg_data)
-        header.version = msg_data.type_hash
-
         if timeout >= 0:
             readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
         else:
@@ -400,6 +386,18 @@ class Client(object):
             )  # blocking
 
         if writefds:
+            header = self._header_cls()
+            header.msg_type = msg_data.type_id
+            header.msg_count = self._msg_count
+            header.send_time = time.perf_counter()
+            header.recv_time = 0.0
+            header.src_host_id = self._host_id
+            header.src_mod_id = self._module_id
+            header.dest_host_id = dest_host_id
+            header.dest_mod_id = dest_mod_id
+            header.num_data_bytes = ctypes.sizeof(msg_data)
+            header.version = msg_data.type_hash
+
             self._sendall(header)
             if header.num_data_bytes > 0:
                 self._sendall(msg_data)
