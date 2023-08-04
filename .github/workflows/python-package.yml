@@ -35,7 +35,8 @@ jobs:
     - name: Test compiler
       working-directory: ./tests
       run: |
-         python -m pyrtma.compile -i ./test_msg_defs/test_defs.yaml --py -o ./test_msg_defs
+        echo `pwd`
+        python -m pyrtma.compile -i ./test_msg_defs/test_defs.yaml --py -o ./test_msg_defs
     - name: Test with unittest
       run: |
         python -m unittest discover
