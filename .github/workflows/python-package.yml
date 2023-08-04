@@ -14,7 +14,7 @@ jobs:
     name: Build and test on ${{ matrix.os }}, Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version:  ["3.8", "3.9", "3.10", "3.11"]
@@ -35,7 +35,7 @@ jobs:
     - name: Test compiler
       working-directory: ./tests
       run: |
-        echo `pwd`
+        ls -l
         python -m pyrtma.compile -i ./test_msg_defs/test_defs.yaml --py -o ./test_msg_defs
     - name: Test with unittest
       run: |
