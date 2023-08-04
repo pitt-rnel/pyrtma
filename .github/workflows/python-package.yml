@@ -34,7 +34,7 @@ jobs:
       uses: psf/black@stable
     - name: Test compiler
       run: |
-        python -m pyrtma.compile -i $GITHUB_WORKSPACE/tests/test_msg_defs/test_defs.yaml --py -o $GITHUB_WORKSPACE/tests/test_msg_defs
+        python -m pyrtma.compile -i ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml --py -o ${{ github.workspace }}/tests/test_msg_defs
     - name: Test with unittest
       run: |
         python -m unittest discover
