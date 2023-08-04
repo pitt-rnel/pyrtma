@@ -268,6 +268,7 @@ def print_content(
     else:
         print(content, end=end)
 
+
 def parse_file(filename, seq: int = 1, out_filename: Optional[str] = None):
     """Parse a C header file for message definitions.
     Notes:

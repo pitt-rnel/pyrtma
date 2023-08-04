@@ -12,7 +12,7 @@ install(word_wrap=True, show_locals=True)
 
 
 def compile(
-    defs_file: List[str], #str, # change back to str after removing v1 compiler
+    defs_file: List[str],  # str, # change back to str after removing v1 compiler
     out_dir: str,
     out_name: str,
     python: bool = False,
@@ -23,12 +23,14 @@ def compile(
     combined: bool = False,
     debug: bool = False,
 ):
-    
     # determine if using v1 or v2 compiler
     file1_ext = pathlib.Path(defs_file[0]).suffix
     if file1_ext.lower() == ".h":
         compiler_version = 1
-        warnings.warn("V1 message def .h compiler is deprecated and has been replaced by the V2 yaml compiler.", FutureWarning)
+        warnings.warn(
+            "V1 message def .h compiler is deprecated and has been replaced by the V2 yaml compiler.",
+            FutureWarning,
+        )
     elif file1_ext.lower() in [".yaml", ".yml"]:
         compiler_version = 2
         if len(defs_file) > 1:
@@ -36,9 +38,10 @@ def compile(
         defs_file = defs_file[0]
     else:
         raise FileFormatError("Unexpected file type. defs_file must be a .yaml file.")
-    
+
     if compiler_version == 1:
         from pyrtma.compilers.python_v1 import python_v1_compile
+
         print("Building V1 python message definitions...")
         python_v1_compile(include_files=defs_file, out_filename=out_dir)
         print("DONE.")
@@ -139,7 +142,7 @@ if __name__ == "__main__":
         "-i",
         "-I",
         "--defs",
-        nargs="*", # for backwards compatibility with v1 compiler. Remove in future version along with v1 compiler.
+        nargs="*",  # for backwards compatibility with v1 compiler. Remove in future version along with v1 compiler.
         dest="defs_file",
         help="YAML message defintion file to parse. C header file(s) will use v1 python compiler (deprecated)",
     )
