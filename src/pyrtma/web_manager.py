@@ -4,7 +4,7 @@ import select
 import errno
 import struct
 
-from pyrtma.proxy_client import ProxyClient
+from pyrtma.client import Client
 from pyrtma.message import RTMAMessageError
 
 from socket import error as SocketError
@@ -34,7 +34,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
     def __init__(self, socket, addr, server):
         # Initialize RTMA Proxy connection
         self.mm_ip = server.mm_ip
-        self.proxy = ProxyClient()
+        self.proxy = Client()
 
         WebSocketHandler.__init__(self, socket, addr, server)
 
@@ -68,7 +68,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
 
             if self.proxy.sock in rd:
                 try:
-                    msg = self.proxy.read_message()
+                    msg = self.proxy.read_message(timeout=None)
                 except RTMAMessageError as e:
                     logger.error(e, stack_info=False)
                     break

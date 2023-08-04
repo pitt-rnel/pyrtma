@@ -210,6 +210,11 @@ class Client(object):
         return self._module_id
 
     @property
+    def sock(self) -> socket.socket:
+        """Underlying socket connection with MessageManager"""
+        return self._sock
+
+    @property
     def header_cls(self) -> Type[MessageHeader]:
         """Class defining the RTMA message header"""
         return self._header_cls
@@ -402,6 +407,47 @@ class Client(object):
             # Socket was not ready to receive data. Drop the packet.
             print("x", end="")
 
+    @requires_connection
+    def forward_message(
+        self,
+        msg_hdr: MessageHeader,
+        msg_data: Optional[MessageData] = None,
+        timeout: float = -1,
+    ):
+        """Forward a message
+
+        A message is a packet that contains a defined data payload.
+        To send a message without associated data, see :py:func:`send_signal`.
+
+        Args:
+            msg_hdr: Object containing RTMA header to send
+            msg_data: Object containing the message to send
+            timeout (optional): Timeout in seconds to wait for socket to be available for sending.
+                Defaults to -1 (blocking).
+
+        """
+        # Assume that msg_type, num_data_bytes, data - have been filled in
+        if msg_data is not None:
+            msg_hdr.num_data_bytes = ctypes.sizeof(msg_data)
+
+        if timeout >= 0:
+            readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
+        else:
+            readfds, writefds, exceptfds = select.select(
+                [], [self._sock], []
+            )  # blocking
+
+        if writefds:
+            self._sendall(msg_hdr)
+            if msg_data is not None:
+                self._sendall(msg_data)
+
+            self._msg_count += 1
+
+        else:
+            # Socket was not ready to write data. Drop the packet.
+            print("x", end="")
+
     def _sendall(self, buffer: bytearray):
         try:
             self._sock.sendall(buffer)
@@ -411,7 +457,7 @@ class Client(object):
 
     @requires_connection
     def read_message(
-        self, timeout: Union[int, float] = -1, ack=False, sync_check=False
+        self, timeout: Union[int, float, None] = -1, ack=False, sync_check=False
     ) -> Optional[Message]:
         """Read a message
 
@@ -426,36 +472,40 @@ class Client(object):
         Returns:
             Message object. If no message is read before timeout, returns None.
         """
-        if timeout >= 0:
+        if timeout is None:
+            # Skip select call
+            pass
+        elif timeout >= 0:
+            # Wait timeout amount
             readfds, writefds, exceptfds = select.select([self._sock], [], [], timeout)
+            if len(readfds) == 0:
+                return None
         else:
-            readfds, writefds, exceptfds = select.select(
-                [self._sock], [], []
-            )  # blocking
+            # Blocking
+            readfds, writefds, exceptfds = select.select([self._sock], [], [])
+            if len(readfds) == 0:
+                return None
 
         # Read RTMA Header Section
-        if readfds:
-            header = self._header_cls()
-            try:
-                nbytes = self._sock.recv_into(header, header.size, socket.MSG_WAITALL)
-                """
-                Note:
-                MSG_WAITALL Flag:
-                The receive request will complete only when one of the following events occurs:
-                The buffer supplied by the caller is completely full.
-                The connection has been closed.
-                The request has been canceled or an error occurred.
-                """
+        header = self._header_cls()
+        try:
+            nbytes = self._sock.recv_into(header, header.size, socket.MSG_WAITALL)
+            """
+            Note:
+            MSG_WAITALL Flag:
+            The receive request will complete only when one of the following events occurs:
+            The buffer supplied by the caller is completely full.
+            The connection has been closed.
+            The request has been canceled or an error occurred.
+            """
 
-                if nbytes != header.size:
-                    self._connected = False
-                    raise ConnectionLost
-
-                header.recv_time = time.perf_counter()
-            except ConnectionError:
+            if nbytes != header.size:
+                self._connected = False
                 raise ConnectionLost
-        else:
-            return None
+
+            header.recv_time = time.perf_counter()
+        except ConnectionError:
+            raise ConnectionLost
 
         # Read Data Section
         data = header.get_data()
