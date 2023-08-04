@@ -229,6 +229,7 @@ if __name__ == "__main__":
             print("Details:")
             msg = " ".join(str(arg) for arg in e.__cause__.args)
             print(f"\t{e.__cause__.__class__.__name__}: {msg}")
+        sys.exit(1)
     except Exception:
         raise
 

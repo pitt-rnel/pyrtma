@@ -20,21 +20,22 @@ jobs:
         python-version:  ["3.8", "3.9", "3.10", "3.11"]
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install black
-        python -m pip install .
-    - name: Lint with black
-      uses: psf/black@stable
-    - name: Test compiler
-      run: |
-        python -m pyrtma.compile -i ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml --py -o ${{ github.workspace }}/tests/test_msg_defs
-    - name: Test with unittest
-      run: |
-        python -m unittest discover
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install black
+          python -m pip install .
+      - name: Lint with black
+        uses: psf/black@stable
+      - name: Test compiler
+        run: |
+          ls -l ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml
+          python -m pyrtma.compile -i ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml --py -o ${{ github.workspace }}/tests/test_msg_defs
+      - name: Test with unittest
+        run: |
+          python -m unittest discover
