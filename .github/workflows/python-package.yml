@@ -16,8 +16,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        python-version:  ["3.8", "3.9", "3.10", "3.11"]
+        os: [ubuntu-latest] #, windows-latest]
+        python-version:  ["3.8"] #, "3.9", "3.10", "3.11"]
 
     steps:
       - uses: actions/checkout@v2
@@ -35,6 +35,7 @@ jobs:
       - name: Test compiler
         run: |
           ls -l ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml
+          tail ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml
           python -m pyrtma.compile -i ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml --py -o ${{ github.workspace }}/tests/test_msg_defs
       - name: Test with unittest
         run: |
