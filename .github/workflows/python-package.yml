@@ -35,6 +35,7 @@ jobs:
     - name: Test compiler
       working-directory: ./tests/test_msg_defs
       run: |
+        ls -l
         python -m pyrtma.compile -i ./test_defs.yaml --py
     - name: Test with unittest
       run: |
