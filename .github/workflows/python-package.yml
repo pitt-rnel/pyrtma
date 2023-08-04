@@ -32,6 +32,9 @@ jobs:
         python -m pip install .
     - name: Lint with black
       uses: psf/black@stable
+    - name: Test compiler
+      run: |
+         python -m pyrtma.compile -i tests/test_msg_defs/test_defs.yaml --py -o tests/test_msg_defs
     - name: Test with unittest
       run: |
         python -m unittest discover
