@@ -33,10 +33,9 @@ jobs:
     - name: Lint with black
       uses: psf/black@stable
     - name: Test compiler
-      working-directory: ./tests
+      working-directory: ./tests/test_msg_defs
       run: |
-        ls -l
-        python -m pyrtma.compile -i ./test_msg_defs/test_defs.yaml --py -o ./test_msg_defs
+        python -m pyrtma.compile -i ./test_defs.yaml --py
     - name: Test with unittest
       run: |
         python -m unittest discover
