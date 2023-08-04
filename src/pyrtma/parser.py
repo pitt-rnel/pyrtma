@@ -122,7 +122,7 @@ class InvalidTypeError(ParserError):
 
 
 class FileFormatError(ParserError):
-    """Raised when a field when the wrong file extension is referenced."""
+    """Raised when the wrong file extension is referenced."""
 
     pass
 
