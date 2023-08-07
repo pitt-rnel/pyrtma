@@ -1039,14 +1039,16 @@ class Parser:
     def parse(self, msgdefs_file: os.PathLike):
         # Get the current pwd
         cwd = pathlib.Path.cwd()
-
+        print(f"In parse function: working dir is: {cwd}") # DEBUG
         try:
             # Always start by parsing the core_defs.yaml file
             pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
             core_defs = pkg_dir / "core_defs/core_defs.yaml"
+            print(f"Calling parse file on {core_defs.absolute()}") # DEBUG
             self.parse_file(core_defs.absolute())
 
             defs_path = pathlib.Path(msgdefs_file)
+            print(f"Calling parse file on {defs_path}") # DEBUG
             self.parse_file(defs_path)
         except Exception as e:
             self.clear()
@@ -1058,6 +1060,7 @@ class Parser:
         # Change the working directory
         cwd = pathlib.Path.cwd()
         msgdefs_path = (cwd / msgdefs_file).resolve()
+        print(f"In parse file, changing dir to {str(msgdefs_path.parent.absolute())}")
         os.chdir(str(msgdefs_path.parent.absolute()))
 
         # check previously included files
