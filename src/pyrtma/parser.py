@@ -1074,8 +1074,10 @@ class Parser:
         self.included_files.append(msgdefs_path)
 
         try:
+            print(f"parser opening file {msgdefs_path}") # DEBUG
             with open(msgdefs_path, "rt") as f:
                 text = f.read()
+                print(f"successfully read file {msgdefs_path}") # DEBUG
         except FileNotFoundError as e:
             alt_ext = ".yaml" if msgdefs_path.suffix == ".yml" else ".yml"
             alt_path = msgdefs_path.parent / (msgdefs_path.stem + alt_ext)
