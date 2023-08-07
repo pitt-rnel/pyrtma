@@ -13,6 +13,7 @@ from .core_defs import *
 
 from functools import wraps
 from typing import List, Optional, Tuple, Type, Union
+from warnings import warn
 
 __all__ = [
     "ClientError",
@@ -104,7 +105,7 @@ class Client(object):
         self._server = ("", -1)
         self._connected = False
         self._header_cls = get_header_cls(timecode)
-        self._recv_buffer = bytearray(1024**2)
+        self._recv_buffer = bytearray(1024 ** 2)
 
     def __del__(self):
         if self._connected:
@@ -395,7 +396,16 @@ class Client(object):
             header.dest_host_id = dest_host_id
             header.dest_mod_id = dest_mod_id
             header.num_data_bytes = ctypes.sizeof(msg_data)
-            header.version = msg_data.type_hash
+            try:
+                header.version = msg_data.type_hash
+            except AttributeError as e:
+                if not hasattr(msg_data, "type_hash"):
+                    warn(
+                        "Message class is missing type_hash. V1 message defs are deprecated.",
+                        FutureWarning,
+                    )
+                else:
+                    raise e
 
             self._sendall(header)
             if header.num_data_bytes > 0:
