@@ -16,6 +16,7 @@ __all__ = [
     "get_header_cls",
     "msg_defs",
     "message_def",
+    "msg_def",  # deprecated
     "RTMAMessageError",
     "UnknownMessageType",
     "JSONDecodingError",
@@ -54,6 +55,10 @@ def message_def(msg_cls: Type["MessageData"], *args, **kwargs):
     """Decorator to add user message definitions."""
     msg_defs[msg_cls.type_id] = msg_cls
     return msg_cls
+
+
+# backwards compatibility: deprecated name
+msg_def = message_def
 
 
 # Type Aliases
