@@ -1039,16 +1039,13 @@ class Parser:
     def parse(self, msgdefs_file: os.PathLike):
         # Get the current pwd
         cwd = pathlib.Path.cwd()
-        print(f"In parse function: working dir is: {cwd}") # DEBUG
         try:
             # Always start by parsing the core_defs.yaml file
             pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
             core_defs = pkg_dir / "core_defs/core_defs.yaml"
-            print(f"Calling parse file on {core_defs.absolute()}") # DEBUG
             self.parse_file(core_defs.absolute())
 
             defs_path = pathlib.Path(msgdefs_file)
-            print(f"Calling parse file on {defs_path}") # DEBUG
             self.parse_file(defs_path)
         except Exception as e:
             self.clear()
@@ -1060,12 +1057,7 @@ class Parser:
         # Change the working directory
         cwd = pathlib.Path.cwd()
         msgdefs_path = (cwd / msgdefs_file).resolve()
-        print(f"In parse file, changing dir to {str(msgdefs_path.parent.absolute())}")
-        try:
-            os.chdir(str(msgdefs_path.parent.absolute()))
-            print("successfully changed dir")
-        except:
-            print("failed to change dir, continuing...")
+        os.chdir(str(msgdefs_path.parent.absolute()))
 
         # check previously included files
         if any((msgdefs_path == f for f in self.included_files)):
@@ -1081,10 +1073,8 @@ class Parser:
         self.included_files.append(msgdefs_path)
 
         try:
-            print(f"parser opening file {msgdefs_path}") # DEBUG
             with open(msgdefs_path, "rt") as f:
                 text = f.read()
-                print(f"successfully read file {msgdefs_path}") # DEBUG
         except FileNotFoundError as e:
             alt_ext = ".yaml" if msgdefs_path.suffix == ".yml" else ".yml"
             alt_path = msgdefs_path.parent / (msgdefs_path.stem + alt_ext)
