@@ -35,7 +35,7 @@ jobs:
       - name: Test compiler
         run: |
           ls -l ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml
-          tail ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml
+          python -VV
           python -m pyrtma.compile -i ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml --py -o ${{ github.workspace }}/tests/test_msg_defs
       - name: Test with unittest
         run: |
