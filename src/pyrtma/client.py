@@ -105,7 +105,7 @@ class Client(object):
         self._server = ("", -1)
         self._connected = False
         self._header_cls = get_header_cls(timecode)
-        self._recv_buffer = bytearray(1024 ** 2)
+        self._recv_buffer = bytearray(1024**2)
 
     def __del__(self):
         if self._connected:
