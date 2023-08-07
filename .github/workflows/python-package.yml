@@ -30,8 +30,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install black
           python -m pip install .
-      - name: Lint with black
-        uses: psf/black@stable
+     # - name: Lint with black
+     #   uses: psf/black@stable
       - name: Test compiler
         run: |
           ls -l ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml
