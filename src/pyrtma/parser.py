@@ -691,7 +691,13 @@ class Parser:
                 mdf.fields.append(copy(field))
         elif isinstance(fields, dict):
             # Parse field specs into Field objects
-            reserved_field_names = ("type_id", "type_name", "type_hash", "type_source")
+            reserved_field_names = (
+                "type_id",
+                "type_name",
+                "type_hash",
+                "type_source",
+                "type_def",
+            )
 
             for fname, fstr in fields.items():
                 if fname in reserved_field_names:
