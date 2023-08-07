@@ -1062,6 +1062,7 @@ class Parser:
         msgdefs_path = (cwd / msgdefs_file).resolve()
         print(f"In parse file, changing dir to {str(msgdefs_path.parent.absolute())}")
         os.chdir(str(msgdefs_path.parent.absolute()))
+        printf("successfully changed dir")
 
         # check previously included files
         if any((msgdefs_path == f for f in self.included_files)):
