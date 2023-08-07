@@ -23,6 +23,9 @@ def compile(
     combined: bool = False,
     debug: bool = False,
 ):
+    
+    print("running pyrtma.compile") # DEBUG
+    
     # determine if using v1 or v2 compiler
     file1_ext = pathlib.Path(defs_file[0]).suffix
     if file1_ext.lower() == ".h":
@@ -49,7 +52,9 @@ def compile(
     # else continue with compiler V2
 
     parser = Parser(debug=debug)
+    print(f"Running parser: {pathlib.Path(defs_file)}") # DEBUG
     parser.parse(pathlib.Path(defs_file))
+    print("done parsing")
 
     if debug:
         with open("parser.json", "w") as f:
@@ -83,7 +88,9 @@ def compile(
         compiler = PyDefCompiler(parser, debug=debug)
         ext = ".py"
         output = outpath / (filename + ext)
+        print(f"Running py compiler: {output}") # DEBUG
         compiler.generate(output)
+        print("done compiling py file") # DEBUG
 
     if javascript:
         print("Building javascript message definitions...")
