@@ -39,6 +39,7 @@ jobs:
           python -m pyrtma.compile -h
           python -m pyrtma.compile -i "${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml" --py -o "${{ github.workspace }}/tests/test_msg_defs/"
         # python -m pyrtma.compile -i ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml --py -o ${{ github.workspace }}/tests/test_msg_defs
+        working-directory: ./src
       - name: Test with unittest
         run: |
           python -m unittest discover
