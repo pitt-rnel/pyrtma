@@ -23,7 +23,7 @@ def compile(
     combined: bool = False,
     debug: bool = False,
 ):
-        
+
     # determine if using v1 or v2 compiler
     file1_ext = pathlib.Path(defs_file[0]).suffix
     if file1_ext.lower() == ".h":

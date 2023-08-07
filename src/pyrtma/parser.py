@@ -646,7 +646,9 @@ class Parser:
         #     self.warning(f"WARNING: Adding {length} trailing padding byte(s) at end of {s.name}.")
 
         # Final size check using Python's builtin struct module
-        assert s.size == struct.calcsize(s.format), f"{s.name} is not 64-bit aligned. s.size = {s.size}, struct size = {struct.calcsize(s.format)}."
+        assert s.size == struct.calcsize(
+            s.format
+        ), f"{s.name} is not 64-bit aligned. s.size = {s.size}, struct size = {struct.calcsize(s.format)}."
 
     def validate_msg_id(self, name: str, msg_id: int):
         if not isinstance(msg_id, int):
