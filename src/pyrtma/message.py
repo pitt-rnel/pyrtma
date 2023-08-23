@@ -233,6 +233,14 @@ class MessageData(ctypes.Structure):
     def hexdump(self, length=16, sep=" "):
         hexdump(bytes(self), length, sep)
 
+    def get_attribute_raw(self, name: str) -> Any:
+        """return raw bytes for attribute"""
+        meta = getattr(type(self), name)
+        offset = meta.offset
+        sz = meta.size
+
+        return bytes(self)[offset : offset + sz]
+
     def __str__(self):
         return self.pretty_print()
 
