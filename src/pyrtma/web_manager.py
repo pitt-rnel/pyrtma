@@ -46,8 +46,8 @@ class RTMAWebSocketHandler(WebSocketHandler):
             logger.error("Websocket handshake failed.")
             return
 
-        # Establish an RTMA connetion with MessageManger
-        self.proxy.connect(self.mm_ip)
+        # Establish the underlying socket connection with MessageManger Server
+        self.proxy._socket_connect(self.mm_ip)
 
         print("New Client:")
         print(
@@ -151,6 +151,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         return message_bytes.decode("utf8")
 
     def finish(self):
+        # Disconnect on behalf of the web client if still connected here
         if self.proxy.connected:
             self.proxy.disconnect()
             logger.debug("Disconnected proxy from MM.")

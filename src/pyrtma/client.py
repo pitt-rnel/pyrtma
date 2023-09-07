@@ -115,25 +115,8 @@ class Client(object):
                 """Silently ignore any errors at this point."""
                 pass
 
-    def connect(
-        self,
-        server_name: str = "localhost:7111",
-        logger_status: bool = False,
-        daemon_status: bool = False,
-    ):
-        """Connect to message manager server
-
-        Args:
-            server_name (optional): IP_addr:port_num string associated with message manager.
-                Defaults to "localhost:7111".
-            logger_status (optional): Flag to declare client as a logger module.
-                Logger modules are automatically subscribed to all message types.
-                Defaults to False.
-            daemon_status (optional): Flag to declare client as a daemon. Defaults to False.
-
-        Raises:
-            MessageManagerNotFound: Unable to connect to message manager
-        """
+    def _socket_connect(self, server_name: str):
+        # Get the server ip info
         addr, port = server_name.split(":")
         self._server = (addr, int(port))
 
@@ -156,6 +139,29 @@ class Client(object):
         self._sock.setsockopt(socket.getprotobyname("tcp"), socket.TCP_NODELAY, 1)
 
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+    def connect(
+        self,
+        server_name: str = "localhost:7111",
+        logger_status: bool = False,
+        daemon_status: bool = False,
+    ):
+        """Connect to message manager server
+
+        Args:
+            server_name (optional): IP_addr:port_num string associated with message manager.
+                Defaults to "localhost:7111".
+            logger_status (optional): Flag to declare client as a logger module.
+                Logger modules are automatically subscribed to all message types.
+                Defaults to False.
+            daemon_status (optional): Flag to declare client as a daemon. Defaults to False.
+
+        Raises:
+            MessageManagerNotFound: Unable to connect to message manager
+        """
+
+        # Setup the underlying socket connection
+        self._socket_connect(server_name)
 
         msg = MDF_CONNECT()
         msg.logger_status = int(logger_status)
