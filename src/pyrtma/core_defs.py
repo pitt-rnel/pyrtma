@@ -1,3 +1,4 @@
+"""pyrtma core definitions """
 import ctypes
 import pyrtma
 

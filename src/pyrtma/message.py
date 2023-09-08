@@ -403,7 +403,7 @@ def _json_decode(obj, data):
         if issubclass(ftype, ctypes.Structure):
             _json_decode(getattr(obj, name), data[name])
         elif issubclass(ftype, ctypes.Array):
-            if issubclass(ftype._type_, ctypes.Structure):
+            if issubclass(ftype._type_, ctypes.Structure):  # type: ignore
                 for i, elem in enumerate(getattr(obj, name)):
                     _json_decode(elem, data[name][i])
             elif ftype._type_ is ctypes.c_char:

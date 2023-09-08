@@ -12,7 +12,7 @@ from .message import *
 from .core_defs import *
 
 from functools import wraps
-from typing import List, Optional, Tuple, Type, Union
+from typing import Optional, Tuple, Type, Union, Iterable
 from warnings import warn
 
 __all__ = [
@@ -255,10 +255,7 @@ class Client(object):
         msg.pid = os.getpid()
         self.send_message(msg)
 
-    def _subscription_control(self, msg_list: List[int], ctrl_msg: str):
-        if not isinstance(msg_list, list):
-            msg_list = [msg_list]
-
+    def _subscription_control(self, msg_list: Iterable[int], ctrl_msg: str):
         msg_set = set(msg_list)
         if ctrl_msg == "Subscribe":
             msg = MDF_SUBSCRIBE()
@@ -284,43 +281,58 @@ class Client(object):
             self.send_message(msg)
 
     @requires_connection
-    def subscribe(self, msg_list: List[int]):
+    def subscribe(self, msg_list: Iterable[int]):
         """Subscribe to message types
 
         Calling this method multiple times will add to, and not replace,
         the list of subscribed messages.
 
         Args:
-            msg_list: A list of numeric message IDs to subscribe to
+            msg_list (Iterable[int]): A list of numeric message IDs to subscribe to
         """
         self._subscription_control(msg_list, "Subscribe")
 
     @requires_connection
-    def unsubscribe(self, msg_list: List[int]):
+    def unsubscribe(self, msg_list: Iterable[int]):
         """Unsubscribe from message types
 
         Args:
-            msg_list: A list of numeric message IDs to unsubscribe to
+            msg_list (Iterable[int]): A list of numeric message IDs to unsubscribe to
         """
         self._subscription_control(msg_list, "Unsubscribe")
 
     @requires_connection
-    def pause_subscription(self, msg_list: List[int]):
+    def pause_subscription(self, msg_list: Iterable[int]):
         """Pause subscription to message types
 
         Args:
-            msg_list (List[int]): A list of numeric message IDs to temporarily unsubscribe to
+            msg_list (Iterable[int]): A list of numeric message IDs to temporarily unsubscribe to
         """
         self._subscription_control(msg_list, "PauseSubscription")
 
     @requires_connection
-    def resume_subscription(self, msg_list: List[int]):
+    def resume_subscription(self, msg_list: Iterable[int]):
         """Resume subscription to message types
 
         Args:
-            msg_list (List[int]): A list of paused message IDs to resubscribe to
+            msg_list (Iterable[int]): A list of paused message IDs to resubscribe to
         """
         self._subscription_control(msg_list, "ResumeSubscription")
+
+    @requires_connection
+    def unsubscribe_from_all(self):
+        """Unsubscribe from all subscribed types"""
+        self.unsubscribe(self.subscribed_types)
+
+    @requires_connection
+    def pause_all_subscriptions(self):
+        """Pause all subscribed types"""
+        self.pause_subscription(self.subscribed_types)
+
+    @requires_connection
+    def resume_all_subscriptions(self):
+        """Resume all paused subscriptions"""
+        self.resume_subscription(self.paused_subscribed_types)
 
     @requires_connection
     def send_signal(
@@ -373,7 +385,7 @@ class Client(object):
             header.dest_mod_id = dest_mod_id
             header.num_data_bytes = 0
 
-            self._sendall(header)
+            self._sendall(header)  # type: ignore
 
             self._msg_count += 1
 
@@ -441,9 +453,9 @@ class Client(object):
                 else:
                     raise e
 
-            self._sendall(header)
+            self._sendall(header)  # type: ignore
             if header.num_data_bytes > 0:
-                self._sendall(msg_data)
+                self._sendall(msg_data)  # type: ignore
 
             self._msg_count += 1
 
@@ -482,9 +494,9 @@ class Client(object):
             )  # blocking
 
         if writefds:
-            self._sendall(msg_hdr)
+            self._sendall(msg_hdr)  # type: ignore
             if msg_data is not None:
-                self._sendall(msg_data)
+                self._sendall(msg_data)  # type: ignore
 
             self._msg_count += 1
 
