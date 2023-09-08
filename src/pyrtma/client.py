@@ -106,6 +106,8 @@ class Client(object):
         self._connected = False
         self._header_cls = get_header_cls(timecode)
         self._recv_buffer = bytearray(1024**2)
+        self._subscribed_types = set()
+        self._paused_types = set()
 
     def __del__(self):
         if self._connected:
@@ -174,6 +176,10 @@ class Client(object):
         if self._module_id == 0:
             self._module_id = ack_msg.header.dest_mod_id
 
+        # reset subscribed and paused types
+        self._subscribed_types = set()
+        self._paused_types = set()
+
     def disconnect(self):
         """Disconnect from message manager server"""
         try:
@@ -185,6 +191,9 @@ class Client(object):
         finally:
             self._sock.close()
             self._connected = False
+            # reset subscribed and paused types
+            self._subscribed_types = set()
+            self._paused_types = set()
 
     @property
     def server(self) -> Tuple[str, int]:
@@ -226,6 +235,16 @@ class Client(object):
         """Class defining the RTMA message header"""
         return self._header_cls
 
+    @property
+    def subscribed_types(self) -> set:
+        """List of subscribed message types"""
+        return set(self._subscribed_types)
+
+    @property
+    def paused_subscribed_types(self) -> set:
+        """Subscriptions on pause"""
+        return set(self._paused_types)
+
     @requires_connection
     def send_module_ready(self):
         """Send a signal to message manager that client is ready
@@ -240,14 +259,23 @@ class Client(object):
         if not isinstance(msg_list, list):
             msg_list = [msg_list]
 
+        msg_set = set(msg_list)
         if ctrl_msg == "Subscribe":
             msg = MDF_SUBSCRIBE()
+            self._subscribed_types |= msg_set
+            self._paused_types -= msg_set
         elif ctrl_msg == "Unsubscribe":
             msg = MDF_UNSUBSCRIBE()
+            self._subscribed_types -= msg_set
+            self._paused_types -= msg_set
         elif ctrl_msg == "PauseSubscription":
             msg = MDF_PAUSE_SUBSCRIPTION()
+            self._subscribed_types -= msg_set
+            self._paused_types |= msg_set
         elif ctrl_msg == "ResumeSubscription":
             msg = MDF_RESUME_SUBSCRIPTION()
+            self._subscribed_types |= msg_set
+            self._paused_types -= msg_set
         else:
             raise TypeError("Unknown control message type.")
 
