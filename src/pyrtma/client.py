@@ -12,7 +12,7 @@ from .message import *
 from .core_defs import *
 
 from functools import wraps
-from typing import Optional, Tuple, Type, Union, Iterable
+from typing import Optional, Tuple, Type, Union, Iterable, Set
 from warnings import warn
 
 __all__ = [
@@ -236,12 +236,12 @@ class Client(object):
         return self._header_cls
 
     @property
-    def subscribed_types(self) -> set[int]:
+    def subscribed_types(self) -> Set[int]:
         """List of subscribed message types"""
         return set(self._subscribed_types)
 
     @property
-    def paused_subscribed_types(self) -> set[int]:
+    def paused_subscribed_types(self) -> Set[int]:
         """Subscriptions on pause"""
         return set(self._paused_types)
 
