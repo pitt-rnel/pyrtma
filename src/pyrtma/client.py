@@ -236,12 +236,12 @@ class Client(object):
         return self._header_cls
 
     @property
-    def subscribed_types(self) -> set:
+    def subscribed_types(self) -> set[int]:
         """List of subscribed message types"""
         return set(self._subscribed_types)
 
     @property
-    def paused_subscribed_types(self) -> set:
+    def paused_subscribed_types(self) -> set[int]:
         """Subscriptions on pause"""
         return set(self._paused_types)
 
