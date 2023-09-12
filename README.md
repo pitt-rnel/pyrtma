@@ -154,7 +154,7 @@ The rtma objects are compiled into objects suitable for each language.
 
 ## Examples
 
-See `/examples/example.py` for pub/sub demo appp
+See [`/examples/example.py`](https://github.com/pitt-rnel/pyrtma/blob/master/examples/example.py) for pub/sub demo app
 
 Compile the example message defintions:
 
