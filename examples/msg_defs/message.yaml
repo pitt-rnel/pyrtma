@@ -1,0 +1,65 @@
+# message.yaml
+
+imports: null
+
+# Constant values and expressions
+constants:
+    STR_SIZE: 32
+    LONG_STRING: STR_SIZE * 2
+
+# Constant string values
+string_constants:
+    default_msg: "hello_world"
+
+host_ids: null
+
+module_ids:
+    PERSON_PUBLISHER: 213
+    PERSON_SUBSCRIBER: 214
+
+# Alias a type by another name
+aliases:
+    AGE_TYPE: int
+
+# Non-message structured data (no id field)
+struct_defs:
+    TEST_STRUCT:
+        fields:
+            value_str: char[STR_SIZE]
+            value_int: int
+
+# Message defintions with user assigned id field
+message_defs:
+    PERSON_MESSAGE:
+        id: 1234
+        fields:
+            name: char[STR_SIZE]
+            age: AGE_TYPE
+
+    ANOTHER_EXAMPLE:
+        id: 5678
+        fields:
+            value_struct: TEST_STRUCT
+            value_float: float
+            value_double: double
+
+    # Example signal definition
+    USER_SIGNAL:
+        id: 2468
+        fields: null
+
+    # Example using a nested message defintion
+    PERSON_LIST:
+        id: 1357
+        fields:
+            person: PERSON_MESSAGE[32]
+
+    # Example reusing a message definition by another name
+    EMPLOYEES:
+        id: 1368
+        fields: PERSON_LIST
+
+    # A block of message ids can be reserved by a file for future use
+    # Ranges are inclusive on both ends
+    _RESERVED_:
+        id: [1000, 1002:1005, 1006 - 1008, 1009 to 1012]

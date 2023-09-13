@@ -4,6 +4,7 @@ import threading
 import time
 import unittest
 
+import pyrtma
 from pyrtma import msg_def
 from pyrtma.client import Client
 from pyrtma.manager import MessageManager
@@ -14,7 +15,7 @@ MT_TEST_MESSAGE2 = 5678
 
 
 @msg_def
-class TEST_MESSAGE(ctypes.Structure):
+class TEST_MESSAGE(pyrtma.MessageData):
     _fields_ = [
         ("str", ctypes.c_byte * 64),
         ("val", ctypes.c_double),
@@ -26,7 +27,7 @@ class TEST_MESSAGE(ctypes.Structure):
 
 
 @msg_def
-class TEST_MESSAGE2(ctypes.Structure):
+class TEST_MESSAGE2(pyrtma.MessageData):
     _fields_ = [
         ("val", ctypes.c_double),
     ]

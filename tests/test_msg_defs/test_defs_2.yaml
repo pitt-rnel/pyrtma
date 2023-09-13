@@ -1,0 +1,219 @@
+# Mujoco VR Message Defintions
+
+imports: null
+
+constants:
+  MJ_VR_MAX_MOCAP_COUNT: 32
+  MJ_VR_MAX_BODY_COUNT: 64
+  MJ_VR_MAX_MOTOR_COUNT: 32
+  MJ_VR_MAX_JOINT_COUNT: 64
+  MJ_VR_MAX_JOINT_DOF: 128
+  MJ_VR_MAX_CONTACT_COUNT: 32
+  MJ_VR_MAX_TENDON_COUNT: 32
+
+string_constants: null
+
+aliases: null
+
+host_ids: null
+
+module_ids:
+  MUJOCO_VR_MODULE: 61 # MujocoVR C++ Module
+
+# Non-message structured data (no id field)
+struct_defs:
+  MJVR_MSG_HEADER:
+    fields:
+      serial_no: int
+      sub_sample: int
+
+# Message Definitions
+message_defs:
+  MUJOCO_VR_REQUEST_STATE:
+    id: 4213
+    fields:
+      header: MJVR_MSG_HEADER
+  
+  MUJOCO_VR_REPLY_STATE:
+    id: 4214
+    fields:
+      header: MJVR_MSG_HEADER
+      requester_MID: int
+      reserved: int
+      sim_time: double
+      body_position: double[3 * MJ_VR_MAX_BODY_COUNT]
+      body_orientation: double[4 * MJ_VR_MAX_BODY_COUNT]
+      motor_ctrltype: int[MJ_VR_MAX_MOTOR_COUNT]
+      motor_position: double[MJ_VR_MAX_MOTOR_COUNT]
+      motor_velocity: double[MJ_VR_MAX_MOTOR_COUNT]
+      joint_position: double[MJ_VR_MAX_JOINT_DOF]
+      joint_velocity: double[MJ_VR_MAX_JOINT_DOF]
+      joint_torque: double[MJ_VR_MAX_JOINT_DOF]
+      contact: double[MJ_VR_MAX_CONTACT_COUNT]
+
+  MUJOCO_VR_MOCAP_MOVE:
+    id: 4215
+    fields:
+      header: MJVR_MSG_HEADER
+      num_id: int # Must be <= than MJ_VR_MAX_MOCAP_COUNT
+      padding: int
+      id: int[MJ_VR_MAX_MOCAP_COUNT] # size: n
+      position: double[3 * MJ_VR_MAX_MOCAP_COUNT] # size: n x 3
+      orientation: double[4 * MJ_VR_MAX_MOCAP_COUNT] # size: n x 4
+
+  MUJOCO_VR_MOTOR_MOVE:
+    id: 4216
+    fields:
+      header: MJVR_MSG_HEADER
+      num_id: int # Must be <= than MJ_VR_MAX_MOTOR_COUNT
+      padding: int
+      id: int[MJ_VR_MAX_MOTOR_COUNT]
+      position: double[MJ_VR_MAX_MOTOR_COUNT]
+
+  MUJOCO_VR_REQUEST_MODEL_INFO:
+    id: 4217
+    fields:
+      header: MJVR_MSG_HEADER
+
+  MUJOCO_VR_REPLY_MODEL_INFO:
+    id: 4218
+    fields:
+      header: MJVR_MSG_HEADER
+      requester_MID: int
+      reserved: int
+      model_file: char[512]
+      sim_time: double
+      nq: int
+      nv: int
+      num_body: int
+      num_mocap: int
+      num_float: int
+      num_motor: int
+      num_joint: int
+      num_contact: int
+      num_tendon: int
+      reserved1: int
+      body_id: int[MJ_VR_MAX_BODY_COUNT]
+      mocap_id: int[MJ_VR_MAX_MOCAP_COUNT] # bodyid of mocap body
+      float_id: int[MJ_VR_MAX_MOCAP_COUNT] # bodyid of floating body
+      motor_id: int[MJ_VR_MAX_MOTOR_COUNT]
+      joint_id: int[MJ_VR_MAX_JOINT_COUNT]
+      contact_id: int[MJ_VR_MAX_CONTACT_COUNT]
+      tendon_id: int[MJ_VR_MAX_TENDON_COUNT]
+      joint_type: int[MJ_VR_MAX_JOINT_COUNT]
+      max_motor_limits: double[MJ_VR_MAX_MOTOR_COUNT]
+      min_motor_limits: double[MJ_VR_MAX_MOTOR_COUNT]
+      body_names: char[1024]  #Names separated by NULL
+      mocap_names: char[1024] #Names separated by NULL
+      float_names: char[1024] #Names separated by NULL
+      motor_names: char[1024] #Names separated by NULL
+      joint_names: char[1024] #Names separated by NULL
+      contact_names: char[1024] #Names separated by NULL
+      tendon_names: char[1024] #Names separated by NULL
+
+  MUJOCO_VR_REQUEST_LINK_STATE:
+    id: 4219
+    fields:
+      header: MJVR_MSG_HEADER
+
+  MUJOCO_VR_REPLY_LINK_STATE:
+    id: 4220
+    fields:
+      header: MJVR_MSG_HEADER
+      requester_MID: int
+      reserved: int
+      nlink: int
+      nfloat: int
+      body_linkid: int[MJ_VR_MAX_BODY_COUNT]
+      link_followerid: int[MJ_VR_MAX_BODY_COUNT]
+      link_leaderid: int[MJ_VR_MAX_BODY_COUNT]
+      link_active: char[MJ_VR_MAX_BODY_COUNT]
+      link_rpos: double[3 * MJ_VR_MAX_BODY_COUNT]
+      link_quat_leader: double[4 * MJ_VR_MAX_BODY_COUNT]
+      link_quat_follower: double[4 * MJ_VR_MAX_BODY_COUNT]
+
+  MUJOCO_VR_LINK:
+    id: 4221
+    fields:
+      header: MJVR_MSG_HEADER
+      num_links: int
+      padding: int
+      follower_id: int[MJ_VR_MAX_MOCAP_COUNT]
+      leader_id: int[MJ_VR_MAX_MOCAP_COUNT]
+
+  MUJOCO_VR_LINK_RESET:
+    id: 4222
+    fields:
+      header: MJVR_MSG_HEADER
+      num_links: int
+      padding: int
+      follower_id: int[MJ_VR_MAX_MOCAP_COUNT]
+
+  MUJOCO_VR_FLOATBODY_MOVE:
+    id: 4223
+    fields:
+      header: MJVR_MSG_HEADER
+      num_id: int # Must be <= than MJ_VR_MAX_MOCAP_COUNT
+      padding: int
+      float_body_id: int[MJ_VR_MAX_MOCAP_COUNT]
+      position: double[3 * MJ_VR_MAX_MOCAP_COUNT]
+      orientation: double[4 * MJ_VR_MAX_MOCAP_COUNT]
+      disable_link: char[MJ_VR_MAX_MOCAP_COUNT]
+
+  MUJOCO_VR_RESET:
+    id: 4224
+    fields: null
+
+  MUJOCO_VR_RELOAD:
+    id: 4225
+    fields: null
+
+  MUJOCO_VR_LOAD_MODEL:
+    id: 4226
+    fields:
+      model_filename: char[512]
+
+  MUJOCO_VR_PAUSE:
+    id: 4227
+    fields: null
+
+  MUJOCO_VR_RESUME:
+    id: 4228
+    fields: null
+
+  MUJOCO_VR_MOTOR_CTRL:
+    id: 4229
+    fields:
+      header: MJVR_MSG_HEADER
+      num_id: int # Must be <= than MJ_VR_MAX_MOTOR_COUNT
+      padding: int
+      id: int[MJ_VR_MAX_MOTOR_COUNT]
+      ctrl: double[MJ_VR_MAX_MOTOR_COUNT]
+
+  MUJOCO_VR_MOTOR_CONFIG:
+    id: 4230
+    fields:
+      header: MJVR_MSG_HEADER
+      num_id: int # Must be <= than MJ_VR_MAX_MOTOR_COUNT
+      padding: int
+      id: int[MJ_VR_MAX_MOTOR_COUNT]
+      type: int[MJ_VR_MAX_MOTOR_COUNT]
+      k_p: double[MJ_VR_MAX_MOTOR_COUNT]
+      k_i: double[MJ_VR_MAX_MOTOR_COUNT]
+      k_d: double[MJ_VR_MAX_MOTOR_COUNT]
+      setpt: double[MJ_VR_MAX_MOTOR_COUNT]
+
+  MUJOCO_VR_SET_RGBA:
+    id: 4231
+    fields:
+      header: MJVR_MSG_HEADER
+      type: int # element type. _mjtObj enum values
+      id: int # element id
+      rgba: float[4] # rgba array
+
+  MUJOCO_VR_MSG:
+    id: 4232
+    fields:
+      message: char[256] # mujoco message text
+      position: int # 0: top right, 1: top left, 2: bottom right, 3: bottom left
+

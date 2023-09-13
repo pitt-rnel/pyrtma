@@ -1,25 +1,12 @@
 import sys
-import ctypes
+import pathlib
 
-sys.path.append("../")
+sys.path.append(str(pathlib.Path(__file__).parent))
 
 import pyrtma
 
-# Choose a unique message type id number
-MT_USER_MESSAGE = 1234
-
-
-# Create a user defined message from a ctypes.Structure or basic ctypes
-@pyrtma.msg_def
-class USER_MESSAGE(pyrtma.MessageData):
-    _fields_ = [
-        ("str", ctypes.c_byte * 64),
-        ("val", ctypes.c_double),
-        ("arr", ctypes.c_int * 8),
-    ]
-
-    type_id: int = MT_USER_MESSAGE
-    type_name: str = "USER_MESSAGE"
+# Import the users compiled message defintions
+import msg_defs.message as md
 
 
 def publisher(server="127.0.0.1:7111", timecode=False):
@@ -28,20 +15,20 @@ def publisher(server="127.0.0.1:7111", timecode=False):
     mod.connect(server_name=server)
 
     # Build a packet to send
-    msg = USER_MESSAGE()
-    py_string = b"Hello World"
-    msg.str[: len(py_string)] = py_string
-    msg.val = 123.456
-    msg.arr[:] = list(range(8))
+    msg = md.MDF_PERSON_MESSAGE()
+    msg.name = "Alice"
+    msg.age = 37
 
     while True:
         c = input("Hit enter to publish a message. (Q)uit.")
 
         if c not in ["Q", "q"]:
+            msg.age += 1
             mod.send_message(msg)
-            print("Sent a packet")
+            print("Sent:")
+            print(msg.to_json())
         else:
-            mod.send_signal(pyrtma.MT_EXIT)
+            mod.send_signal(md.MT_EXIT)
             print("Goodbye")
             break
 
@@ -52,7 +39,7 @@ def subscriber(server="127.0.0.1:7111", timecode=False):
     mod.connect(server_name=server)
 
     # Select the messages to receive
-    mod.subscribe([MT_USER_MESSAGE, pyrtma.MT_EXIT])
+    mod.subscribe([md.MT_PERSON_MESSAGE, md.MT_EXIT])
 
     print("Waiting for packets...")
     while True:
@@ -60,11 +47,10 @@ def subscriber(server="127.0.0.1:7111", timecode=False):
             msg = mod.read_message(timeout=0.200)
 
             if msg is not None:
-                if msg.name == "USER_MESSAGE":
-                    msg.data.hexdump()
-                    print("")
-                    print(msg.pretty_print())
-                elif msg.name == "EXIT":
+                if msg.type_id == md.MT_PERSON_MESSAGE:
+                    print("Recv:")
+                    print(msg.data.to_json())
+                elif msg.type_id == md.MT_EXIT:
                     print("Goodbye.")
                     break
         except KeyboardInterrupt:

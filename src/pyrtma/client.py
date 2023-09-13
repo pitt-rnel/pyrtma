@@ -8,11 +8,12 @@ import time
 import os
 import ctypes
 
-from ._core import *
-from .constants import *
+from .message import *
+from .core_defs import *
 
 from functools import wraps
-from typing import List, Optional, Tuple, Type, Union, Dict
+from typing import Optional, Tuple, Type, Union, Iterable, Set
+from warnings import warn
 
 __all__ = [
     "ClientError",
@@ -105,6 +106,8 @@ class Client(object):
         self._connected = False
         self._header_cls = get_header_cls(timecode)
         self._recv_buffer = bytearray(1024**2)
+        self._subscribed_types = set()
+        self._paused_types = set()
 
     def __del__(self):
         if self._connected:
@@ -114,25 +117,8 @@ class Client(object):
                 """Silently ignore any errors at this point."""
                 pass
 
-    def connect(
-        self,
-        server_name: str = "localhost:7111",
-        logger_status: bool = False,
-        daemon_status: bool = False,
-    ):
-        """Connect to message manager server
-
-        Args:
-            server_name (optional): IP_addr:port_num string associated with message manager.
-                Defaults to "localhost:7111".
-            logger_status (optional): Flag to declare client as a logger module.
-                Logger modules are automatically subscribed to all message types.
-                Defaults to False.
-            daemon_status (optional): Flag to declare client as a daemon. Defaults to False.
-
-        Raises:
-            MessageManagerNotFound: Unable to connect to message manager
-        """
+    def _socket_connect(self, server_name: str):
+        # Get the server ip info
         addr, port = server_name.split(":")
         self._server = (addr, int(port))
 
@@ -156,7 +142,30 @@ class Client(object):
 
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-        msg = CONNECT()
+    def connect(
+        self,
+        server_name: str = "localhost:7111",
+        logger_status: bool = False,
+        daemon_status: bool = False,
+    ):
+        """Connect to message manager server
+
+        Args:
+            server_name (optional): IP_addr:port_num string associated with message manager.
+                Defaults to "localhost:7111".
+            logger_status (optional): Flag to declare client as a logger module.
+                Logger modules are automatically subscribed to all message types.
+                Defaults to False.
+            daemon_status (optional): Flag to declare client as a daemon. Defaults to False.
+
+        Raises:
+            MessageManagerNotFound: Unable to connect to message manager
+        """
+
+        # Setup the underlying socket connection
+        self._socket_connect(server_name)
+
+        msg = MDF_CONNECT()
         msg.logger_status = int(logger_status)
         msg.daemon_status = int(daemon_status)
 
@@ -166,6 +175,10 @@ class Client(object):
         # save own module ID from ACK if asked to be assigned dynamic ID
         if self._module_id == 0:
             self._module_id = ack_msg.header.dest_mod_id
+
+        # reset subscribed and paused types
+        self._subscribed_types = set()
+        self._paused_types = set()
 
     def disconnect(self):
         """Disconnect from message manager server"""
@@ -178,6 +191,9 @@ class Client(object):
         finally:
             self._sock.close()
             self._connected = False
+            # reset subscribed and paused types
+            self._subscribed_types = set()
+            self._paused_types = set()
 
     @property
     def server(self) -> Tuple[str, int]:
@@ -210,9 +226,24 @@ class Client(object):
         return self._module_id
 
     @property
+    def sock(self) -> socket.socket:
+        """Underlying socket connection with MessageManager"""
+        return self._sock
+
+    @property
     def header_cls(self) -> Type[MessageHeader]:
         """Class defining the RTMA message header"""
         return self._header_cls
+
+    @property
+    def subscribed_types(self) -> Set[int]:
+        """List of subscribed message types"""
+        return set(self._subscribed_types)
+
+    @property
+    def paused_subscribed_types(self) -> Set[int]:
+        """Subscriptions on pause"""
+        return set(self._paused_types)
 
     @requires_connection
     def send_module_ready(self):
@@ -220,22 +251,28 @@ class Client(object):
 
         This method also sends the client's process ID to message manager.
         """
-        msg = MODULE_READY()
+        msg = MDF_MODULE_READY()
         msg.pid = os.getpid()
         self.send_message(msg)
 
-    def _subscription_control(self, msg_list: List[int], ctrl_msg: str):
-        if not isinstance(msg_list, list):
-            msg_list = [msg_list]
-
+    def _subscription_control(self, msg_list: Iterable[int], ctrl_msg: str):
+        msg_set = set(msg_list)
         if ctrl_msg == "Subscribe":
-            msg = SUBSCRIBE()
+            msg = MDF_SUBSCRIBE()
+            self._subscribed_types |= msg_set
+            self._paused_types -= msg_set
         elif ctrl_msg == "Unsubscribe":
-            msg = UNSUBSCRIBE()
+            msg = MDF_UNSUBSCRIBE()
+            self._subscribed_types -= msg_set
+            self._paused_types -= msg_set
         elif ctrl_msg == "PauseSubscription":
-            msg = PAUSE_SUBSCRIPTION()
+            msg = MDF_PAUSE_SUBSCRIPTION()
+            self._subscribed_types -= msg_set
+            self._paused_types |= msg_set
         elif ctrl_msg == "ResumeSubscription":
-            msg = RESUME_SUBSCRIPTION()
+            msg = MDF_RESUME_SUBSCRIPTION()
+            self._subscribed_types |= msg_set
+            self._paused_types -= msg_set
         else:
             raise TypeError("Unknown control message type.")
 
@@ -244,43 +281,58 @@ class Client(object):
             self.send_message(msg)
 
     @requires_connection
-    def subscribe(self, msg_list: List[int]):
+    def subscribe(self, msg_list: Iterable[int]):
         """Subscribe to message types
 
         Calling this method multiple times will add to, and not replace,
         the list of subscribed messages.
 
         Args:
-            msg_list: A list of numeric message IDs to subscribe to
+            msg_list (Iterable[int]): A list of numeric message IDs to subscribe to
         """
         self._subscription_control(msg_list, "Subscribe")
 
     @requires_connection
-    def unsubscribe(self, msg_list: List[int]):
+    def unsubscribe(self, msg_list: Iterable[int]):
         """Unsubscribe from message types
 
         Args:
-            msg_list: A list of numeric message IDs to unsubscribe to
+            msg_list (Iterable[int]): A list of numeric message IDs to unsubscribe to
         """
         self._subscription_control(msg_list, "Unsubscribe")
 
     @requires_connection
-    def pause_subscription(self, msg_list: List[int]):
+    def pause_subscription(self, msg_list: Iterable[int]):
         """Pause subscription to message types
 
         Args:
-            msg_list (List[int]): A list of numeric message IDs to temporarily unsubscribe to
+            msg_list (Iterable[int]): A list of numeric message IDs to temporarily unsubscribe to
         """
         self._subscription_control(msg_list, "PauseSubscription")
 
     @requires_connection
-    def resume_subscription(self, msg_list: List[int]):
+    def resume_subscription(self, msg_list: Iterable[int]):
         """Resume subscription to message types
 
         Args:
-            msg_list (List[int]): A list of paused message IDs to resubscribe to
+            msg_list (Iterable[int]): A list of paused message IDs to resubscribe to
         """
         self._subscription_control(msg_list, "ResumeSubscription")
+
+    @requires_connection
+    def unsubscribe_from_all(self):
+        """Unsubscribe from all subscribed types"""
+        self.unsubscribe(self.subscribed_types)
+
+    @requires_connection
+    def pause_all_subscriptions(self):
+        """Pause all subscribed types"""
+        self.pause_subscription(self.subscribed_types)
+
+    @requires_connection
+    def resume_all_subscriptions(self):
+        """Resume all paused subscriptions"""
+        self.resume_subscription(self.paused_subscribed_types)
 
     @requires_connection
     def send_signal(
@@ -314,18 +366,6 @@ class Client(object):
         if dest_host_id < 0 or dest_host_id > MAX_HOSTS:
             raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
 
-        # Assume that msg_type, num_data_bytes, data - have been filled in
-        header = self._header_cls()
-        header.msg_type = signal_type
-        header.msg_count = self._msg_count
-        header.send_time = time.time()
-        header.recv_time = 0.0
-        header.src_host_id = self._host_id
-        header.src_mod_id = self._module_id
-        header.dest_host_id = dest_host_id
-        header.dest_mod_id = dest_mod_id
-        header.num_data_bytes = 0
-
         if timeout >= 0:
             readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
         else:
@@ -334,7 +374,18 @@ class Client(object):
             )  # blocking
 
         if writefds:
-            self._sendall(header)
+            header = self._header_cls()
+            header.msg_type = signal_type
+            header.msg_count = self._msg_count
+            header.send_time = time.perf_counter()
+            header.recv_time = 0.0
+            header.src_host_id = self._host_id
+            header.src_mod_id = self._module_id
+            header.dest_host_id = dest_host_id
+            header.dest_mod_id = dest_mod_id
+            header.num_data_bytes = 0
+
+            self._sendall(header)  # type: ignore
 
             self._msg_count += 1
 
@@ -373,17 +424,67 @@ class Client(object):
         if dest_host_id < 0 or dest_host_id > MAX_HOSTS:
             raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
 
+        if timeout >= 0:
+            readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
+        else:
+            readfds, writefds, exceptfds = select.select(
+                [], [self._sock], []
+            )  # blocking
+
+        if writefds:
+            header = self._header_cls()
+            header.msg_type = msg_data.type_id
+            header.msg_count = self._msg_count
+            header.send_time = time.perf_counter()
+            header.recv_time = 0.0
+            header.src_host_id = self._host_id
+            header.src_mod_id = self._module_id
+            header.dest_host_id = dest_host_id
+            header.dest_mod_id = dest_mod_id
+            header.num_data_bytes = ctypes.sizeof(msg_data)
+            try:
+                header.version = msg_data.type_hash
+            except AttributeError as e:
+                if not hasattr(msg_data, "type_hash"):
+                    warn(
+                        "Message class is missing type_hash. V1 message defs are deprecated.",
+                        FutureWarning,
+                    )
+                else:
+                    raise e
+
+            self._sendall(header)  # type: ignore
+            if header.num_data_bytes > 0:
+                self._sendall(msg_data)  # type: ignore
+
+            self._msg_count += 1
+
+        else:
+            # Socket was not ready to receive data. Drop the packet.
+            print("x", end="")
+
+    @requires_connection
+    def forward_message(
+        self,
+        msg_hdr: MessageHeader,
+        msg_data: Optional[MessageData] = None,
+        timeout: float = -1,
+    ):
+        """Forward a message
+
+        A message is a packet that contains a defined data payload.
+        To send a message without associated data, see :py:func:`send_signal`.
+
+        Args:
+            msg_hdr: Object containing RTMA header to send
+            msg_data: Object containing the message to send
+            timeout (optional): Timeout in seconds to wait for socket to be available for sending.
+                Defaults to -1 (blocking).
+
+        """
         # Assume that msg_type, num_data_bytes, data - have been filled in
-        header = self._header_cls()
-        header.msg_type = msg_data.type_id
-        header.msg_count = self._msg_count
-        header.send_time = time.time()
-        header.recv_time = 0.0
-        header.src_host_id = self._host_id
-        header.src_mod_id = self._module_id
-        header.dest_host_id = dest_host_id
-        header.dest_mod_id = dest_mod_id
-        header.num_data_bytes = ctypes.sizeof(msg_data)
+        if msg_data is not None:
+            msg_hdr.num_data_bytes = ctypes.sizeof(msg_data)
 
         if timeout >= 0:
             readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
@@ -393,14 +494,14 @@ class Client(object):
             )  # blocking
 
         if writefds:
-            self._sendall(header)
-            if header.num_data_bytes > 0:
-                self._sendall(msg_data)
+            self._sendall(msg_hdr)  # type: ignore
+            if msg_data is not None:
+                self._sendall(msg_data)  # type: ignore
 
             self._msg_count += 1
 
         else:
-            # Socket was not ready to receive data. Drop the packet.
+            # Socket was not ready to write data. Drop the packet.
             print("x", end="")
 
     def _sendall(self, buffer: bytearray):
@@ -412,7 +513,7 @@ class Client(object):
 
     @requires_connection
     def read_message(
-        self, timeout: Union[int, float] = -1, ack=False
+        self, timeout: Union[int, float, None] = -1, ack=False, sync_check=False
     ) -> Optional[Message]:
         """Read a message
 
@@ -427,39 +528,56 @@ class Client(object):
         Returns:
             Message object. If no message is read before timeout, returns None.
         """
-        if timeout >= 0:
+        if timeout is None:
+            # Skip select call
+            pass
+        elif timeout >= 0:
+            # Wait timeout amount
             readfds, writefds, exceptfds = select.select([self._sock], [], [], timeout)
+            if len(readfds) == 0:
+                return None
         else:
-            readfds, writefds, exceptfds = select.select(
-                [self._sock], [], []
-            )  # blocking
+            # Blocking
+            readfds, writefds, exceptfds = select.select([self._sock], [], [])
+            if len(readfds) == 0:
+                return None
 
         # Read RTMA Header Section
-        if readfds:
-            header = self._header_cls()
-            try:
-                nbytes = self._sock.recv_into(header, header.size, socket.MSG_WAITALL)
-                """
-                Note:
-                MSG_WAITALL Flag:
-                The receive request will complete only when one of the following events occurs:
-                The buffer supplied by the caller is completely full.
-                The connection has been closed.
-                The request has been canceled or an error occurred.
-                """
+        header = self._header_cls()
+        try:
+            nbytes = self._sock.recv_into(header, header.size, socket.MSG_WAITALL)
+            """
+            Note:
+            MSG_WAITALL Flag:
+            The receive request will complete only when one of the following events occurs:
+            The buffer supplied by the caller is completely full.
+            The connection has been closed.
+            The request has been canceled or an error occurred.
+            """
 
-                if nbytes != header.size:
-                    self._connected = False
-                    raise ConnectionLost
-
-                header.recv_time = time.time()
-            except ConnectionError:
+            if nbytes != header.size:
+                self._connected = False
                 raise ConnectionLost
-        else:
-            return None
+
+            header.recv_time = time.perf_counter()
+        except ConnectionError:
+            raise ConnectionLost
 
         # Read Data Section
         data = header.get_data()
+
+        if data.size != header.num_data_bytes:
+            raise InvalidMessageDefinition(
+                f"Received message header indicating a message data size that does not match the expected size of message type {data.type_name}. Message definitions may be out of sync across systems."
+            )
+
+        # Note: Ignore the sync check if header.version is not filled in
+        # This can removed once all clients support this field.
+        if sync_check and header.version != 0 and header.version != data.type_hash:
+            raise InvalidMessageDefinition(
+                f"Received message header indicating a message version that does not match the expected version of message type {data.type_name}. Message definitions may be out of sync across systems."
+            )
+
         if header.num_data_bytes:
             try:
                 nbytes = self._sock.recv_into(data, data.size, socket.MSG_WAITALL)

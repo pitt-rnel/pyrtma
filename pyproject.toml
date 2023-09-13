@@ -21,6 +21,12 @@ classifiers = [
 ]
 dynamic = ["version"]
 
+dependencies = [
+  "ruamel.yaml",
+  "websocket-server",
+  "rich"
+]
+
 [tool.setuptools.dynamic]
 version = {attr = "pyrtma.__version__"}
 

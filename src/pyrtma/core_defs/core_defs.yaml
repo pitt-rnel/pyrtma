@@ -1,0 +1,130 @@
+# core_defs.yaml
+
+imports: null
+
+constants:
+  MAX_MODULES: 200
+  DYN_MOD_ID_START: 100
+  MAX_HOSTS: 5
+  MAX_MESSAGE_TYPES: 10000
+  MIN_STREAM_TYPE: 9000
+  MAX_TIMERS: 100
+  MAX_INTERNAL_TIMERS: 20
+  MAX_RTMA_MSG_TYPE: 99
+  MAX_RTMA_MODULE_ID: 9
+  MAX_LOGGER_FILENAME_LENGTH: 256
+  MAX_CONTIGUOUS_MESSAGE_DATA: 9000
+  ALL_MESSAGE_TYPES: 0x7FFFFFFF
+
+string_constants: null
+
+aliases:
+  MODULE_ID: short
+  HOST_ID: short
+  MSG_TYPE: int
+  MSG_COUNT: int
+
+host_ids:
+  LOCAL_HOST: 0
+  ALL_HOSTS: 0x7FFF
+
+module_ids:
+  MESSAGE_MANAGER: 0
+  QUICK_LOGGER: 5
+
+struct_defs:
+  RTMA_MSG_HEADER:
+    fields:
+      msg_type: MSG_TYPE
+      msg_count: MSG_COUNT
+      send_time: double
+      recv_time: double
+      src_host_id: HOST_ID
+      src_mod_id: MODULE_ID
+      dest_host_id: HOST_ID
+      dest_mod_id: MODULE_ID
+      num_data_bytes: int
+      remaining_bytes: int
+      is_dynamic: int
+      reserved: int
+
+message_defs:
+  EXIT:
+    id: 0
+    fields: null
+
+  KILL:
+    id: 1
+    fields: null
+
+  ACKNOWLEDGE:
+    id: 2
+    fields: null
+
+  CONNECT:
+    id: 13
+    fields:
+      logger_status: short
+      daemon_status: short
+
+  DISCONNECT:
+    id: 14
+    fields: null
+
+  SUBSCRIBE:
+    id: 15
+    fields:
+      msg_type: MSG_TYPE
+
+  UNSUBSCRIBE:
+    id: 16
+    fields:
+      msg_type: MSG_TYPE
+
+  PAUSE_SUBSCRIPTION:
+    id: 85
+    fields:
+      msg_type: MSG_TYPE
+
+  RESUME_SUBSCRIPTION:
+    id: 86
+    fields:
+      msg_type: MSG_TYPE
+
+  FAIL_SUBSCRIBE:
+    id: 6
+    fields:
+      mod_id: MODULE_ID
+      reserved: short
+      msg_type: MSG_TYPE
+
+  FAILED_MESSAGE:
+    id: 8
+    fields:
+      dest_mod_id: MODULE_ID
+      reserved: short[3]
+      time_of_failure: double
+      msg_header: RTMA_MSG_HEADER
+
+  FORCE_DISCONNECT:
+    id: 82
+    fields:
+      mod_id: int
+
+  MODULE_READY:
+    id: 26
+    fields:
+      pid: int
+
+  SAVE_MESSAGE_LOG:
+    id: 56
+    fields:
+      pathname: char[MAX_LOGGER_FILENAME_LENGTH]
+      pathname_length: int
+
+  TIMING_MESSAGE:
+    id: 80
+    fields:
+      timing: unsigned short[MAX_MESSAGE_TYPES]
+      ModulePID: int[MAX_MODULES]
+      send_time: double

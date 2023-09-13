@@ -1,312 +1,136 @@
-"""pyrtma.compile Message Type Compiler
-"""
-
-from io import TextIOWrapper
+"""pyrtma.compile Message Type Compiler """
+import pathlib
 import re
-from typing import List, Dict, Optional
+import sys
+from typing import List
 
-from ._core import ctypes_map
+from .parser import Parser, ParserError, FileFormatError
+from rich.traceback import install
+import warnings
 
-
-def camelcase(name):
-    name = re.sub(r"_", " ", name)
-    pieces = [s.title() for s in name.split(sep=" ")]
-    return "".join(pieces)
-
-
-def preprocess(text: str) -> str:
-    # Strip Inline Comments
-    text = re.sub(r"//(.*)\n", r"\n", text)
-
-    # Strip Block Comments
-    text = re.sub(r"/\*(.*?)\*/", r"\n", text, flags=re.DOTALL)
-
-    # Strip Tabs
-    text = re.sub(r"\t+", " ", text)
-
-    return text
+install(word_wrap=True, show_locals=True)
 
 
-def parse_defines(text: str) -> Dict:
-    defines = {}
-    defines["MT"] = {}
-    defines["MID"] = {}
-    defines["constants"] = {}
-
-    # Get Defines (Only simple one line constants here)
-    macros = re.findall(
-        r"#define\s*(?P<name>\w+)\s+(?P<expression>[\(\)\[\]\w \*/\+-\.]+)\n", text
-    )
-
-    for name, exp in macros:
-        name = name.strip()
-        exp = exp.strip()
-
-        # Store a mapping for each define type
-        if name.startswith("MT_"):
-            defines["MT"][name] = exp
-        elif name.startswith("MID_"):
-            defines["MID"][name] = exp
-        else:
-            if "/" in exp and "." not in exp:
-                # Ensure division results in an integer if no decimal
-                exp = "int(" + exp + ")"
-            defines["constants"][name] = exp
-
-    return defines
-
-
-def parse_typedefs(text: str) -> Dict:
-    # Get simple typedefs
-    typedefs = {}
-    c_typedefs = re.finditer(
-        r"\s*typedef\s+(?P<qual1>\w+\s+)?\s*(?P<qual2>\w+\s+)?\s*(?P<typ>\w+)\s+(?P<name>\w+)\s*;\s*$",
-        text,
-        flags=re.MULTILINE,
-    )
-
-    for m in c_typedefs:
-        alias = m.group("name").strip()
-        if alias.startswith("MDF_"):
-            # TODO:Non struct message defintion. Maybe drop support?
-            pass
-        else:
-            # Field type
-            qual1 = m.group("qual1")
-            qual2 = m.group("qual2")
-            typ = m.group("typ")
-
-            ftype = ""
-            if qual1:
-                ftype += qual1.strip()
-                ftype += " "
-
-            if qual2:
-                ftype += qual2.strip()
-                ftype += " "
-
-            ftype += typ.strip()
-
-            # Must be a native type
-            ctype = ctypes_map[ftype]
-
-            # Create another alias for the native type
-            typedefs[alias.strip()] = f"{ctype.__module__}.{ctype.__name__}"
-
-    return typedefs
-
-
-def parse_structs(msg_types, text: str) -> Dict:
-    structs = {}
-
-    # Strip Newlines
-    text = re.sub(r"\n", "", text)
-    # Get Struct Definitions
-    c_msg_defs = re.finditer(
-        r"\s*typedef\s+struct\s*\{(?P<def>.*?)\}(?P<name>\s*\w*)\s*;", text
-    )
-
-    for m in c_msg_defs:
-        name = m.group("name").strip()
-        fields = m.group("def").split(sep=";")
-        fields = [f.strip() for f in fields if f.strip() != ""]
-        c_fields = []
-
-        for field in fields:
-            fmatch = re.match(
-                r"(?P<qual1>\w+\s+)?\s*(?P<qual2>\w+\s+)?\s*(?P<typ>\w+)\s+(?P<name>\w+)\s*(\[(?P<length>.*)\])?$",
-                field,
-            )
-
-            if fmatch is None:
-                print(field)
-                raise RuntimeError("Error parsing field definition.")
-
-            # Field name
-            fname = fmatch.group("name").strip()
-            qual1 = fmatch.group("qual1")
-            qual2 = fmatch.group("qual2")
-            typ = fmatch.group("typ")
-
-            ftype = ""
-            if qual1:
-                ftype += qual1.strip()
-                ftype += " "
-
-            if qual2:
-                ftype += qual2.strip()
-                ftype += " "
-
-            ftype += typ.strip()
-
-            t = ctypes_map.get(ftype)
-            if t:
-                ftype = f"{t.__module__}.{t.__name__}"
-
-            flen = fmatch.group("length") or None
-            c_fields.append((fname, ftype, flen))
-
-        structs[name] = c_fields
-
-    # Add a placeholder for signal definitions
-    for msg_type in msg_types.keys():
-        if msg_type.startswith("MT_"):
-            structs.setdefault("MDF_" + msg_type[3:], None)
-
-    return structs
-
-
-def generate_constant(name, value):
-    return f"{name} = {value}"
-
-
-def generate_struct(name: str, fields):
-    assert not name.startswith("MDF_")
-    f = []
-    fnum = len(fields)
-    for i, (fname, ftyp, flen) in enumerate(fields, start=1):
-        if flen and re.search(r"/|\+|\*|-", flen):
-            flen = "int(" + flen + ")"
-        nl = ",\n" if i < fnum else ""
-        f.append(f"        (\"{fname}\", {ftyp}{' * ' + flen if flen else ''}){nl}")
-
-    fstr = "".join(f)
-
-    template = f"""
-class {name}(ctypes.Structure):
-    _fields_ = [
-{fstr}
-    ]
-
-"""
-    return template
-
-
-def generate_msg_def(name: str, fields):
-    assert name.startswith("MDF_")
-
-    basename = name[4:]
-    f = []
-    fnum = len(fields)
-    for i, (fname, ftyp, flen) in enumerate(fields, start=1):
-        if flen and re.search(r"/|\+|\*|-", flen):
-            flen = "int(" + flen + ")"
-        nl = ",\n" if i < fnum else ""
-        f.append(f"        (\"{fname}\", {ftyp}{' * ' + flen if flen else ''}){nl}")
-
-    fstr = "".join(f)
-
-    msg_id = "MT_" + basename
-    template = f"""
-@pyrtma.msg_def
-class {name}(pyrtma.MessageData):
-    _fields_ = [
-{fstr}
-    ]
-    type_id = {msg_id}
-    type_name = \"{basename}\"
-
-"""
-    return template
-
-
-def generate_sig_def(name: str):
-    assert name.startswith("MDF_")
-    basename = name[4:]
-    msg_id = "MT_" + basename
-    template = f"""
-# Signal Definition
-@pyrtma.msg_def
-class {name}(pyrtma.MessageData):
-    _fields_ = []
-    type_id = {msg_id}
-    type_name = \"{basename}\"
-
-"""
-    return template
-
-
-def print_content(
-    content: str = "", end: str = "\n", out_file: Optional[TextIOWrapper] = None
+def compile(
+    defs_file: List[str],  # str, # change back to str after removing v1 compiler
+    out_dir: str,
+    out_name: str,
+    python: bool = False,
+    javascript: bool = False,
+    matlab: bool = False,
+    c_lang: bool = False,
+    info: bool = False,
+    combined: bool = False,
+    debug: bool = False,
 ):
-    """Print content to the console and optionally write to file"""
-    print(content, end=end)
-    if out_file and not out_file.closed:
-        out_file.write(f"{content}{end}")
-
-
-def parse_file(filename, seq: int = 1, out_filename: Optional[str] = None):
-    """Parse a C header file for message definitions.
-    Notes:
-        * Does not follow other #includes
-        * Parsing order: #defines, typedefs, typedef struct
-    """
-
-    with open(filename, "r") as f:
-        text = f.read()
-
-    out_file = None
-    if out_filename:
-        mode = "w" if seq == 1 else "a"
-        out_file = open(out_filename, mode=mode)
-
-    try:
-        text = preprocess(text)
-        defines = parse_defines(text)
-        typedefs = parse_typedefs(text)
-        structs = parse_structs(defines["MT"], text)
-
-        if seq == 1:
-            print_content("import ctypes", out_file=out_file)
-            print_content("import pyrtma", out_file=out_file)
-            print_content("from pyrtma.constants import *", out_file=out_file)
-            print_content(out_file=out_file)
-
-        print_content(f"# User Constants: {filename}", out_file=out_file)
-        for name, value in defines["constants"].items():
-            print_content(generate_constant(name, value), out_file=out_file)
-
-        print_content(out_file=out_file)
-        print_content(f"# User Message IDs: {filename}", out_file=out_file)
-        for name, value in defines["MT"].items():
-            print_content(generate_constant(name, value), out_file=out_file)
-
-        print_content(out_file=out_file)
-        print_content(f"# User Module IDs: {filename}", out_file=out_file)
-        for name, value in defines["MID"].items():
-            print_content(generate_constant(name, value), out_file=out_file)
-
-        print_content(out_file=out_file)
-        print_content(f"# User Type Definitions: {filename}", out_file=out_file)
-        for name, value in typedefs.items():
-            print_content(generate_constant(name, value), out_file=out_file)
-
-        ctypes_map.update(typedefs)
-
-        print_content()
-        print_content(
-            f"# User Message Definitions: {filename}", end="\n\n", out_file=out_file
+    # determine if using v1 or v2 compiler
+    file1_ext = pathlib.Path(defs_file[0]).suffix
+    if file1_ext.lower() == ".h":
+        compiler_version = 1
+        warnings.warn(
+            "V1 message def .h compiler is deprecated and has been replaced by the V2 yaml compiler.",
+            FutureWarning,
         )
+    elif file1_ext.lower() in [".yaml", ".yml"]:
+        compiler_version = 2
+        if len(defs_file) > 1:
+            raise FileFormatError("defs_file must be a single .yaml file")
+        defs_file = defs_file[0]
+    else:
+        raise FileFormatError("Unexpected file type. defs_file must be a .yaml file.")
 
-        for name, fields in structs.items():
-            if name.startswith("MDF_"):
-                if fields is not None:
-                    print_content(
-                        generate_msg_def(name, fields), end="", out_file=out_file
-                    )
-                else:
-                    print_content(generate_sig_def(name), end="", out_file=out_file)
-            else:
-                print_content(generate_struct(name, fields), end="", out_file=out_file)
+    if compiler_version == 1:
+        from pyrtma.compilers.python_v1 import python_v1_compile
 
-    finally:
-        if out_file and not out_file.closed:
-            out_file.close()
+        print("Building V1 python message definitions...")
+        python_v1_compile(include_files=defs_file, out_filename=out_dir)
+        print("DONE.")
+        return
+    # else continue with compiler V2
 
+    parser = Parser(debug=debug)
+    parser.parse(pathlib.Path(defs_file))
 
-def compile(include_files: List, out_filename: Optional[str]):
-    for n, f in enumerate(include_files, start=1):
-        parse_file(f, seq=n, out_filename=out_filename)
+    if debug:
+        with open("parser.json", "w") as f:
+            f.write(parser.to_json())
+
+    # Use the same directory and filename as the message defs file by default
+    if out_dir == "":
+        outpath = pathlib.Path(defs_file).parent.resolve().absolute()
+    else:
+        outpath = pathlib.Path(out_dir)
+
+    if not outpath.is_dir():
+        raise FileExistsError(f"The output location must be a directory.")
+
+    # Make the final output directory, but no anything above it.
+    outpath.mkdir(parents=False, exist_ok=True)
+
+    if out_name == "":
+        filename = pathlib.Path(defs_file).stem
+    else:
+        filename = out_name
+
+    # Check for any invalid names
+    if re.search(r"[^a-zA-Z0-9_-]", filename):
+        raise RuntimeError(f"Invalid out filename: {filename}")
+
+    if python:
+        print("Building python message definitions...")
+        from pyrtma.compilers.python import PyDefCompiler
+
+        compiler = PyDefCompiler(parser, debug=debug)
+        ext = ".py"
+        output = outpath / (filename + ext)
+        compiler.generate(output)
+
+    if javascript:
+        print("Building javascript message definitions...")
+        from pyrtma.compilers.javascript import JSDefCompiler
+
+        compiler = JSDefCompiler(parser, debug=debug)
+        ext = ".js"
+        output = outpath / (filename + ext)
+        compiler.generate(output)
+
+    if matlab:
+        print("Building matlab message definitions...")
+        from pyrtma.compilers.matlab import MatlabDefCompiler
+
+        compiler = MatlabDefCompiler(parser, debug=debug)
+        ext = ".m"
+        output = outpath / (filename + ext)
+        compiler.generate(output)
+
+    if c_lang:
+        print("Building C/C++ message definitions...")
+        from pyrtma.compilers.c99 import CDefCompiler
+
+        compiler = CDefCompiler(parser, filename=filename, debug=debug)
+        ext = ".h"
+        output = outpath / (filename + ext)
+        compiler.generate(output)
+
+    if combined:
+        print("Building combined yaml file...")
+        from pyrtma.compilers.yaml import YAMLCompiler
+
+        compiler = YAMLCompiler(parser, filename=filename, debug=debug)
+        ext = ".yaml"
+        output = outpath / (filename + "_combined" + ext)
+        compiler.generate(output)
+
+    if info:
+        print("Building info file...")
+        from pyrtma.compilers.info import InfoCompiler
+
+        compiler = InfoCompiler(parser, filename=filename, debug=debug)
+        ext = ".txt"
+        output = outpath / (filename + ext)
+        compiler.generate(output)
+
+    print("DONE.")
 
 
 if __name__ == "__main__":
@@ -317,16 +141,96 @@ if __name__ == "__main__":
     parser.add_argument(
         "-i",
         "-I",
-        "--include",
-        nargs="*",
-        dest="include_files",
-        help="Files to parse",
+        "--defs",
+        nargs="*",  # for backwards compatibility with v1 compiler. Remove in future version along with v1 compiler.
+        dest="defs_file",
+        help="YAML message defintion file to parse. C header file(s) will use v1 python compiler (deprecated)",
     )
+
+    parser.add_argument(
+        "--c",
+        "--c_lang",
+        dest="c_lang",
+        action="store_true",
+        help="Output C .h file",
+    )
+
+    parser.add_argument(
+        "--python",
+        "--py",
+        dest="python",
+        action="store_true",
+        help="Output python .py file",
+    )
+
+    parser.add_argument(
+        "--javascript",
+        "--js",
+        dest="javascript",
+        action="store_true",
+        help="Output javascrip .js file",
+    )
+
+    parser.add_argument(
+        "--matlab",
+        "--mat",
+        "--ml",
+        dest="matlab",
+        action="store_true",
+        help="Output matlab .m file",
+    )
+
+    parser.add_argument(
+        "--info",
+        dest="info",
+        action="store_true",
+        help="Output info .txt file",
+    )
+
+    parser.add_argument(
+        "--combined",
+        dest="combined",
+        action="store_true",
+        help="Output combined yaml file",
+    )
+
     parser.add_argument(
         "-o",
         "--out",
-        dest="output_file",
-        help="Output python file",
+        default="",
+        dest="out_dir",
+        help="Output directory for compiled files. For v1 compiler (deprecated), full output filename.",
     )
+
+    parser.add_argument(
+        "-n",
+        "--name",
+        default="",
+        dest="out_name",
+        help="Output file(s) base name.",
+    )
+
+    parser.add_argument(
+        "--debug",
+        dest="debug",
+        action="store_true",
+        help="Debug compiler",
+    )
+
     args = parser.parse_args()
-    compile(args.include_files, args.output_file)
+    try:
+        compile(**vars(args))
+    except (ParserError, FileNotFoundError) as e:
+        print()
+        msg = " ".join(str(arg) for arg in e.args)
+        print(f"{e.__class__.__name__}: {msg}")
+        print()
+        if e.__cause__:
+            print("Details:")
+            msg = " ".join(str(arg) for arg in e.__cause__.args)
+            print(f"\t{e.__cause__.__class__.__name__}: {msg}")
+        sys.exit(1)
+    except Exception:
+        raise
+
+    sys.exit(0)
