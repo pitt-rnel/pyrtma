@@ -72,7 +72,7 @@ class MessageManager:
 
     def __init__(
         self,
-        ip_address: Union[str, int] = socket.INADDR_ANY,
+        ip_address: str = "",  # "" equivalent to socket.INADDR_ANY
         port: int = 7111,
         timecode=False,
         debug=False,
@@ -520,6 +520,7 @@ class MessageManager:
                     random.shuffle(rlist)
 
                     # Check whichs clients are ready to receive data
+                    wlist = []
                     if rlist:
                         _, wlist, _ = select.select(
                             [], self.modules.keys(), [], self.write_timeout
@@ -573,7 +574,7 @@ if __name__ == "__main__":
     if args.addr:  # a non-empty host address was passed in.
         ip_addr = args.addr
     else:
-        ip_addr = socket.INADDR_ANY
+        ip_addr = ""  # socket.INADDR_ANY
 
     msg_mgr = MessageManager(
         ip_address=ip_addr,
