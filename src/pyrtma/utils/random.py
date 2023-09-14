@@ -1,22 +1,22 @@
 import ctypes
 import random
 import string
-from typing import List, SupportsIndex
+from typing import List
 
 
-def _random_str(length: SupportsIndex) -> str:
+def _random_str(length: int) -> str:
     return "".join(random.choice(string.printable) for _ in range(length))
 
 
-def _random_int_array(length: SupportsIndex, min: int = 0, max: int = 9) -> List[int]:
+def _random_int_array(length: int, min: int = 0, max: int = 9) -> List[int]:
     return [random.randint(min, max) for _ in range(length)]
 
 
-def _random_float_array(length: SupportsIndex) -> List[float]:
+def _random_float_array(length: int) -> List[float]:
     return [random.random() for _ in range(length)]
 
 
-def _random_byte_array(length: SupportsIndex) -> bytes:
+def _random_byte_array(length: int) -> bytes:
     return bytes([random.randint(0, 255) for _ in range(length)])
 
 
