@@ -1,32 +1,32 @@
 import ctypes
 import random
 import string
-from typing import List
+from typing import List, SupportsIndex
 
 
-def _random_str(length) -> str:
+def _random_str(length: SupportsIndex) -> str:
     return "".join(random.choice(string.printable) for _ in range(length))
 
 
-def _random_int_array(length: int, min: int = 0, max: int = 9) -> List[int]:
+def _random_int_array(length: SupportsIndex, min: int = 0, max: int = 9) -> List[int]:
     return [random.randint(min, max) for _ in range(length)]
 
 
-def _random_float_array(length) -> List[float]:
+def _random_float_array(length: SupportsIndex) -> List[float]:
     return [random.random() for _ in range(length)]
 
 
-def _random_byte_array(length) -> bytes:
+def _random_byte_array(length: SupportsIndex) -> bytes:
     return bytes([random.randint(0, 255) for _ in range(length)])
 
 
-def _random_struct(obj):
+def _random_struct(obj: ctypes.Structure):
     for name, ftype in obj._fields_:
         if issubclass(ftype, ctypes.Structure):
             setattr(obj, name, _random_struct(getattr(obj, name)))
         elif issubclass(ftype, ctypes.Array):
-            length = ftype._length_
-            etype = ftype._type_
+            length: int = ftype._length_  # type: ignore
+            etype: type = ftype._type_  # type: ignore
             if issubclass(etype, ctypes.Structure):
                 for i in range(length):
                     getattr(obj, name)[i] = _random_struct(getattr(obj, name)[i])
