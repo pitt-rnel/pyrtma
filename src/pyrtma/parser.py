@@ -704,6 +704,8 @@ class Parser:
                 "type_hash",
                 "type_source",
                 "type_def",
+                "type_size",
+                "hexdump",
             )
 
             for fname, fstr in fields.items():

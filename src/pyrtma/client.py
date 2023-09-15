@@ -566,7 +566,7 @@ class Client(object):
         # Read Data Section
         data = header.get_data()
 
-        if data.size != header.num_data_bytes:
+        if data.type_size != header.num_data_bytes:
             raise InvalidMessageDefinition(
                 f"Received message header indicating a message data size that does not match the expected size of message type {data.type_name}. Message definitions may be out of sync across systems."
             )
@@ -580,9 +580,9 @@ class Client(object):
 
         if header.num_data_bytes:
             try:
-                nbytes = self._sock.recv_into(data, data.size, socket.MSG_WAITALL)
+                nbytes = self._sock.recv_into(data, data.type_size, socket.MSG_WAITALL)
 
-                if nbytes != data.size:
+                if nbytes != data.type_size:
                     self._connected = False
                     raise ConnectionLost
             except ConnectionError:
