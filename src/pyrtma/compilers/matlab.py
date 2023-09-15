@@ -148,7 +148,6 @@ class MatlabDefCompiler:
             f.append(f"% {name} (Signal)")
         else:
             f.append(f"% {name}")
-
         f.append(f"{self.struct_name}.{top_field}.{name} = struct();")
 
         for field in struct.fields:
@@ -290,6 +289,15 @@ class MatlabDefCompiler:
             for obj in self.parser.message_defs.values():
                 f.write(self.generate_struct(obj, top_field="MDF"))
                 f.write("\n\n")
+
+            # include STRING_DATA core defs for backwards compatibility with quicklogger and message manager output
+            f.write("% Manual Definitions - obsolete core defs\n")
+            f.write(f"RTMA.MT.MM_ERROR = 83;\n")
+            f.write(f"RTMA.MDF.MM_ERROR = 'VARIABLE_LENGTH_ARRAY(int8)';\n")
+            f.write(f"RTMA.MT.MM_INFO = 84;\n")
+            f.write(f"RTMA.MDF.MM_INFO = 'VARIABLE_LENGTH_ARRAY(int8)';\n")
+            f.write(f"RTMA.MT.DEBUG_TEXT = 91;\n")
+            f.write(f"RTMA.MDF.DEBUG_TEXT = 'VARIABLE_LENGTH_ARRAY(int8)';\n")
 
             # RTMA.hash
             f.write("% Message Definition Hashes\n")
