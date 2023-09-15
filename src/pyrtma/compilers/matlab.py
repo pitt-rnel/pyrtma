@@ -148,6 +148,7 @@ class MatlabDefCompiler:
             f.append(f"% {name} (Signal)")
         else:
             f.append(f"% {name}")
+        
         f.append(f"{self.struct_name}.{top_field}.{name} = struct();")
 
         for field in struct.fields:
