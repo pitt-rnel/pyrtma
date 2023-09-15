@@ -61,6 +61,21 @@ message_defs:
     id: 2
     fields: null
 
+  FAIL_SUBSCRIBE:
+    id: 6
+    fields:
+      mod_id: MODULE_ID
+      reserved: short
+      msg_type: MSG_TYPE
+
+  FAILED_MESSAGE:
+    id: 8
+    fields:
+      dest_mod_id: MODULE_ID
+      reserved: short[3]
+      time_of_failure: double
+      msg_header: RTMA_MSG_HEADER
+
   CONNECT:
     id: 13
     fields:
@@ -81,6 +96,53 @@ message_defs:
     fields:
       msg_type: MSG_TYPE
 
+  MODULE_READY:
+    id: 26
+    fields:
+      pid: int
+
+  LM_EXIT:
+    id: 55
+    fields: null
+
+  SAVE_MESSAGE_LOG:
+    id: 56
+    fields:
+      pathname: char[MAX_LOGGER_FILENAME_LENGTH]
+      pathname_length: int
+
+  MESSAGE_LOG_SAVED:
+    id: 57
+    fields: null
+
+  PAUSE_MESSAGE_LOGGING:
+    id: 58
+    fields: null
+
+  RESUME_MESSAGE_LOGGING:
+    id: 59
+    fields: null
+
+  RESET_MESSAGE_LOG:
+    id: 60
+    fields: null
+
+  DUMP_MESSAGE_LOG:
+    id: 61
+    fields: null
+
+  TIMING_MESSAGE:
+    id: 80
+    fields:
+      timing: unsigned short[MAX_MESSAGE_TYPES]
+      ModulePID: int[MAX_MODULES]
+      send_time: double
+
+  FORCE_DISCONNECT:
+    id: 82
+    fields:
+      mod_id: int
+
   PAUSE_SUBSCRIPTION:
     id: 85
     fields:
@@ -91,40 +153,6 @@ message_defs:
     fields:
       msg_type: MSG_TYPE
 
-  FAIL_SUBSCRIBE:
-    id: 6
-    fields:
-      mod_id: MODULE_ID
-      reserved: short
-      msg_type: MSG_TYPE
-
-  FAILED_MESSAGE:
-    id: 8
-    fields:
-      dest_mod_id: MODULE_ID
-      reserved: short[3]
-      time_of_failure: double
-      msg_header: RTMA_MSG_HEADER
-
-  FORCE_DISCONNECT:
-    id: 82
-    fields:
-      mod_id: int
-
-  MODULE_READY:
-    id: 26
-    fields:
-      pid: int
-
-  SAVE_MESSAGE_LOG:
-    id: 56
-    fields:
-      pathname: char[MAX_LOGGER_FILENAME_LENGTH]
-      pathname_length: int
-
-  TIMING_MESSAGE:
-    id: 80
-    fields:
-      timing: unsigned short[MAX_MESSAGE_TYPES]
-      ModulePID: int[MAX_MODULES]
-      send_time: double
+  LM_READY:
+    id: 96
+    fields: null
