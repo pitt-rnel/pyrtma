@@ -154,7 +154,7 @@ class MatlabDefCompiler:
         for field in struct.fields:
             if field.type_name in type_map.keys():
                 s = type_map[field.type_name]
-                ftype = f"{self.struct_name}.typedefs.{s}(0)"
+                ftype = f"{s}(0)"
             elif field.type_name in self.parser.message_defs.keys():
                 ftype = f"{self.struct_name}.MDF.{field.type_name}"
             elif field.type_name in self.parser.struct_defs.keys():
