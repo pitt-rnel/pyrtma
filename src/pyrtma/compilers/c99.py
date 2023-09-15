@@ -73,7 +73,7 @@ class CDefCompiler:
         return f"#define MID_{mid.name:<48}{mid.value}\n"
 
     def generate_hash_id(self, mdf: Union[MDF, SDF]) -> str:
-        return f'#define HASH_{mdf.name:<48}"{mdf.hash[:8]}"\n'
+        return f"#define HASH_{mdf.name:<48} 0x{mdf.hash[:8]}\n"
 
     def generate_type_alias(self, td: TypeAlias) -> str:
         if td.type_name in type_map.keys():
