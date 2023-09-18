@@ -212,14 +212,8 @@ class MessageData(ctypes.Structure):
         return obj
 
     @property
-    def size(self) -> int:
+    def type_size(self) -> int:
         return ctypes.sizeof(self)
-
-    @property
-    def buffer(self):
-        return memoryview(
-            self
-        )  # should this return after .cast("B")? (or "b" or "c")? Uncasted memoryview is 0-dim and does not seem to be useful by itself
 
     def pretty_print(self, add_tabs=0):
         str = "\t" * add_tabs + f"{type(self).__name__}:"
@@ -246,7 +240,7 @@ class MessageData(ctypes.Structure):
             offset = meta.offset
             sz = meta.size
 
-        return bytes(self.buffer.cast("c")[offset : offset + sz])
+        return bytes(memoryview(self).cast("c")[offset : offset + sz])
 
     def __str__(self):
         return self.pretty_print()

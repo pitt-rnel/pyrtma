@@ -81,7 +81,7 @@ class TestSync(unittest.TestCase):
 
         # Create a size mismatch between sender and receiver
         data = MDF_TRIAL_METADATA()
-        header.num_data_bytes = data.size
+        header.num_data_bytes = data.type_size
 
         publisher.forward_message(header, data)
 

@@ -301,6 +301,7 @@ class Parser:
     def __init__(self, debug: bool = False):
         self.included_files = []
         self.current_file = pathlib.Path()
+        self.root_path = pathlib.Path()
         self.debug = debug
 
         self.yaml_dict = dict(
@@ -421,7 +422,7 @@ class Parser:
         return expanded, value
 
     def handle_import(self, fname: str):
-        imp = Import(pathlib.Path(fname), src=self.current_file)
+        imp = Import(pathlib.Path(fname), src=self.trim_root(self.current_file))
         self.imports.append(imp)
         if imp.file.is_dir():
             raise FileFormatError(
@@ -461,7 +462,7 @@ class Parser:
                 expression=str(expression),
                 expanded=str(expression),
                 value=expression,
-                src=self.current_file,
+                src=self.trim_root(self.current_file),
             )
         elif isinstance(expression, str):
             expanded, value = self.expand_expression(name, expression)
@@ -470,7 +471,7 @@ class Parser:
                 expression=expression,
                 expanded=expanded,
                 value=value,
-                src=self.current_file,
+                src=self.trim_root(self.current_file),
             )
 
     def handle_string(self, name: str, value: str):
@@ -493,7 +494,7 @@ class Parser:
             )
 
         self.string_constants[name] = ConstantString(
-            name, value=f'"{value}"', src=self.current_file
+            name, value=f'"{value}"', src=self.trim_root(self.current_file)
         )
 
     def handle_alias(self, alias: str, ftype: str):
@@ -530,7 +531,7 @@ class Parser:
                 if ftype == sdf.name:
                     ftype = sdf.name
                     self.aliases[alias] = TypeAlias(
-                        alias, ftype, sdf, src=self.current_file
+                        alias, ftype, sdf, src=self.trim_root(self.current_file)
                     )
                     return
 
@@ -567,7 +568,9 @@ class Parser:
                 raise HostIDError(
                     f"Duplicate host id conflict found for {name} and {hid.name} -> {value}\n1: {hid.src.absolute()}\n2: {self.current_file}\n"
                 )
-        self.host_ids[name] = HID(name, int(value), src=self.current_file)
+        self.host_ids[name] = HID(
+            name, int(value), src=self.trim_root(self.current_file)
+        )
 
     def handle_module_id(self, name: str, value: int):
         self.check_name(name)
@@ -590,7 +593,9 @@ class Parser:
                     f"Duplicate module id conflict found for {name} and {mid.name} -> {value}\n1: {mid.src.absolute()}\n2: {self.current_file}\n"
                 )
 
-        self.module_ids[name] = MID(name, int(value), src=self.current_file)
+        self.module_ids[name] = MID(
+            name, int(value), src=self.trim_root(self.current_file)
+        )
 
     def check_alignment(self, s: Union[SDF, MDF], auto_pad: bool = True):
         """Confirm 64 bit alignment of structures"""
@@ -699,6 +704,8 @@ class Parser:
                 "type_hash",
                 "type_source",
                 "type_def",
+                "type_size",
+                "hexdump",
             )
 
             for fname, fstr in fields.items():
@@ -784,10 +791,12 @@ class Parser:
         # Check and validate message id
         msg_id = mdf["id"]
         self.validate_msg_id(name, msg_id)
-        self.message_ids[name] = MT(name, msg_id, src=self.current_file)
+        self.message_ids[name] = MT(name, msg_id, src=self.trim_root(self.current_file))
 
         # Create the MDF data class
-        obj = MDF(raw, hash, name, type_id=mdf["id"], src=self.current_file)
+        obj = MDF(
+            raw, hash, name, type_id=mdf["id"], src=self.trim_root(self.current_file)
+        )
 
         # Store the new definition
         self.message_defs[name] = obj
@@ -834,7 +843,7 @@ class Parser:
         hash = sha256(raw.encode()).hexdigest()
 
         # Create the SDF data class
-        obj = SDF(raw, hash, name, src=self.current_file)
+        obj = SDF(raw, hash, name, src=self.trim_root(self.current_file))
 
         # Parse and the fields of the definition
         self.add_fields(obj, sdf["fields"])
@@ -902,12 +911,14 @@ class Parser:
         hash = sha256(raw.encode()).hexdigest()
 
         # Create the MDF data class
-        obj = MDF(raw, hash, name, type_id=mdf["id"], src=self.current_file)
+        obj = MDF(
+            raw, hash, name, type_id=mdf["id"], src=self.trim_root(self.current_file)
+        )
 
         # Check and validate message id
         msg_id = mdf["id"]
         self.validate_msg_id(name, msg_id)
-        self.message_ids[name] = MT(name, msg_id, src=self.current_file)
+        self.message_ids[name] = MT(name, msg_id, src=self.trim_root(self.current_file))
 
         # Parse and the fields of the definition
         self.add_fields(obj, mdf["fields"])
@@ -1045,9 +1056,11 @@ class Parser:
             # Always start by parsing the core_defs.yaml file
             pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
             core_defs = pkg_dir / "core_defs/core_defs.yaml"
+            self.root_path = pkg_dir
             self.parse_file(core_defs.absolute())
 
             defs_path = pathlib.Path(msgdefs_file)
+            self.root_path = defs_path.parent.resolve()
             self.parse_file(defs_path)
         except Exception as e:
             self.clear()
@@ -1091,6 +1104,9 @@ class Parser:
         self.current_file = prev_file
 
         os.chdir(str(cwd.absolute()))
+
+    def trim_root(self, p: pathlib.Path) -> pathlib.Path:
+        return pathlib.Path("." + str(p).replace(str(self.root_path), ""))
 
     def to_json(self):
         d = dict(
