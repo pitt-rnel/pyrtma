@@ -1106,7 +1106,7 @@ class Parser:
         os.chdir(str(cwd.absolute()))
 
     def trim_root(self, p: pathlib.Path) -> pathlib.Path:
-        return pathlib.Path("." + str(p).replace(str(self.root_path), ""))
+        return pathlib.Path(os.path.relpath(p, self.root_path))
 
     def to_json(self):
         d = dict(
