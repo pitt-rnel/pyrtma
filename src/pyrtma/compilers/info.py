@@ -22,7 +22,7 @@ class InfoCompiler:
 
     def generate(self, out_filepath: pathlib.Path):
         with open(out_filepath, mode="w") as f:
-            f.write(f"# {out_filepath}\n")
+            f.write(f"# {out_filepath.as_posix()}\n")
             f.write("# DO NOT EDIT BY HAND. FILE IS AUTO-GENERATED.\n\n")
             f.write(
                 "# File contains a list of message and module ids currently in use.\n\n"
