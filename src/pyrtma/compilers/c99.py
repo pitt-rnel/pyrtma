@@ -351,8 +351,9 @@ class CDefCompiler:
             f.write(self.generate_type_info())
             f.write("\n")
 
-            f.write(self.generate_rtma_info_getter())
-            f.write("\n")
+            # TODO below commented out by JW because it causes link errors when header file is included multiple times (in multiple object files)
+            # f.write(self.generate_rtma_info_getter())
+            # f.write("\n")
 
             # Close header guard
             f.write(self.generate_close_guard())
