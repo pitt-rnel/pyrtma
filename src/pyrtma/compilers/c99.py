@@ -77,7 +77,7 @@ class CDefCompiler:
 
     def generate_type_alias(self, td: TypeAlias) -> str:
         if td.type_name in type_map.keys():
-            return f"typedef {td.type_name} {td.name};\n"
+            return f"typedef {type_map[td.type_name]} {td.name};\n"
 
         if td.type_name in self.parser.aliases.keys():
             return f"typedef {td.type_name} {td.name};\n"
@@ -103,7 +103,7 @@ class CDefCompiler:
         tabs = f"{tab}" * 1
         for field in struct.fields:
             if field.type_name in type_map.keys():
-                ftype = f"{field.type_name}"
+                ftype = f"{type_map[field.type_name]}"
             elif field.type_name in self.parser.message_defs.keys():
                 ftype = f"MDF_{field.type_name}"
             elif field.type_name in self.parser.struct_defs.keys():
@@ -145,6 +145,8 @@ class CDefCompiler:
 
         s += "typedef struct {\n"
         for obj in self.parser.constants.values():
+            if obj.src.name == "core_defs.yaml":
+                continue
             if type(obj.value) is float:
                 ftype = "double"
             else:
@@ -157,6 +159,8 @@ class CDefCompiler:
             s += "\n"
 
         for obj in self.parser.string_constants.values():
+            if obj.src.name == "core_defs.yaml":
+                continue
             s += f'#pragma push_macro("{obj.name}")\n'
             s += f"#undef {obj.name}\n"
             s += f"    const char* {obj.name};\n"
@@ -168,6 +172,8 @@ class CDefCompiler:
 
         s += "typedef struct {\n"
         for obj in self.parser.host_ids.values():
+            if obj.src.name == "core_defs.yaml":
+                continue
             s += f"    HOST_ID {obj.name};\n"
         s += "} HostIdInfo;\n"
 
@@ -175,6 +181,8 @@ class CDefCompiler:
 
         s += "typedef struct {\n"
         for obj in self.parser.module_ids.values():
+            if obj.src.name == "core_defs.yaml":
+                continue
             s += f"    MODULE_ID {obj.name};\n"
         s += "} ModuleIdInfo;\n"
 
@@ -182,6 +190,8 @@ class CDefCompiler:
 
         s += "typedef struct {\n"
         for obj in self.parser.message_ids.values():
+            if obj.src.name == "core_defs.yaml":
+                continue
             s += f"    MSG_TYPE {obj.name};\n"
         s += "} MsgIdInfo;\n"
 
@@ -189,6 +199,8 @@ class CDefCompiler:
 
         s += "typedef struct {\n"
         for obj in self.parser.message_defs.values():
+            if obj.src.name == "core_defs.yaml":
+                continue
             s += f"    int {obj.name};\n"
         s += "} MsgHashInfo;\n"
 
@@ -211,6 +223,8 @@ class CDefCompiler:
         s += "    static RTMAInfo RTMA;\n"
 
         for obj in self.parser.constants.values():
+            if obj.src.name == "core_defs.yaml":
+                continue
             s += f'#pragma push_macro("{obj.name}")\n'
             s += f"#undef {obj.name}\n"
             s += f"{tab}RTMA.constants.{obj.name} = {obj.value};\n"
@@ -218,6 +232,8 @@ class CDefCompiler:
             s += "\n"
 
         for obj in self.parser.string_constants.values():
+            if obj.src.name == "core_defs.yaml":
+                continue
             s += f'#pragma push_macro("{obj.name}")\n'
             s += f"#undef {obj.name}\n"
             s += f"{tab}RTMA.constants.{obj.name} = {obj.value};\n"
@@ -225,21 +241,29 @@ class CDefCompiler:
             s += "\n"
 
         for obj in self.parser.host_ids.values():
+            if obj.src.name == "core_defs.yaml":
+                continue
             s += f"{tab}RTMA.HID.{obj.name} = {obj.value};\n"
 
         s += "\n" * 2
 
         for obj in self.parser.module_ids.values():
+            if obj.src.name == "core_defs.yaml":
+                continue
             s += f"{tab}RTMA.MID.{obj.name} = {obj.value};\n"
 
         s += "\n" * 2
 
         for obj in self.parser.message_ids.values():
+            if obj.src.name == "core_defs.yaml":
+                continue
             s += f"{tab}RTMA.MT.{obj.name} = {obj.value};\n"
 
         s += "\n" * 2
 
         for obj in self.parser.message_defs.values():
+            if obj.src.name == "core_defs.yaml":
+                continue
             s += f"{tab}RTMA.HASH.{obj.name} = 0x{obj.hash[:8]};\n"
 
         s += "\n"
@@ -256,59 +280,70 @@ class CDefCompiler:
         with open(out_filepath, mode="w") as f:
             # Includes
             f.write(self.generate_includes())
+            # Note: above includes RTMA_type.h, and user code will typically include RTMA.h
+            # For this reason, we will exclude compiling anything from core_defs.yaml, which is redundant with RTMA_types.h
 
             # Constants
             f.write("// Constants\n")
             for obj in self.parser.constants.values():
-                f.write(self.generate_constant(obj))
+                if obj.src.name != "core_defs.yaml":
+                    f.write(self.generate_constant(obj))
             f.write("\n")
 
             # String Constants
             f.write("// String Constants\n")
             for obj in self.parser.string_constants.values():
-                f.write(self.generate_string_constant(obj))
+                if obj.src.name != "core_defs.yaml":
+                    f.write(self.generate_string_constant(obj))
             f.write("\n")
 
             # Type Aliases
             f.write("// Type Aliases\n")
             for obj in self.parser.aliases.values():
-                f.write(self.generate_type_alias(obj))
+                if obj.src.name != "core_defs.yaml":
+                    f.write(self.generate_type_alias(obj))
             f.write("\n")
 
             # Host IDs
             f.write("// Host IDs\n")
             for obj in self.parser.host_ids.values():
-                f.write(self.generate_host_id(obj))
+                if obj.src.name != "core_defs.yaml":
+                    f.write(self.generate_host_id(obj))
             f.write("\n")
 
             # Module IDs
             f.write("// Module IDs\n")
             for obj in self.parser.module_ids.values():
-                f.write(self.generate_module_id(obj))
+                if obj.src.name != "core_defs.yaml":
+                    f.write(self.generate_module_id(obj))
             f.write("\n")
 
             # Message Type IDs
             f.write("// Message Type IDs\n")
             for obj in self.parser.message_ids.values():
-                f.write(self.generate_msg_type_id(obj))
+                if obj.src.name != "core_defs.yaml":
+                    f.write(self.generate_msg_type_id(obj))
             f.write("\n")
 
             # Structure Types
             f.write("// Struct Definitions\n")
             for obj in self.parser.struct_defs.values():
-                f.write(self.generate_struct(obj))
-                f.write("\n\n")
+                if obj.src.name != "core_defs.yaml":
+                    f.write(self.generate_struct(obj))
+                    f.write("\n\n")
 
             # Message Definitions
             f.write("// Message Definitions\n")
             for obj in self.parser.message_defs.values():
-                f.write(self.generate_struct(obj))
-                f.write("\n\n")
+                if obj.src.name != "core_defs.yaml":
+                    f.write(self.generate_struct(obj))
+                    f.write("\n\n")
 
             # Message Definition Hashes
             f.write("// Message Definition Hashes\n")
             for obj in self.parser.message_defs.values():
-                f.write(self.generate_hash_id(obj))
+                if obj.src.name != "core_defs.yaml":
+                    f.write(self.generate_hash_id(obj))
             f.write("\n")
 
             # Message Definition Type Info (Future Use)
