@@ -347,9 +347,9 @@ class CDefCompiler:
             f.write("\n")
 
             # Message Definition Type Info (Future Use)
-            f.write("// Type Information\n")
-            f.write(self.generate_type_info())
-            f.write("\n")
+            #f.write("// Type Information\n")
+            #f.write(self.generate_type_info())
+            #f.write("\n")
 
             # TODO below commented out by JW because it causes link errors when header file is included multiple times (in multiple object files)
             # f.write(self.generate_rtma_info_getter())
