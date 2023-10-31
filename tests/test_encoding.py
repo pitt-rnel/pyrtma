@@ -5,7 +5,6 @@ import time
 import logging
 
 import pyrtma
-from .test_msg_defs.test_defs import *
 
 from pyrtma.client import Client
 import pyrtma.manager

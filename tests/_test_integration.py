@@ -99,7 +99,7 @@ class TestSingleClient(unittest.TestCase):
         wait_for_message()
 
         # Act
-        self.client.subscribe(MT_TEST_MESSAGE)
+        self.client.subscribe([MT_TEST_MESSAGE])
         wait_for_message()
 
         # Assert
@@ -141,11 +141,11 @@ class TestSingleClient(unittest.TestCase):
         # Arrange
         self.client.connect(server_name=f"127.0.0.1:{self.port}")
         wait_for_message()
-        self.client.subscribe(MT_TEST_MESSAGE)
+        self.client.subscribe([MT_TEST_MESSAGE])
         wait_for_message()
 
         # Act
-        self.client.unsubscribe(MT_TEST_MESSAGE)
+        self.client.unsubscribe([MT_TEST_MESSAGE])
         wait_for_message()
 
         # Assert
@@ -189,11 +189,11 @@ class TestSingleClient(unittest.TestCase):
         # Arrange
         self.client.connect(server_name=f"127.0.0.1:{self.port}")
         wait_for_message()
-        self.client.subscribe(MT_TEST_MESSAGE)
+        self.client.subscribe([MT_TEST_MESSAGE])
         wait_for_message()
 
         # Act
-        self.client.pause_subscription(MT_TEST_MESSAGE)
+        self.client.pause_subscription([MT_TEST_MESSAGE])
         wait_for_message()
 
         # Assert
@@ -237,13 +237,13 @@ class TestSingleClient(unittest.TestCase):
         # Arrange
         self.client.connect(server_name=f"127.0.0.1:{self.port}")
         wait_for_message()
-        self.client.subscribe(MT_TEST_MESSAGE)
+        self.client.subscribe([MT_TEST_MESSAGE])
         wait_for_message()
-        self.client.pause_subscription(MT_TEST_MESSAGE)
+        self.client.pause_subscription([MT_TEST_MESSAGE])
         wait_for_message()
 
         # Act
-        self.client.resume_subscription(MT_TEST_MESSAGE)
+        self.client.resume_subscription([MT_TEST_MESSAGE])
         wait_for_message()
 
         # Assert

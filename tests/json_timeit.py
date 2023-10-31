@@ -1,7 +1,6 @@
 import pyrtma
 import timeit
 import statistics
-from .test_msg_defs.test_defs import *
 
 
 def convert_to_json(n=1000):

@@ -1,8 +1,9 @@
 import pyrtma
 import ctypes
 import unittest
+from typing import cast
 
-from .test_msg_defs.test_defs import *
+# from .test_msg_defs.test_defs import *
 
 
 def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
@@ -14,8 +15,8 @@ def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
             if not is_equal(getattr(obj, name), getattr(other, name)):
                 return False
         elif issubclass(ftype, ctypes.Array):
-            length = ftype._length_
-            etype = ftype._type_
+            length = cast(int, ftype._length_)
+            etype = cast(type, ftype._type_)
             for i in range(length):
                 if issubclass(etype, ctypes.Structure):
                     if not is_equal(getattr(obj, name)[i], getattr(other, name)[i]):
@@ -43,7 +44,7 @@ class TestJSONConversion(unittest.TestCase):
             in_str = in_msg.to_json()
 
             # Create a message from the json string
-            out_msg = mdf.from_json(in_str)
+            out_msg = mdf.from_json(in_str)  # type: ignore
 
             # Convert the output back to json
             out_str = out_msg.to_json()
