@@ -113,7 +113,7 @@ class MDF_LM_EXIT(pyrtma.MessageData):
     type_def: str
 
 class MDF_SAVE_MESSAGE_LOG(pyrtma.MessageData):
-    pathname: ctypes.c_char * 256
+    pathname: str
     pathname_length: int
     type_id: int
     type_name: str
