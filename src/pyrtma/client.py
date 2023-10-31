@@ -8,8 +8,14 @@ import time
 import os
 import ctypes
 
-from .message import *
-from .core_defs import *
+from .message import (
+    Message,
+    MessageData,
+    MessageHeader,
+    get_header_cls,
+    InvalidMessageDefinition,
+)
+from . import core_defs as cd
 
 from functools import wraps
 from typing import Optional, Tuple, Type, Union, Iterable, Set
@@ -165,7 +171,7 @@ class Client(object):
         # Setup the underlying socket connection
         self._socket_connect(server_name)
 
-        msg = MDF_CONNECT()
+        msg = cd.MDF_CONNECT()
         msg.logger_status = int(logger_status)
         msg.daemon_status = int(daemon_status)
 
@@ -184,7 +190,7 @@ class Client(object):
         """Disconnect from message manager server"""
         try:
             if self._connected:
-                self.send_signal(MT_DISCONNECT)
+                self.send_signal(cd.MT_DISCONNECT)
                 ack_msg = self.wait_for_acknowledgement(timeout=0.5)
         except AcknowledgementTimeout:
             pass
@@ -251,26 +257,26 @@ class Client(object):
 
         This method also sends the client's process ID to message manager.
         """
-        msg = MDF_MODULE_READY()
+        msg = cd.MDF_MODULE_READY()
         msg.pid = os.getpid()
         self.send_message(msg)
 
     def _subscription_control(self, msg_list: Iterable[int], ctrl_msg: str):
         msg_set = set(msg_list)
         if ctrl_msg == "Subscribe":
-            msg = MDF_SUBSCRIBE()
+            msg = cd.MDF_SUBSCRIBE()
             self._subscribed_types |= msg_set
             self._paused_types -= msg_set
         elif ctrl_msg == "Unsubscribe":
-            msg = MDF_UNSUBSCRIBE()
+            msg = cd.MDF_UNSUBSCRIBE()
             self._subscribed_types -= msg_set
             self._paused_types -= msg_set
         elif ctrl_msg == "PauseSubscription":
-            msg = MDF_PAUSE_SUBSCRIPTION()
+            msg = cd.MDF_PAUSE_SUBSCRIPTION()
             self._subscribed_types -= msg_set
             self._paused_types |= msg_set
         elif ctrl_msg == "ResumeSubscription":
-            msg = MDF_RESUME_SUBSCRIPTION()
+            msg = cd.MDF_RESUME_SUBSCRIPTION()
             self._subscribed_types |= msg_set
             self._paused_types -= msg_set
         else:
@@ -360,10 +366,10 @@ class Client(object):
             InvalidDestinationHost: Specified destination host is invalid
         """
         # Verify that the module & host ids are valid
-        if dest_mod_id < 0 or dest_mod_id > MAX_MODULES:
+        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULES:
             raise InvalidDestinationModule(f"Invalid dest_mod_id  of [{dest_mod_id}]")
 
-        if dest_host_id < 0 or dest_host_id > MAX_HOSTS:
+        if dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS:
             raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
 
         if timeout >= 0:
@@ -418,10 +424,10 @@ class Client(object):
             InvalidDestinationHost: Specified destination host is invalid
         """
         # Verify that the module & host ids are valid
-        if dest_mod_id < 0 or dest_mod_id > MAX_MODULES:
+        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULES:
             raise InvalidDestinationModule(f"Invalid dest_mod_id of [{dest_mod_id}]")
 
-        if dest_host_id < 0 or dest_host_id > MAX_HOSTS:
+        if dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS:
             raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
 
         if timeout >= 0:
@@ -613,7 +619,7 @@ class Client(object):
             while True:
                 msg = self.read_message(ack=True)
                 if msg is not None:
-                    if msg.header.msg_type == MT_ACKNOWLEDGE:
+                    if msg.header.msg_type == cd.MT_ACKNOWLEDGE:
                         break
             return msg
         else:
@@ -623,7 +629,7 @@ class Client(object):
             while time_remaining > 0:
                 msg = self.read_message(timeout=time_remaining, ack=True)
                 if msg is not None:
-                    if msg.header.msg_type == MT_ACKNOWLEDGE:
+                    if msg.header.msg_type == cd.MT_ACKNOWLEDGE:
                         return msg
 
                 time_now = time.perf_counter()

@@ -81,19 +81,19 @@ class PyDefCompiler:
         self.parser = parser
 
     def generate_constant(self, c: ConstantExpr) -> str:
-        return f"{c.name} = {c.value}\n"
+        return f"{c.name}: {type(c.value).__qualname__} = {c.value}\n"
 
     def generate_string_constant(self, c: ConstantString) -> str:
-        return f"{c.name} = {c.value}\n"
+        return f"{c.name}: str = {c.value}\n"
 
     def generate_msg_type_id(self, mt: MT) -> str:
-        return f"MT_{mt.name} = {mt.value}\n"
+        return f"MT_{mt.name}: int = {mt.value}\n"
 
     def generate_module_id(self, mid: MID) -> str:
-        return f"MID_{mid.name} = {mid.value}\n"
+        return f"MID_{mid.name}: int = {mid.value}\n"
 
     def generate_host_id(self, hid: HID) -> str:
-        return f"{hid.name} = {hid.value}\n"
+        return f"{hid.name}: int = {hid.value}\n"
 
     def generate_type_alias(self, td: TypeAlias) -> str:
         ftype = type_map.get(td.type_name)
@@ -354,7 +354,6 @@ class PyDefCompiler:
             f.write("# Type Aliases\n")
             for obj in self.parser.aliases.values():
                 f.write(self.generate_type_alias(obj))
-                f.write("\n\n")
             f.write("\n")
 
             f.write("# Host IDs\n")
@@ -389,9 +388,34 @@ class PyDefCompiler:
             f.write(self.generate_imports())
             f.write("\n")
 
+            f.write("# Constants\n")
+            for obj in self.parser.constants.values():
+                f.write(self.generate_constant(obj))
+            f.write("\n")
+
+            f.write("# String Constants\n")
+            for obj in self.parser.string_constants.values():
+                f.write(self.generate_string_constant(obj))
+            f.write("\n")
+
             f.write("# Type Aliases\n")
             for obj in self.parser.aliases.values():
                 f.write(self.generate_type_alias(obj))
+            f.write("\n")
+
+            f.write("# Host IDs\n")
+            for obj in self.parser.host_ids.values():
+                f.write(self.generate_host_id(obj))
+            f.write("\n")
+
+            f.write("# Module IDs\n")
+            for obj in self.parser.module_ids.values():
+                f.write(self.generate_module_id(obj))
+            f.write("\n")
+
+            f.write("# Message Type IDs\n")
+            for obj in self.parser.message_ids.values():
+                f.write(self.generate_msg_type_id(obj))
             f.write("\n\n")
 
             f.write("# Struct Definitions\n")

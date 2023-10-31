@@ -12,8 +12,8 @@ import random
 import ctypes
 import os
 
-from .message import *
-from .core_defs import *
+from .message import Message, MessageHeader, MessageData, get_header_cls
+from . import core_defs as cd
 
 from typing import Dict, List, Tuple, Set, Type, Union, Optional
 from dataclasses import dataclass
@@ -44,9 +44,9 @@ class Module:
     def send_ack(self):
         # Just send a header
         header = self.header_cls()
-        header.msg_type = MT_ACKNOWLEDGE
+        header.msg_type = cd.MT_ACKNOWLEDGE
         header.send_time = time.perf_counter()
-        header.src_mod_id = MID_MESSAGE_MANAGER
+        header.src_mod_id = cd.MID_MESSAGE_MANAGER
         header.dest_mod_id = self.id
         header.num_data_bytes = 0
 
@@ -159,9 +159,9 @@ class MessageManager:
     def assign_module_id(self) -> int:
         current_ids = [mod.id for mod in self.modules.values()]
 
-        MAX_DYN_IDS = MAX_MODULES - DYN_MOD_ID_START
+        MAX_DYN_IDS = cd.MAX_MODULES - cd.DYN_MOD_ID_START
         for i in range(0, MAX_DYN_IDS):
-            mod_id = self.next_dynamic_mod_id_offset + DYN_MOD_ID_START
+            mod_id = self.next_dynamic_mod_id_offset + cd.DYN_MOD_ID_START
             self.next_dynamic_mod_id_offset += 1
             if self.next_dynamic_mod_id_offset == MAX_DYN_IDS:
                 self.next_dynamic_mod_id_offset = 0
@@ -222,12 +222,12 @@ class MessageManager:
         self.remove_module(src_module)
 
     def add_subscription(self, src_module: Module, msg: Message):
-        sub = MDF_SUBSCRIBE.from_buffer(msg.data)
+        sub = cd.MDF_SUBSCRIBE.from_buffer(msg.data)
         self.subscriptions[sub.msg_type].add(src_module)
         self.logger.info(f"SUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
 
     def remove_subscription(self, src_module: Module, msg: Message):
-        sub = MDF_UNSUBSCRIBE.from_buffer(msg.data)
+        sub = cd.MDF_UNSUBSCRIBE.from_buffer(msg.data)
         # Silently let modules unsubscribe from messages that they are not subscribed to.
         self.subscriptions[sub.msg_type].discard(src_module)
         self.logger.info(f"UNSUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
@@ -239,7 +239,7 @@ class MessageManager:
         self.remove_subscription(src_module, msg)
 
     def register_module_ready(self, src_module: Module, msg: Message):
-        mr = MDF_MODULE_READY.from_buffer(msg.data)
+        mr = cd.MDF_MODULE_READY.from_buffer(msg.data)
         src_module.pid = mr.pid
 
     def read_message(self, sock: socket.socket) -> bool:
@@ -295,12 +295,12 @@ class MessageManager:
         dest_host_id = header.dest_host_id
 
         # Verify that the module & host ids are valid
-        if dest_mod_id < 0 or dest_mod_id > MAX_MODULES:
+        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULES:
             self.logger.error(
                 f"MessageManager::forward_message: Got invalid dest_mod_id [{dest_mod_id}]"
             )
 
-        if dest_host_id < 0 or dest_host_id > MAX_HOSTS:
+        if dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS:
             self.logger.error(
                 f"MessageManager::forward_message: Got invalid dest_host_id [{dest_host_id}]"
             )
@@ -370,9 +370,9 @@ class MessageManager:
         # src_module.send_ack()
 
         header = self.header_cls()
-        header.msg_type = MT_ACKNOWLEDGE
+        header.msg_type = cd.MT_ACKNOWLEDGE
         header.send_time = time.perf_counter()
-        header.src_mod_id = MID_MESSAGE_MANAGER
+        header.src_mod_id = cd.MID_MESSAGE_MANAGER
         header.dest_mod_id = src_module.id
         header.num_data_bytes = 0
 
@@ -394,11 +394,11 @@ class MessageManager:
         wlist: List[socket.socket],
     ):
         out_header = self.header_cls()
-        data = MDF_FAILED_MESSAGE()
+        data = cd.MDF_FAILED_MESSAGE()
 
-        out_header.msg_type = MT_FAILED_MESSAGE
+        out_header.msg_type = cd.MT_FAILED_MESSAGE
         out_header.send_time = time.perf_counter()
-        out_header.src_mod_id = MID_MESSAGE_MANAGER
+        out_header.src_mod_id = cd.MID_MESSAGE_MANAGER
         out_header.num_data_bytes = ctypes.sizeof(data)
 
         data.dest_mod_id = dest_module.id
@@ -409,7 +409,7 @@ class MessageManager:
             setattr(data.msg_header, fname, getattr(header, fname))
 
         if (
-            data.msg_header.msg_type == MT_FAILED_MESSAGE
+            data.msg_header.msg_type == cd.MT_FAILED_MESSAGE
         ):  # avoid unlikely infinite recursion
             return
 
@@ -421,11 +421,11 @@ class MessageManager:
 
     def send_timing_message(self, wlist: List[socket.socket]):
         header = self.header_cls()
-        data = MDF_TIMING_MESSAGE()
+        data = cd.MDF_TIMING_MESSAGE()
 
-        header.msg_type = MT_TIMING_MESSAGE
+        header.msg_type = cd.MT_TIMING_MESSAGE
         header.send_time = time.perf_counter()
-        header.src_mod_id = MID_MESSAGE_MANAGER
+        header.src_mod_id = cd.MID_MESSAGE_MANAGER
         header.num_data_bytes = ctypes.sizeof(data)
 
         data.send_time = time.perf_counter()
@@ -448,27 +448,27 @@ class MessageManager:
         hdr = self.header
         msg_type = hdr.msg_type
 
-        if msg_type == MT_CONNECT:
+        if msg_type == cd.MT_CONNECT:
             if self.connect_module(src_module, self.message):
                 self.send_ack(src_module, wlist)
                 self.logger.info(f"CONNECT - {src_module!s}")
-        elif msg_type == MT_DISCONNECT:
+        elif msg_type == cd.MT_DISCONNECT:
             self.send_ack(src_module, wlist)
             self.disconnect_module(src_module)
             self.logger.info(f"DISCONNECT - {src_module!s}")
-        elif msg_type == MT_SUBSCRIBE:
+        elif msg_type == cd.MT_SUBSCRIBE:
             self.add_subscription(src_module, self.message)
             self.send_ack(src_module, wlist)
-        elif msg_type == MT_UNSUBSCRIBE:
+        elif msg_type == cd.MT_UNSUBSCRIBE:
             self.remove_subscription(src_module, self.message)
             self.send_ack(src_module, wlist)
-        elif msg_type == MT_PAUSE_SUBSCRIPTION:
+        elif msg_type == cd.MT_PAUSE_SUBSCRIPTION:
             self.pause_subscription(src_module, self.message)
             self.send_ack(src_module, wlist)
-        elif msg_type == MT_RESUME_SUBSCRIPTION:
+        elif msg_type == cd.MT_RESUME_SUBSCRIPTION:
             self.resume_subscription(src_module, self.message)
             self.send_ack(src_module, wlist)
-        elif msg_type == MT_MODULE_READY:
+        elif msg_type == cd.MT_MODULE_READY:
             # used to store module pids
             self.register_module_ready(src_module, self.message)
         else:
