@@ -44,35 +44,65 @@ type_map = {
     "int64": "ctypes.c_int64",
 }
 
+# Field type name to ctypes (in python file)
+pytype_map = {
+    "char": "str",
+    "unsigned char": "int",
+    "byte": "int",
+    "int": "int",
+    "signed int": "int",
+    "unsigned int": "int",
+    "unsigned": "int",
+    "short": "int",
+    "signed short": "int",
+    "unsigned short": "int",
+    "long": "int",
+    "signed long": "int",
+    "unsigned long": "int",
+    "long long": "int",
+    "signed long long": "int",
+    "unsigned long long": "int",
+    "float": "float",
+    "double": "float",
+    "uint8": "int",
+    "uint16": "int",
+    "uint32": "int",
+    "uint64": "int",
+    "int8": "int",
+    "int16": "int",
+    "int32": "int",
+    "int64": "int",
+}
+
 
 class PyDefCompiler:
     def __init__(self, parser: Parser, debug: bool = False):
         self.debug = debug
         self.parser = parser
 
-    def generate_constant(self, c: ConstantExpr):
+    def generate_constant(self, c: ConstantExpr) -> str:
         return f"{c.name} = {c.value}\n"
 
-    def generate_string_constant(self, c: ConstantString):
+    def generate_string_constant(self, c: ConstantString) -> str:
         return f"{c.name} = {c.value}\n"
 
-    def generate_msg_type_id(self, mt: MT):
+    def generate_msg_type_id(self, mt: MT) -> str:
         return f"MT_{mt.name} = {mt.value}\n"
 
-    def generate_module_id(self, mid: MID):
+    def generate_module_id(self, mid: MID) -> str:
         return f"MID_{mid.name} = {mid.value}\n"
 
-    def generate_host_id(self, hid: HID):
+    def generate_host_id(self, hid: HID) -> str:
         return f"{hid.name} = {hid.value}\n"
 
-    def generate_type_alias(self, td: TypeAlias):
+    def generate_type_alias(self, td: TypeAlias) -> str:
         ftype = type_map.get(td.type_name)
         if ftype:
             return f"{td.name} = {ftype}\n"
         else:
             return f"{td.name} = {td.type_name}\n"
 
-    def generate_struct(self, sdf: SDF):
+    def generate_struct(self, sdf: SDF) -> str:
         f = []
         fnum = len(sdf.fields)
         fstr = "["
@@ -109,7 +139,50 @@ class PyDefCompiler:
         """
         return dedent(template)
 
-    def generate_msg_def(self, mdf: MDF):
+    def generate_struct_stub(self, sdf: SDF) -> str:
+        f = []
+        fnum = len(sdf.fields)
+        fstr = ""
+        # if fnum == 0:
+        #    fstr += "]"
+        # else:
+        tab = "    "
+        fstr += "\n"
+        for i, field in enumerate(sdf.fields, start=1):
+            flen = field.length
+            nl = "\n" if i < fnum else ""
+            if field.type_name in type_map.keys():
+                if flen:
+                    ftype = type_map[field.type_name]
+                else:
+                    ftype = pytype_map[field.type_name]
+            elif field.type_name in self.parser.message_defs.keys():
+                ftype = f"MDF_{field.type_name}"
+            elif field.type_name in self.parser.struct_defs.keys():
+                ftype = f"{field.type_name}"
+            elif field.type_name in self.parser.aliases.keys():
+                type_name = self.parser.aliases[field.type_name].type_name
+                if type_name in type_map.keys():
+                    if flen:
+                        ftype = type_map[type_name]
+                    else:
+                        ftype = pytype_map[type_name]
+                else:
+                    ftype = f"{field.type_name}"
+            else:
+                raise RuntimeError(f"Unknown field name {field.name} in {sdf.name}")
+            f.append(
+                f"{tab *3}{field.name}: {ftype}{' * ' + str(flen) if flen else ''}{nl}"
+            )
+        fstr += "".join(f)
+        # fstr += f"\n{tab * 3}]"
+
+        template = f"""\
+        class {sdf.name}(ctypes.Structure): {fstr}
+        """
+        return dedent(template)
+
+    def generate_msg_def(self, mdf: MDF) -> str:
         f = []
         fnum = len(mdf.fields)
         fstr = "["
@@ -154,7 +227,56 @@ class PyDefCompiler:
         """
         return dedent(template)
 
-    def generate_imports(self):
+    def generate_msg_stub(self, mdf: MDF) -> str:
+        f = []
+        fnum = len(mdf.fields)
+        fstr = ""
+        # if fnum == 0:
+        #    fstr += "]"
+        # else:
+        tab = "    "
+        if fnum:
+            fstr += "\n"
+        for i, field in enumerate(mdf.fields, start=1):
+            flen = field.length
+            nl = "\n" if i < fnum else ""
+            if field.type_name in type_map.keys():
+                if flen:
+                    ftype = type_map[field.type_name]
+                else:
+                    ftype = pytype_map[field.type_name]
+            elif field.type_name in self.parser.message_defs.keys():
+                ftype = f"MDF_{field.type_name}"
+            elif field.type_name in self.parser.struct_defs.keys():
+                ftype = f"{field.type_name}"
+            elif field.type_name in self.parser.aliases.keys():
+                type_name = self.parser.aliases[field.type_name].type_name
+                if type_name in type_map.keys():
+                    if flen:
+                        ftype = type_map[type_name]
+                    else:
+                        ftype = pytype_map[type_name]
+                else:
+                    ftype = f"{field.type_name}"
+            else:
+                raise RuntimeError(f"Unknown field name {field.name} in {mdf.name}")
+            f.append(
+                f"{tab *3}{field.name}: {ftype}{' * ' + str(flen) if flen else ''}{nl}"
+            )
+        fstr += "".join(f)
+        # fstr += f"\n{tab * 3}]"
+
+        template = f"""\
+        class MDF_{mdf.name}(pyrtma.MessageData): {fstr}
+            type_id: int
+            type_name: str
+            type_hash: int
+            type_source: str
+            type_def: str
+        """
+        return dedent(template)
+
+    def generate_imports(self) -> str:
         s = """\
         import ctypes
         import pyrtma
@@ -261,3 +383,23 @@ class PyDefCompiler:
                 f.write("\n\n")
 
             f.write(self.generate_type_info())
+
+    def generate_stub(self, out_filepath: pathlib.Path):
+        with open(out_filepath, mode="w") as f:
+            f.write(self.generate_imports())
+            f.write("\n")
+
+            f.write("# Type Aliases\n")
+            for obj in self.parser.aliases.values():
+                f.write(self.generate_type_alias(obj))
+            f.write("\n\n")
+
+            f.write("# Struct Definitions\n")
+            for obj in self.parser.struct_defs.values():
+                f.write(self.generate_struct_stub(obj))
+                f.write("\n\n")
+
+            f.write("# Message Definitions\n")
+            for obj in self.parser.message_defs.values():
+                f.write(self.generate_msg_stub(obj))
+                f.write("\n\n")

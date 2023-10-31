@@ -1,4 +1,5 @@
 """pyrtma.messaage: RTMA message classes"""
+from __future__ import annotations
 import json
 import ctypes
 
@@ -24,7 +25,7 @@ __all__ = [
 ]
 
 # Main Map of all internal message types
-msg_defs: Dict[int, Type["MessageData"]] = {}
+msg_defs: Dict[int, Type[MessageData]] = {}
 
 
 class RTMAMessageError(Exception):
@@ -51,7 +52,7 @@ class InvalidMessageDefinition(RTMAMessageError):
     pass
 
 
-def message_def(msg_cls: Type["MessageData"], *args, **kwargs):
+def message_def(msg_cls: Type[MessageData], *args, **kwargs) -> Type[MessageData]:
     """Decorator to add user message definitions."""
     msg_defs[msg_cls.type_id] = msg_cls
     return msg_cls
@@ -97,7 +98,7 @@ class MessageHeader(_RTMA_MSG_HEADER):
         return ctypes.sizeof(self)
 
     @property
-    def buffer(self):
+    def buffer(self) -> memoryview:
         return memoryview(self)
 
     @property
@@ -108,7 +109,7 @@ class MessageHeader(_RTMA_MSG_HEADER):
     def version(self, value: int):
         self.reserved = value
 
-    def pretty_print(self, add_tabs=0):
+    def pretty_print(self, add_tabs=0) -> str:
         str = "\t" * add_tabs + f"{type(self).__name__}:"
         for field_name, field_type in self._fields_:
             val = getattr(self, field_name)
@@ -123,7 +124,7 @@ class MessageHeader(_RTMA_MSG_HEADER):
         hexdump(bytes(self), length, sep)
 
     @property
-    def get_data(self) -> Type["MessageData"]:
+    def get_data(self) -> Type[MessageData]:
         try:
             return msg_defs[self.msg_type]
         except KeyError as e:
@@ -140,7 +141,7 @@ class MessageHeader(_RTMA_MSG_HEADER):
             return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data) -> MessageHeader:
         obj = cls()
         try:
             _json_decode(obj, data)
@@ -151,11 +152,11 @@ class MessageHeader(_RTMA_MSG_HEADER):
             )
 
     @classmethod
-    def from_json(cls, s):
+    def from_json(cls, s) -> MessageHeader:
         obj = cls.from_dict(json.loads(s))
         return obj
 
-    def __eq__(self, other: "MessageHeader") -> bool:
+    def __eq__(self, other: MessageHeader) -> bool:
         if type(self) != type(other):
             raise TypeError(f"Can not compare {type(other)} to {type(self)}.")
 
@@ -176,7 +177,7 @@ def get_header_cls(timecode: bool = False) -> Type[MessageHeader]:
         return MessageHeader
 
 
-def _create_ftype_map(obj: "MessageData"):
+def _create_ftype_map(obj: MessageData):
     super(MessageData, obj).__setattr__(
         "_ftype_map",
         {k: v for k, v in super(MessageData, obj).__getattribute__("_fields_")},
@@ -195,18 +196,18 @@ class MessageData(ctypes.Structure):
         _create_ftype_map(self)
 
     @classmethod
-    def from_random(cls):
+    def from_random(cls) -> MessageData:
         obj = _random_struct(cls())
         return obj
 
     @classmethod
-    def from_buffer(cls, source, offset=0):
+    def from_buffer(cls, source, offset=0) -> MessageData:
         obj = type(cls).from_buffer(cls, source, offset)
         _create_ftype_map(obj)
         return obj
 
     @classmethod
-    def from_buffer_copy(cls, source, offset=0):
+    def from_buffer_copy(cls, source, offset=0) -> MessageData:
         obj = type(cls).from_buffer_copy(cls, source, offset)
         _create_ftype_map(obj)
         return obj
@@ -215,7 +216,7 @@ class MessageData(ctypes.Structure):
     def type_size(self) -> int:
         return ctypes.sizeof(self)
 
-    def pretty_print(self, add_tabs=0):
+    def pretty_print(self, add_tabs=0) -> str:
         str = "\t" * add_tabs + f"{type(self).__name__}:"
         for field_name, field_type in self._fields_:
             val = getattr(self, field_name)
@@ -242,10 +243,10 @@ class MessageData(ctypes.Structure):
 
         return bytes(memoryview(self).cast("c")[offset : offset + sz])
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.pretty_print()
 
-    def __eq__(self, other: "MessageData") -> bool:
+    def __eq__(self, other: MessageData) -> bool:
         if type(self) != type(other):
             raise TypeError(f"Can not compare {type(other)} to {type(self)}.")
 
@@ -302,7 +303,7 @@ class MessageData(ctypes.Structure):
             return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data) -> MessageData:
         obj = cls()
         try:
             _json_decode(obj, data)
@@ -311,7 +312,7 @@ class MessageData(ctypes.Structure):
             raise JSONDecodingError(f"Unable to decode {obj.type_name} from {data}.")
 
     @classmethod
-    def from_json(cls, s):
+    def from_json(cls, s) -> MessageData:
         obj = cls.from_dict(json.loads(s))
         return obj
 
@@ -329,10 +330,10 @@ class Message:
     def name(self) -> str:
         return self.data.type_name
 
-    def __eq__(self, other: "Message") -> bool:
+    def __eq__(self, other: Message) -> bool:
         return self.header == other.header and self.data == other.data
 
-    def pretty_print(self, add_tabs=0):
+    def pretty_print(self, add_tabs: int = 0) -> str:
         return (
             self.header.pretty_print(add_tabs) + "\n" + self.data.pretty_print(add_tabs)
         )
@@ -346,7 +347,7 @@ class Message:
             return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
 
     @classmethod
-    def from_json(cls, s: str):
+    def from_json(cls, s: str) -> Message:
         # Convert json string to dict
         d = json.loads(s)
 
