@@ -1,7 +1,7 @@
 import ctypes
 import random
 import string
-from typing import List
+from typing import List, TypeVar
 
 
 def _random_str(length: int) -> str:
@@ -19,8 +19,8 @@ def _random_float_array(length: int) -> List[float]:
 def _random_byte_array(length: int) -> bytes:
     return bytes([random.randint(0, 255) for _ in range(length)])
 
-
-def _random_struct(obj: ctypes.Structure):
+CStruct = TypeVar('CStruct', bound=ctypes.Structure)
+def _random_struct(obj: CStruct) -> CStruct:
     for name, ftype in obj._fields_:
         if issubclass(ftype, ctypes.Structure):
             setattr(obj, name, _random_struct(getattr(obj, name)))
