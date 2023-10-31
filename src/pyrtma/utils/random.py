@@ -19,7 +19,10 @@ def _random_float_array(length: int) -> List[float]:
 def _random_byte_array(length: int) -> bytes:
     return bytes([random.randint(0, 255) for _ in range(length)])
 
-CStruct = TypeVar('CStruct', bound=ctypes.Structure)
+
+CStruct = TypeVar("CStruct", bound=ctypes.Structure)
+
+
 def _random_struct(obj: CStruct) -> CStruct:
     for name, ftype in obj._fields_:
         if issubclass(ftype, ctypes.Structure):
