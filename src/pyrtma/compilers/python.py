@@ -152,7 +152,7 @@ class PyDefCompiler:
             flen = field.length
             nl = "\n" if i < fnum else ""
             if field.type_name in type_map.keys():
-                if flen:
+                if flen and field.type_name != "char":
                     ftype = type_map[field.type_name]
                 else:
                     ftype = pytype_map[field.type_name]
@@ -163,7 +163,7 @@ class PyDefCompiler:
             elif field.type_name in self.parser.aliases.keys():
                 type_name = self.parser.aliases[field.type_name].type_name
                 if type_name in type_map.keys():
-                    if flen:
+                    if flen and type_name != "char":
                         ftype = type_map[type_name]
                     else:
                         ftype = pytype_map[type_name]
@@ -172,7 +172,7 @@ class PyDefCompiler:
             else:
                 raise RuntimeError(f"Unknown field name {field.name} in {sdf.name}")
             f.append(
-                f"{tab *3}{field.name}: {ftype}{' * ' + str(flen) if flen else ''}{nl}"
+                f"{tab *3}{field.name}: {ftype}{' * ' + str(flen) if (flen and ftype != 'str') else ''}{nl}"
             )
         fstr += "".join(f)
         # fstr += f"\n{tab * 3}]"
@@ -241,7 +241,7 @@ class PyDefCompiler:
             flen = field.length
             nl = "\n" if i < fnum else ""
             if field.type_name in type_map.keys():
-                if flen:
+                if flen and field.type_name != "char":
                     ftype = type_map[field.type_name]
                 else:
                     ftype = pytype_map[field.type_name]
@@ -252,7 +252,7 @@ class PyDefCompiler:
             elif field.type_name in self.parser.aliases.keys():
                 type_name = self.parser.aliases[field.type_name].type_name
                 if type_name in type_map.keys():
-                    if flen:
+                    if flen and type_name != "char":
                         ftype = type_map[type_name]
                     else:
                         ftype = pytype_map[type_name]
@@ -261,7 +261,7 @@ class PyDefCompiler:
             else:
                 raise RuntimeError(f"Unknown field name {field.name} in {mdf.name}")
             f.append(
-                f"{tab *3}{field.name}: {ftype}{' * ' + str(flen) if flen else ''}{nl}"
+                f"{tab *3}{field.name}: {ftype}{' * ' + str(flen) if (flen and ftype != 'str') else ''}{nl}"
             )
         fstr += "".join(f)
         # fstr += f"\n{tab * 3}]"
