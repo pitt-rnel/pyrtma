@@ -1,5 +1,6 @@
 import ctypes
 import pyrtma
+from typing import ClassVar
 
 # Constants
 MAX_MODULES: int = 200

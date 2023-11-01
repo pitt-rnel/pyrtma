@@ -58,8 +58,10 @@ def _create_ftype_map(obj: MessageData): ...
 class MessageData(ctypes.Structure):
     type_id: ClassVar[int]
     type_name: ClassVar[str]
-    type_hash: int
-    type_src: str
+    type_hash: ClassVar[int]
+    type_source: ClassVar[str]
+    type_def: ClassVar[str]
+
     @classmethod
     def from_random(cls) -> MessageData: ...
     @classmethod

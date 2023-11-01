@@ -188,8 +188,9 @@ def _create_ftype_map(obj: MessageData):
 class MessageData(ctypes.Structure):
     type_id: ClassVar[int] = -1
     type_name: ClassVar[str] = ""
-    type_hash: int
-    type_src: str
+    type_hash: ClassVar[int]
+    type_source: ClassVar[str] = ""
+    type_def: ClassVar[str] = ""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

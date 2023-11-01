@@ -222,11 +222,11 @@ class PyDefCompiler:
         @pyrtma.message_def
         class MDF_{mdf.name}(pyrtma.MessageData):
             _fields_ = {fstr}
-            type_id = {msg_id}
-            type_name = \"{mdf.name}\"
-            type_hash = 0x{mdf.hash[:8]}
-            type_source = \"{msg_src}\"
-            type_def = \"{repr(mdf.raw)}\"
+            type_id: ClassVar[int] = {msg_id}
+            type_name: ClassVar[str] = \"{mdf.name}\"
+            type_hash: ClassVar[int] = 0x{mdf.hash[:8]}
+            type_source: ClassVar[str] = \"{msg_src}\"
+            type_def: ClassVar[str] = \"{repr(mdf.raw)}\"
         """
         return dedent(template)
 
@@ -282,6 +282,7 @@ class PyDefCompiler:
         s = """\
         import ctypes
         import pyrtma
+        from typing import ClassVar
         """
         return dedent(s)
 
@@ -335,7 +336,7 @@ class PyDefCompiler:
         s += "    SDF = _SDF\n"
         s += "\n" * 2
 
-        s += "RTMA = _RTMA()"
+        s += "RTMA: _RTMA = _RTMA()"
 
         return dedent(s)
 
