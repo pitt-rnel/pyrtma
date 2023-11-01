@@ -83,7 +83,7 @@ class MDF_FAIL_SUBSCRIBE(pyrtma.MessageData):
 
 class MDF_FAILED_MESSAGE(pyrtma.MessageData):
     dest_mod_id: int
-    reserved: ctypes.Array[ctypes.c_short]
+    reserved: ctypes.Array[ctypes.c_short]  # length: 3
     time_of_failure: float
     msg_header: RTMA_MSG_HEADER
 
@@ -105,7 +105,7 @@ class MDF_MODULE_READY(pyrtma.MessageData):
 class MDF_LM_EXIT(pyrtma.MessageData): ...
 
 class MDF_SAVE_MESSAGE_LOG(pyrtma.MessageData):
-    pathname: str
+    pathname: str  # length: 256
     pathname_length: int
 
 class MDF_MESSAGE_LOG_SAVED(pyrtma.MessageData): ...
@@ -115,8 +115,8 @@ class MDF_RESET_MESSAGE_LOG(pyrtma.MessageData): ...
 class MDF_DUMP_MESSAGE_LOG(pyrtma.MessageData): ...
 
 class MDF_TIMING_MESSAGE(pyrtma.MessageData):
-    timing: ctypes.Array[ctypes.c_ushort]
-    ModulePID: ctypes.Array[ctypes.c_int]
+    timing: ctypes.Array[ctypes.c_ushort]  # length: 10000
+    ModulePID: ctypes.Array[ctypes.c_int]  # length: 200
     send_time: float
 
 class MDF_FORCE_DISCONNECT(pyrtma.MessageData):

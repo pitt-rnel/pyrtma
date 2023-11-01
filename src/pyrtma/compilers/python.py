@@ -152,10 +152,8 @@ class PyDefCompiler:
         for i, field in enumerate(sdf.fields, start=1):
             flen = field.length
             nl = "\n" if i < fnum else ""
-            if flen and field.type_name == "char":
-                flen = 0  # char of any length gets converted to str
             if field.type_name in type_map.keys():
-                if flen:
+                if flen and field.type_name != "char":
                     ftype = f"ctypes.Array[{type_map[field.type_name]}]"
                 else:
                     ftype = pytype_map[field.type_name]
@@ -165,10 +163,8 @@ class PyDefCompiler:
                 ftype = f"{field.type_name}"
             elif field.type_name in self.parser.aliases.keys():
                 type_name = self.parser.aliases[field.type_name].type_name
-                if flen and type_name == "char":
-                    flen = 0
                 if type_name in type_map.keys():
-                    if flen:
+                    if flen and type_name != "char":
                         ftype = f"ctypes.Array[{type_map[type_name]}]"
                     else:
                         ftype = pytype_map[type_name]
@@ -176,7 +172,8 @@ class PyDefCompiler:
                     ftype = f"{field.type_name}"
             else:
                 raise RuntimeError(f"Unknown field name {field.name} in {sdf.name}")
-            f.append(f"{tab *3}{field.name}: {ftype}{nl}")
+            comment = f" # length: {flen}" if flen else ""
+            f.append(f"{tab *3}{field.name}: {ftype}{comment}{nl}")
         fstr += "".join(f)
         # fstr += f"\n{tab * 3}]"
 
@@ -243,10 +240,8 @@ class PyDefCompiler:
         for i, field in enumerate(mdf.fields, start=1):
             flen = field.length
             nl = "\n" if i < fnum else ""
-            if flen and field.type_name == "char":
-                flen = 0  # char of any length gets converted to str
             if field.type_name in type_map.keys():
-                if flen:
+                if flen and field.type_name != "char":
                     ftype = f"ctypes.Array[{type_map[field.type_name]}]"
                 else:
                     ftype = pytype_map[field.type_name]
@@ -256,10 +251,8 @@ class PyDefCompiler:
                 ftype = f"{field.type_name}"
             elif field.type_name in self.parser.aliases.keys():
                 type_name = self.parser.aliases[field.type_name].type_name
-                if flen and type_name == "char":
-                    flen = 0
                 if type_name in type_map.keys():
-                    if flen:
+                    if flen and type_name != "char":
                         ftype = f"ctypes.Array[{type_map[type_name]}]"
                     else:
                         ftype = pytype_map[type_name]
@@ -267,7 +260,8 @@ class PyDefCompiler:
                     ftype = f"{field.type_name}"
             else:
                 raise RuntimeError(f"Unknown field name {field.name} in {mdf.name}")
-            f.append(f"{tab *3}{field.name}: {ftype}{nl}")
+            comment = f" # length: {flen}" if flen else ""
+            f.append(f"{tab *3}{field.name}: {ftype}{comment}{nl}")
         fstr += "".join(f)
         # fstr += f"\n{tab * 3}]"
         if not fstr:
