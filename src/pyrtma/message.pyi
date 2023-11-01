@@ -15,11 +15,6 @@ def message_def(msg_cls: Type[MessageData], *args, **kwargs) -> Type[MessageData
 
 msg_def = message_def
 
-MODULE_ID = ctypes.c_short
-HOST_ID = ctypes.c_short
-MSG_TYPE = ctypes.c_int
-MSG_COUNT = ctypes.c_int
-
 class _RTMA_MSG_HEADER(ctypes.Structure):
     msg_type: int
     msg_count: int
@@ -90,6 +85,3 @@ class Message:
     def to_json(self, minify: bool = False, **kwargs) -> str: ...
     @classmethod
     def from_json(cls, s: str) -> Message: ...
-
-class RTMAJSONEncoder(json.JSONEncoder):
-    def default(self, o: Any) -> Any: ...
