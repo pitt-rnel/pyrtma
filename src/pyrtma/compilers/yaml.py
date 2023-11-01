@@ -1,7 +1,7 @@
 import pathlib
 import sys
 from pyrtma.parser import Parser
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML  # type: ignore
 from typing import Dict, Any, Optional
 
 

@@ -8,7 +8,7 @@ import logging
 import string
 
 # import yaml
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML  # type: ignore
 
 from copy import copy
 from hashlib import sha256
@@ -358,7 +358,7 @@ class Parser:
         self.included_files = []
         self.imports = []
         self.constants = {}
-        self.string_constants: Dict[str, ConstantString] = {}
+        self.string_constants = {}
         self.aliases = {}
         self.host_ids = {}
         self.module_ids = {}
