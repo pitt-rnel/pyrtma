@@ -265,14 +265,11 @@ class PyDefCompiler:
             )
         fstr += "".join(f)
         # fstr += f"\n{tab * 3}]"
+        if not fstr:
+            fstr = "..."
 
         template = f"""\
         class MDF_{mdf.name}(pyrtma.MessageData): {fstr}
-            type_id: int
-            type_name: str
-            type_hash: int
-            type_source: str
-            type_def: str
         """
         return dedent(template)
 
