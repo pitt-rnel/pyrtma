@@ -27,8 +27,14 @@ dependencies = [
   "rich"
 ]
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.setuptools.dynamic]
 version = {attr = "pyrtma.__version__"}
+
+[tool.setuptools.package-data]
+pyrtma = ["py.typed", "*.yaml"]
 
 [project.urls]
 "Homepage" = "https://github.com/pitt-rnel/pyrtma"
