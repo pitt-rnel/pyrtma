@@ -153,6 +153,7 @@ class JSDefCompiler:
             # RTMA.constants
             f.write("// Constants\n")
             f.write("RTMA.constants =  {};\n")
+            obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
             for obj in self.parser.constants.values():
                 f.write(self.generate_constant(obj))
             f.write("\n")

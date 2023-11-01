@@ -299,12 +299,12 @@ RTMAObject = Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, MDF, SDF, 
 
 class Parser:
     def __init__(self, debug: bool = False):
-        self.included_files = []
+        self.included_files: List[pathlib.Path] = []
         self.current_file = pathlib.Path()
         self.root_path = pathlib.Path()
         self.debug = debug
 
-        self.yaml_dict = dict(
+        self.yaml_dict: Dict[str, Dict[str, Any]] = dict(
             imports={},
             constants={},
             string_constants={},
@@ -739,6 +739,7 @@ class Parser:
                     )
 
                 # Check for a valid type
+                ftype_obj: Union[NativeType, TypeAlias, MDF, SDF]
                 if ftype in supported_types.keys():
                     ftype_obj = supported_types[ftype]
                 elif ftype in self.aliases.keys():
@@ -832,6 +833,7 @@ class Parser:
                 )
 
         # Create a string representation of the defintion to hash
+        f: Union[str, List[str]]
         if isinstance(sdf["fields"], str):
             f = f"    fields: {sdf['fields']}"
         else:
@@ -900,6 +902,7 @@ class Parser:
             return
 
         # Create a string representation of the defintion to hash
+        f: Union[str, List[str]]
         if isinstance(mdf["fields"], str):
             f = f"    fields: {mdf['fields']}"
         else:

@@ -144,6 +144,7 @@ class CDefCompiler:
         s = ""
 
         s += "typedef struct {\n"
+        obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
         for obj in self.parser.constants.values():
             if obj.src.name == "core_defs.yaml":
                 continue
@@ -221,7 +222,7 @@ class CDefCompiler:
     def generate_rtma_info_getter(self) -> str:
         s = "const RTMAInfo get_rtma_info() {\n"
         s += "    static RTMAInfo RTMA;\n"
-
+        obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
         for obj in self.parser.constants.values():
             if obj.src.name == "core_defs.yaml":
                 continue
@@ -285,6 +286,7 @@ class CDefCompiler:
 
             # Constants
             f.write("// Constants\n")
+            obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
             for obj in self.parser.constants.values():
                 if obj.src.name != "core_defs.yaml":
                     f.write(self.generate_constant(obj))

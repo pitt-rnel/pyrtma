@@ -2,6 +2,7 @@ import pathlib
 import sys
 from pyrtma.parser import Parser
 from ruamel.yaml import YAML
+from typing import Dict, Any, Optional
 
 
 class NullRepresenter:
@@ -24,7 +25,7 @@ class YAMLCompiler:
         my_represent_none = NullRepresenter()
         yaml.representer.add_representer(type(None), my_represent_none)
 
-        d = {}
+        d: Dict[str, Optional[Dict[str, Any]]] = {}
         for k, v in self.parser.yaml_dict.items():
             if isinstance(v, dict) and len(v) == 0:
                 d[k] = None

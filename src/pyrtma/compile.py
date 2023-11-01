@@ -2,11 +2,17 @@
 import pathlib
 import re
 import sys
-from typing import List
+from typing import List, Union
 
 from .parser import Parser, ParserError, FileFormatError
 from rich.traceback import install
 import warnings
+from pyrtma.compilers.python import PyDefCompiler
+from pyrtma.compilers.javascript import JSDefCompiler
+from pyrtma.compilers.matlab import MatlabDefCompiler
+from pyrtma.compilers.c99 import CDefCompiler
+from pyrtma.compilers.yaml import YAMLCompiler
+from pyrtma.compilers.info import InfoCompiler
 
 install(word_wrap=True, show_locals=True)
 
@@ -76,9 +82,16 @@ def compile(
     if re.search(r"[^a-zA-Z0-9_-]", filename):
         raise RuntimeError(f"Invalid out filename: {filename}")
 
+    compiler: Union[
+        PyDefCompiler,
+        JSDefCompiler,
+        MatlabDefCompiler,
+        CDefCompiler,
+        YAMLCompiler,
+        InfoCompiler,
+    ]
     if python:
         print("Building python message definitions...")
-        from pyrtma.compilers.python import PyDefCompiler
 
         compiler = PyDefCompiler(parser, debug=debug)
         ext = ".py"
@@ -90,7 +103,6 @@ def compile(
 
     if javascript:
         print("Building javascript message definitions...")
-        from pyrtma.compilers.javascript import JSDefCompiler
 
         compiler = JSDefCompiler(parser, debug=debug)
         ext = ".js"
@@ -99,7 +111,6 @@ def compile(
 
     if matlab:
         print("Building matlab message definitions...")
-        from pyrtma.compilers.matlab import MatlabDefCompiler
 
         compiler = MatlabDefCompiler(parser, debug=debug)
         ext = ".m"
@@ -108,7 +119,6 @@ def compile(
 
     if c_lang:
         print("Building C/C++ message definitions...")
-        from pyrtma.compilers.c99 import CDefCompiler
 
         compiler = CDefCompiler(parser, filename=filename, debug=debug)
         ext = ".h"
@@ -117,7 +127,6 @@ def compile(
 
     if combined:
         print("Building combined yaml file...")
-        from pyrtma.compilers.yaml import YAMLCompiler
 
         compiler = YAMLCompiler(parser, filename=filename, debug=debug)
         ext = ".yaml"
@@ -126,7 +135,6 @@ def compile(
 
     if info:
         print("Building info file...")
-        from pyrtma.compilers.info import InfoCompiler
 
         compiler = InfoCompiler(parser, filename=filename, debug=debug)
         ext = ".txt"

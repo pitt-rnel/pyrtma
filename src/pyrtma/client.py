@@ -112,8 +112,8 @@ class Client(object):
         self._connected = False
         self._header_cls = get_header_cls(timecode)
         self._recv_buffer = bytearray(1024**2)
-        self._subscribed_types = set()
-        self._paused_types = set()
+        self._subscribed_types: Set[int] = set()
+        self._paused_types: Set[int] = set()
 
     def __del__(self):
         if self._connected:
@@ -263,6 +263,7 @@ class Client(object):
 
     def _subscription_control(self, msg_list: Iterable[int], ctrl_msg: str):
         msg_set = set(msg_list)
+        msg: MessageData
         if ctrl_msg == "Subscribe":
             msg = cd.MDF_SUBSCRIBE()
             self._subscribed_types |= msg_set

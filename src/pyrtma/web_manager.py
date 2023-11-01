@@ -9,7 +9,7 @@ from pyrtma.message import RTMAMessageError
 
 from socket import error as SocketError
 from socketserver import TCPServer
-from websocket_server import (
+from websocket_server import (  # type: ignore
     WebsocketServer,
     WebSocketHandler,
     logger,
@@ -25,7 +25,7 @@ from websocket_server import (
     OPCODE_TEXT,
 )
 
-from typing import Optional
+from typing import Optional, List, Callable, Any
 
 
 class RTMAWebSocketHandler(WebSocketHandler):
@@ -101,7 +101,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
             if e.errno == errno.ECONNRESET:
                 logger.info("Client closed connection.")
                 self.keep_alive = 0
-                return
+                return None
             b1, b2 = 0, 0
         except ValueError as e:
             b1, b2 = 0, 0
@@ -110,21 +110,22 @@ class RTMAWebSocketHandler(WebSocketHandler):
         opcode = b1 & OPCODE
         masked = b2 & MASKED
         payload_length = b2 & PAYLOAD_LEN
+        opcode_handler: Callable[[str], None]
 
         if opcode == OPCODE_CLOSE_CONN:
             logger.info("Client asked to close connection.")
             self.keep_alive = 0
-            return
+            return None
         if not masked:
             logger.warning("Client must always be masked.")
             self.keep_alive = 0
-            return
+            return None
         if opcode == OPCODE_CONTINUATION:
             logger.warning("Continuation frames are not supported.")
-            return
+            return None
         elif opcode == OPCODE_BINARY:
             logger.warning("Binary frames are not supported.")
-            return
+            return None
         elif opcode == OPCODE_TEXT:
             opcode_handler = self.process_json_message
         elif opcode == OPCODE_PING:
@@ -134,7 +135,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         else:
             logger.warning("Unknown opcode %#x." % opcode)
             self.keep_alive = 0
-            return
+            return None
 
         if payload_length == 126:
             payload_length = struct.unpack(">H", self.rfile.read(2))[0]
@@ -177,7 +178,7 @@ class WebMessageManager(WebsocketServer):
         self.key = key
         self.cert = cert
 
-        self.clients = []
+        self.clients: List[dict] = []
         self.id_counter = 0
         self.thread = None
 

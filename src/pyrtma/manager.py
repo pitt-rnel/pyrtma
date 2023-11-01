@@ -16,6 +16,7 @@ from .message import Message, MessageHeader, MessageData, get_header_cls
 from . import core_defs as cd
 
 from typing import Dict, List, Tuple, Set, Type, Union, Optional
+import typing
 from dataclasses import dataclass
 from collections import defaultdict, Counter
 
@@ -110,7 +111,7 @@ class MessageManager:
         self.start_time = time.time()
 
         # dictionary of message type ids and message counts, reset each time timing_message is sent
-        self.message_counts = Counter()
+        self.message_counts: typing.Counter[int] = Counter()
         self.t_last_message_count = time.perf_counter()
         self.min_timing_message_period = 0.9
 

@@ -12,6 +12,7 @@ from pyrtma.parser import (
     MDF,
     SDF,
 )
+from typing import Union
 
 
 class InfoCompiler:
@@ -30,6 +31,7 @@ class InfoCompiler:
             mids = list(self.parser.module_ids.values())
             mids.sort(key=lambda x: x.value)
             f.write("module_ids\n")
+            obj: Union[MID, MT]
             for obj in mids:
                 src = "/".join(obj.src.parts[-2:])
                 f.write(f"{obj.value:4d}: {obj.name:<32} # {src}\n")

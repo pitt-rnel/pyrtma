@@ -12,6 +12,7 @@ from pyrtma.parser import (
     MDF,
     SDF,
 )
+from typing import Union
 
 
 # Field type name to ctypes
@@ -287,6 +288,7 @@ class PyDefCompiler:
     def generate_type_info(self) -> str:
         s = "# Collect all info into one object\n"
         s += "class _constants:\n"
+        obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
         for obj in self.parser.constants.values():
             s += f"    {obj.name} = {obj.value}\n"
         for obj in self.parser.string_constants.values():
@@ -343,6 +345,7 @@ class PyDefCompiler:
             f.write("\n")
 
             f.write("# Constants\n")
+            obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
             for obj in self.parser.constants.values():
                 f.write(self.generate_constant(obj))
             f.write("\n")
@@ -390,6 +393,7 @@ class PyDefCompiler:
             f.write("\n")
 
             f.write("# Constants\n")
+            obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
             for obj in self.parser.constants.values():
                 f.write(self.generate_constant(obj))
             f.write("\n")
