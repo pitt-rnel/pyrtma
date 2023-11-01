@@ -8,7 +8,7 @@ import logging
 import string
 
 # import yaml
-from ruamel.yaml import YAML  # type: ignore
+from ruamel.yaml import YAML
 
 from copy import copy
 from hashlib import sha256
