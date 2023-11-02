@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import ctypes
 
-from typing import Type, Any, ClassVar, Dict, Union
+from typing import Type, Any, ClassVar, Dict, Union, TypeVar, Generic
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from .utils.print import print_ctype_array, hexdump
@@ -22,6 +23,7 @@ __all__ = [
     "UnknownMessageType",
     "JSONDecodingError",
     "InvalidMessageDefinition",
+    "CArrayProxy",
 ]
 
 # Main Map of all internal message types
@@ -62,16 +64,17 @@ def message_def(msg_cls: Type[MessageData], *args, **kwargs) -> Type[MessageData
 msg_def = message_def
 
 
+def _create_ftype_map(obj: _MessageBase):
+    super(_MessageBase, obj).__setattr__(
+        "_ftype_map",
+        {k: v for k, v in super(_MessageBase, obj).__getattribute__("_fields_")},
+    )
+
+
 # Type Aliases
 MODULE_ID = ctypes.c_short
-
-
 HOST_ID = ctypes.c_short
-
-
 MSG_TYPE = ctypes.c_int
-
-
 MSG_COUNT = ctypes.c_int
 
 
@@ -92,22 +95,18 @@ class _RTMA_MSG_HEADER(ctypes.Structure):
     ]
 
 
-class MessageHeader(_RTMA_MSG_HEADER):
-    @property
-    def size(self) -> int:
-        return ctypes.sizeof(self)
+MB = TypeVar("MB", bound="_MessageBase")
+
+
+# "abstract" base class for MessageHeader and MessageData
+class _MessageBase(ctypes.Structure):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _create_ftype_map(self)
 
     @property
     def buffer(self) -> memoryview:
         return memoryview(self)
-
-    @property
-    def version(self) -> int:
-        return self.reserved
-
-    @version.setter
-    def version(self, value: int):
-        self.reserved = value
 
     def pretty_print(self, add_tabs=0) -> str:
         str = "\t" * add_tabs + f"{type(self).__name__}:"
@@ -119,21 +118,11 @@ class MessageHeader(_RTMA_MSG_HEADER):
                 if hasattr(val, "_type_"):
                     class_name = val._type_.__name__
                 val = print_ctype_array(val)
-
             str += f"\n" + "\t" * (add_tabs + 1) + f"{field_name} = ({class_name}){val}"
         return str
 
     def hexdump(self, length=16, sep=" "):
         hexdump(bytes(self), length, sep)
-
-    @property
-    def get_data(self) -> Type[MessageData]:
-        try:
-            return msg_defs[self.msg_type]
-        except KeyError as e:
-            raise UnknownMessageType(
-                f"There is no message definition associated with id:{self.msg_type}"
-            ) from e
 
     def to_json(self, minify: bool = False, **kwargs) -> str:
         if minify:
@@ -143,183 +132,65 @@ class MessageHeader(_RTMA_MSG_HEADER):
         else:
             return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
 
-    @classmethod
-    def from_dict(cls, data) -> MessageHeader:
-        obj = cls()
-        try:
-            _json_decode(obj, data)
-            return obj
-        except Exception as e:
-            raise JSONDecodingError(
-                f"Unable to decode MessageHeader object from {data}."
-            )
-
-    @classmethod
-    def from_json(cls, s) -> MessageHeader:
-        obj = cls.from_dict(json.loads(s))
-        return obj
-
-    def __eq__(self, other: MessageHeader) -> bool:
-        if type(self) != type(other):
-            raise TypeError(f"Can not compare {type(other)} to {type(self)}.")
-
-        return bytes(self) == bytes(other)
-
-
-class TimeCodeMessageHeader(MessageHeader):
-    _fields_ = [
-        ("utc_seconds", ctypes.c_uint),
-        ("utc_fraction", ctypes.c_uint),
-    ]
-
-
-def get_header_cls(timecode: bool = False) -> Type[MessageHeader]:
-    if timecode:
-        return TimeCodeMessageHeader
-    else:
-        return MessageHeader
-
-
-def _create_ftype_map(obj: MessageData):
-    super(MessageData, obj).__setattr__(
-        "_ftype_map",
-        {k: v for k, v in super(MessageData, obj).__getattribute__("_fields_")},
-    )
-
-
-# proxy class to handle getting/setting from ctypes numeric arrays
-class CArrayProxy:
-    def __init__(self, array: ctypes.Array):
-        self._array = array
-        self._pytype_ = type(self._array[0])
-
-    @property
-    def _length_(self) -> int:
-        return len(self)
-
-    @property
-    def _type_(self) -> type:
-        return self._array._type_
-
-    def __setitem__(self, slice: Union[slice, int], value_in):
-        if type(slice) is int:
-            r = range(slice, slice + 1)
-        else:
-            r = range(slice.start or 0, slice.stop or len(self), slice.step or 1)  # type: ignore
-
-        for j, i in enumerate(r):
-            try:
-                value = value_in[j]
-            except TypeError:  # expand scalar to all values of slice
-                value = value_in
-            ftype = self._type_
-            pytype = self._pytype_
-            if pytype is int:
-                try:
-                    if ftype(value).value != value:
-                        raise ValueError(
-                            f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
-                        )
-                except TypeError:
-                    raise TypeError(
-                        f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
-                    )
-            elif pytype is float:
-                # allow rounding errors but check that float values aren't wildly off
-                try:
-                    if abs(ftype(value).value - value) > 0.1:
-                        raise ValueError(
-                            f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
-                        )
-                except TypeError:
-                    raise TypeError(
-                        f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
-                    )
-            self._array[i] = value
-
-    def __getitem__(self, i) -> Union[ctypes.Array, CArrayProxy]:
-        item = self._array[i]
-        if issubclass(type(item), ctypes.Array):  # multi-dimensional arrays
-            item = CArrayProxy(item)
-        return item
-
-    def __len__(self) -> int:
-        return len(self._array)
-
-    def __repr__(self) -> str:
-        mloc = id(self)
-        return f"CArrayProxy object of {repr(self._array)} at {mloc:#X}"
-
-    def __str__(self) -> str:
-        return print_ctype_array(self._array)
-
-
-# TODO: Make this class abstract
-class MessageData(ctypes.Structure):
-    type_id: ClassVar[int] = -1
-    type_name: ClassVar[str] = ""
-    type_hash: ClassVar[int]
-    type_source: ClassVar[str] = ""
-    type_def: ClassVar[str] = ""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        _create_ftype_map(self)
-
-    @classmethod
-    def from_random(cls) -> MessageData:
-        obj = _random_struct(cls())
-        return obj
-
-    @classmethod
-    def from_buffer(cls, source, offset=0) -> MessageData:
-        obj = type(cls).from_buffer(cls, source, offset)
-        _create_ftype_map(obj)
-        return obj
-
-    @classmethod
-    def from_buffer_copy(cls, source, offset=0) -> MessageData:
-        obj = type(cls).from_buffer_copy(cls, source, offset)
-        _create_ftype_map(obj)
-        return obj
-
-    @property
-    def type_size(self) -> int:
-        return ctypes.sizeof(self)
-
-    def pretty_print(self, add_tabs=0) -> str:
-        str = "\t" * add_tabs + f"{type(self).__name__}:"
-        for field_name, field_type in self._fields_:
-            val = getattr(self, field_name)
-            class_name = field_type.__name__
-            # expand arrays
-            if hasattr(val, "__len__"):
-                if hasattr(val, "_type_"):
-                    class_name = val._type_.__name__
-                val = print_ctype_array(val)
-            str += f"\n" + "\t" * (add_tabs + 1) + f"{field_name} = ({class_name}){val}"
-        return str
-
-    def hexdump(self, length=16, sep=" "):
-        hexdump(bytes(self), length, sep)
-
     def get_field_raw(self, name: str) -> bytes:
         """return copy of raw bytes for ctypes field 'name'"""
         meta = getattr(type(self), name)
         if name not in [x[0] for x in self._fields_]:
-            raise KeyError(
-                f"name {name} is not a field of message type {self.type_name}"
-            )
+            if isinstance(self, MessageData):
+                error_str = f"{name} is not a field of message type {self.type_name}"
+            elif isinstance(self, MessageHeader):
+                error_str = f"{name} is not a field of message header"
+            else:
+                error_str = f"{name} is not a field"
+            raise KeyError(error_str)
         else:
             offset = meta.offset
             sz = meta.size
 
         return bytes(memoryview(self).cast("c")[offset : offset + sz])
 
+    @classmethod
+    def from_dict(cls: Type[MB], data) -> MB:
+        obj = cls()
+        try:
+            _json_decode(obj, data)
+            return obj
+        except Exception as e:
+            if issubclass(cls, MessageHeader):
+                error_str = f"Unable to decode MessageHeader object from {data}."
+            elif issubclass(cls, MessageData):
+                error_str = f"Unable to decode {obj.type_name} from {data}."
+            else:
+                error_str = "Unable to construct class"
+
+            raise JSONDecodingError(error_str)
+
+    @classmethod
+    def from_json(cls: Type[MB], s) -> MB:
+        obj = cls.from_dict(json.loads(s))
+        return obj
+
+    @classmethod
+    def from_random(cls: Type[MB]) -> MB:
+        obj = _random_struct(cls())
+        return obj
+
+    @classmethod
+    def from_buffer(cls: Type[MB], source, offset=0) -> MB:
+        obj = type(cls).from_buffer(cls, source, offset)
+        _create_ftype_map(obj)
+        return obj
+
+    @classmethod
+    def from_buffer_copy(cls: Type[MB], source, offset=0) -> Type[MB]:
+        obj = type(cls).from_buffer_copy(cls, source, offset)
+        _create_ftype_map(obj)
+        return obj
+
     def __str__(self) -> str:
         return self.pretty_print()
 
-    def __eq__(self, other: MessageData) -> bool:
+    def __eq__(self, other: _MessageBase) -> bool:
         if type(self) != type(other):
             raise TypeError(f"Can not compare {type(other)} to {type(self)}.")
 
@@ -350,7 +221,7 @@ class MessageData(ctypes.Structure):
         else:
             return value
 
-    def __setattr__(self, name: str, value: Any) -> None:
+    def __setattr__(self, name: str, value: Any):
         try:
             ftype = super().__getattribute__("_ftype_map").get(name)
         except AttributeError:
@@ -406,28 +277,137 @@ class MessageData(ctypes.Structure):
 
         super().__setattr__(name, value)
 
-    def to_json(self, minify: bool = False, **kwargs) -> str:
-        if minify:
-            return json.dumps(
-                self, cls=RTMAJSONEncoder, separators=(",", ":"), **kwargs
-            )
 
-        else:
-            return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
+class MessageHeader(_RTMA_MSG_HEADER, _MessageBase):
+    @property
+    def size(self) -> int:
+        return ctypes.sizeof(self)
 
-    @classmethod
-    def from_dict(cls, data) -> MessageData:
-        obj = cls()
+    @property
+    def version(self) -> int:
+        return self.reserved
+
+    @version.setter
+    def version(self, value: int):
+        self.reserved = value
+
+    @property
+    def get_data(self) -> Type[MessageData]:
         try:
-            _json_decode(obj, data)
-            return obj
-        except Exception as e:
-            raise JSONDecodingError(f"Unable to decode {obj.type_name} from {data}.")
+            return msg_defs[self.msg_type]
+        except KeyError as e:
+            raise UnknownMessageType(
+                f"There is no message definition associated with id:{self.msg_type}"
+            ) from e
 
-    @classmethod
-    def from_json(cls, s) -> MessageData:
-        obj = cls.from_dict(json.loads(s))
-        return obj
+
+class TimeCodeMessageHeader(MessageHeader):
+    _fields_ = [
+        ("utc_seconds", ctypes.c_uint),
+        ("utc_fraction", ctypes.c_uint),
+    ]
+
+
+def get_header_cls(timecode: bool = False) -> Type[MessageHeader]:
+    if timecode:
+        return TimeCodeMessageHeader
+    else:
+        return MessageHeader
+
+
+# proxy class to handle getting/setting from ctypes numeric arrays
+_CT = TypeVar("_CT", bound=ctypes._CData)
+
+
+class CArrayProxy(Sequence, Generic[_CT]):
+    def __init__(self, array: ctypes.Array[_CT]):
+        self._array = array
+        self._pytype_ = type(self._array[0])
+
+    @property
+    def _length_(self) -> int:
+        return len(self)
+
+    @property
+    def _type_(self) -> Type[_CT]:
+        return self._array._type_
+
+    def __setitem__(self, __s: Union[slice, int], value_in):
+        if type(__s) is slice:
+            r = range(__s.start or 0, __s.stop or len(self), __s.step or 1)  # type: ignore
+        else:
+            r = range(__s, __s + 1)
+        try:
+            if len(value_in) != len(r):
+                raise IndexError(f"Value longer than slice")
+        except TypeError:  # ignore scalar value in which can be applied to all values
+            pass
+
+        if r.stop > len(self):
+            raise IndexError("Index out of range")
+
+        for j, i in enumerate(r):
+            try:
+                value = value_in[j]
+            except TypeError:  # expand scalar to all values of slice
+                value = value_in
+            ftype = self._type_
+            pytype = self._pytype_
+            if pytype is int:
+                try:
+                    if ftype(value).value != value:  # type: ignore
+                        raise ValueError(
+                            f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                        )
+                except TypeError:
+                    raise TypeError(
+                        f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                    )
+            elif pytype is float:
+                # allow rounding errors but check that float values aren't wildly off
+                try:
+                    if abs(ftype(value).value - value) > 0.1:  # type: ignore
+                        raise ValueError(
+                            f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                        )
+                except TypeError:
+                    raise TypeError(
+                        f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                    )
+            self._array[i] = value
+
+    def __getitem__(self, __s: Union[slice, int]) -> Any:
+        if (isinstance(__s, int) and __s > len(self)) or (
+            isinstance(__s, slice) and (__s.start > len(self) or __s.stop > len(self))
+        ):
+            raise IndexError("Index out of range")
+        item = self._array[__s]
+        if isinstance(item, ctypes.Array):  # multi-dimensional arrays
+            item = CArrayProxy(item)
+        return item
+
+    def __len__(self) -> int:
+        return len(self._array)
+
+    def __repr__(self) -> str:
+        mloc = id(self)
+        return f"CArrayProxy object of {repr(self._array)} at {mloc:#X}"
+
+    def __str__(self) -> str:
+        return print_ctype_array(self._array)
+
+
+# TODO: Make this class abstract
+class MessageData(_MessageBase):
+    type_id: ClassVar[int] = -1
+    type_name: ClassVar[str] = ""
+    type_hash: ClassVar[int]
+    type_source: ClassVar[str] = ""
+    type_def: ClassVar[str] = ""
+
+    @property
+    def type_size(self) -> int:
+        return ctypes.sizeof(self)
 
 
 @dataclass
@@ -451,6 +431,9 @@ class Message:
             self.header.pretty_print(add_tabs) + "\n" + self.data.pretty_print(add_tabs)
         )
 
+    def __str__(self) -> str:
+        return self.pretty_print()
+
     def to_json(self, minify: bool = False, **kwargs) -> str:
         if minify:
             return json.dumps(
@@ -465,7 +448,8 @@ class Message:
         d = json.loads(s)
 
         # Decode header segment
-        hdr_cls = get_header_cls()
+        timecode_flag = "utc_seconds" in d["header"]
+        hdr_cls = get_header_cls(timecode_flag)
         hdr = hdr_cls.from_dict(d["header"])
 
         # Decode message data segment
@@ -504,7 +488,7 @@ class RTMAJSONEncoder(json.JSONEncoder):
         if issubclass(o.__class__, ctypes.Structure):
             return {k: getattr(o, k) for k, _ in getattr(o, ("_fields_"))}
 
-        if isinstance(o, ctypes.Array):
+        if isinstance(o, CArrayProxy) or isinstance(o, ctypes.Array):
             return list(o)
 
         if isinstance(o, bytes):
