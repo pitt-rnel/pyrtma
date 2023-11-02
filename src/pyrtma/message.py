@@ -369,6 +369,10 @@ class MessageData(ctypes.Structure):
         elif issubclass(ftype, ctypes.Array) and ftype._type_ is ctypes.c_char:
             if isinstance(value, str):
                 value = value.encode()
+        elif issubclass(ftype, ctypes.Array):
+            array_proxy = getattr(self, name)
+            array_proxy[:] = value
+            return
         else:  # check for scalar rollover
             pytype = type(getattr(self, name))
             if pytype is int:  # check for value overflow (this is hard to do for float)
