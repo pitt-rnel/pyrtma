@@ -198,31 +198,42 @@ class CArrayProxy:
     def _type_(self) -> type:
         return self._array._type_
 
-    def __setitem__(self, i, value):
-        self._array[i] = value
-        ftype = self._type_
-        pytype = self._pytype_
-        if pytype is int:
+    def __setitem__(self, slice: Union[slice, int], value_in):
+        if type(slice) is int:
+            r = range(slice, slice + 1)
+        else:
+            r = range(slice.start or 0, slice.stop or len(self), slice.step or 1)  # type: ignore
+
+        for i in r:
             try:
-                if ftype(value).value != value:
-                    raise ValueError(
+                value = value_in[i]
+            except TypeError:  # expand scalar to all values of slice
+                value = value_in
+
+            self._array[i] = value
+            ftype = self._type_
+            pytype = self._pytype_
+            if pytype is int:
+                try:
+                    if ftype(value).value != value:
+                        raise ValueError(
+                            f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                        )
+                except TypeError:
+                    raise TypeError(
                         f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
                     )
-            except TypeError:
-                raise TypeError(
-                    f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
-                )
-        elif pytype is float:
-            # allow rounding errors but check that float values aren't wildly off
-            try:
-                if abs(ftype(value).value - value) > 0.1:
-                    raise ValueError(
+            elif pytype is float:
+                # allow rounding errors but check that float values aren't wildly off
+                try:
+                    if abs(ftype(value).value - value) > 0.1:
+                        raise ValueError(
+                            f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                        )
+                except TypeError:
+                    raise TypeError(
                         f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
                     )
-            except TypeError:
-                raise TypeError(
-                    f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
-                )
 
     def __getitem__(self, i) -> Union[ctypes.Array, CArrayProxy]:
         item = self._array[i]
