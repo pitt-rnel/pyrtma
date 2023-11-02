@@ -316,7 +316,7 @@ def get_header_cls(timecode: bool = False) -> Type[MessageHeader]:
 
 
 # proxy class to handle getting/setting from ctypes numeric arrays
-_CT = TypeVar("_CT", bound=ctypes._CData)
+_CT = TypeVar("_CT", bound=ctypes._SimpleCData)
 
 
 class CArrayProxy(Sequence, Generic[_CT]):
@@ -355,7 +355,7 @@ class CArrayProxy(Sequence, Generic[_CT]):
             pytype = self._pytype_
             if pytype is int:
                 try:
-                    if ftype(value).value != value:  # type: ignore
+                    if ftype(value).value != value:
                         raise ValueError(
                             f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
                         )
@@ -366,7 +366,7 @@ class CArrayProxy(Sequence, Generic[_CT]):
             elif pytype is float:
                 # allow rounding errors but check that float values aren't wildly off
                 try:
-                    if abs(ftype(value).value - value) > 0.1:  # type: ignore
+                    if abs(ftype(value).value - value) > 0.1:
                         raise ValueError(
                             f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
                         )
@@ -391,7 +391,7 @@ class CArrayProxy(Sequence, Generic[_CT]):
 
     def __repr__(self) -> str:
         mloc = id(self)
-        return f"CArrayProxy object of {repr(self._array)} at {mloc:#X}"
+        return f"CArrayProxy object of {repr(self._array)} at 0x{mloc:016X}"
 
     def __str__(self) -> str:
         return print_ctype_array(self._array)
