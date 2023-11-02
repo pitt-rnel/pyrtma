@@ -212,8 +212,6 @@ class CArrayProxy:
                 value = value_in[j]
             except TypeError:  # expand scalar to all values of slice
                 value = value_in
-
-            self._array[i] = value
             ftype = self._type_
             pytype = self._pytype_
             if pytype is int:
@@ -237,6 +235,7 @@ class CArrayProxy:
                     raise TypeError(
                         f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
                     )
+            self._array[i] = value
 
     def __getitem__(self, i) -> Union[ctypes.Array, CArrayProxy]:
         item = self._array[i]
