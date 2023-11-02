@@ -229,6 +229,17 @@ class PyDefCompiler:
 
         msg_id = mdf.type_id
         msg_src = mdf.src.as_posix()
+        type_def_str = repr(mdf.raw)
+        tab = "    "
+        type_def_rhs = 'type_def: ClassVar[str] = "'
+        type_def_end = '"'
+        type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
+        type_def_line_len = len(tab) + len(type_def_line)
+        default_black_len = 88  # preferred line length
+        if type_def_line_len > default_black_len:
+            type_def_rhs = f'type_def: ClassVar[\n{tab *4}str\n{tab *3}] = "'
+            type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
+
         template = f"""\
         @pyrtma.message_def
         class MDF_{mdf.name}(pyrtma.MessageData):
@@ -237,7 +248,7 @@ class PyDefCompiler:
             type_name: ClassVar[str] = \"{mdf.name}\"
             type_hash: ClassVar[int] = 0x{mdf.hash[:8].upper()}
             type_source: ClassVar[str] = \"{msg_src}\"
-            type_def: ClassVar[str] = \"{repr(mdf.raw)}\"
+            {type_def_line}
         """
         return dedent(template)
 
