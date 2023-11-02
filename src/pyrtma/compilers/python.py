@@ -110,11 +110,14 @@ class PyDefCompiler:
         if fnum == 0:
             fstr += "]"
         else:
-            tab = "    "
-            fstr += "\n"
+            if fnum > 2:
+                tab = "    "
+                fstr += "\n"
+            else:
+                tab = ""
             for i, field in enumerate(sdf.fields, start=1):
                 flen = field.length
-                nl = ",\n" if i < fnum else ""
+                nl = ",\n" if fnum > 2 else ", " if i < fnum else ""
 
                 if field.type_name in type_map.keys():
                     ftype = type_map[field.type_name]
@@ -132,7 +135,10 @@ class PyDefCompiler:
                 )
 
             fstr += "".join(f)
-            fstr += f"\n{tab * 3}]"
+            if fnum > 2:
+                fstr += f"{tab * 3}]"
+            else:
+                fstr += "]"
 
         template = f"""\
         class {sdf.name}(ctypes.Structure):
@@ -151,7 +157,7 @@ class PyDefCompiler:
         fstr += "\n"
         for i, field in enumerate(sdf.fields, start=1):
             flen = field.length
-            nl = "\n" if i < fnum else ""
+            nl = "\n"
             if field.type_name in type_map.keys():
                 if flen and field.type_name != "char":
                     ftype = f"ctypes.Array[{type_map[field.type_name]}]"
@@ -176,9 +182,11 @@ class PyDefCompiler:
             f.append(f"{tab *3}{field.name}: {ftype}{comment}{nl}")
         fstr += "".join(f)
         # fstr += f"\n{tab * 3}]"
+        if not fstr:
+            fstr = " ..."
 
         template = f"""\
-        class {sdf.name}(ctypes.Structure): {fstr}
+        class {sdf.name}(ctypes.Structure):{fstr}
         """
         return dedent(template)
 
@@ -189,11 +197,14 @@ class PyDefCompiler:
         if fnum == 0:
             fstr += "]"
         else:
-            tab = "    "
-            fstr += "\n"
+            if fnum > 2:
+                tab = "    "
+                fstr += "\n"
+            else:
+                tab = ""
             for i, field in enumerate(mdf.fields, start=1):
                 flen = field.length
-                nl = ",\n" if i < fnum else ""
+                nl = ",\n" if fnum > 2 else ", " if i < fnum else ""
 
                 if field.type_name in type_map.keys():
                     ftype = type_map[field.type_name]
@@ -211,7 +222,10 @@ class PyDefCompiler:
                 )
 
             fstr += "".join(f)
-            fstr += f"\n{tab * 3}]"
+            if fnum > 2:
+                fstr += f"{tab * 3}]"
+            else:
+                fstr += "]"
 
         msg_id = mdf.type_id
         msg_src = mdf.src.as_posix()
@@ -221,7 +235,7 @@ class PyDefCompiler:
             _fields_ = {fstr}
             type_id: ClassVar[int] = {msg_id}
             type_name: ClassVar[str] = \"{mdf.name}\"
-            type_hash: ClassVar[int] = 0x{mdf.hash[:8]}
+            type_hash: ClassVar[int] = 0x{mdf.hash[:8].upper()}
             type_source: ClassVar[str] = \"{msg_src}\"
             type_def: ClassVar[str] = \"{repr(mdf.raw)}\"
         """
@@ -239,7 +253,7 @@ class PyDefCompiler:
             fstr += "\n"
         for i, field in enumerate(mdf.fields, start=1):
             flen = field.length
-            nl = "\n" if i < fnum else ""
+            nl = "\n"
             if field.type_name in type_map.keys():
                 if flen and field.type_name != "char":
                     ftype = f"ctypes.Array[{type_map[field.type_name]}]"
@@ -260,15 +274,15 @@ class PyDefCompiler:
                     ftype = f"{field.type_name}"
             else:
                 raise RuntimeError(f"Unknown field name {field.name} in {mdf.name}")
-            comment = f" # length: {flen}" if flen else ""
+            comment = f"  # length: {flen}" if flen else ""
             f.append(f"{tab *3}{field.name}: {ftype}{comment}{nl}")
         fstr += "".join(f)
         # fstr += f"\n{tab * 3}]"
         if not fstr:
-            fstr = "..."
+            fstr = " ..."
 
         template = f"""\
-        class MDF_{mdf.name}(pyrtma.MessageData): {fstr}
+        class MDF_{mdf.name}(pyrtma.MessageData):{fstr}
         """
         return dedent(template)
 
@@ -381,6 +395,7 @@ class PyDefCompiler:
                 f.write("\n\n")
 
             f.write(self.generate_type_info())
+            f.write("\n")
 
     def generate_stub(self, out_filepath: pathlib.Path):
         with open(out_filepath, mode="w") as f:
@@ -416,14 +431,25 @@ class PyDefCompiler:
             f.write("# Message Type IDs\n")
             for obj in self.parser.message_ids.values():
                 f.write(self.generate_msg_type_id(obj))
-            f.write("\n\n")
+            f.write("\n")
 
             f.write("# Struct Definitions\n")
+            new_line_flag = False
             for obj in self.parser.struct_defs.values():
-                f.write(self.generate_struct_stub(obj))
-                f.write("\n\n")
+                struct_txt = self.generate_struct_stub(obj)
+                if struct_txt[-4:] != "...\n" and new_line_flag:
+                    f.write("\n")
+                f.write(struct_txt)
+                new_line_flag = (
+                    struct_txt[-4:] == "...\n"
+                )  # if new line may be needed for next class
 
             f.write("# Message Definitions\n")
             for obj in self.parser.message_defs.values():
-                f.write(self.generate_msg_stub(obj))
-                f.write("\n\n")
+                mdf_text = self.generate_msg_stub(obj)
+                if mdf_text[-4:] != "...\n" and new_line_flag:
+                    f.write("\n")
+                f.write(mdf_text)
+                new_line_flag = (
+                    mdf_text[-4:] == "...\n"
+                )  # if new line may be needed for next class
