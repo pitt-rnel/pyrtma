@@ -314,9 +314,8 @@ class MessageData(ctypes.Structure):
                     raise TypeError(
                         f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
                     )
-            elif (
-                pytype is float
-            ):  # allow rounding errors but check that float values aren't wildly off
+            elif pytype is float:
+                # allow rounding errors but check that float values aren't wildly off
                 try:
                     if abs(ftype(value).value - value) > 0.1:
                         raise ValueError(
