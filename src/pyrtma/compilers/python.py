@@ -277,6 +277,13 @@ class PyDefCompiler:
         import ctypes
         import pyrtma
         from typing import ClassVar
+        """
+        return dedent(s)
+
+    def generate_stub_imports(self) -> str:
+        s = """\
+        import ctypes
+        import pyrtma
         from pyrtma.message import CArrayProxy
         """
         return dedent(s)
@@ -385,7 +392,7 @@ class PyDefCompiler:
 
     def generate_stub(self, out_filepath: pathlib.Path):
         with open(out_filepath, mode="w") as f:
-            f.write(self.generate_imports())
+            f.write(self.generate_stub_imports())
             f.write("\n")
 
             f.write("# Constants\n")
