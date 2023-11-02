@@ -288,9 +288,44 @@ class MessageData(ctypes.Structure):
         if ftype is ctypes.c_char:
             if isinstance(value, str):
                 value = value.encode()
+            elif isinstance(value, int):
+                # check for int overflow
+                try:
+                    if int.from_bytes(ftype(value).value, "little") != value:
+                        raise ValueError(
+                            f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                        )
+                except TypeError:
+                    raise ValueError(
+                        f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                    )
         elif issubclass(ftype, ctypes.Array) and ftype._type_ is ctypes.c_char:
             if isinstance(value, str):
                 value = value.encode()
+        else:  # check for scalar rollover
+            pytype = type(getattr(self, name))
+            if pytype is int:  # check for value overflow (this is hard to do for float)
+                try:
+                    if ftype(value).value != value:
+                        raise ValueError(
+                            f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                        )
+                except TypeError:
+                    raise TypeError(
+                        f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                    )
+            elif (
+                pytype is float
+            ):  # allow rounding errors but check that float values aren't wildly off
+                try:
+                    if abs(ftype(value).value - value) > 0.1:
+                        raise ValueError(
+                            f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                        )
+                except TypeError:
+                    raise TypeError(
+                        f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                    )
 
         super().__setattr__(name, value)
 
