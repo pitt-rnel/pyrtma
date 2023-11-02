@@ -207,9 +207,9 @@ class CArrayProxy:
         else:
             r = range(slice.start or 0, slice.stop or len(self), slice.step or 1)  # type: ignore
 
-        for i in r:
+        for j, i in enumerate(r):
             try:
-                value = value_in[i]
+                value = value_in[j]
             except TypeError:  # expand scalar to all values of slice
                 value = value_in
 
