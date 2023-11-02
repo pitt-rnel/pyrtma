@@ -113,10 +113,13 @@ class MessageHeader(_RTMA_MSG_HEADER):
         str = "\t" * add_tabs + f"{type(self).__name__}:"
         for field_name, field_type in self._fields_:
             val = getattr(self, field_name)
-            class_name = type(val).__name__
+            class_name = field_type.__name__
             # expand arrays
             if hasattr(val, "__len__"):
+                if hasattr(val, "_type_"):
+                    class_name = val._type_.__name__
                 val = print_ctype_array(val)
+
             str += f"\n" + "\t" * (add_tabs + 1) + f"{field_name} = ({class_name}){val}"
         return str
 
@@ -248,6 +251,9 @@ class CArrayProxy:
         mloc = id(self)
         return f"CArrayProxy object of {repr(self._array)} at {mloc:#X}"
 
+    def __str__(self) -> str:
+        return print_ctype_array(self._array)
+
 
 # TODO: Make this class abstract
 class MessageData(ctypes.Structure):
@@ -286,9 +292,11 @@ class MessageData(ctypes.Structure):
         str = "\t" * add_tabs + f"{type(self).__name__}:"
         for field_name, field_type in self._fields_:
             val = getattr(self, field_name)
-            class_name = type(val).__name__
+            class_name = field_type.__name__
             # expand arrays
             if hasattr(val, "__len__"):
+                if hasattr(val, "_type_"):
+                    class_name = val._type_.__name__
                 val = print_ctype_array(val)
             str += f"\n" + "\t" * (add_tabs + 1) + f"{field_name} = ({class_name}){val}"
         return str
