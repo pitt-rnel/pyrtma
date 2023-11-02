@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import ctypes
 
-from typing import Type, Any, ClassVar, Dict
+from typing import Type, Any, ClassVar, Dict, Union
 from dataclasses import dataclass
 
 from .utils.print import print_ctype_array, hexdump
@@ -184,6 +184,60 @@ def _create_ftype_map(obj: MessageData):
     )
 
 
+# proxy class to handle getting/setting from ctypes numeric arrays
+class CArrayProxy:
+    def __init__(self, array: ctypes.Array):
+        self._array = array
+        self._pytype_ = type(self._array[0])
+
+    @property
+    def _length_(self) -> int:
+        return len(self)
+
+    @property
+    def _type_(self) -> type:
+        return self._array._type_
+
+    def __setitem__(self, i, value):
+        self._array[i] = value
+        ftype = self._type_
+        pytype = self._pytype_
+        if pytype is int:
+            try:
+                if ftype(value).value != value:
+                    raise ValueError(
+                        f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                    )
+            except TypeError:
+                raise TypeError(
+                    f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                )
+        elif pytype is float:
+            # allow rounding errors but check that float values aren't wildly off
+            try:
+                if abs(ftype(value).value - value) > 0.1:
+                    raise ValueError(
+                        f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                    )
+            except TypeError:
+                raise TypeError(
+                    f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
+                )
+
+    def __getitem__(self, i) -> Union[ctypes.Array, CArrayProxy]:
+        item = self._array[i]
+        if issubclass(type(item), ctypes.Array):  # multi-dimensional arrays
+            item = CArrayProxy(item)
+        return item
+
+    def __len__(self) -> int:
+        return len(self._array)
+
+    def __repr__(self) -> str:
+        mloc = id(self)
+        return f"CArrayProxy object of {repr(self._array)} at {mloc:#X}"
+
+
 # TODO: Make this class abstract
 class MessageData(ctypes.Structure):
     type_id: ClassVar[int] = -1
@@ -273,6 +327,8 @@ class MessageData(ctypes.Structure):
             return value.decode()
         elif issubclass(ftype, ctypes.Array) and ftype._type_ is ctypes.c_char:
             return value.decode()
+        elif issubclass(ftype, ctypes.Array):
+            return CArrayProxy(value)
         else:
             return value
 
