@@ -75,6 +75,8 @@ pytype_map = {
     "int64": "int",
 }
 
+DEFAULT_BLACK_LEN = 88  # preferred line length
+
 
 class PyDefCompiler:
     def __init__(self, parser: Parser, debug: bool = False):
@@ -235,8 +237,7 @@ class PyDefCompiler:
         type_def_end = '"'
         type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
         type_def_line_len = len(tab) + len(type_def_line)
-        default_black_len = 88  # preferred line length
-        if type_def_line_len > default_black_len:
+        if type_def_line_len > DEFAULT_BLACK_LEN:
             type_def_rhs = f'type_def: ClassVar[\n{tab *4}str\n{tab *3}] = "'
             type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
 
@@ -306,6 +307,7 @@ class PyDefCompiler:
         return dedent(s)
 
     def generate_type_info(self) -> str:
+        tab = "    "
         s = "# Collect all info into one object\n"
         s += "class _constants:\n"
         obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
@@ -317,32 +319,35 @@ class PyDefCompiler:
 
         s += "class _HID:\n"
         for obj in self.parser.host_ids.values():
-            s += f"    {obj.name} = {obj.value}\n"
+            s += f"{tab}{obj.name} = {obj.value}\n"
         s += "\n" * 2
 
         s += "class _MID:\n"
         for obj in self.parser.module_ids.values():
-            s += f"    {obj.name} = {obj.value}\n"
+            s += f"{tab}{obj.name} = {obj.value}\n"
         s += "\n" * 2
 
         s += "class _aliases:\n"
         for obj in self.parser.aliases.values():
-            s += f"    {obj.name} = {obj.name}\n"
+            s += f"{tab}{obj.name} = {obj.name}\n"
         s += "\n" * 2
 
         s += "class _SDF:\n"
         for obj in self.parser.struct_defs.values():
-            s += f"    {obj.name} = {obj.name}\n"
+            s += f"{tab}{obj.name} = {obj.name}\n"
         s += "\n" * 2
 
         s += "class _MT:\n"
         for obj in self.parser.message_ids.values():
-            s += f"    {obj.name} = {obj.value}\n"
+            s += f"{tab}{obj.name} = {obj.value}\n"
         s += "\n" * 2
 
         s += "class _MDF:\n"
         for obj in self.parser.message_defs.values():
-            s += f"    {obj.name} = MDF_{obj.name}\n"
+            mdf_txt = f"{tab}{obj.name} = MDF_{obj.name}\n"
+            if len(mdf_txt) > DEFAULT_BLACK_LEN:
+                mdf_txt = f"{tab}{obj.name} = (\n{tab*2}MDF_{obj.name}\n{tab})\n"
+            s += mdf_txt
         s += "\n" * 2
 
         s += "class _RTMA:\n"
