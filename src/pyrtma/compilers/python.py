@@ -76,6 +76,7 @@ pytype_map = {
 }
 
 DEFAULT_BLACK_LEN = 88  # preferred line length
+TAB = "    "
 
 
 class PyDefCompiler:
@@ -113,7 +114,7 @@ class PyDefCompiler:
             fstr += "]"
         else:
             if fnum > 2:
-                tab = "    "
+                tab = TAB
                 fstr += "\n"
             else:
                 tab = ""
@@ -155,7 +156,7 @@ class PyDefCompiler:
         # if fnum == 0:
         #    fstr += "]"
         # else:
-        tab = "    "
+        tab = TAB
         fstr += "\n"
         for i, field in enumerate(sdf.fields, start=1):
             flen = field.length
@@ -200,7 +201,7 @@ class PyDefCompiler:
             fstr += "]"
         else:
             if fnum > 2:
-                tab = "    "
+                tab = TAB
                 fstr += "\n"
             else:
                 tab = ""
@@ -232,13 +233,12 @@ class PyDefCompiler:
         msg_id = mdf.type_id
         msg_src = mdf.src.as_posix()
         type_def_str = repr(mdf.raw)
-        tab = "    "
         type_def_rhs = 'type_def: ClassVar[str] = "'
         type_def_end = '"'
         type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
-        type_def_line_len = len(tab) + len(type_def_line)
+        type_def_line_len = len(TAB) + len(type_def_line)
         if type_def_line_len > DEFAULT_BLACK_LEN:
-            type_def_rhs = f'type_def: ClassVar[\n{tab *4}str\n{tab *3}] = "'
+            type_def_rhs = f'type_def: ClassVar[\n{TAB *4}str\n{TAB *3}] = "'
             type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
 
         template = f"""\
@@ -260,7 +260,6 @@ class PyDefCompiler:
         # if fnum == 0:
         #    fstr += "]"
         # else:
-        tab = "    "
         if fnum:
             fstr += "\n"
         for i, field in enumerate(mdf.fields, start=1):
@@ -287,9 +286,8 @@ class PyDefCompiler:
             else:
                 raise RuntimeError(f"Unknown field name {field.name} in {mdf.name}")
             comment = f"  # length: {flen}" if flen else ""
-            f.append(f"{tab *3}{field.name}: {ftype}{comment}{nl}")
+            f.append(f"{TAB *3}{field.name}: {ftype}{comment}{nl}")
         fstr += "".join(f)
-        # fstr += f"\n{tab * 3}]"
         if not fstr:
             fstr = " ..."
 
@@ -307,57 +305,56 @@ class PyDefCompiler:
         return dedent(s)
 
     def generate_type_info(self) -> str:
-        tab = "    "
         s = "# Collect all info into one object\n"
         s += "class _constants:\n"
         obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
         for obj in self.parser.constants.values():
-            s += f"    {obj.name} = {obj.value}\n"
+            s += f"{TAB}{obj.name} = {obj.value}\n"
         for obj in self.parser.string_constants.values():
-            s += f"    {obj.name} = {obj.value}\n"
+            s += f"{TAB}{obj.name} = {obj.value}\n"
         s += "\n" * 2
 
         s += "class _HID:\n"
         for obj in self.parser.host_ids.values():
-            s += f"{tab}{obj.name} = {obj.value}\n"
+            s += f"{TAB}{obj.name} = {obj.value}\n"
         s += "\n" * 2
 
         s += "class _MID:\n"
         for obj in self.parser.module_ids.values():
-            s += f"{tab}{obj.name} = {obj.value}\n"
+            s += f"{TAB}{obj.name} = {obj.value}\n"
         s += "\n" * 2
 
         s += "class _aliases:\n"
         for obj in self.parser.aliases.values():
-            s += f"{tab}{obj.name} = {obj.name}\n"
+            s += f"{TAB}{obj.name} = {obj.name}\n"
         s += "\n" * 2
 
         s += "class _SDF:\n"
         for obj in self.parser.struct_defs.values():
-            s += f"{tab}{obj.name} = {obj.name}\n"
+            s += f"{TAB}{obj.name} = {obj.name}\n"
         s += "\n" * 2
 
         s += "class _MT:\n"
         for obj in self.parser.message_ids.values():
-            s += f"{tab}{obj.name} = {obj.value}\n"
+            s += f"{TAB}{obj.name} = {obj.value}\n"
         s += "\n" * 2
 
         s += "class _MDF:\n"
         for obj in self.parser.message_defs.values():
-            mdf_txt = f"{tab}{obj.name} = MDF_{obj.name}\n"
+            mdf_txt = f"{TAB}{obj.name} = MDF_{obj.name}\n"
             if len(mdf_txt) > DEFAULT_BLACK_LEN:
-                mdf_txt = f"{tab}{obj.name} = (\n{tab*2}MDF_{obj.name}\n{tab})\n"
+                mdf_txt = f"{TAB}{obj.name} = (\n{TAB*2}MDF_{obj.name}\n{TAB})\n"
             s += mdf_txt
         s += "\n" * 2
 
         s += "class _RTMA:\n"
-        s += "    constants = _constants\n"
-        s += "    HID = _HID\n"
-        s += "    MID = _MID\n"
-        s += "    aliases = _aliases\n"
-        s += "    MT = _MT\n"
-        s += "    MDF = _MDF\n"
-        s += "    SDF = _SDF\n"
+        s += f"{TAB}constants = _constants\n"
+        s += f"{TAB}HID = _HID\n"
+        s += f"{TAB}MID = _MID\n"
+        s += f"{TAB}aliases = _aliases\n"
+        s += f"{TAB}MT = _MT\n"
+        s += f"{TAB}MDF = _MDF\n"
+        s += f"{TAB}SDF = _SDF\n"
         s += "\n" * 2
 
         s += "RTMA: _RTMA = _RTMA()"
@@ -456,9 +453,8 @@ class PyDefCompiler:
                 if struct_txt[-4:] != "...\n" and new_line_flag:
                     f.write("\n")
                 f.write(struct_txt)
-                new_line_flag = (
-                    struct_txt[-4:] == "...\n"
-                )  # if new line may be needed for next class
+                # if new line may be needed for next class
+                new_line_flag = struct_txt[-4:] == "...\n"
 
             f.write("# Message Definitions\n")
             for obj in self.parser.message_defs.values():
@@ -466,6 +462,5 @@ class PyDefCompiler:
                 if mdf_text[-4:] != "...\n" and new_line_flag:
                     f.write("\n")
                 f.write(mdf_text)
-                new_line_flag = (
-                    mdf_text[-4:] == "...\n"
-                )  # if new line may be needed for next class
+                # if new line may be needed for next class
+                new_line_flag = mdf_text[-4:] == "...\n"
