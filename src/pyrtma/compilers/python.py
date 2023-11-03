@@ -153,14 +153,10 @@ class PyDefCompiler:
         f = []
         fnum = len(sdf.fields)
         fstr = ""
-        # if fnum == 0:
-        #    fstr += "]"
-        # else:
-        tab = TAB
         fstr += "\n"
         for i, field in enumerate(sdf.fields, start=1):
             flen = field.length
-            nl = "\n"
+            nl = "\n" if i < fnum else ""
             if field.type_name in type_map.keys():
                 if flen and field.type_name != "char":
                     ftype = f"CArrayProxy[{type_map[field.type_name]}]"
@@ -181,10 +177,9 @@ class PyDefCompiler:
                     ftype = f"{field.type_name}"
             else:
                 raise RuntimeError(f"Unknown field name {field.name} in {sdf.name}")
-            comment = f" # length: {flen}" if flen else ""
-            f.append(f"{tab *3}{field.name}: {ftype}{comment}{nl}")
+            comment = f"  # length: {flen}" if flen else ""
+            f.append(f"{TAB *3}{field.name}: {ftype}{comment}{nl}")
         fstr += "".join(f)
-        # fstr += f"\n{tab * 3}]"
         if not fstr:
             fstr = " ..."
 
@@ -257,14 +252,11 @@ class PyDefCompiler:
         f = []
         fnum = len(mdf.fields)
         fstr = ""
-        # if fnum == 0:
-        #    fstr += "]"
-        # else:
         if fnum:
             fstr += "\n"
         for i, field in enumerate(mdf.fields, start=1):
             flen = field.length
-            nl = "\n"
+            nl = "\n" if i < fnum else ""
             if field.type_name in type_map.keys():
                 if flen and field.type_name != "char":
                     ftype = f"CArrayProxy[{type_map[field.type_name]}]"
@@ -456,19 +448,23 @@ class PyDefCompiler:
 
             f.write("# Struct Definitions\n")
             new_line_flag = False
-            for obj in self.parser.struct_defs.values():
+            for i, obj in enumerate(self.parser.struct_defs.values()):
                 struct_txt = self.generate_struct_stub(obj)
-                if struct_txt[-4:] != "...\n" and new_line_flag:
+                end_flag = struct_txt[-4:] != "...\n"
+                if i and (end_flag or new_line_flag):
                     f.write("\n")
                 f.write(struct_txt)
                 # if new line may be needed for next class
-                new_line_flag = struct_txt[-4:] == "...\n"
+                new_line_flag = end_flag
+            f.write("\n")
 
             f.write("# Message Definitions\n")
-            for obj in self.parser.message_defs.values():
+            new_line_flag = False
+            for i, obj in enumerate(self.parser.message_defs.values()):
                 mdf_text = self.generate_msg_stub(obj)
-                if mdf_text[-4:] != "...\n" and new_line_flag:
+                end_flag = mdf_text[-4:] != "...\n"
+                if i and (end_flag or new_line_flag):
                     f.write("\n")
                 f.write(mdf_text)
                 # if new line may be needed for next class
-                new_line_flag = mdf_text[-4:] == "...\n"
+                new_line_flag = end_flag
