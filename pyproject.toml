@@ -24,7 +24,8 @@ dynamic = ["version"]
 dependencies = [
   "ruamel.yaml",
   "websocket-server",
-  "rich"
+  "rich",
+  "black",
 ]
 
 [tool.setuptools.packages.find]
