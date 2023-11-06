@@ -341,7 +341,6 @@ class Parser:
 
     def warning(self, msg: str):
         self.logger.warning(msg)
-        input("Hit enter to continue...")
 
     def clear(self):
         self.current_file = pathlib.Path()
@@ -433,6 +432,7 @@ class Parser:
 
         if imp.file.suffix == ".yml":
             self.warning(f"Please change {imp.file} to use '.yaml' extension.")
+            input("Hit enter to continue...")
 
         self.parse_file(imp.file.absolute())
 
