@@ -636,7 +636,6 @@ class TestParser(unittest.TestCase):
         with self.assertRaises(pyrtma.parser.InvalidTypeError):
             self.parser.parse(self.tmp.path)
 
-
     def test_auto_padding(self):
         text = textwrap.dedent(
             """
@@ -655,6 +654,6 @@ class TestParser(unittest.TestCase):
                         d: double
             """
         )
-        
+
         self.tmp.write(text)
         self.parser.parse(self.tmp.path)

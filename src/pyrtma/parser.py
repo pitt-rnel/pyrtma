@@ -650,7 +650,9 @@ class Parser:
                 length=length or None,
             )
             s.fields.append(padding)
-            self.warning(f"WARNING: Adding {length} trailing padding byte(s) at end of {s.name}.")
+            self.warning(
+                f"WARNING: Adding {length} trailing padding byte(s) at end of {s.name}."
+            )
 
         # Final size check using Python's builtin struct module
         assert s.size == struct.calcsize(
