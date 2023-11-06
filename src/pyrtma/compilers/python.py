@@ -13,6 +13,9 @@ from pyrtma.parser import (
     SDF,
 )
 from typing import Union
+import subprocess
+import sys
+import os
 
 
 # Field type name to ctypes
@@ -401,6 +404,8 @@ class PyDefCompiler:
 
             f.write(self.generate_type_info())
             f.write("\n")
+        # run black formatter
+        subprocess.run([sys.executable, "-m", "black", out_filepath], cwd=os.getcwd())
 
     def generate_stub(self, out_filepath: pathlib.Path):
         with open(out_filepath, mode="w") as f:
@@ -460,3 +465,5 @@ class PyDefCompiler:
                 f.write(mdf_text)
                 # if new line may be needed for next class
                 new_line_flag = end_flag
+        # run black formatter
+        subprocess.run([sys.executable, "-m", "black", out_filepath], cwd=os.getcwd())
