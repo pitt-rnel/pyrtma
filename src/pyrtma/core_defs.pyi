@@ -1,6 +1,6 @@
 import ctypes
 import pyrtma
-from pyrtma.message import CArrayProxy
+from pyrtma.message import ArrayField
 
 # Constants
 MAX_MODULES: int = 200
@@ -83,7 +83,7 @@ class MDF_FAIL_SUBSCRIBE(pyrtma.MessageData):
 
 class MDF_FAILED_MESSAGE(pyrtma.MessageData):
     dest_mod_id: int
-    reserved: CArrayProxy[ctypes.c_short]  # length: 3
+    reserved: ArrayField[ctypes.c_short]  # length: 3
     time_of_failure: float
     msg_header: RTMA_MSG_HEADER
 
@@ -115,8 +115,8 @@ class MDF_RESET_MESSAGE_LOG(pyrtma.MessageData): ...
 class MDF_DUMP_MESSAGE_LOG(pyrtma.MessageData): ...
 
 class MDF_TIMING_MESSAGE(pyrtma.MessageData):
-    timing: CArrayProxy[ctypes.c_ushort]  # length: 10000
-    ModulePID: CArrayProxy[ctypes.c_int]  # length: 200
+    timing: ArrayField[ctypes.c_ushort]  # length: 10000
+    ModulePID: ArrayField[ctypes.c_int]  # length: 200
     send_time: float
 
 class MDF_FORCE_DISCONNECT(pyrtma.MessageData):

@@ -1,7 +1,18 @@
 from __future__ import annotations
 import json
 import ctypes
-from typing import Type, Any, ClassVar, Dict, Union, Iterator, TypeVar, Generic
+from typing import (
+    Type,
+    Any,
+    ClassVar,
+    Dict,
+    Union,
+    Iterator,
+    TypeVar,
+    Generic,
+    overload,
+    List,
+)
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -80,17 +91,91 @@ def get_header_cls(timecode: bool = False) -> Type[MessageHeader]: ...
 
 # proxy class to handle getting/setting from ctypes numeric arrays
 _CT = TypeVar("_CT", bound=ctypes._CData)
+_CInt = TypeVar(
+    "_CInt",
+    bound=Union[
+        ctypes.c_bool,
+        ctypes.c_byte,
+        ctypes.c_long,
+        ctypes.c_longlong,
+        ctypes.c_int,
+        ctypes.c_int8,
+        ctypes.c_int16,
+        ctypes.c_int32,
+        ctypes.c_int64,
+        ctypes.c_ulong,
+        ctypes.c_ulonglong,
+        ctypes.c_uint,
+        ctypes.c_uint8,
+        ctypes.c_uint16,
+        ctypes.c_uint32,
+        ctypes.c_uint64,
+        ctypes.c_long,
+        ctypes.c_longlong,
+    ],
+)
+_CFloat = TypeVar(
+    "_CFloat",
+    bound=Union[
+        ctypes.c_float,
+        ctypes.c_double,
+        ctypes.c_longdouble,
+    ],
+)
+_CNum = TypeVar(
+    "_CNum",
+    bound=Union[
+        ctypes.c_bool,
+        ctypes.c_byte,
+        ctypes.c_long,
+        ctypes.c_longlong,
+        ctypes.c_int,
+        ctypes.c_int8,
+        ctypes.c_int16,
+        ctypes.c_int32,
+        ctypes.c_int64,
+        ctypes.c_ulong,
+        ctypes.c_ulonglong,
+        ctypes.c_uint,
+        ctypes.c_uint8,
+        ctypes.c_uint16,
+        ctypes.c_uint32,
+        ctypes.c_uint64,
+        ctypes.c_long,
+        ctypes.c_longlong,
+        ctypes.c_float,
+        ctypes.c_double,
+        ctypes.c_longdouble,
+    ],
+)
+# _CStr = TypeVar("_CStr", bound=ctypes.c_char)
 
-class CArrayProxy(Sequence, Generic[_CT]):
-    _array: ctypes.Array[_CT]
+class ArrayField(Sequence, Generic[_CNum]):
+    _array: ctypes.Array[_CNum]
     _pytype_: type
-    def __init__(self, array: ctypes.Array[_CT]): ...
+    def __init__(self, array: ctypes.Array[_CNum]): ...
     @property
     def _length_(self) -> int: ...
     @property
-    def _type_(self) -> Type[_CT]: ...
-    def __setitem__(self, __s: Union[slice, int], value_in): ...
-    def __getitem__(self, __s: Union[slice, int]) -> Any: ...
+    def _type_(self) -> Type[_CNum]: ...
+    @overload
+    def __setitem__(self: ArrayField[_CInt], __s: int, value_in: int): ...
+    @overload
+    def __setitem__(self: ArrayField[_CInt], __s: slice, value_in: Sequence[int]): ...
+    @overload
+    def __setitem__(self: ArrayField[_CFloat], __s: int, value_in: float): ...
+    @overload
+    def __setitem__(
+        self: ArrayField[_CFloat], __s: slice, value_in: Sequence[float]
+    ): ...
+    @overload
+    def __getitem__(self: ArrayField[_CInt], __s: int) -> int: ...
+    @overload
+    def __getitem__(self: ArrayField[_CInt], __s: slice) -> List[int]: ...
+    @overload
+    def __getitem__(self: ArrayField[_CFloat], __s: int) -> float: ...
+    @overload
+    def __getitem__(self: ArrayField[_CFloat], __s: slice) -> List[float]: ...
     def __len__(self) -> int: ...
     def __repr__(self) -> str: ...
     def __str__(self) -> str: ...

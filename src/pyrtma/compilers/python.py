@@ -162,7 +162,7 @@ class PyDefCompiler:
             nl = "\n" if i < fnum else ""
             if field.type_name in type_map.keys():
                 if flen and field.type_name != "char":
-                    ftype = f"CArrayProxy[{type_map[field.type_name]}]"
+                    ftype = f"ArrayField[{type_map[field.type_name]}]"
                 else:
                     ftype = pytype_map[field.type_name]
             elif field.type_name in self.parser.message_defs.keys():
@@ -173,7 +173,7 @@ class PyDefCompiler:
                 type_name = self.parser.aliases[field.type_name].type_name
                 if type_name in type_map.keys():
                     if flen and type_name != "char":
-                        ftype = f"CArrayProxy[{type_map[type_name]}]"
+                        ftype = f"ArrayField[{type_map[type_name]}]"
                     else:
                         ftype = pytype_map[type_name]
                 else:
@@ -262,7 +262,7 @@ class PyDefCompiler:
             nl = "\n" if i < fnum else ""
             if field.type_name in type_map.keys():
                 if flen and field.type_name != "char":
-                    ftype = f"CArrayProxy[{type_map[field.type_name]}]"
+                    ftype = f"ArrayField[{type_map[field.type_name]}]"
                 else:
                     ftype = pytype_map[field.type_name]
             elif field.type_name in self.parser.message_defs.keys():
@@ -273,7 +273,7 @@ class PyDefCompiler:
                 type_name = self.parser.aliases[field.type_name].type_name
                 if type_name in type_map.keys():
                     if flen and type_name != "char":
-                        ftype = f"CArrayProxy[{type_map[type_name]}]"
+                        ftype = f"ArrayField[{type_map[type_name]}]"
                     else:
                         ftype = pytype_map[type_name]
                 else:
@@ -303,7 +303,7 @@ class PyDefCompiler:
         s = """\
         import ctypes
         import pyrtma
-        from pyrtma.message import CArrayProxy
+        from pyrtma.message import ArrayField
         """
         return dedent(s)
 

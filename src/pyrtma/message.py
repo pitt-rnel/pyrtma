@@ -23,7 +23,7 @@ __all__ = [
     "UnknownMessageType",
     "JSONDecodingError",
     "InvalidMessageDefinition",
-    "CArrayProxy",
+    "ArrayField",
 ]
 
 # Main Map of all internal message types
@@ -217,7 +217,7 @@ class _MessageBase(ctypes.Structure):
         elif issubclass(ftype, ctypes.Array) and ftype._type_ is ctypes.c_char:
             return value.decode()
         elif issubclass(ftype, ctypes.Array):
-            return CArrayProxy(value)
+            return ArrayField(value)
         else:
             return value
 
@@ -319,10 +319,10 @@ def get_header_cls(timecode: bool = False) -> Type[MessageHeader]:
 _CT = TypeVar("_CT", bound=ctypes._SimpleCData)
 
 
-class CArrayProxy(Sequence, Generic[_CT]):
+class ArrayField(Sequence, Generic[_CT]):
     def __init__(self, array: ctypes.Array[_CT]):
-        self._array = array
-        self._pytype_ = type(self._array[0])
+        self._carray = array
+        self._pytype_ = type(self._carray[0])
 
     @property
     def _length_(self) -> int:
@@ -330,7 +330,7 @@ class CArrayProxy(Sequence, Generic[_CT]):
 
     @property
     def _type_(self) -> Type[_CT]:
-        return self._array._type_
+        return self._carray._type_
 
     def __setitem__(self, __s: Union[slice, int], value_in):
         if type(__s) is slice:
@@ -374,27 +374,27 @@ class CArrayProxy(Sequence, Generic[_CT]):
                     raise TypeError(
                         f"Value {value} incompatible with type <ctypes.{ftype.__name__}>"
                     )
-            self._array[i] = value
+            self._carray[i] = value
 
     def __getitem__(self, __s: Union[slice, int]) -> Any:
         if (isinstance(__s, int) and __s > len(self)) or (
             isinstance(__s, slice) and (__s.start > len(self) or __s.stop > len(self))
         ):
             raise IndexError("Index out of range")
-        item = self._array[__s]
+        item = self._carray[__s]
         if isinstance(item, ctypes.Array):  # multi-dimensional arrays
-            item = CArrayProxy(item)
+            item = ArrayField(item)
         return item
 
     def __len__(self) -> int:
-        return len(self._array)
+        return len(self._carray)
 
     def __repr__(self) -> str:
         mloc = id(self)
-        return f"CArrayProxy object of {repr(self._array)} at 0x{mloc:016X}"
+        return f"ArrayField object of {repr(self._carray)} at 0x{mloc:016X}"
 
     def __str__(self) -> str:
-        return print_ctype_array(self._array)
+        return print_ctype_array(self._carray)
 
 
 # TODO: Make this class abstract
@@ -488,7 +488,7 @@ class RTMAJSONEncoder(json.JSONEncoder):
         if issubclass(o.__class__, ctypes.Structure):
             return {k: getattr(o, k) for k, _ in getattr(o, ("_fields_"))}
 
-        if isinstance(o, CArrayProxy) or isinstance(o, ctypes.Array):
+        if isinstance(o, ArrayField) or isinstance(o, ctypes.Array):
             return list(o)
 
         if isinstance(o, bytes):
