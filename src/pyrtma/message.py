@@ -156,11 +156,11 @@ class MessageHeader(_RTMA_MSG_HEADER):
         obj = cls.from_dict(json.loads(s))
         return obj
 
-    def __eq__(self, other: MessageHeader) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if type(self) != type(other):
-            raise TypeError(f"Can not compare {type(other)} to {type(self)}.")
-
-        return bytes(self) == bytes(other)
+            return False
+        else:
+            return bytes(self) == bytes(other)
 
 
 class TimeCodeMessageHeader(MessageHeader):
@@ -247,11 +247,11 @@ class MessageData(ctypes.Structure):
     def __str__(self) -> str:
         return self.pretty_print()
 
-    def __eq__(self, other: MessageData) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if type(self) != type(other):
-            raise TypeError(f"Can not compare {type(other)} to {type(self)}.")
-
-        return bytes(self) == bytes(other)
+            return False
+        else:
+            return bytes(self) == bytes(other)
 
     def __getattribute__(self, name: str) -> Any:
         value = super().__getattribute__(name)
@@ -331,8 +331,11 @@ class Message:
     def name(self) -> str:
         return self.data.type_name
 
-    def __eq__(self, other: Message) -> bool:
-        return self.header == other.header and self.data == other.data
+    def __eq__(self, other: Any) -> bool:
+        if type(self) != type(other):
+            return False
+        else:
+            return self.header == other.header and self.data == other.data
 
     def pretty_print(self, add_tabs: int = 0) -> str:
         return (
