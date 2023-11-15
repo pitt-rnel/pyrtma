@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import ctypes
 
-from typing import Type, Any, ClassVar, Dict
+from typing import Type, Any, ClassVar, Dict, TypeVar
 from dataclasses import dataclass
 
 from .utils.print import print_ctype_array, hexdump
@@ -75,7 +75,93 @@ MSG_TYPE = ctypes.c_int
 MSG_COUNT = ctypes.c_int
 
 
-class _RTMA_MSG_HEADER(ctypes.Structure):
+MB = TypeVar("MB", bound="_MessageBase")
+
+
+# "abstract" base class for MessageHeader and MessageData
+class _MessageBase(ctypes.Structure):
+    @property
+    def size(self) -> int:
+        return ctypes.sizeof(self)
+
+    def pretty_print(self, add_tabs=0) -> str:
+        str = "\t" * add_tabs + f"{type(self).__name__}:"
+        for field_name, field_type in self._fields_:
+            val = getattr(self, field_name)
+            class_name = field_type.__name__
+            # expand arrays
+            if hasattr(val, "__len__"):
+                if hasattr(val, "_type_"):
+                    class_name = val._type_.__name__
+                val = print_ctype_array(val)
+            str += f"\n" + "\t" * (add_tabs + 1) + f"{field_name} = ({class_name}){val}"
+        return str
+
+    def hexdump(self, length=16, sep=" "):
+        hexdump(bytes(self), length, sep)
+
+    def to_json(self, minify: bool = False, **kwargs) -> str:
+        if minify:
+            return json.dumps(
+                self, cls=RTMAJSONEncoder, separators=(",", ":"), **kwargs
+            )
+        else:
+            return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
+
+    def get_field_raw(self, name: str) -> bytes:
+        """return copy of raw bytes for ctypes field 'name'"""
+        meta = getattr(type(self), f"_{name}")
+        if name not in [x[0] for x in self._fields_]:
+            if isinstance(self, MessageData):
+                error_str = f"{name} is not a field of message type {self.type_name}"
+            elif isinstance(self, MessageHeader):
+                error_str = f"{name} is not a field of message header"
+            else:
+                error_str = f"{name} is not a field"
+            raise KeyError(error_str)
+        else:
+            offset = meta.offset
+            sz = meta.size
+
+        return bytes(memoryview(self).cast("c")[offset : offset + sz])
+
+    @classmethod
+    def from_dict(cls: Type[MB], data) -> MB:
+        obj = cls()
+        try:
+            _json_decode(obj, data)
+            return obj
+        except Exception as e:
+            if issubclass(cls, MessageHeader):
+                error_str = f"Unable to decode MessageHeader object from {data}."
+            elif issubclass(cls, MessageData):
+                error_str = f"Unable to decode {obj.type_name} from {data}."
+            else:
+                error_str = "Unable to construct class"
+
+            raise JSONDecodingError(error_str)
+
+    @classmethod
+    def from_json(cls: Type[MB], s) -> MB:
+        obj = cls.from_dict(json.loads(s))
+        return obj
+
+    @classmethod
+    def from_random(cls: Type[MB]) -> MB:
+        obj = _random_struct(cls())
+        return obj
+
+    def __str__(self) -> str:
+        return self.pretty_print()
+
+    def __eq__(self, other: _MessageBase) -> bool:
+        if type(self) != type(other):
+            return False
+
+        return bytes(self) == bytes(other)
+
+
+class _RTMA_MSG_HEADER(_MessageBase):
     _fields_ = [
         ("msg_type", MSG_TYPE),
         ("msg_count", MSG_COUNT),
@@ -94,34 +180,12 @@ class _RTMA_MSG_HEADER(ctypes.Structure):
 
 class MessageHeader(_RTMA_MSG_HEADER):
     @property
-    def size(self) -> int:
-        return ctypes.sizeof(self)
-
-    @property
-    def buffer(self) -> memoryview:
-        return memoryview(self)
-
-    @property
     def version(self) -> int:
         return self.reserved
 
     @version.setter
     def version(self, value: int):
         self.reserved = value
-
-    def pretty_print(self, add_tabs=0) -> str:
-        str = "\t" * add_tabs + f"{type(self).__name__}:"
-        for field_name, field_type in self._fields_:
-            val = getattr(self, field_name)
-            class_name = type(val).__name__
-            # expand arrays
-            if hasattr(val, "__len__"):
-                val = print_ctype_array(val)
-            str += f"\n" + "\t" * (add_tabs + 1) + f"{field_name} = ({class_name}){val}"
-        return str
-
-    def hexdump(self, length=16, sep=" "):
-        hexdump(bytes(self), length, sep)
 
     @property
     def get_data(self) -> Type[MessageData]:
@@ -131,36 +195,6 @@ class MessageHeader(_RTMA_MSG_HEADER):
             raise UnknownMessageType(
                 f"There is no message definition associated with id:{self.msg_type}"
             ) from e
-
-    def to_json(self, minify: bool = False, **kwargs) -> str:
-        if minify:
-            return json.dumps(
-                self, cls=RTMAJSONEncoder, separators=(",", ":"), **kwargs
-            )
-        else:
-            return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
-
-    @classmethod
-    def from_dict(cls, data) -> MessageHeader:
-        obj = cls()
-        try:
-            _json_decode(obj, data)
-            return obj
-        except Exception as e:
-            raise JSONDecodingError(
-                f"Unable to decode MessageHeader object from {data}."
-            )
-
-    @classmethod
-    def from_json(cls, s) -> MessageHeader:
-        obj = cls.from_dict(json.loads(s))
-        return obj
-
-    def __eq__(self, other: MessageHeader) -> bool:
-        if type(self) != type(other):
-            raise TypeError(f"Can not compare {type(other)} to {type(self)}.")
-
-        return bytes(self) == bytes(other)
 
 
 class TimeCodeMessageHeader(MessageHeader):
@@ -177,24 +211,17 @@ def get_header_cls(timecode: bool = False) -> Type[MessageHeader]:
         return MessageHeader
 
 
-def _create_ftype_map(obj: MessageData):
-    super(MessageData, obj).__setattr__(
-        "_ftype_map",
-        {k: v for k, v in super(MessageData, obj).__getattribute__("_fields_")},
-    )
-
-
-# TODO: Make this class abstract
-class MessageData(ctypes.Structure):
+class MessageData(_MessageBase):
     type_id: ClassVar[int] = -1
     type_name: ClassVar[str] = ""
     type_hash: ClassVar[int]
     type_source: ClassVar[str] = ""
     type_def: ClassVar[str] = ""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        _create_ftype_map(self)
+    @property
+    def type_size(self) -> int:
+        return ctypes.sizeof(self)
+
 
     @classmethod
     def from_random(cls) -> MessageData:
@@ -202,120 +229,8 @@ class MessageData(ctypes.Structure):
         return obj
 
     @classmethod
-    def from_buffer(cls, source, offset=0) -> MessageData:
-        obj = type(cls).from_buffer(cls, source, offset)
-        _create_ftype_map(obj)
-        return obj
-
-    @classmethod
-    def from_buffer_copy(cls, source, offset=0) -> MessageData:
-        obj = type(cls).from_buffer_copy(cls, source, offset)
-        _create_ftype_map(obj)
-        return obj
-
-    @property
-    def type_size(self) -> int:
-        return ctypes.sizeof(self)
-
-    def pretty_print(self, add_tabs=0) -> str:
-        str = "\t" * add_tabs + f"{type(self).__name__}:"
-        for field_name, field_type in self._fields_:
-            val = getattr(self, field_name)
-            class_name = type(val).__name__
-            # expand arrays
-            if hasattr(val, "__len__"):
-                val = print_ctype_array(val)
-            str += f"\n" + "\t" * (add_tabs + 1) + f"{field_name} = ({class_name}){val}"
-        return str
-
-    def hexdump(self, length=16, sep=" "):
-        hexdump(bytes(self), length, sep)
-
-    def get_field_raw(self, name: str) -> bytes:
-        """return copy of raw bytes for ctypes field 'name'"""
-        meta = getattr(type(self), name)
-        if name not in [x[0] for x in self._fields_]:
-            raise KeyError(
-                f"name {name} is not a field of message type {self.type_name}"
-            )
-        else:
-            offset = meta.offset
-            sz = meta.size
-
-        return bytes(memoryview(self).cast("c")[offset : offset + sz])
-
-    def __str__(self) -> str:
-        return self.pretty_print()
-
-    def __eq__(self, other: MessageData) -> bool:
-        if type(self) != type(other):
-            raise TypeError(f"Can not compare {type(other)} to {type(self)}.")
-
-        return bytes(self) == bytes(other)
-
-    def __getattribute__(self, name: str) -> Any:
-        value = super().__getattribute__(name)
-        try:
-            # This is a workaround for nested messages. _ftype_map should exist for
-            # for other cases.
-            ftype = super().__getattribute__("_ftype_map").get(name)
-        except AttributeError:
-            # Create map if it doesn't exist
-            _create_ftype_map(self)
-            ftype = super().__getattribute__("_ftype_map").get(name)
-
-        # Check attribute is not a struct field
-        if ftype is None:
-            return value
-
-        # Automatically decode char types to a string
-        if ftype is ctypes.c_char:
-            return value.decode()
-        elif issubclass(ftype, ctypes.Array) and ftype._type_ is ctypes.c_char:
-            return value.decode()
-        else:
-            return value
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        try:
-            ftype = super().__getattribute__("_ftype_map").get(name)
-        except AttributeError:
-            # Create map if it doesn't exist
-            _create_ftype_map(self)
-            ftype = super().__getattribute__("_ftype_map").get(name)
-
-        # Automatically encode a string value to bytes
-        if ftype is ctypes.c_char:
-            if isinstance(value, str):
-                value = value.encode()
-        elif issubclass(ftype, ctypes.Array) and ftype._type_ is ctypes.c_char:
-            if isinstance(value, str):
-                value = value.encode()
-
-        super().__setattr__(name, value)
-
-    def to_json(self, minify: bool = False, **kwargs) -> str:
-        if minify:
-            return json.dumps(
-                self, cls=RTMAJSONEncoder, separators=(",", ":"), **kwargs
-            )
-
-        else:
-            return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
-
-    @classmethod
-    def from_dict(cls, data) -> MessageData:
-        obj = cls()
-        try:
-            _json_decode(obj, data)
-            return obj
-        except Exception as e:
-            raise JSONDecodingError(f"Unable to decode {obj.type_name} from {data}.")
-
-    @classmethod
-    def from_json(cls, s) -> MessageData:
-        obj = cls.from_dict(json.loads(s))
-        return obj
+    def copy(cls, s: MessageData):
+        return cls.from_buffer_copy(s)
 
 
 @dataclass
@@ -338,14 +253,6 @@ class Message:
         return (
             self.header.pretty_print(add_tabs) + "\n" + self.data.pretty_print(add_tabs)
         )
-
-    def to_json(self, minify: bool = False, **kwargs) -> str:
-        if minify:
-            return json.dumps(
-                self, cls=RTMAJSONEncoder, separators=(",", ":"), **kwargs
-            )
-        else:
-            return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
 
     @classmethod
     def from_json(cls, s: str) -> Message:
@@ -383,11 +290,6 @@ class RTMAJSONEncoder(json.JSONEncoder):
     def default(self, o: Any) -> Any:
         if isinstance(o, Message):
             return dict(header=o.header, data=o.data)
-
-        # if isinstance(o, MessageData):
-        #     d = {}
-        #     d.update({k: getattr(o, k) for k, _ in getattr(o, ("_fields_"))})
-        #     return d
 
         if issubclass(o.__class__, ctypes.Structure):
             return {k: getattr(o, k) for k, _ in getattr(o, ("_fields_"))}
