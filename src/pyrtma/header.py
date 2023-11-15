@@ -1,7 +1,7 @@
 import ctypes
 from typing import Type
 
-from ._message_base import _MessageBase
+from .message_base import MessageBase
 from .validators import Int16, Double, Int32
 
 # Type Aliases
@@ -17,7 +17,7 @@ MSG_TYPE = ctypes.c_int
 MSG_COUNT = ctypes.c_int
 
 
-class _RTMA_MSG_HEADER(_MessageBase):
+class _RTMA_MSG_HEADER(MessageBase):
     _fields_ = [
         ("_msg_type", MSG_TYPE),
         ("_msg_count", MSG_COUNT),

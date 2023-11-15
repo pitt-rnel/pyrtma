@@ -6,11 +6,11 @@ from .utils.print import print_ctype_array, hexdump
 from .utils.random import _random_struct
 from .exceptions import JSONDecodingError
 
-MB = TypeVar("MB", bound="_MessageBase")
+MB = TypeVar("MB", bound="MessageBase")
 
 
 # "abstract" base class for MessageHeader and MessageData
-class _MessageBase(ctypes.Structure):
+class MessageBase(ctypes.Structure):
     @property
     def size(self) -> int:
         return ctypes.sizeof(self)
@@ -90,7 +90,7 @@ class RTMAJSONEncoder(json.JSONEncoder):
     """
 
     def default(self, o: Any) -> Any:
-        if isinstance(o, _MessageBase):
+        if isinstance(o, MessageBase):
             return o.to_dict()
 
         if isinstance(o, ctypes.Array):
@@ -105,10 +105,10 @@ class RTMAJSONEncoder(json.JSONEncoder):
 def _from_dict(obj, data):
     for _name, ftype in obj._fields_:
         name = _name[1:]
-        if issubclass(ftype, _MessageBase):
+        if issubclass(ftype, MessageBase):
             _from_dict(getattr(obj, _name), data[name])
         elif issubclass(ftype, ctypes.Array):
-            if issubclass(ftype._type_, _MessageBase):  # type: ignore
+            if issubclass(ftype._type_, MessageBase):  # type: ignore
                 for i, elem in enumerate(getattr(obj, _name)):
                     _from_dict(elem, data[name][i])
             elif ftype._type_ is ctypes.c_char:
@@ -123,10 +123,10 @@ def _to_dict(obj) -> Dict[str, Any]:
     data = {}
     for _name, ftype in obj._fields_:
         name = _name[1:]
-        if issubclass(ftype, _MessageBase):
+        if issubclass(ftype, MessageBase):
             data[name] = _to_dict(getattr(obj, _name))
         elif issubclass(ftype, ctypes.Array):
-            if issubclass(ftype._type_, _MessageBase):  # type: ignore
+            if issubclass(ftype._type_, MessageBase):  # type: ignore
                 data[name] = []
                 for elem in getattr(obj, _name):
                     data[name].append(_to_dict(elem))
