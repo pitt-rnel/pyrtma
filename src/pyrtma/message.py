@@ -16,8 +16,6 @@ __all__ = [
     "msg_defs",
     "message_def",
     "msg_def",  # deprecated
-    "UnknownMessageType",
-    "InvalidMessageDefinition",
 ]
 
 # Main Map of all internal message types
@@ -32,7 +30,8 @@ def message_def(msg_cls: Type[MessageData], *args, **kwargs) -> Type[MessageData
 
 # backwards compatibility: deprecated name
 msg_def = message_def
-    
+
+
 def get_msg_cls(id: int) -> Type[MessageData]:
     try:
         return msg_defs[id]
@@ -68,12 +67,10 @@ class Message:
     def to_json(self, minify: bool = False, **kwargs) -> str:
         d = dict(header=self.header.to_dict(), data=self.data.to_dict())
         if minify:
-            return json.dumps(
-                d , separators=(",", ":"), **kwargs
-            )
+            return json.dumps(d, separators=(",", ":"), **kwargs)
         else:
-            return json.dumps(self, indent=2, **kwargs)  
-            
+            return json.dumps(self, indent=2, **kwargs)
+
     @classmethod
     def from_json(cls, s: str) -> "Message":
         # Convert json string to dict
@@ -98,4 +95,3 @@ class Message:
         obj = cls(hdr, msg_data)
 
         return obj
-

@@ -4,6 +4,7 @@ from typing import ClassVar
 from ._message_base import _MessageBase
 from .utils.random import _random_struct
 
+
 class MessageData(_MessageBase):
     type_id: ClassVar[int] = -1
     type_name: ClassVar[str] = ""

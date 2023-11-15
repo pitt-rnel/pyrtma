@@ -1,30 +1,49 @@
 from __future__ import annotations
 
 import ctypes
-
-from typing import List, ClassVar, Type, Generic, TypeVar, Union, Sequence, Iterable, Optional, overload
-from abc import abstractmethod, ABCMeta
 import collections.abc as abc
+import math
 
+from typing import (
+    List,
+    ClassVar,
+    Type,
+    Generic,
+    TypeVar,
+    Union,
+    Iterable,
+    Optional,
+    overload,
+)
+from abc import abstractmethod, ABCMeta
 
-class MessageBase(ctypes.Structure):
-    type_id: ClassVar[int] = 0
-    type_name: ClassVar[str] = ""
-    type_hash: ClassVar[int] = 0x0
-    type_source: ClassVar[str] = ""
+from ._message_base import _MessageBase
 
-    @classmethod
-    def copy(cls, s: ctypes.Structure):
-        return cls.from_buffer_copy(s)
+__all__ = [
+    "Int8",
+    "Int16",
+    "Int32",
+    "Int64",
+    "Uint8",
+    "Uint16",
+    "Uint32",
+    "Uint64",
+    "Float",
+    "Double",
+    "String",
+    "Bytes",
+    "Struct",
+    "IntArray",
+    "FloatArray",
+    "StructArray",
+]
 
-
-_P = TypeVar("_P") # Parent
-_V = TypeVar("_V") # Value
+_P = TypeVar("_P")  # Parent
+_V = TypeVar("_V")  # Value
 
 
 # Base Class for all type validator descriptors
 class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
-
     def __set_name__(self, owner: _P, name: str):
         self.owner = owner
         self.public_name = name
@@ -41,10 +60,50 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
     @abstractmethod
     def validate_one(self, value: _V):
         pass
-    
+
     @abstractmethod
-    def validate_many(self, value: _V): 
+    def validate_many(self, value: _V):
         pass
+
+
+class FloatValidatorBase(FieldValidator, Generic[_P], metaclass=ABCMeta):
+    _float_type = ctypes.c_float
+
+    def __get__(self, obj: _P, objtype=None) -> float:
+        return getattr(obj, self.private_name)
+
+    def __set__(self, obj: _P, value: float):
+        self.validate_one(value)
+        setattr(obj, self.private_name, value)
+
+    def validate_one(self, value: float):
+        if not isinstance(value, (float, int)):
+            raise TypeError(f"Expected {value} to be an float")
+
+        if not math.isclose(self._float_type(value).value, value):
+            raise ValueError(
+                f"The {value} can not be represented as a {type(self).__name__}"
+            )
+
+    def validate_many(self, value: Iterable[float]):
+        if any(not isinstance(v, (float, int)) for v in value):
+            raise TypeError(f"Expected {value!r} to be an int.")
+
+        if any(not math.isclose(self._float_type(v).value, v) for v in value):
+            raise ValueError(
+                f"{value} contains value(s) that can not be represented as a {type(self).__name__}"
+            )
+
+    def __repr__(self):
+        return f"{type(self).__name__} at 0x{id(self):016X}"
+
+
+class Float(FloatValidatorBase):
+    _float_type = ctypes.c_float
+
+
+class Double(FloatValidatorBase):
+    _float_type = ctypes.c_double
 
 
 # Base Class for int validator fields
@@ -82,7 +141,7 @@ class IntValidatorBase(FieldValidator, Generic[_P], metaclass=ABCMeta):
 
     def validate_one(self, value: int):
         if not isinstance(value, int):
-            raise TypeError(f"Expected {value!r} to be an int")
+            raise TypeError(f"Expected {value} to be an int")
 
         if value < self._min:
             raise ValueError(f"Expected {value} to be at least {self._min}")
@@ -91,7 +150,7 @@ class IntValidatorBase(FieldValidator, Generic[_P], metaclass=ABCMeta):
 
     def validate_many(self, value: Iterable[int]):
         if any(not isinstance(v, int) for v in value):
-            raise TypeError(f"Expected {value!r} to be an int.")
+            raise TypeError(f"Expected {value} to be an int.")
 
         if any((v < self._min for v in value)):
             raise ValueError(f"Expected {value} to be {self._min} or greater.")
@@ -129,6 +188,7 @@ class Int64(IntValidatorBase):
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**63)
     _max: ClassVar[int] = 2**63 - 1
+
 
 class Uint8(IntValidatorBase):
     _size: ClassVar[int] = 1
@@ -171,10 +231,10 @@ class String(FieldValidator, Generic[_P]):
 
     def validate_one(self, value: str):
         if not isinstance(value, str):
-            raise TypeError(f"Expected {value!r} to be an str")
+            raise TypeError(f"Expected {value} to be an str")
 
         if len(value) > self.len:
-            raise ValueError(f"Expected \"{value}\" to be no longer than {self.len}")
+            raise ValueError(f'Expected "{value}" to be no longer than {self.len}')
 
     def validate_many(self, value):
         raise NotImplementedError
@@ -184,6 +244,8 @@ class String(FieldValidator, Generic[_P]):
 
 
 _B = TypeVar("_B", bytes, bytearray)
+
+
 class Bytes(FieldValidator, Generic[_P, _B]):
     def __init__(self, len: int):
         self.len = len
@@ -197,10 +259,10 @@ class Bytes(FieldValidator, Generic[_P, _B]):
 
     def validate_one(self, value: bytes):
         if not isinstance(value, (bytes, bytearray)):
-            raise TypeError(f"Expected {value!r} to be bytes")
+            raise TypeError(f"Expected {value} to be bytes")
 
         if len(value) > self.len:
-            raise ValueError(f"Expected {value!r} to be no bigger than {self.len}")
+            raise ValueError(f"Expected {value} to be no bigger than {self.len}")
 
     def validate_many(self, value):
         raise NotImplementedError
@@ -216,10 +278,10 @@ class ArrayField(FieldValidator, Generic[_FV]):
     def __init__(self, validator: Type[_FV], len: int):
         self._validator = validator()
         self._len = len
-        self._bound_obj:Optional[MessageBase] = None
+        self._bound_obj: Optional[_MessageBase] = None
 
     @classmethod
-    def _bound(cls, obj: ArrayField[_FV], bound_obj: MessageBase) -> ArrayField[_FV]:
+    def _bound(cls, obj: ArrayField[_FV], bound_obj: _MessageBase) -> ArrayField[_FV]:
         new_obj = super().__new__(cls)
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
@@ -230,27 +292,23 @@ class ArrayField(FieldValidator, Generic[_FV]):
 
         return new_obj
 
-    def __get__(self, obj: MessageBase, objtype=None) -> ArrayField[_FV]:
+    def __get__(self, obj: _MessageBase, objtype=None) -> ArrayField[_FV]:
         """Return an Array bound to a message obj instance."""
         return ArrayField._bound(self, obj)
 
-    def __set__(self, obj: MessageBase, value:ArrayField[_FV]):
+    def __set__(self, obj: _MessageBase, value: ArrayField[_FV]):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
-    def __getitem__(self, key) -> Union[_FV, List[_FV]]:
+    def __getitem__(self, key):
         if self._bound_obj is None:
-            raise AttributeError(
-                "Array descriptor is not bound to an instance object."
-            )
+            raise AttributeError("Array descriptor is not bound to an instance object.")
 
         return getattr(self._bound_obj, self.private_name)[key]
 
     def __setitem__(self, key, value):
         if self._bound_obj is None:
-            raise AttributeError(
-                "Array descriptor is not bound to an instance object."
-            )
+            raise AttributeError("Array descriptor is not bound to an instance object.")
 
         if isinstance(value, abc.Iterable):
             self.validate_many(value)
@@ -273,16 +331,80 @@ class ArrayField(FieldValidator, Generic[_FV]):
 
     def validate_array(self, value):
         if not isinstance(value._validator, type(self._validator)):
-            raise TypeError(
-                f"Expected an ArrayField({type(self._validator).__name__}"
-            )
+            raise TypeError(f"Expected an ArrayField({type(self._validator).__name__}")
         return
 
 
-_S = TypeVar("_S", bound=MessageBase)
+class IntArray(ArrayField[_FV]):
+    def __init__(self, validator: Type[_FV], len: int):
+        self._validator = validator()
+        self._len = len
+        self._bound_obj: Optional[_MessageBase] = None
+
+    @classmethod
+    def _bound(cls, obj: IntArray[_FV], bound_obj: _MessageBase) -> IntArray[_FV]:
+        new_obj = super().__new__(cls)
+        new_obj._bound_obj = bound_obj
+        new_obj._validator = obj._validator
+        new_obj._len = obj._len
+        new_obj.owner = obj.owner
+        new_obj.public_name = obj.public_name
+        new_obj.private_name = obj.private_name
+
+        return new_obj
+
+    def __get__(self, obj: _MessageBase, objtype=None) -> IntArray[_FV]:
+        """Return an Array bound to a message obj instance."""
+        return IntArray._bound(self, obj)
+
+    def __set__(self, obj: _MessageBase, value: IntArray[_FV]):
+        self.validate_array(value)
+        setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
+
+    def __getitem__(self, key) -> Union[int, List[int]]:
+        if self._bound_obj is None:
+            raise AttributeError("Array descriptor is not bound to an instance object.")
+
+        return getattr(self._bound_obj, self.private_name)[key]
 
 
-class StructField(FieldValidator, Generic[_S]):
+class FloatArray(ArrayField[_FV]):
+    def __init__(self, validator: Type[_FV], len: int):
+        self._validator = validator()
+        self._len = len
+        self._bound_obj: Optional[_MessageBase] = None
+
+    @classmethod
+    def _bound(cls, obj: FloatArray[_FV], bound_obj: _MessageBase) -> FloatArray[_FV]:
+        new_obj = super().__new__(cls)
+        new_obj._bound_obj = bound_obj
+        new_obj._validator = obj._validator
+        new_obj._len = obj._len
+        new_obj.owner = obj.owner
+        new_obj.public_name = obj.public_name
+        new_obj.private_name = obj.private_name
+
+        return new_obj
+
+    def __get__(self, obj: _MessageBase, objtype=None) -> FloatArray[_FV]:
+        """Return an Array bound to a message obj instance."""
+        return FloatArray._bound(self, obj)
+
+    def __set__(self, obj: _MessageBase, value: IntArray[_FV]):
+        self.validate_array(value)
+        setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
+
+    def __getitem__(self, key) -> Union[float, List[float]]:
+        if self._bound_obj is None:
+            raise AttributeError("Array descriptor is not bound to an instance object.")
+
+        return getattr(self._bound_obj, self.private_name)[key]
+
+
+_S = TypeVar("_S", bound=_MessageBase)
+
+
+class Struct(FieldValidator, Generic[_S]):
     def __init__(self, stype: Type[_S]):
         self.stype = stype
 
@@ -290,10 +412,12 @@ class StructField(FieldValidator, Generic[_S]):
         return getattr(obj, self.private_name)
 
     @overload
-    def __set__ (self, obj: MessageBase, value: _S): ...
+    def __set__(self, obj: _MessageBase, value: _S):
+        ...
 
     @overload
-    def __set__(self, obj: StructArrayField, value: StructField[_S]): ...
+    def __set__(self, obj: StructArray, value: Struct[_S]):
+        ...
 
     def __set__(self, obj, value):
         self.validate_one(value)
@@ -312,15 +436,15 @@ class StructField(FieldValidator, Generic[_S]):
         return f"Struct({self.stype.__name__}) at 0x{id(self):016X}"
 
 
-class StructArrayField(FieldValidator, Generic[_S]):
+class StructArray(FieldValidator, Generic[_S]):
     def __init__(self, msg_struct: Type[_S], len: int):
-        self._validator = StructField(msg_struct)
+        self._validator = Struct(msg_struct)
         self._len = len
-        self._bound_obj: Optional[MessageBase] = None
+        self._bound_obj: Optional[_MessageBase] = None
 
     @classmethod
-    def _bound(cls, obj: StructArrayField[_S], bound_obj: MessageBase) -> StructArrayField[_S]:
-        new_obj: StructArrayField[_S] = super().__new__(cls)
+    def _bound(cls, obj: StructArray[_S], bound_obj: _MessageBase) -> StructArray[_S]:
+        new_obj: StructArray[_S] = super().__new__(cls)
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
         new_obj._len = obj._len
@@ -330,9 +454,9 @@ class StructArrayField(FieldValidator, Generic[_S]):
 
         return new_obj
 
-    def __get__(self, obj: MessageBase, objtype=None) -> StructArrayField[_S]:
+    def __get__(self, obj: _MessageBase, objtype=None) -> StructArray[_S]:
         """Return an StructArray bound to a message obj instance."""
-        return StructArrayField._bound(self, obj)
+        return StructArray._bound(self, obj)
 
     def __set__(self, obj, value):
         self.validate_array(value)
@@ -340,9 +464,7 @@ class StructArrayField(FieldValidator, Generic[_S]):
 
     def __getitem__(self, key) -> Union[_S, List[_S]]:
         if self._bound_obj is None:
-            raise AttributeError(
-                "Array descriptor is not bound to an instance object."
-            )
+            raise AttributeError("Array descriptor is not bound to an instance object.")
         return getattr(self._bound_obj, self.private_name)[key]
 
     def __setitem__(self, key, value):
@@ -370,64 +492,7 @@ class StructArrayField(FieldValidator, Generic[_S]):
     def validate_many(self, value: Iterable[_S]):
         self._validator.validate_many(value)
 
-    def validate_array(self, value:StructArrayField[_S]):
+    def validate_array(self, value: StructArray[_S]):
         if not isinstance(value._validator.stype, type(self._validator.stype)):
-            raise TypeError(
-                f"Expected a StructArrayField({self._validator.stype.__name__}"
-            )
+            raise TypeError(f"Expected a StructArray({self._validator.stype.__name__}")
         return
-
-
-# User defined struct
-class USER_STRUCT(MessageBase):
-    # Internal Underlying memory layout (Generated)
-    _fields_ = [
-        ("_char", ctypes.c_char),
-        ("_int8", ctypes.c_int8),
-        ("_char_arr", ctypes.c_char * 32),
-        ("_int8_arr", ctypes.c_int8 * 8),
-    ]
-
-    # Attribute Validator Descriptors
-    char: String = String(1)
-    int8: Int8 = Int8()
-    char_arr: String = String(32)
-    int8_arr: ArrayField[Int8] = ArrayField(Int8, len=8)
-
-
-# User defined message class
-class MDF_ARRAY_TEST(MessageBase):
-    # Internal underlying memory layout (Generated)
-    _fields_ = [
-        ("_char", ctypes.c_char),
-        ("_int8", ctypes.c_int8),
-        ("_char_arr", ctypes.c_char * 32),
-        ("_int8_arr", ctypes.c_int8 * 8),
-        ("_user_struct", USER_STRUCT),
-        ("_user_struct1", USER_STRUCT),
-        ("_user_struct_arr", USER_STRUCT * 3),
-    ]
-
-    # Class Vars
-    type_id: ClassVar[int] = 9999
-    type_name: ClassVar[str] = "ARRAY_TEST"
-    type_hash: ClassVar[int] = 0x0
-    type_source: ClassVar[str] = ""
-
-    # Attribute Validator Descriptors
-    char: String = String(1)
-    int8: Int8 = Int8()
-    char_arr: String = String(32)
-    int8_arr: ArrayField[Int8] = ArrayField(Int8, len=8)
-    user_struct: StructField[USER_STRUCT] = StructField(USER_STRUCT)
-    user_struct1: StructField[USER_STRUCT] = StructField(USER_STRUCT)
-    user_struct_arr: StructArrayField[USER_STRUCT] = StructArrayField(USER_STRUCT, len=3)
-
-msg = MDF_ARRAY_TEST()
-msg.char
-msg.char_arr
-msg.int8
-msg.int8_arr
-msg.user_struct
-msg.user_struct1
-msg.user_struct_arr # Don't know why this breaks the type checking / linting

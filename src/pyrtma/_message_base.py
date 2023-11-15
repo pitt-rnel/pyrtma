@@ -8,6 +8,7 @@ from .exceptions import JSONDecodingError
 
 MB = TypeVar("MB", bound="_MessageBase")
 
+
 # "abstract" base class for MessageHeader and MessageData
 class _MessageBase(ctypes.Structure):
     @property
@@ -79,8 +80,8 @@ class _MessageBase(ctypes.Structure):
             return False
 
         return bytes(self) == bytes(other)
-    
-            
+
+
 class RTMAJSONEncoder(json.JSONEncoder):
     """JSONEncoder object used to convert MessageData to json
 
