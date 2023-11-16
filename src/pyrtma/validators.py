@@ -252,7 +252,7 @@ class Bytes(FieldValidator, Generic[_P, _B]):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**8 - 1
 
-    def __init__(self, len: int=1):
+    def __init__(self, len: int = 1):
         self.len = len
 
     def __get__(self, obj: _P, objtype=None) -> _B:
@@ -378,17 +378,18 @@ class IntArray(ArrayField[_FV]):
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
     @overload
-    def __getitem__(self, key:int) -> int:...
+    def __getitem__(self, key: int) -> int:
+        ...
 
     @overload
-    def __getitem__(self, key:slice) -> List[int]:...
+    def __getitem__(self, key: slice) -> List[int]:
+        ...
 
     def __getitem__(self, key) -> Union[int, List[int]]:
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
         return getattr(self._bound_obj, self.private_name)[key]
-
 
 
 class FloatArray(ArrayField[_FV]):
@@ -418,10 +419,12 @@ class FloatArray(ArrayField[_FV]):
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
     @overload
-    def __getitem__(self, key:int) -> float:...
+    def __getitem__(self, key: int) -> float:
+        ...
 
     @overload
-    def __getitem__(self, key:slice) -> List[float]:...
+    def __getitem__(self, key: slice) -> List[float]:
+        ...
 
     def __getitem__(self, key) -> Union[float, List[float]]:
         if self._bound_obj is None:

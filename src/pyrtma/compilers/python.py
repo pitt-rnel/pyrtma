@@ -156,11 +156,19 @@ class PyDefCompiler:
 
         elif ftype in self.parser.message_defs.keys():
             ftype = f"MDF_{ftype}"
-            return f":Struct[{ftype} = Struct({ftype})" if flen == 0 else f":StructArray[{ftype}] = StructArray({ftype}, {flen})"
+            return (
+                f":Struct[{ftype} = Struct({ftype})"
+                if flen == 0
+                else f":StructArray[{ftype}] = StructArray({ftype}, {flen})"
+            )
 
         elif ftype in self.parser.struct_defs.keys():
             ftype = f"{ftype}"
-            return f":Struct[{ftype}] = Struct({ftype})" if flen == 0 else f":StructArray[{ftype}] = StructArray({ftype}, {flen})"
+            return (
+                f":Struct[{ftype}] = Struct({ftype})"
+                if flen == 0
+                else f":StructArray[{ftype}] = StructArray({ftype}, {flen})"
+            )
 
         elif ftype in self.parser.aliases.keys():
             ftype = self.parser.aliases[ftype].type_name

@@ -97,18 +97,18 @@ class RTMA_MSG_HEADER(MessageBase):
         ("_reserved", ctypes.c_uint),
     ]
 
-    msg_type = Int32()
-    msg_count = Int32()
-    send_time = Double()
-    recv_time = Double()
-    src_host_id = Int16()
-    src_mod_id = Int16()
-    dest_host_id = Int16()
-    dest_mod_id = Int16()
-    num_data_bytes = Int32()
-    remaining_bytes = Int32()
-    is_dynamic = Int32()
-    reserved = Uint32()
+    msg_type: Int32 = Int32()
+    msg_count: Int32 = Int32()
+    send_time: Double = Double()
+    recv_time: Double = Double()
+    src_host_id: Int16 = Int16()
+    src_mod_id: Int16 = Int16()
+    dest_host_id: Int16 = Int16()
+    dest_mod_id: Int16 = Int16()
+    num_data_bytes: Int32 = Int32()
+    remaining_bytes: Int32 = Int32()
+    is_dynamic: Int32 = Int32()
+    reserved: Uint32 = Uint32()
 
 
 # Message Definitions
@@ -157,9 +157,9 @@ class MDF_FAIL_SUBSCRIBE(MessageData):
         str
     ] = "'FAIL_SUBSCRIBE:\n  id: 6\n  fields:\n    mod_id: MODULE_ID\n    reserved: short\n    msg_type: MSG_TYPE'"
 
-    mod_id = Int16()
-    reserved = Int16()
-    msg_type = Int32()
+    mod_id: Int16 = Int16()
+    reserved: Int16 = Int16()
+    msg_type: Int32 = Int32()
 
 
 @pyrtma.message_def
@@ -178,10 +178,10 @@ class MDF_FAILED_MESSAGE(MessageData):
         str
     ] = "'FAILED_MESSAGE:\n  id: 8\n  fields:\n    dest_mod_id: MODULE_ID\n    reserved: short[3]\n    time_of_failure: double\n    msg_header: RTMA_MSG_HEADER'"
 
-    dest_mod_id = Int16()
-    reserved = IntArray(Int16, 3)
-    time_of_failure = Double()
-    msg_header = Struct(RTMA_MSG_HEADER)
+    dest_mod_id: Int16 = Int16()
+    reserved: IntArray[Int16] = IntArray(Int16, 3)
+    time_of_failure: Double = Double()
+    msg_header: Struct[RTMA_MSG_HEADER] = Struct(RTMA_MSG_HEADER)
 
 
 @pyrtma.message_def
@@ -195,8 +195,8 @@ class MDF_CONNECT(MessageData):
         str
     ] = "'CONNECT:\n  id: 13\n  fields:\n    logger_status: short\n    daemon_status: short'"
 
-    logger_status = Int16()
-    daemon_status = Int16()
+    logger_status: Int16 = Int16()
+    daemon_status: Int16 = Int16()
 
 
 @pyrtma.message_def
@@ -220,7 +220,7 @@ class MDF_SUBSCRIBE(MessageData):
         str
     ] = "'SUBSCRIBE:\n  id: 15\n  fields:\n    msg_type: MSG_TYPE'"
 
-    msg_type = Int32()
+    msg_type: Int32 = Int32()
 
 
 @pyrtma.message_def
@@ -234,7 +234,7 @@ class MDF_UNSUBSCRIBE(MessageData):
         str
     ] = "'UNSUBSCRIBE:\n  id: 16\n  fields:\n    msg_type: MSG_TYPE'"
 
-    msg_type = Int32()
+    msg_type: Int32 = Int32()
 
 
 @pyrtma.message_def
@@ -246,7 +246,7 @@ class MDF_MODULE_READY(MessageData):
     type_source: ClassVar[str] = "core_defs/core_defs.yaml"
     type_def: ClassVar[str] = "'MODULE_READY:\n  id: 26\n  fields:\n    pid: int'"
 
-    pid = Int32()
+    pid: Int32 = Int32()
 
 
 @pyrtma.message_def
@@ -270,8 +270,8 @@ class MDF_SAVE_MESSAGE_LOG(MessageData):
         str
     ] = "'SAVE_MESSAGE_LOG:\n  id: 56\n  fields:\n    pathname: char[MAX_LOGGER_FILENAME_LENGTH]\n    pathname_length: int'"
 
-    pathname = String(256)
-    pathname_length = Int32()
+    pathname: String = String(256)
+    pathname_length: Int32 = Int32()
 
 
 @pyrtma.message_def
@@ -339,9 +339,9 @@ class MDF_TIMING_MESSAGE(MessageData):
         str
     ] = "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: unsigned short[MAX_MESSAGE_TYPES]\n    ModulePID: int[MAX_MODULES]\n    send_time: double'"
 
-    timing = IntArray(Uint16, 10000)
-    ModulePID = IntArray(Int32, 200)
-    send_time = Double()
+    timing: IntArray[Uint16] = IntArray(Uint16, 10000)
+    ModulePID: IntArray[Int32] = IntArray(Int32, 200)
+    send_time: Double = Double()
 
 
 @pyrtma.message_def
@@ -355,7 +355,7 @@ class MDF_FORCE_DISCONNECT(MessageData):
         str
     ] = "'FORCE_DISCONNECT:\n  id: 82\n  fields:\n    mod_id: int'"
 
-    mod_id = Int32()
+    mod_id: Int32 = Int32()
 
 
 @pyrtma.message_def
@@ -369,7 +369,7 @@ class MDF_PAUSE_SUBSCRIPTION(MessageData):
         str
     ] = "'PAUSE_SUBSCRIPTION:\n  id: 85\n  fields:\n    msg_type: MSG_TYPE'"
 
-    msg_type = Int32()
+    msg_type: Int32 = Int32()
 
 
 @pyrtma.message_def
@@ -383,7 +383,7 @@ class MDF_RESUME_SUBSCRIPTION(MessageData):
         str
     ] = "'RESUME_SUBSCRIPTION:\n  id: 86\n  fields:\n    msg_type: MSG_TYPE'"
 
-    msg_type = Int32()
+    msg_type: Int32 = Int32()
 
 
 @pyrtma.message_def

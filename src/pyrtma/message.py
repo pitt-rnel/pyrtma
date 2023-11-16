@@ -24,6 +24,7 @@ msg_defs: Dict[int, Type[MessageData]] = {}
 
 _MD = TypeVar("_MD", bound=MessageData)  # Parent
 
+
 def message_def(msg_cls: Type[_MD], *args, **kwargs) -> Type[_MD]:
     """Decorator to add user message definitions."""
     msg_defs[msg_cls.type_id] = msg_cls
