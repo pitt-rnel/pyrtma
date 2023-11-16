@@ -249,7 +249,10 @@ _B = TypeVar("_B", bytes, bytearray)
 
 
 class Bytes(FieldValidator, Generic[_P, _B]):
-    def __init__(self, len: int):
+    _min: ClassVar[int] = 0
+    _max: ClassVar[int] = 2**8 - 1
+
+    def __init__(self, len: int=1):
         self.len = len
 
     def __get__(self, obj: _P, objtype=None) -> _B:
@@ -257,9 +260,20 @@ class Bytes(FieldValidator, Generic[_P, _B]):
 
     def __set__(self, obj: _P, value: _B):
         self.validate_one(value)
+        if self.len == 1 and isinstance(value, bytes):
+            int_value = int.from_bytes(value)
+            setattr(obj, self.private_name, int_value)
+            return
         setattr(obj, self.private_name, value)
 
-    def validate_one(self, value: bytes):
+    def validate_one(self, value: Union[int, bytes]):
+        if isinstance(value, int):
+            if value < self._min:
+                raise ValueError(f"Expected {value} to be at least {self._min}")
+            if value > self._max:
+                raise ValueError(f"Expected {value} to be no more than {self._max}")
+            return
+
         if not isinstance(value, (bytes, bytearray)):
             raise TypeError(f"Expected {value} to be bytes")
 

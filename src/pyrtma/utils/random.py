@@ -81,7 +81,7 @@ def _random_struct(obj: CStruct) -> CStruct:
         elif ftype is ctypes.c_char:
             setattr(obj, name, _random_str(1))
         elif ftype is ctypes.c_ubyte:
-            setattr(obj, name, random.randint(0, 255))
+            setattr(obj, name, random.randint(0, 255).to_bytes(1))
         elif ftype is ctypes.c_int8:
             setattr(obj, name, random.randint(-(2**7), 2**7 - 1))
         elif ftype is ctypes.c_uint8:
