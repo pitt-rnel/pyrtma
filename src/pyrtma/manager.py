@@ -12,7 +12,9 @@ import random
 import ctypes
 import os
 
-from .message import Message, MessageHeader, MessageData, get_header_cls
+from .message import Message, get_msg_cls
+from .header import MessageHeader, get_header_cls
+from .message_data import MessageData
 from . import core_defs as cd
 
 from typing import Dict, List, Tuple, Set, Type, Union, Optional
@@ -443,7 +445,7 @@ class MessageManager:
     @property
     def message(self) -> Message:
         hdr = self.header
-        return Message(hdr, hdr.get_data.from_buffer(self.data_buffer))
+        return Message(hdr, get_msg_cls(hdr.msg_type).from_buffer(self.data_buffer))
 
     def process_message(self, src_module: Module, wlist: List[socket.socket]):
         hdr = self.header

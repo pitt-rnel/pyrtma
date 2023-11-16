@@ -46,7 +46,7 @@ struct_defs:
       num_data_bytes: int
       remaining_bytes: int
       is_dynamic: int
-      reserved: int
+      reserved: unsigned int
 
 message_defs:
   EXIT:

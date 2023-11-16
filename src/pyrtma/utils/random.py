@@ -1,6 +1,7 @@
 import ctypes
 import random
 import string
+import decimal
 from typing import List, TypeVar
 
 
@@ -13,6 +14,11 @@ def _random_int_array(length: int, min: int = 0, max: int = 9) -> List[int]:
 
 
 def _random_float_array(length: int) -> List[float]:
+    context = decimal.Context(prec=5, rounding=decimal.ROUND_DOWN)
+    return [round(random.random(), 6) for _ in range(length)]
+
+
+def _random_double_array(length: int) -> List[float]:
     return [random.random() for _ in range(length)]
 
 
@@ -24,7 +30,8 @@ CStruct = TypeVar("CStruct", bound=ctypes.Structure)
 
 
 def _random_struct(obj: CStruct) -> CStruct:
-    for name, ftype in obj._fields_:
+    for _name, ftype in obj._fields_:
+        name = _name[1:]
         if issubclass(ftype, ctypes.Structure):
             setattr(obj, name, _random_struct(getattr(obj, name)))
         elif issubclass(ftype, ctypes.Array):
@@ -70,7 +77,7 @@ def _random_struct(obj: CStruct) -> CStruct:
             elif etype is ctypes.c_float:
                 getattr(obj, name)[:] = _random_float_array(length)
             elif etype is ctypes.c_double:
-                getattr(obj, name)[:] = _random_float_array(length)
+                getattr(obj, name)[:] = _random_double_array(length)
         elif ftype is ctypes.c_char:
             setattr(obj, name, _random_str(1))
         elif ftype is ctypes.c_ubyte:

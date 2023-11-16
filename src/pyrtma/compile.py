@@ -97,9 +97,6 @@ def compile(
         ext = ".py"
         output = outpath / (filename + ext)
         compiler.generate(output)
-        ext = ".pyi"
-        output = outpath / (filename + ext)
-        compiler.generate_stub(output)
 
     if javascript:
         print("Building javascript message definitions...")

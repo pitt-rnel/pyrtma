@@ -60,7 +60,9 @@ class MessageBase(ctypes.Structure):
             _from_dict(obj, data)
             return obj
         except Exception as e:
-            raise JSONDecodingError(f"Unable to decode {obj.__name__} from {data}")
+            raise JSONDecodingError(
+                f"Unable to decode {type(obj).__name__} from {data}"
+            )
 
     @classmethod
     def from_json(cls: Type[MB], s) -> MB:
@@ -106,17 +108,17 @@ def _from_dict(obj, data):
     for _name, ftype in obj._fields_:
         name = _name[1:]
         if issubclass(ftype, MessageBase):
-            _from_dict(getattr(obj, _name), data[name])
+            _from_dict(getattr(obj, name), data[name])
         elif issubclass(ftype, ctypes.Array):
             if issubclass(ftype._type_, MessageBase):  # type: ignore
-                for i, elem in enumerate(getattr(obj, _name)):
+                for i, elem in enumerate(getattr(obj, name)):
                     _from_dict(elem, data[name][i])
             elif ftype._type_ is ctypes.c_char:
-                setattr(obj, _name, data[name])
+                setattr(obj, name, data[name])
             else:
-                getattr(obj, _name)[:] = data[name]
+                getattr(obj, name)[:] = data[name]
         else:
-            setattr(obj, _name, data[name])
+            setattr(obj, name, data[name])
 
 
 def _to_dict(obj) -> Dict[str, Any]:
@@ -124,16 +126,16 @@ def _to_dict(obj) -> Dict[str, Any]:
     for _name, ftype in obj._fields_:
         name = _name[1:]
         if issubclass(ftype, MessageBase):
-            data[name] = _to_dict(getattr(obj, _name))
+            data[name] = _to_dict(getattr(obj, name))
         elif issubclass(ftype, ctypes.Array):
             if issubclass(ftype._type_, MessageBase):  # type: ignore
                 data[name] = []
-                for elem in getattr(obj, _name):
+                for elem in getattr(obj, name):
                     data[name].append(_to_dict(elem))
             elif ftype._type_ is ctypes.c_char:
-                data[name] = getattr(obj, _name)
+                data[name] = getattr(obj, name)
             else:
-                data[name] = getattr(obj, _name)[:]
+                data[name] = getattr(obj, name)[:]
         else:
             data[name] = getattr(obj, name)
 

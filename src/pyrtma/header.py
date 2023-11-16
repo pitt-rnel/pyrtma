@@ -2,7 +2,7 @@ import ctypes
 from typing import Type
 
 from .message_base import MessageBase
-from .validators import Int16, Double, Int32
+from .validators import Int16, Double, Int32, Uint32
 
 # Type Aliases
 MODULE_ID = ctypes.c_short
@@ -30,7 +30,7 @@ class _RTMA_MSG_HEADER(MessageBase):
         ("_num_data_bytes", ctypes.c_int),
         ("_remaining_bytes", ctypes.c_int),
         ("_is_dynamic", ctypes.c_int),
-        ("_reserved", ctypes.c_int),
+        ("_reserved", ctypes.c_uint),
     ]
 
     msg_type: Int32 = Int32()
@@ -44,7 +44,7 @@ class _RTMA_MSG_HEADER(MessageBase):
     num_data_bytes: Int32 = Int32()
     remaining_bytes: Int32 = Int32()
     is_dynamic: Int32 = Int32()
-    reserved: Int32 = Int32()
+    reserved: Uint32 = Uint32()
 
 
 class MessageHeader(_RTMA_MSG_HEADER):

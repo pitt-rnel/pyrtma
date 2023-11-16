@@ -8,13 +8,10 @@ import time
 import os
 import ctypes
 
-from .message import (
-    Message,
-    MessageData,
-    MessageHeader,
-    get_header_cls,
-    InvalidMessageDefinition,
-)
+from .message import Message, get_msg_cls
+from .message_data import MessageData
+from .header import MessageHeader, get_header_cls
+from .exceptions import InvalidMessageDefinition
 from . import core_defs as cd
 
 from functools import wraps
@@ -571,8 +568,7 @@ class Client(object):
             raise ConnectionLost
 
         # Read Data Section
-        data = header.get_data()
-
+        data = get_msg_cls(header.msg_type)()
         if data.type_size != header.num_data_bytes:
             raise InvalidMessageDefinition(
                 f"Received message header indicating a message data size that does not match the expected size of message type {data.type_name}. Message definitions may be out of sync across systems."

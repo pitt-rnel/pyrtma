@@ -17,7 +17,7 @@ from typing import (
 )
 from abc import abstractmethod, ABCMeta
 
-from ._message_base import _MessageBase
+from .message_base import MessageBase
 
 __all__ = [
     "Int8",
@@ -80,7 +80,7 @@ class FloatValidatorBase(FieldValidator, Generic[_P], metaclass=ABCMeta):
         if not isinstance(value, (float, int)):
             raise TypeError(f"Expected {value} to be an float")
 
-        if not math.isclose(self._float_type(value).value, value):
+        if not math.isclose(self._float_type(value).value, value, rel_tol=1e-6):
             raise ValueError(
                 f"The {value} can not be represented as a {type(self).__name__}"
             )
@@ -89,7 +89,9 @@ class FloatValidatorBase(FieldValidator, Generic[_P], metaclass=ABCMeta):
         if any(not isinstance(v, (float, int)) for v in value):
             raise TypeError(f"Expected {value!r} to be an int.")
 
-        if any(not math.isclose(self._float_type(v).value, v) for v in value):
+        if any(
+            not math.isclose(self._float_type(v).value, v, rel_tol=1e-6) for v in value
+        ):
             raise ValueError(
                 f"{value} contains value(s) that can not be represented as a {type(self).__name__}"
             )
@@ -219,7 +221,7 @@ class Uint64(IntValidatorBase):
 
 
 class String(FieldValidator, Generic[_P]):
-    def __init__(self, len: int):
+    def __init__(self, len: int = 1):
         self.len = len
 
     def __get__(self, obj: _P, objtype=None) -> str:
@@ -278,10 +280,10 @@ class ArrayField(FieldValidator, Generic[_FV]):
     def __init__(self, validator: Type[_FV], len: int):
         self._validator = validator()
         self._len = len
-        self._bound_obj: Optional[_MessageBase] = None
+        self._bound_obj: Optional[MessageBase] = None
 
     @classmethod
-    def _bound(cls, obj: ArrayField[_FV], bound_obj: _MessageBase) -> ArrayField[_FV]:
+    def _bound(cls, obj: ArrayField[_FV], bound_obj: MessageBase) -> ArrayField[_FV]:
         new_obj = super().__new__(cls)
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
@@ -292,11 +294,11 @@ class ArrayField(FieldValidator, Generic[_FV]):
 
         return new_obj
 
-    def __get__(self, obj: _MessageBase, objtype=None) -> ArrayField[_FV]:
+    def __get__(self, obj: MessageBase, objtype=None) -> ArrayField[_FV]:
         """Return an Array bound to a message obj instance."""
         return ArrayField._bound(self, obj)
 
-    def __set__(self, obj: _MessageBase, value: ArrayField[_FV]):
+    def __set__(self, obj: MessageBase, value: ArrayField[_FV]):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
@@ -339,10 +341,10 @@ class IntArray(ArrayField[_FV]):
     def __init__(self, validator: Type[_FV], len: int):
         self._validator = validator()
         self._len = len
-        self._bound_obj: Optional[_MessageBase] = None
+        self._bound_obj: Optional[MessageBase] = None
 
     @classmethod
-    def _bound(cls, obj: IntArray[_FV], bound_obj: _MessageBase) -> IntArray[_FV]:
+    def _bound(cls, obj: IntArray[_FV], bound_obj: MessageBase) -> IntArray[_FV]:
         new_obj = super().__new__(cls)
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
@@ -353,11 +355,11 @@ class IntArray(ArrayField[_FV]):
 
         return new_obj
 
-    def __get__(self, obj: _MessageBase, objtype=None) -> IntArray[_FV]:
+    def __get__(self, obj: MessageBase, objtype=None) -> IntArray[_FV]:
         """Return an Array bound to a message obj instance."""
         return IntArray._bound(self, obj)
 
-    def __set__(self, obj: _MessageBase, value: IntArray[_FV]):
+    def __set__(self, obj: MessageBase, value: IntArray[_FV]):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
@@ -372,10 +374,10 @@ class FloatArray(ArrayField[_FV]):
     def __init__(self, validator: Type[_FV], len: int):
         self._validator = validator()
         self._len = len
-        self._bound_obj: Optional[_MessageBase] = None
+        self._bound_obj: Optional[MessageBase] = None
 
     @classmethod
-    def _bound(cls, obj: FloatArray[_FV], bound_obj: _MessageBase) -> FloatArray[_FV]:
+    def _bound(cls, obj: FloatArray[_FV], bound_obj: MessageBase) -> FloatArray[_FV]:
         new_obj = super().__new__(cls)
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
@@ -386,11 +388,11 @@ class FloatArray(ArrayField[_FV]):
 
         return new_obj
 
-    def __get__(self, obj: _MessageBase, objtype=None) -> FloatArray[_FV]:
+    def __get__(self, obj: MessageBase, objtype=None) -> FloatArray[_FV]:
         """Return an Array bound to a message obj instance."""
         return FloatArray._bound(self, obj)
 
-    def __set__(self, obj: _MessageBase, value: IntArray[_FV]):
+    def __set__(self, obj: MessageBase, value: IntArray[_FV]):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
@@ -401,7 +403,7 @@ class FloatArray(ArrayField[_FV]):
         return getattr(self._bound_obj, self.private_name)[key]
 
 
-_S = TypeVar("_S", bound=_MessageBase)
+_S = TypeVar("_S", bound=MessageBase)
 
 
 class Struct(FieldValidator, Generic[_S]):
@@ -412,7 +414,7 @@ class Struct(FieldValidator, Generic[_S]):
         return getattr(obj, self.private_name)
 
     @overload
-    def __set__(self, obj: _MessageBase, value: _S):
+    def __set__(self, obj: MessageBase, value: _S):
         ...
 
     @overload
@@ -440,10 +442,10 @@ class StructArray(FieldValidator, Generic[_S]):
     def __init__(self, msg_struct: Type[_S], len: int):
         self._validator = Struct(msg_struct)
         self._len = len
-        self._bound_obj: Optional[_MessageBase] = None
+        self._bound_obj: Optional[MessageBase] = None
 
     @classmethod
-    def _bound(cls, obj: StructArray[_S], bound_obj: _MessageBase) -> StructArray[_S]:
+    def _bound(cls, obj: StructArray[_S], bound_obj: MessageBase) -> StructArray[_S]:
         new_obj: StructArray[_S] = super().__new__(cls)
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
@@ -454,7 +456,7 @@ class StructArray(FieldValidator, Generic[_S]):
 
         return new_obj
 
-    def __get__(self, obj: _MessageBase, objtype=None) -> StructArray[_S]:
+    def __get__(self, obj: MessageBase, objtype=None) -> StructArray[_S]:
         """Return an StructArray bound to a message obj instance."""
         return StructArray._bound(self, obj)
 

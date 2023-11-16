@@ -1,7 +1,29 @@
-"""pyrtma core definitions """
 import ctypes
+
 import pyrtma
 from typing import ClassVar
+
+from pyrtma.message_base import MessageBase
+from pyrtma.message_data import MessageData
+from pyrtma.validators import (
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    Uint8,
+    Uint16,
+    Uint32,
+    Uint64,
+    Float,
+    Double,
+    Struct,
+    IntArray,
+    FloatArray,
+    StructArray,
+    String,
+    Bytes,
+)
+
 
 # Constants
 MAX_MODULES: int = 200
@@ -59,26 +81,39 @@ MT_LM_READY: int = 96
 
 
 # Struct Definitions
-class RTMA_MSG_HEADER(ctypes.Structure):
+class RTMA_MSG_HEADER(MessageBase):
     _fields_ = [
-        ("msg_type", MSG_TYPE),
-        ("msg_count", MSG_COUNT),
-        ("send_time", ctypes.c_double),
-        ("recv_time", ctypes.c_double),
-        ("src_host_id", HOST_ID),
-        ("src_mod_id", MODULE_ID),
-        ("dest_host_id", HOST_ID),
-        ("dest_mod_id", MODULE_ID),
-        ("num_data_bytes", ctypes.c_int),
-        ("remaining_bytes", ctypes.c_int),
-        ("is_dynamic", ctypes.c_int),
-        ("reserved", ctypes.c_int),
+        ("_msg_type", MSG_TYPE),
+        ("_msg_count", MSG_COUNT),
+        ("_send_time", ctypes.c_double),
+        ("_recv_time", ctypes.c_double),
+        ("_src_host_id", HOST_ID),
+        ("_src_mod_id", MODULE_ID),
+        ("_dest_host_id", HOST_ID),
+        ("_dest_mod_id", MODULE_ID),
+        ("_num_data_bytes", ctypes.c_int),
+        ("_remaining_bytes", ctypes.c_int),
+        ("_is_dynamic", ctypes.c_int),
+        ("_reserved", ctypes.c_uint),
     ]
+
+    msg_type = Int32()
+    msg_count = Int32()
+    send_time = Double()
+    recv_time = Double()
+    src_host_id = Int16()
+    src_mod_id = Int16()
+    dest_host_id = Int16()
+    dest_mod_id = Int16()
+    num_data_bytes = Int32()
+    remaining_bytes = Int32()
+    is_dynamic = Int32()
+    reserved = Uint32()
 
 
 # Message Definitions
 @pyrtma.message_def
-class MDF_EXIT(pyrtma.MessageData):
+class MDF_EXIT(MessageData):
     _fields_ = []
     type_id: ClassVar[int] = 0
     type_name: ClassVar[str] = "EXIT"
@@ -88,7 +123,7 @@ class MDF_EXIT(pyrtma.MessageData):
 
 
 @pyrtma.message_def
-class MDF_KILL(pyrtma.MessageData):
+class MDF_KILL(MessageData):
     _fields_ = []
     type_id: ClassVar[int] = 1
     type_name: ClassVar[str] = "KILL"
@@ -98,7 +133,7 @@ class MDF_KILL(pyrtma.MessageData):
 
 
 @pyrtma.message_def
-class MDF_ACKNOWLEDGE(pyrtma.MessageData):
+class MDF_ACKNOWLEDGE(MessageData):
     _fields_ = []
     type_id: ClassVar[int] = 2
     type_name: ClassVar[str] = "ACKNOWLEDGE"
@@ -108,11 +143,11 @@ class MDF_ACKNOWLEDGE(pyrtma.MessageData):
 
 
 @pyrtma.message_def
-class MDF_FAIL_SUBSCRIBE(pyrtma.MessageData):
+class MDF_FAIL_SUBSCRIBE(MessageData):
     _fields_ = [
-        ("mod_id", MODULE_ID),
-        ("reserved", ctypes.c_short),
-        ("msg_type", MSG_TYPE),
+        ("_mod_id", MODULE_ID),
+        ("_reserved", ctypes.c_short),
+        ("_msg_type", MSG_TYPE),
     ]
     type_id: ClassVar[int] = 6
     type_name: ClassVar[str] = "FAIL_SUBSCRIBE"
@@ -122,14 +157,18 @@ class MDF_FAIL_SUBSCRIBE(pyrtma.MessageData):
         str
     ] = "'FAIL_SUBSCRIBE:\n  id: 6\n  fields:\n    mod_id: MODULE_ID\n    reserved: short\n    msg_type: MSG_TYPE'"
 
+    mod_id = Int16()
+    reserved = Int16()
+    msg_type = Int32()
+
 
 @pyrtma.message_def
-class MDF_FAILED_MESSAGE(pyrtma.MessageData):
+class MDF_FAILED_MESSAGE(MessageData):
     _fields_ = [
-        ("dest_mod_id", MODULE_ID),
-        ("reserved", ctypes.c_short * 3),
-        ("time_of_failure", ctypes.c_double),
-        ("msg_header", RTMA_MSG_HEADER),
+        ("_dest_mod_id", MODULE_ID),
+        ("_reserved", ctypes.c_short * 3),
+        ("_time_of_failure", ctypes.c_double),
+        ("_msg_header", RTMA_MSG_HEADER),
     ]
     type_id: ClassVar[int] = 8
     type_name: ClassVar[str] = "FAILED_MESSAGE"
@@ -139,10 +178,15 @@ class MDF_FAILED_MESSAGE(pyrtma.MessageData):
         str
     ] = "'FAILED_MESSAGE:\n  id: 8\n  fields:\n    dest_mod_id: MODULE_ID\n    reserved: short[3]\n    time_of_failure: double\n    msg_header: RTMA_MSG_HEADER'"
 
+    dest_mod_id = Int16()
+    reserved = IntArray(Int16, 3)
+    time_of_failure = Double()
+    msg_header = Struct(RTMA_MSG_HEADER)
+
 
 @pyrtma.message_def
-class MDF_CONNECT(pyrtma.MessageData):
-    _fields_ = [("logger_status", ctypes.c_short), ("daemon_status", ctypes.c_short)]
+class MDF_CONNECT(MessageData):
+    _fields_ = [("_logger_status", ctypes.c_short), ("_daemon_status", ctypes.c_short)]
     type_id: ClassVar[int] = 13
     type_name: ClassVar[str] = "CONNECT"
     type_hash: ClassVar[int] = 0x6F2E3CA5
@@ -151,9 +195,12 @@ class MDF_CONNECT(pyrtma.MessageData):
         str
     ] = "'CONNECT:\n  id: 13\n  fields:\n    logger_status: short\n    daemon_status: short'"
 
+    logger_status = Int16()
+    daemon_status = Int16()
+
 
 @pyrtma.message_def
-class MDF_DISCONNECT(pyrtma.MessageData):
+class MDF_DISCONNECT(MessageData):
     _fields_ = []
     type_id: ClassVar[int] = 14
     type_name: ClassVar[str] = "DISCONNECT"
@@ -163,8 +210,8 @@ class MDF_DISCONNECT(pyrtma.MessageData):
 
 
 @pyrtma.message_def
-class MDF_SUBSCRIBE(pyrtma.MessageData):
-    _fields_ = [("msg_type", MSG_TYPE)]
+class MDF_SUBSCRIBE(MessageData):
+    _fields_ = [("_msg_type", MSG_TYPE)]
     type_id: ClassVar[int] = 15
     type_name: ClassVar[str] = "SUBSCRIBE"
     type_hash: ClassVar[int] = 0xF5B437C8
@@ -173,10 +220,12 @@ class MDF_SUBSCRIBE(pyrtma.MessageData):
         str
     ] = "'SUBSCRIBE:\n  id: 15\n  fields:\n    msg_type: MSG_TYPE'"
 
+    msg_type = Int32()
+
 
 @pyrtma.message_def
-class MDF_UNSUBSCRIBE(pyrtma.MessageData):
-    _fields_ = [("msg_type", MSG_TYPE)]
+class MDF_UNSUBSCRIBE(MessageData):
+    _fields_ = [("_msg_type", MSG_TYPE)]
     type_id: ClassVar[int] = 16
     type_name: ClassVar[str] = "UNSUBSCRIBE"
     type_hash: ClassVar[int] = 0x193FB9E0
@@ -185,19 +234,23 @@ class MDF_UNSUBSCRIBE(pyrtma.MessageData):
         str
     ] = "'UNSUBSCRIBE:\n  id: 16\n  fields:\n    msg_type: MSG_TYPE'"
 
+    msg_type = Int32()
+
 
 @pyrtma.message_def
-class MDF_MODULE_READY(pyrtma.MessageData):
-    _fields_ = [("pid", ctypes.c_int)]
+class MDF_MODULE_READY(MessageData):
+    _fields_ = [("_pid", ctypes.c_int)]
     type_id: ClassVar[int] = 26
     type_name: ClassVar[str] = "MODULE_READY"
     type_hash: ClassVar[int] = 0x0DF81813
     type_source: ClassVar[str] = "core_defs/core_defs.yaml"
     type_def: ClassVar[str] = "'MODULE_READY:\n  id: 26\n  fields:\n    pid: int'"
 
+    pid = Int32()
+
 
 @pyrtma.message_def
-class MDF_LM_EXIT(pyrtma.MessageData):
+class MDF_LM_EXIT(MessageData):
     _fields_ = []
     type_id: ClassVar[int] = 55
     type_name: ClassVar[str] = "LM_EXIT"
@@ -207,8 +260,8 @@ class MDF_LM_EXIT(pyrtma.MessageData):
 
 
 @pyrtma.message_def
-class MDF_SAVE_MESSAGE_LOG(pyrtma.MessageData):
-    _fields_ = [("pathname", ctypes.c_char * 256), ("pathname_length", ctypes.c_int)]
+class MDF_SAVE_MESSAGE_LOG(MessageData):
+    _fields_ = [("_pathname", ctypes.c_char * 256), ("_pathname_length", ctypes.c_int)]
     type_id: ClassVar[int] = 56
     type_name: ClassVar[str] = "SAVE_MESSAGE_LOG"
     type_hash: ClassVar[int] = 0x515569E9
@@ -217,9 +270,12 @@ class MDF_SAVE_MESSAGE_LOG(pyrtma.MessageData):
         str
     ] = "'SAVE_MESSAGE_LOG:\n  id: 56\n  fields:\n    pathname: char[MAX_LOGGER_FILENAME_LENGTH]\n    pathname_length: int'"
 
+    pathname = String(256)
+    pathname_length = Int32()
+
 
 @pyrtma.message_def
-class MDF_MESSAGE_LOG_SAVED(pyrtma.MessageData):
+class MDF_MESSAGE_LOG_SAVED(MessageData):
     _fields_ = []
     type_id: ClassVar[int] = 57
     type_name: ClassVar[str] = "MESSAGE_LOG_SAVED"
@@ -229,7 +285,7 @@ class MDF_MESSAGE_LOG_SAVED(pyrtma.MessageData):
 
 
 @pyrtma.message_def
-class MDF_PAUSE_MESSAGE_LOGGING(pyrtma.MessageData):
+class MDF_PAUSE_MESSAGE_LOGGING(MessageData):
     _fields_ = []
     type_id: ClassVar[int] = 58
     type_name: ClassVar[str] = "PAUSE_MESSAGE_LOGGING"
@@ -239,7 +295,7 @@ class MDF_PAUSE_MESSAGE_LOGGING(pyrtma.MessageData):
 
 
 @pyrtma.message_def
-class MDF_RESUME_MESSAGE_LOGGING(pyrtma.MessageData):
+class MDF_RESUME_MESSAGE_LOGGING(MessageData):
     _fields_ = []
     type_id: ClassVar[int] = 59
     type_name: ClassVar[str] = "RESUME_MESSAGE_LOGGING"
@@ -249,7 +305,7 @@ class MDF_RESUME_MESSAGE_LOGGING(pyrtma.MessageData):
 
 
 @pyrtma.message_def
-class MDF_RESET_MESSAGE_LOG(pyrtma.MessageData):
+class MDF_RESET_MESSAGE_LOG(MessageData):
     _fields_ = []
     type_id: ClassVar[int] = 60
     type_name: ClassVar[str] = "RESET_MESSAGE_LOG"
@@ -259,7 +315,7 @@ class MDF_RESET_MESSAGE_LOG(pyrtma.MessageData):
 
 
 @pyrtma.message_def
-class MDF_DUMP_MESSAGE_LOG(pyrtma.MessageData):
+class MDF_DUMP_MESSAGE_LOG(MessageData):
     _fields_ = []
     type_id: ClassVar[int] = 61
     type_name: ClassVar[str] = "DUMP_MESSAGE_LOG"
@@ -269,11 +325,11 @@ class MDF_DUMP_MESSAGE_LOG(pyrtma.MessageData):
 
 
 @pyrtma.message_def
-class MDF_TIMING_MESSAGE(pyrtma.MessageData):
+class MDF_TIMING_MESSAGE(MessageData):
     _fields_ = [
-        ("timing", ctypes.c_ushort * 10000),
-        ("ModulePID", ctypes.c_int * 200),
-        ("send_time", ctypes.c_double),
+        ("_timing", ctypes.c_ushort * 10000),
+        ("_ModulePID", ctypes.c_int * 200),
+        ("_send_time", ctypes.c_double),
     ]
     type_id: ClassVar[int] = 80
     type_name: ClassVar[str] = "TIMING_MESSAGE"
@@ -283,10 +339,14 @@ class MDF_TIMING_MESSAGE(pyrtma.MessageData):
         str
     ] = "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: unsigned short[MAX_MESSAGE_TYPES]\n    ModulePID: int[MAX_MODULES]\n    send_time: double'"
 
+    timing = IntArray(Uint16, 10000)
+    ModulePID = IntArray(Int32, 200)
+    send_time = Double()
+
 
 @pyrtma.message_def
-class MDF_FORCE_DISCONNECT(pyrtma.MessageData):
-    _fields_ = [("mod_id", ctypes.c_int)]
+class MDF_FORCE_DISCONNECT(MessageData):
+    _fields_ = [("_mod_id", ctypes.c_int)]
     type_id: ClassVar[int] = 82
     type_name: ClassVar[str] = "FORCE_DISCONNECT"
     type_hash: ClassVar[int] = 0xC37C54E8
@@ -295,10 +355,12 @@ class MDF_FORCE_DISCONNECT(pyrtma.MessageData):
         str
     ] = "'FORCE_DISCONNECT:\n  id: 82\n  fields:\n    mod_id: int'"
 
+    mod_id = Int32()
+
 
 @pyrtma.message_def
-class MDF_PAUSE_SUBSCRIPTION(pyrtma.MessageData):
-    _fields_ = [("msg_type", MSG_TYPE)]
+class MDF_PAUSE_SUBSCRIPTION(MessageData):
+    _fields_ = [("_msg_type", MSG_TYPE)]
     type_id: ClassVar[int] = 85
     type_name: ClassVar[str] = "PAUSE_SUBSCRIPTION"
     type_hash: ClassVar[int] = 0x22338A6D
@@ -307,10 +369,12 @@ class MDF_PAUSE_SUBSCRIPTION(pyrtma.MessageData):
         str
     ] = "'PAUSE_SUBSCRIPTION:\n  id: 85\n  fields:\n    msg_type: MSG_TYPE'"
 
+    msg_type = Int32()
+
 
 @pyrtma.message_def
-class MDF_RESUME_SUBSCRIPTION(pyrtma.MessageData):
-    _fields_ = [("msg_type", MSG_TYPE)]
+class MDF_RESUME_SUBSCRIPTION(MessageData):
+    _fields_ = [("_msg_type", MSG_TYPE)]
     type_id: ClassVar[int] = 86
     type_name: ClassVar[str] = "RESUME_SUBSCRIPTION"
     type_hash: ClassVar[int] = 0xC56A97F2
@@ -319,9 +383,11 @@ class MDF_RESUME_SUBSCRIPTION(pyrtma.MessageData):
         str
     ] = "'RESUME_SUBSCRIPTION:\n  id: 86\n  fields:\n    msg_type: MSG_TYPE'"
 
+    msg_type = Int32()
+
 
 @pyrtma.message_def
-class MDF_LM_READY(pyrtma.MessageData):
+class MDF_LM_READY(MessageData):
     _fields_ = []
     type_id: ClassVar[int] = 96
     type_name: ClassVar[str] = "LM_READY"

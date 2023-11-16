@@ -11,6 +11,7 @@ from pyrtma.parser import (
     HID,
     MDF,
     SDF,
+    Field,
 )
 from typing import Union
 import subprocess
@@ -78,6 +79,33 @@ pytype_map = {
     "int64": "int",
 }
 
+desctype_map = {
+    "char": "String",
+    "unsigned char": "Bytes",
+    "int": "Int32",
+    "signed int": "Int32",
+    "unsigned int": "Uint32",
+    "unsigned": "Uint32",
+    "short": "Int16",
+    "signed short": "Int16",
+    "unsigned short": "Uint16",
+    "long": "Int32",
+    "signed long": "Int32",
+    "unsigned long": "Uint32",
+    "long long": "Int64",
+    "signed long long": "Int64",
+    "unsigned long long": "Uint64",
+    "float": "Float",
+    "double": "Double",
+    "uint8": "Uint8",
+    "uint16": "Uint16",
+    "uint32": "Uint32",
+    "uint64": "Uint64",
+    "int8": "Int8",
+    "int16": "Int16",
+    "int32": "Int32",
+    "int64": "Int64",
+}
 DEFAULT_BLACK_LEN = 88  # preferred line length
 TAB = "    "
 
@@ -109,10 +137,43 @@ class PyDefCompiler:
         else:
             return f"{td.name} = {td.type_name}\n"
 
+    def get_descriptor(self, ftype: str, flen: int) -> str:
+        if ftype in type_map.keys():
+            dtype = desctype_map[ftype]
+            if flen > 0:
+                if dtype.startswith("Int") or dtype.startswith("Uint"):
+                    return f"IntArray({dtype}, {flen})"
+                elif dtype.startswith("Float") or dtype.startswith("Double"):
+                    return f"FloatArray({dtype}, {flen})"
+                elif dtype.startswith("String"):
+                    return f"String({flen})"
+                elif dtype.startswith("Bytes"):
+                    return f"Bytes({flen})"
+                else:
+                    raise RuntimeError(f"Unknown field descriptor{dtype}")
+            else:
+                return f"{dtype}()"
+
+        elif ftype in self.parser.message_defs.keys():
+            ftype = f"MDF_{ftype}"
+            return f"Struct({ftype})" if flen == 0 else f"StructArray({ftype}, {flen})"
+
+        elif ftype in self.parser.struct_defs.keys():
+            ftype = f"{ftype}"
+            return f"Struct({ftype})" if flen == 0 else f"StructArray({ftype}, {flen})"
+
+        elif ftype in self.parser.aliases.keys():
+            ftype = self.parser.aliases[ftype].type_name
+            return self.get_descriptor(ftype, flen)
+
+        else:
+            raise RuntimeError(f"Unknown field name {ftype}")
+
     def generate_struct(self, sdf: SDF) -> str:
         f = []
         fnum = len(sdf.fields)
         fstr = "["
+        dstr = "\n"
         if fnum == 0:
             fstr += "]"
         else:
@@ -121,8 +182,9 @@ class PyDefCompiler:
                 fstr += "\n"
             else:
                 tab = ""
+
             for i, field in enumerate(sdf.fields, start=1):
-                flen = field.length
+                flen = field.length or 0
                 nl = ",\n" if fnum > 2 else ", " if i < fnum else ""
 
                 if field.type_name in type_map.keys():
@@ -137,8 +199,11 @@ class PyDefCompiler:
                     raise RuntimeError(f"Unknown field name {field.name} in {sdf.name}")
 
                 f.append(
-                    f"{tab *4}(\"{field.name}\", {ftype}{' * ' + str(flen) if flen else ''}){nl}"
+                    f"{tab *4}(\"_{field.name}\", {ftype}{' * ' + str(flen) if flen else ''}){nl}"
                 )
+
+                desc = self.get_descriptor(field.type_name, flen)
+                dstr += f"{'    ' * 3}{field.name}={desc}\n"
 
             fstr += "".join(f)
             if fnum > 2:
@@ -147,8 +212,10 @@ class PyDefCompiler:
                 fstr += "]"
 
         template = f"""\
-        class {sdf.name}(ctypes.Structure):
+        class {sdf.name}(MessageBase):
             _fields_ = {fstr}
+
+            {dstr}
         """
         return dedent(template)
 
@@ -194,6 +261,7 @@ class PyDefCompiler:
     def generate_msg_def(self, mdf: MDF) -> str:
         f = []
         fnum = len(mdf.fields)
+        dstr = "\n"
         fstr = "["
         if fnum == 0:
             fstr += "]"
@@ -204,7 +272,7 @@ class PyDefCompiler:
             else:
                 tab = ""
             for i, field in enumerate(mdf.fields, start=1):
-                flen = field.length
+                flen = field.length or 0
                 nl = ",\n" if fnum > 2 else ", " if i < fnum else ""
 
                 if field.type_name in type_map.keys():
@@ -219,8 +287,11 @@ class PyDefCompiler:
                     raise RuntimeError(f"Unknown field name {field.name} in {mdf.name}")
 
                 f.append(
-                    f"{tab *4}(\"{field.name}\", {ftype}{' * ' + str(flen) if flen else ''}){nl}"
+                    f"{tab *4}(\"_{field.name}\", {ftype}{' * ' + str(flen) if flen else ''}){nl}"
                 )
+
+                desc = self.get_descriptor(field.type_name, flen)
+                dstr += f"{'    ' * 3}{field.name}={desc}\n"
 
             fstr += "".join(f)
             if fnum > 2:
@@ -241,13 +312,15 @@ class PyDefCompiler:
 
         template = f"""\
         @pyrtma.message_def
-        class MDF_{mdf.name}(pyrtma.MessageData):
+        class MDF_{mdf.name}(MessageData):
             _fields_ = {fstr}
             type_id: ClassVar[int] = {msg_id}
             type_name: ClassVar[str] = \"{mdf.name}\"
             type_hash: ClassVar[int] = 0x{mdf.hash[:8].upper()}
             type_source: ClassVar[str] = \"{msg_src}\"
             {type_def_line}
+
+            {dstr}
         """
         return dedent(template)
 
@@ -294,8 +367,14 @@ class PyDefCompiler:
     def generate_imports(self) -> str:
         s = """\
         import ctypes
+
         import pyrtma
         from typing import ClassVar
+
+        from pyrtma.message_base import MessageBase
+        from pyrtma.message_data import MessageData
+        from pyrtma.validators import Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float, Double, Struct, IntArray, FloatArray, StructArray, String, Bytes
+        
         """
         return dedent(s)
 
