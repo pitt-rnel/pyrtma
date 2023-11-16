@@ -142,25 +142,25 @@ class PyDefCompiler:
             dtype = desctype_map[ftype]
             if flen > 0:
                 if dtype.startswith("Int") or dtype.startswith("Uint"):
-                    return f"IntArray({dtype}, {flen})"
+                    return f":IntArray[{dtype}] = IntArray({dtype}, {flen})"
                 elif dtype.startswith("Float") or dtype.startswith("Double"):
-                    return f"FloatArray({dtype}, {flen})"
+                    return f":FloatArray[{dtype}] = FloatArray({dtype}, {flen})"
                 elif dtype.startswith("String"):
-                    return f"String({flen})"
+                    return f":String = String({flen})"
                 elif dtype.startswith("Bytes"):
-                    return f"Bytes({flen})"
+                    return f":Bytes = Bytes({flen})"
                 else:
                     raise RuntimeError(f"Unknown field descriptor{dtype}")
             else:
-                return f"{dtype}()"
+                return f":{dtype} = {dtype}()"
 
         elif ftype in self.parser.message_defs.keys():
             ftype = f"MDF_{ftype}"
-            return f"Struct({ftype})" if flen == 0 else f"StructArray({ftype}, {flen})"
+            return f":Struct[{ftype} = Struct({ftype})" if flen == 0 else f":StructArray[{ftype}] = StructArray({ftype}, {flen})"
 
         elif ftype in self.parser.struct_defs.keys():
             ftype = f"{ftype}"
-            return f"Struct({ftype})" if flen == 0 else f"StructArray({ftype}, {flen})"
+            return f":Struct[{ftype}] = Struct({ftype})" if flen == 0 else f":StructArray[{ftype}] = StructArray({ftype}, {flen})"
 
         elif ftype in self.parser.aliases.keys():
             ftype = self.parser.aliases[ftype].type_name
@@ -203,7 +203,7 @@ class PyDefCompiler:
                 )
 
                 desc = self.get_descriptor(field.type_name, flen)
-                dstr += f"{'    ' * 3}{field.name}={desc}\n"
+                dstr += f"{'    ' * 3}{field.name}{desc}\n"
 
             fstr += "".join(f)
             if fnum > 2:
@@ -291,7 +291,7 @@ class PyDefCompiler:
                 )
 
                 desc = self.get_descriptor(field.type_name, flen)
-                dstr += f"{'    ' * 3}{field.name}={desc}\n"
+                dstr += f"{'    ' * 3}{field.name}{desc}\n"
 
             fstr += "".join(f)
             if fnum > 2:
