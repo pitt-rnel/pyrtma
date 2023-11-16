@@ -1411,7 +1411,7 @@ message_defs:
     id: 4100 # message to log lambda value in cst task
     fields:
       header: MSG_HEADER
-      lambda: float
+      lamda: float
       k: int
       cursor_pos: double # if discretized, different than control_space_feedback
 
