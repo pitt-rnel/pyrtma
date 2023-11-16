@@ -3,7 +3,8 @@ import ctypes
 import unittest
 from typing import cast
 
-# from .test_msg_defs.test_defs import *
+# Import message defs to add to pyrtma.msg_defs map
+from .test_msg_defs.test_defs import *
 
 
 def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
