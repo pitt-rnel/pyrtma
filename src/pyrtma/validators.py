@@ -51,23 +51,27 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
 
     @abstractmethod
     def __get__(self, obj: _P, objtype=None):
-        pass
+        ...
 
     @abstractmethod
     def __set__(self, obj: _P, value: _V):
-        pass
+        ...
 
     @abstractmethod
     def validate_one(self, value: _V):
-        pass
+        ...
 
     @abstractmethod
     def validate_many(self, value: _V):
-        pass
+        ...
 
 
 class FloatValidatorBase(FieldValidator, Generic[_P], metaclass=ABCMeta):
     _float_type = ctypes.c_float
+
+    @abstractmethod
+    def __init__(self):
+        ...
 
     def __get__(self, obj: _P, objtype=None) -> float:
         return getattr(obj, self.private_name)
@@ -103,9 +107,15 @@ class FloatValidatorBase(FieldValidator, Generic[_P], metaclass=ABCMeta):
 class Float(FloatValidatorBase):
     _float_type = ctypes.c_float
 
+    def __init__(self):
+        ...
+
 
 class Double(FloatValidatorBase):
     _float_type = ctypes.c_double
+
+    def __init__(self):
+        ...
 
 
 # Base Class for int validator fields
@@ -115,8 +125,9 @@ class IntValidatorBase(FieldValidator, Generic[_P], metaclass=ABCMeta):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**8 - 1
 
+    @abstractmethod
     def __init__(self):
-        pass
+        ...
 
     @property
     def size(self) -> int:
@@ -170,12 +181,18 @@ class Int8(IntValidatorBase):
     _min: ClassVar[int] = -(2**7)
     _max: ClassVar[int] = 2**7 - 1
 
+    def __init__(self):
+        ...
+
 
 class Int16(IntValidatorBase):
     _size: ClassVar[int] = 2
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**15)
     _max: ClassVar[int] = 2**15 - 1
+
+    def __init__(self):
+        ...
 
 
 class Int32(IntValidatorBase):
@@ -184,12 +201,18 @@ class Int32(IntValidatorBase):
     _min: ClassVar[int] = -(2**31)
     _max: ClassVar[int] = 2**31 - 1
 
+    def __init__(self):
+        ...
+
 
 class Int64(IntValidatorBase):
     _size: ClassVar[int] = 8
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**63)
     _max: ClassVar[int] = 2**63 - 1
+
+    def __init__(self):
+        ...
 
 
 class Uint8(IntValidatorBase):
@@ -198,12 +221,18 @@ class Uint8(IntValidatorBase):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**8 - 1
 
+    def __init__(self):
+        ...
+
 
 class Uint16(IntValidatorBase):
     _size: ClassVar[int] = 2
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**16 - 1
+
+    def __init__(self):
+        ...
 
 
 class Uint32(IntValidatorBase):
@@ -212,12 +241,18 @@ class Uint32(IntValidatorBase):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**32 - 1
 
+    def __init__(self):
+        ...
+
 
 class Uint64(IntValidatorBase):
     _size: ClassVar[int] = 8
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**64 - 1
+
+    def __init__(self):
+        ...
 
 
 class String(FieldValidator, Generic[_P]):
