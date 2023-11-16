@@ -64,6 +64,9 @@ class Message:
             self.header.pretty_print(add_tabs) + "\n" + self.data.pretty_print(add_tabs)
         )
 
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(header=self.header.to_dict(), data=self.data.to_dict())
+
     def to_json(self, minify: bool = False, **kwargs) -> str:
         d = dict(header=self.header.to_dict(), data=self.data.to_dict())
         if minify:
