@@ -377,11 +377,18 @@ class IntArray(ArrayField[_FV]):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
+    @overload
+    def __getitem__(self, key:int) -> int:...
+
+    @overload
+    def __getitem__(self, key:slice) -> List[int]:...
+
     def __getitem__(self, key) -> Union[int, List[int]]:
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
         return getattr(self._bound_obj, self.private_name)[key]
+
 
 
 class FloatArray(ArrayField[_FV]):
@@ -409,6 +416,12 @@ class FloatArray(ArrayField[_FV]):
     def __set__(self, obj: MessageBase, value: IntArray[_FV]):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
+
+    @overload
+    def __getitem__(self, key:int) -> float:...
+
+    @overload
+    def __getitem__(self, key:slice) -> List[float]:...
 
     def __getitem__(self, key) -> Union[float, List[float]]:
         if self._bound_obj is None:
