@@ -296,7 +296,7 @@ class Bytes(FieldValidator, Generic[_P, _B]):
     def __set__(self, obj: _P, value: _B):
         self.validate_one(value)
         if self.len == 1 and isinstance(value, bytes):
-            int_value = int.from_bytes(value)
+            int_value = int.from_bytes(value, "little")
             setattr(obj, self.private_name, int_value)
             return
         setattr(obj, self.private_name, value)
