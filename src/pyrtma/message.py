@@ -1,7 +1,7 @@
 """pyrtma.messaage: RTMA message classes"""
 import json
 
-from typing import Type, Dict, Any
+from typing import Type, Dict, Any, TypeVar
 from dataclasses import dataclass
 
 from .header import MessageHeader, get_header_cls
@@ -22,7 +22,9 @@ __all__ = [
 msg_defs: Dict[int, Type[MessageData]] = {}
 
 
-def message_def(msg_cls: Type[MessageData], *args, **kwargs) -> Type[MessageData]:
+_MD = TypeVar("_MD", bound=MessageData)  # Parent
+
+def message_def(msg_cls: Type[_MD], *args, **kwargs) -> Type[_MD]:
     """Decorator to add user message definitions."""
     msg_defs[msg_cls.type_id] = msg_cls
     return msg_cls
