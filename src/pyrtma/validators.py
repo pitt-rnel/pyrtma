@@ -66,7 +66,7 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
         ...
 
 
-class FloatValidatorBase(FieldValidator, Generic[_P], metaclass=ABCMeta):
+class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMeta):
     _float_type = ctypes.c_float
 
     @abstractmethod
@@ -119,7 +119,7 @@ class Double(FloatValidatorBase):
 
 
 # Base Class for int validator fields
-class IntValidatorBase(FieldValidator, Generic[_P], metaclass=ABCMeta):
+class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
     _size: ClassVar[int] = 1
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = 0
@@ -255,7 +255,7 @@ class Uint64(IntValidatorBase):
         ...
 
 
-class String(FieldValidator, Generic[_P]):
+class String(FieldValidator[_P, str], Generic[_P]):
     def __init__(self, len: int = 1):
         self.len = len
 
@@ -283,7 +283,7 @@ class String(FieldValidator, Generic[_P]):
 _B = TypeVar("_B", bytes, bytearray)
 
 
-class Bytes(FieldValidator, Generic[_P, _B]):
+class Bytes(FieldValidator[_P, _B], Generic[_P, _B]):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**8 - 1
 
@@ -385,15 +385,16 @@ class ArrayField(FieldValidator, Generic[_FV]):
             raise TypeError(f"Expected an ArrayField({type(self._validator).__name__}")
         return
 
+_IV = TypeVar("_IV", bound=IntValidatorBase)
 
-class IntArray(ArrayField[_FV]):
-    def __init__(self, validator: Type[_FV], len: int):
+class IntArray(ArrayField[_IV]):
+    def __init__(self, validator: Type[_IV], len: int):
         self._validator = validator()
         self._len = len
         self._bound_obj: Optional[MessageBase] = None
 
     @classmethod
-    def _bound(cls, obj: IntArray[_FV], bound_obj: MessageBase) -> IntArray[_FV]:
+    def _bound(cls, obj: IntArray[_IV], bound_obj: MessageBase) -> IntArray[_IV]:
         new_obj = super().__new__(cls)
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
@@ -404,11 +405,11 @@ class IntArray(ArrayField[_FV]):
 
         return new_obj
 
-    def __get__(self, obj: MessageBase, objtype=None) -> IntArray[_FV]:
+    def __get__(self, obj: MessageBase, objtype=None) -> IntArray[_IV]:
         """Return an Array bound to a message obj instance."""
         return IntArray._bound(self, obj)
 
-    def __set__(self, obj: MessageBase, value: IntArray[_FV]):
+    def __set__(self, obj: MessageBase, value: IntArray[_IV]):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
@@ -426,15 +427,16 @@ class IntArray(ArrayField[_FV]):
 
         return getattr(self._bound_obj, self.private_name)[key]
 
+_FPV = TypeVar("_FPV", bound=FloatValidatorBase)
 
-class FloatArray(ArrayField[_FV]):
-    def __init__(self, validator: Type[_FV], len: int):
+class FloatArray(ArrayField[_FPV]):
+    def __init__(self, validator: Type[_FPV], len: int):
         self._validator = validator()
         self._len = len
         self._bound_obj: Optional[MessageBase] = None
 
     @classmethod
-    def _bound(cls, obj: FloatArray[_FV], bound_obj: MessageBase) -> FloatArray[_FV]:
+    def _bound(cls, obj: FloatArray[_FPV], bound_obj: MessageBase) -> FloatArray[_FPV]:
         new_obj = super().__new__(cls)
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
@@ -445,11 +447,11 @@ class FloatArray(ArrayField[_FV]):
 
         return new_obj
 
-    def __get__(self, obj: MessageBase, objtype=None) -> FloatArray[_FV]:
+    def __get__(self, obj: MessageBase, objtype=None) -> FloatArray[_FPV]:
         """Return an Array bound to a message obj instance."""
         return FloatArray._bound(self, obj)
 
-    def __set__(self, obj: MessageBase, value: IntArray[_FV]):
+    def __set__(self, obj: MessageBase, value: FloatArray[_FPV]):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
