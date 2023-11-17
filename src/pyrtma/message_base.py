@@ -3,7 +3,7 @@ import json
 
 from typing import TypeVar, Any, Type, Dict
 from .utils.print import print_ctype_array, hexdump
-from .utils.random import _random_struct
+from .utils.random_fields import _random_struct
 from .exceptions import JSONDecodingError
 
 MB = TypeVar("MB", bound="MessageBase")

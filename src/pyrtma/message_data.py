@@ -2,7 +2,7 @@ import ctypes
 
 from typing import ClassVar
 from .message_base import MessageBase
-from .utils.random import _random_struct
+from .utils.random_fields import _random_struct
 
 
 class MessageData(MessageBase):

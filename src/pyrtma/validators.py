@@ -385,7 +385,9 @@ class ArrayField(FieldValidator, Generic[_FV]):
             raise TypeError(f"Expected an ArrayField({type(self._validator).__name__}")
         return
 
+
 _IV = TypeVar("_IV", bound=IntValidatorBase)
+
 
 class IntArray(ArrayField[_IV]):
     def __init__(self, validator: Type[_IV], len: int):
@@ -427,7 +429,9 @@ class IntArray(ArrayField[_IV]):
 
         return getattr(self._bound_obj, self.private_name)[key]
 
+
 _FPV = TypeVar("_FPV", bound=FloatValidatorBase)
+
 
 class FloatArray(ArrayField[_FPV]):
     def __init__(self, validator: Type[_FPV], len: int):
