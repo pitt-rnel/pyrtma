@@ -341,7 +341,6 @@ class Parser:
 
     def warning(self, msg: str):
         self.logger.warning(msg)
-        input("Hit enter to continue...")
 
     def clear(self):
         self.current_file = pathlib.Path()
@@ -433,6 +432,7 @@ class Parser:
 
         if imp.file.suffix == ".yml":
             self.warning(f"Please change {imp.file} to use '.yaml' extension.")
+            input("Hit enter to continue...")
 
         self.parse_file(imp.file.absolute())
 
@@ -633,22 +633,26 @@ class Parser:
                 n += 1
                 ptr += field.size
 
-        # Align the end of the struct to 64 bit pointer boundary.
-        # if ptr % 8 != 0:
-        #     length = 8 - (ptr % 8)
-        #     if length == 1:
-        #         length = ""
+        # Align the end of the struct to the boundary of the first element.
+        # This accounts for C packing of array of structs
+        boundary = s.fields[0].boundary
+        if (ptr % boundary) != 0:
+            length = boundary - (ptr % boundary)
+            if length == 1:
+                length = ""
 
-        #     padding = Field(
-        #         name=f"padding_{npad}_",
-        #         type_name="char",
-        #         type_obj=supported_types["char"],
-        #         length_expression=f'"{length}"',
-        #         length_expanded=f'"{length}"',
-        #         length=length or None,
-        #     )
-        #     s.fields.append(padding)
-        #     self.warning(f"WARNING: Adding {length} trailing padding byte(s) at end of {s.name}.")
+            padding = Field(
+                name=f"padding_{npad}_",
+                type_name="char",
+                type_obj=supported_types["char"],
+                length_expression=f'"{length}"',
+                length_expanded=f'"{length}"',
+                length=length or None,
+            )
+            s.fields.append(padding)
+            self.warning(
+                f"WARNING: Adding {length} trailing padding byte(s) at end of {s.name}."
+            )
 
         # Final size check using Python's builtin struct module
         assert s.size == struct.calcsize(
