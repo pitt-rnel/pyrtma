@@ -10,7 +10,7 @@ class MessageData(MessageBase):
     type_name: ClassVar[str] = ""
     type_hash: ClassVar[int]
     type_source: ClassVar[str] = ""
-    type_size:ClassVar[int] = -1
+    type_size: ClassVar[int] = -1
     type_def: ClassVar[str] = ""
 
     @classmethod

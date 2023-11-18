@@ -76,13 +76,13 @@ class TestDefGenerator:
 
         if random.random() > 0.5:
             if len(self.struct_defs):
-                s = list(k for (k,v) in self.struct_defs.items() if len(v["fields"]))
+                s = list(k for (k, v) in self.struct_defs.items() if len(v["fields"]))
             else:
                 s = []
             return random.choice(s or type_map)
         else:
             if len(self.message_defs):
-                m = list(k for (k,v) in self.message_defs.items() if v["fields"])
+                m = list(k for (k, v) in self.message_defs.items() if v["fields"])
             else:
                 m = []
             return random.choice(m or type_map)

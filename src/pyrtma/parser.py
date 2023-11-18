@@ -213,7 +213,7 @@ class Field:
     length_expression: Optional[str] = None
     length_expanded: Optional[str] = None
     length: Optional[int] = None
-    offset:int = -1
+    offset: int = -1
 
     @property
     def base_size(self) -> int:
@@ -246,7 +246,7 @@ class MDF:
     type_id: int
     src: pathlib.Path
     fields: List[Field] = field(default_factory=list)
-    alignment:int = 8
+    alignment: int = 8
 
     @property
     def signal(self) -> bool:
@@ -255,7 +255,7 @@ class MDF:
     @property
     def size(self) -> int:
         return sum([f.size for f in self.fields])
-    
+
     @property
     def format(self) -> str:
         s = ""
@@ -272,7 +272,7 @@ class SDF:
     name: str
     src: pathlib.Path
     fields: List[Field] = field(default_factory=list)
-    alignment:int = 8
+    alignment: int = 8
 
     @property
     def size(self) -> int:
@@ -592,12 +592,12 @@ class Parser:
 
     def check_alignment(self, s: Union[SDF, MDF], auto_pad: bool = True):
         """Confirm 64 bit alignment of structures"""
-        
+
         # This value will represent the memory address currently pointed to in the struct layout
         ptr = 0
 
-        npad = 0 # padding field count
-        n = 0 # field index
+        npad = 0  # padding field count
+        n = 0  # field index
 
         # Loop over all fields in struct
         while n < len(s.fields):
@@ -608,10 +608,10 @@ class Parser:
             if (ptr % field.alignment) == 0:
                 # Store the fields offset in struct
                 field.offset = ptr
-                
+
                 # Stride by an amount equal to the field size
                 ptr += field.size
-                
+
                 # Go on to the next field (No padding required)
                 n += 1
                 continue
@@ -624,7 +624,7 @@ class Parser:
 
             # Calculate number of bytes needed to get to next alignment boundary
             pad_len = field.alignment - (ptr % field.alignment)
-            
+
             # Create the required padding field
             padding = Field(
                 name=f"padding_{npad}_",
@@ -633,7 +633,7 @@ class Parser:
                 length_expression=f'"{pad_len}"',
                 length_expanded=f'"{pad_len}"',
                 length=pad_len,
-                offset=ptr
+                offset=ptr,
             )
 
             # Insert the padding into MDF or SDF object before the current field
@@ -648,7 +648,7 @@ class Parser:
             )
 
             # Store the fields offset in struct
-            field.offset = ptr 
+            field.offset = ptr
 
             # Stride by an amount equal to the field size
             ptr += field.size
@@ -658,13 +658,13 @@ class Parser:
             npad += 1
 
         # Note: ptr currently points to the byte immediately following the struct
-        
+
         # Explicitly align the end of the struct to allow for the strictest alignment to be satisfied
         # Must account for C packing of array of structs and striding using sizeof
         # We do this by calculating the padding required for consecutive structs
-        
-        pad_len = 0 # Start with no padding
-        while (1):
+
+        pad_len = 0  # Start with no padding
+        while 1:
             # Check if any fields do not meet their required alignment
             if any([(pad_len + ptr + f.offset) % f.alignment for f in s.fields]):
                 # Increase the padding and try again
@@ -711,7 +711,7 @@ class Parser:
 
         # Determine the alignment requirement for the struct
         strictest_alignment = max(f.alignment for f in s.fields)
-        for a in (8,4,2,1):
+        for a in (8, 4, 2, 1):
             # Find where the current ptr aligns
             if (ptr % a) == 0:
                 s.alignment = min(a, strictest_alignment)
@@ -721,9 +721,11 @@ class Parser:
             raise RuntimeError(f"Unable to determine alignment required for {s.name}")
 
         # Final size check using Python's builtin ctypes module
-        assert s.size == self.get_ctype_size(s), f"{s.name} is not 64-bit aligned. s.size = {s.size}, struct size = {self.get_ctype_size(s)}."
+        assert s.size == self.get_ctype_size(
+            s
+        ), f"{s.name} is not 64-bit aligned. s.size = {s.size}, struct size = {self.get_ctype_size(s)}."
 
-    def get_ctype_cls(self, s:Union[MDF, SDF]) -> Type[ctypes.Structure]:
+    def get_ctype_cls(self, s: Union[MDF, SDF]) -> Type[ctypes.Structure]:
         # Field type name to ctypes
         type_map = {
             "char": ctypes.c_char,
@@ -772,10 +774,10 @@ class Parser:
                 f.append((f"f{n}", cobj * (field.length)))
             else:
                 f.append((f"f{n}", cobj))
-        
-        return type(s.name, (ctypes.Structure,), {"_fields_":f})
 
-    def get_ctype_size(self, s:Union[MDF, SDF]) -> int:
+        return type(s.name, (ctypes.Structure,), {"_fields_": f})
+
+    def get_ctype_size(self, s: Union[MDF, SDF]) -> int:
         return ctypes.sizeof(self.get_ctype_cls(s))
 
     def validate_msg_id(self, name: str, msg_id: int):
@@ -806,7 +808,9 @@ class Parser:
 
         # Check size
         if mdf.size > 65535:
-            raise InvalidMessageSize(f"{mdf.name} size of {mdf.size} exceeds maximum allowe of 65535 bytes.")
+            raise InvalidMessageSize(
+                f"{mdf.name} size of {mdf.size} exceeds maximum allowe of 65535 bytes."
+            )
 
     def add_fields(self, mdf: Union[SDF, MDF], fields: Union[Dict, str]):
         # Pattern to parse field specs
