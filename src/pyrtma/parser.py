@@ -3,7 +3,7 @@ import json
 import pathlib
 import os
 import textwrap
-import struct
+import ctypes
 import logging
 import string
 
@@ -12,7 +12,7 @@ from ruamel.yaml import YAML
 
 from copy import copy
 from hashlib import sha256
-from typing import List, Optional, Any, Union, Tuple, Dict
+from typing import List, Optional, Any, Union, Tuple, Dict, Type
 from dataclasses import dataclass, field, is_dataclass, asdict
 
 
@@ -133,6 +133,12 @@ class AlignmentError(ParserError):
     pass
 
 
+class InvalidMessageSize(ParserError):
+    """Raised when a message is too large"""
+
+    pass
+
+
 @dataclass
 class Import:
     file: pathlib.Path
@@ -188,11 +194,11 @@ class TypeAlias:
         return self.type_obj.size
 
     @property
-    def boundary(self) -> int:
+    def alignment(self) -> int:
         if isinstance(self.type_obj, NativeType):
             return self.type_obj.size
         else:
-            return self.type_obj.boundary
+            return self.type_obj.alignment
 
     @property
     def format(self) -> str:
@@ -207,6 +213,7 @@ class Field:
     length_expression: Optional[str] = None
     length_expanded: Optional[str] = None
     length: Optional[int] = None
+    offset:int = -1
 
     @property
     def base_size(self) -> int:
@@ -217,11 +224,11 @@ class Field:
         return self.type_obj.size * (self.length or 1)
 
     @property
-    def boundary(self) -> int:
+    def alignment(self) -> int:
         if isinstance(self.type_obj, NativeType):
             return self.type_obj.size
         else:
-            return self.type_obj.boundary
+            return self.type_obj.alignment
 
     @property
     def format(self) -> str:
@@ -239,6 +246,7 @@ class MDF:
     type_id: int
     src: pathlib.Path
     fields: List[Field] = field(default_factory=list)
+    alignment:int = 8
 
     @property
     def signal(self) -> bool:
@@ -247,15 +255,7 @@ class MDF:
     @property
     def size(self) -> int:
         return sum([f.size for f in self.fields])
-
-    @property
-    def boundary(self) -> int:
-        f0 = self.fields[0]
-        if isinstance(f0.type_obj, NativeType):
-            return f0.type_obj.size
-        else:
-            return f0.type_obj.boundary
-
+    
     @property
     def format(self) -> str:
         s = ""
@@ -272,18 +272,11 @@ class SDF:
     name: str
     src: pathlib.Path
     fields: List[Field] = field(default_factory=list)
+    alignment:int = 8
 
     @property
     def size(self) -> int:
         return sum([f.size for f in self.fields])
-
-    @property
-    def boundary(self) -> int:
-        f0 = self.fields[0]
-        if isinstance(f0.type_obj, NativeType):
-            return f0.type_obj.size
-        else:
-            return f0.type_obj.boundary
 
     @property
     def format(self) -> str:
@@ -599,65 +592,191 @@ class Parser:
 
     def check_alignment(self, s: Union[SDF, MDF], auto_pad: bool = True):
         """Confirm 64 bit alignment of structures"""
-        npad = 0
+        
+        # This value will represent the memory address currently pointed to in the struct layout
         ptr = 0
-        n = 0
+
+        npad = 0 # padding field count
+        n = 0 # field index
+
+        # Loop over all fields in struct
         while n < len(s.fields):
+            # Get the next field object
             field = s.fields[n]
-            boundary = field.boundary
-            if ptr % boundary != 0:
-                if not auto_pad:
-                    raise AlignmentError(
-                        f"{s.name}.{field.name} does not start on a valid memory boundary for type: {field.type_name}. Add padding fields prior for 64-bit alignment."
-                    )
-                else:
-                    length = boundary - (ptr % boundary)
-                    padding = Field(
-                        name=f"padding_{npad}_",
-                        type_name="char",
-                        type_obj=supported_types["char"],
-                        length_expression=f'"{length}"',
-                        length_expanded=f'"{length}"',
-                        length=length,
-                    )
 
-                    self.warning(
-                        f"Adding {length} padding byte(s) before {s.name}.{field.name}."
-                    )
-                    s.fields.insert(n, padding)
-                    n += 2
-                    npad += 1
-                    ptr += padding.size
-                    ptr += field.size
-            else:
-                n += 1
+            # Check if current address meets alignment requirement of the field
+            if (ptr % field.alignment) == 0:
+                # Store the fields offset in struct
+                field.offset = ptr
+                
+                # Stride by an amount equal to the field size
                 ptr += field.size
+                
+                # Go on to the next field (No padding required)
+                n += 1
+                continue
 
-        # Align the end of the struct to the boundary of the first element.
-        # This accounts for C packing of array of structs
-        boundary = s.fields[0].boundary
-        if (ptr % boundary) != 0:
-            length = boundary - (ptr % boundary)
-            if length == 1:
-                length = ""
+            # Bail if auto padding is disabled
+            if not auto_pad:
+                raise AlignmentError(
+                    f"{s.name}.{field.name} does not start on a valid memory boundary for type: {field.type_name}. Add padding fields prior for 64-bit alignment."
+                )
 
+            # Calculate number of bytes needed to get to next alignment boundary
+            pad_len = field.alignment - (ptr % field.alignment)
+            
+            # Create the required padding field
             padding = Field(
                 name=f"padding_{npad}_",
                 type_name="char",
                 type_obj=supported_types["char"],
-                length_expression=f'"{length}"',
-                length_expanded=f'"{length}"',
-                length=length or None,
-            )
-            s.fields.append(padding)
-            self.warning(
-                f"WARNING: Adding {length} trailing padding byte(s) at end of {s.name}."
+                length_expression=f'"{pad_len}"',
+                length_expanded=f'"{pad_len}"',
+                length=pad_len,
+                offset=ptr
             )
 
-        # Final size check using Python's builtin struct module
-        assert s.size == struct.calcsize(
-            s.format
-        ), f"{s.name} is not 64-bit aligned. s.size = {s.size}, struct size = {struct.calcsize(s.format)}."
+            # Insert the padding into MDF or SDF object before the current field
+            s.fields.insert(n, padding)
+
+            # Stride by an amount equal to the field size
+            ptr += padding.size
+
+            # Ideally the user should explicitly pad their struct layout
+            self.warning(
+                f"Adding {pad_len} padding byte(s) before {s.name}.{field.name}."
+            )
+
+            # Store the fields offset in struct
+            field.offset = ptr 
+
+            # Stride by an amount equal to the field size
+            ptr += field.size
+
+            # Skip 2 since len of fields has been extended
+            n += 2
+            npad += 1
+
+        # Note: ptr currently points to the byte immediately following the struct
+        
+        # Explicitly align the end of the struct to allow for the strictest alignment to be satisfied
+        # Must account for C packing of array of structs and striding using sizeof
+        # We do this by calculating the padding required for consecutive structs
+        
+        pad_len = 0 # Start with no padding
+        while (1):
+            # Check if any fields do not meet their required alignment
+            if any([(pad_len + ptr + f.offset) % f.alignment for f in s.fields]):
+                # Increase the padding and try again
+                pad_len += 1
+                continue
+
+            # No padding required
+            if pad_len == 0:
+                break
+
+            # Bail if auto padding is disabled
+            if not auto_pad:
+                raise AlignmentError(
+                    f"{s.name}.{field.name} requires trailing padding of {pad_len} bytes for 64-bit alignment."
+                )
+
+            # Don't make an array type if we only need one byte padding
+            if pad_len == 1:
+                pad_len = ""
+
+            # Create the required padding field
+            padding = Field(
+                name=f"padding_{npad}_",
+                type_name="char",
+                type_obj=supported_types["char"],
+                length_expression=f'"{pad_len}"',
+                length_expanded=f'"{pad_len}"',
+                length=pad_len or None,
+            )
+
+            # Stride by an amount equal to the field size
+            ptr += padding.size
+
+            # Append the padding at the end of the MDF or SDF object
+            s.fields.append(padding)
+
+            # Ideally the user should explicitly pad their struct layout
+            self.warning(
+                f"WARNING: Adding {pad_len} trailing padding byte(s) at end of {s.name}."
+            )
+
+            # Exit loop
+            break
+
+        # Determine the alignment requirement for the struct
+        strictest_alignment = max(f.alignment for f in s.fields)
+        for a in (8,4,2,1):
+            # Find where the current ptr aligns
+            if (ptr % a) == 0:
+                s.alignment = min(a, strictest_alignment)
+                break
+        else:
+            # Note: This should never happen
+            raise RuntimeError(f"Unable to determine alignment required for {s.name}")
+
+        # Final size check using Python's builtin ctypes module
+        assert s.size == self.get_ctype_size(s), f"{s.name} is not 64-bit aligned. s.size = {s.size}, struct size = {self.get_ctype_size(s)}."
+
+    def get_ctype_cls(self, s:Union[MDF, SDF]) -> Type[ctypes.Structure]:
+        # Field type name to ctypes
+        type_map = {
+            "char": ctypes.c_char,
+            "unsigned char": ctypes.c_ubyte,
+            "byte": ctypes.c_ubyte,
+            "int": ctypes.c_int,
+            "signed int": ctypes.c_int,
+            "unsigned int": ctypes.c_uint,
+            "unsigned": ctypes.c_uint,
+            "short": ctypes.c_short,
+            "signed short": ctypes.c_short,
+            "unsigned short": ctypes.c_ushort,
+            "long": ctypes.c_int32,
+            "signed long": ctypes.c_int32,
+            "unsigned long": ctypes.c_uint32,
+            "long long": ctypes.c_longlong,
+            "signed long long": ctypes.c_longlong,
+            "unsigned long long": ctypes.c_ulonglong,
+            "float": ctypes.c_float,
+            "double": ctypes.c_double,
+            "uint8": ctypes.c_uint8,
+            "uint16": ctypes.c_uint16,
+            "uint32": ctypes.c_uint32,
+            "uint64": ctypes.c_uint64,
+            "int8": ctypes.c_int8,
+            "int16": ctypes.c_int16,
+            "int32": ctypes.c_int32,
+            "int64": ctypes.c_int64,
+        }
+
+        f = []
+        for n, field in enumerate(s.fields):
+            if isinstance(field.type_obj, (MDF, SDF)):
+                cobj = self.get_ctype_cls(field.type_obj)
+            elif isinstance(field.type_obj, NativeType):
+                cobj = type_map[field.type_obj.name]
+            elif isinstance(field.type_obj, TypeAlias):
+                if isinstance(field.type_obj.type_obj, NativeType):
+                    cobj = type_map[field.type_obj.type_obj.name]
+                else:
+                    cobj = self.get_ctype_size(field.type_obj.type_obj)
+            else:
+                raise RuntimeError(f"Unexpected type {type(field.type_obj)}")
+
+            if field.length:
+                f.append((f"f{n}", cobj * (field.length)))
+            else:
+                f.append((f"f{n}", cobj))
+        
+        return type(s.name, (ctypes.Structure,), {"_fields_":f})
+
+    def get_ctype_size(self, s:Union[MDF, SDF]) -> int:
+        return ctypes.sizeof(self.get_ctype_cls(s))
 
     def validate_msg_id(self, name: str, msg_id: int):
         if not isinstance(msg_id, int):
@@ -684,6 +803,10 @@ class Parser:
 
         # Check memory alignment layout
         self.check_alignment(mdf, auto_pad=True)
+
+        # Check size
+        if mdf.size > 65535:
+            raise InvalidMessageSize(f"{mdf.name} size of {mdf.size} exceeds maximum allowe of 65535 bytes.")
 
     def add_fields(self, mdf: Union[SDF, MDF], fields: Union[Dict, str]):
         # Pattern to parse field specs
