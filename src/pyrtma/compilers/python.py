@@ -220,9 +220,24 @@ class PyDefCompiler:
             else:
                 fstr += "]"
 
+        msg_src = sdf.src.as_posix()
+        type_def_str = repr(sdf.raw)
+        type_def_rhs = 'type_def: ClassVar[str] = "'
+        type_def_end = '"'
+        type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
+        type_def_line_len = len(TAB) + len(type_def_line)
+        if type_def_line_len > DEFAULT_BLACK_LEN:
+            type_def_rhs = f'type_def: ClassVar[\n{TAB *4}str\n{TAB *3}] = "'
+            type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
+
         template = f"""\
         class {sdf.name}(MessageBase):
             _fields_ = {fstr}
+            type_name: ClassVar[str] = \"{sdf.name}\"
+            type_hash: ClassVar[int] = 0x{sdf.hash[:8].upper()}
+            type_size: ClassVar[str] = {sdf.size}
+            type_source: ClassVar[str] = \"{msg_src}\"
+            {type_def_line}
 
             {dstr}
         """
@@ -326,6 +341,7 @@ class PyDefCompiler:
             type_id: ClassVar[int] = {msg_id}
             type_name: ClassVar[str] = \"{mdf.name}\"
             type_hash: ClassVar[int] = 0x{mdf.hash[:8].upper()}
+            type_size: ClassVar[str] = {mdf.size}
             type_source: ClassVar[str] = \"{msg_src}\"
             {type_def_line}
 

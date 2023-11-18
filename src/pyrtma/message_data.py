@@ -10,11 +10,8 @@ class MessageData(MessageBase):
     type_name: ClassVar[str] = ""
     type_hash: ClassVar[int]
     type_source: ClassVar[str] = ""
+    type_size:ClassVar[int] = -1
     type_def: ClassVar[str] = ""
-
-    @property
-    def type_size(self) -> int:
-        return ctypes.sizeof(self)
 
     @classmethod
     def from_random(cls) -> "MessageData":
