@@ -81,6 +81,7 @@ pytype_map = {
 
 desctype_map = {
     "char": "String",
+    "byte": "Bytes",
     "unsigned char": "Bytes",
     "int": "Int32",
     "signed int": "Int32",
@@ -157,7 +158,7 @@ class PyDefCompiler:
         elif ftype in self.parser.message_defs.keys():
             ftype = f"MDF_{ftype}"
             return (
-                f":Struct[{ftype} = Struct({ftype})"
+                f":Struct[{ftype}] = Struct({ftype})"
                 if flen == 0
                 else f":StructArray[{ftype}] = StructArray({ftype}, {flen})"
             )
