@@ -7,19 +7,6 @@ from typing import Dict, Any, Optional
 type_map = (
     "char",
     "unsigned char",
-    "byte",
-    "int",
-    "signed int",
-    "unsigned int",
-    "short",
-    "signed short",
-    "unsigned short",
-    "long",
-    "signed long",
-    "unsigned long",
-    "long long",
-    "signed long long",
-    "unsigned long long",
     "float",
     "double",
     "uint8",
@@ -46,7 +33,7 @@ class TestDefGenerator:
         return self._id
 
     def random_nfields(self) -> int:
-        return random.randint(0, 7)
+        return random.randint(0, 5)
 
     def random_flen(self) -> int:
         if random.random() > 0.5:
@@ -54,7 +41,7 @@ class TestDefGenerator:
         return self.random_expression()
 
     def random_value(self) -> int:
-        return random.randint(1, 9)
+        return random.randint(1, 4)
 
     def random_op(self) -> str:
         return random.choice(["", "+", "*"])
@@ -74,7 +61,7 @@ class TestDefGenerator:
         if type(c) is str:
             op = self.random_op()
             if op:
-                c2 = self.random_constant()
+                c2 = self.random_value()
                 return f"{c} {op} {c2}"
 
         return c
@@ -88,29 +75,17 @@ class TestDefGenerator:
             return random.choice(type_map)
 
         if random.random() > 0.5:
-            return random.choice(list(self.struct_defs.keys()) or type_map)
+            if len(self.struct_defs):
+                s = list(k for (k,v) in self.struct_defs.items() if len(v["fields"]))
+            else:
+                s = []
+            return random.choice(s or type_map)
         else:
-            return random.choice(list(self.message_defs.keys()) or type_map)
-
-    def random_fieldname(self, ftype: str) -> str:
-        if ftype in ("unsigned char", "byte"):
-            return "uint8"
-        elif ftype == "char":
-            return "char"
-        elif ftype == "unsigned short":
-            return "uint16"
-        elif ftype == "short":
-            return "int16"
-        elif ftype in ("signed int", "int", "long"):
-            return "int32"
-        elif ftype in ("unsigned int", "unsigned long"):
-            return "uint32"
-        elif ftype in ("signed long long", "long long"):
-            return "int64"
-        elif ftype == "unsigned long long":
-            return "uint64"
-        else:
-            return ftype
+            if len(self.message_defs):
+                m = list(k for (k,v) in self.message_defs.items() if v["fields"])
+            else:
+                m = []
+            return random.choice(m or type_map)
 
     def generate_constants(self, n: int):
         for i in range(1, n):
@@ -124,7 +99,7 @@ class TestDefGenerator:
             nfields = self.random_nfields() or 1
             for k in range(1, nfields + 1):
                 ftype = self.random_ftype()
-                fname = f"{self.random_fieldname(ftype)}_{k}"
+                fname = f"f{k}"
                 flen = self.random_flen()
                 if flen == 0:
                     fields[fname] = f"{ftype}"
@@ -140,19 +115,19 @@ class TestDefGenerator:
             nfields = self.random_nfields()
             for k in range(1, nfields + 1):
                 ftype = self.random_ftype(nested=True)
-                fname = f"{self.random_fieldname(ftype)}_{k}"
+                fname = f"f{k}"
                 flen = self.random_flen()
                 if flen == 0:
                     fields[fname] = f"{ftype}"
                 else:
                     fields[fname] = f"{ftype}[{flen}]"
 
-            self.message_defs[name] = dict(id=self.id, fields=fields)
+            self.message_defs[name] = dict(id=self.id, fields=fields or None)
 
     def generate(self, out_filepath: pathlib.Path):
         self.generate_constants(24)
         self.generate_structs(10)
-        self.generate_message_defs(128)
+        self.generate_message_defs(256)
 
         d: Dict[str, Any] = dict(
             constants=self.constants,
