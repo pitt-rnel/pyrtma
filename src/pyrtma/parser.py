@@ -678,7 +678,7 @@ class Parser:
             # Bail if auto padding is disabled
             if not auto_pad:
                 raise AlignmentError(
-                    f"{s.name}.{field.name} requires trailing padding of {pad_len} bytes for 64-bit alignment."
+                    f"{s.name} requires trailing padding of {pad_len} bytes for 64-bit alignment."
                 )
 
             # Don't make an array type if we only need one byte padding
