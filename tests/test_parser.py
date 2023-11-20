@@ -661,9 +661,16 @@ class TestParser(unittest.TestCase):
                 D:
                     id: 1004
                     fields:
+                        f: float
+                        i: int64
+                        c: char[7]
+                E:
+                    id: 1005
+                    fields:
                         a: A
                         b: B
                         c: C
+                        d: D
 
             """
         )

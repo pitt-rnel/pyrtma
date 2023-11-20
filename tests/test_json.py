@@ -36,6 +36,25 @@ def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
 
 
 class TestJSONConversion(unittest.TestCase):
+    def test_dict(self):
+        for mdf in pyrtma.msg_defs.values():
+            # Fill the message with random data
+            in_msg = mdf.from_random()
+
+            # Convert to dict
+            in_dict = in_msg.to_dict()
+
+            # Create a message from the json string
+            out_msg = mdf.from_dict(in_dict)  # type: ignore
+
+            # Convert the output back to dict
+            out_dict = out_msg.to_dict()
+
+            # Check for equality in all respects
+            self.assertTrue(is_equal(in_msg, out_msg))
+            self.assertEqual(in_msg, out_msg)
+            self.assertEqual(in_dict, out_dict)
+
     def test_json(self):
         for mdf in pyrtma.msg_defs.values():
             # Fill the message with random data
