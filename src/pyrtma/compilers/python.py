@@ -235,7 +235,7 @@ class PyDefCompiler:
             _fields_ = {fstr}
             type_name: ClassVar[str] = \"{sdf.name}\"
             type_hash: ClassVar[int] = 0x{sdf.hash[:8].upper()}
-            type_size: ClassVar[str] = {sdf.size}
+            type_size: ClassVar[int] = {sdf.size}
             type_source: ClassVar[str] = \"{msg_src}\"
             {type_def_line}
 
@@ -341,7 +341,7 @@ class PyDefCompiler:
             type_id: ClassVar[int] = {msg_id}
             type_name: ClassVar[str] = \"{mdf.name}\"
             type_hash: ClassVar[int] = 0x{mdf.hash[:8].upper()}
-            type_size: ClassVar[str] = {mdf.size}
+            type_size: ClassVar[int] = {mdf.size}
             type_source: ClassVar[str] = \"{msg_src}\"
             {type_def_line}
 
