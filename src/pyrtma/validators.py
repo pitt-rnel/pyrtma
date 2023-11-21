@@ -108,14 +108,14 @@ class Float(FloatValidatorBase):
     _float_type = ctypes.c_float
 
     def __init__(self):
-        ...
+        pass
 
 
 class Double(FloatValidatorBase):
     _float_type = ctypes.c_double
 
     def __init__(self):
-        ...
+        pass
 
 
 # Base Class for int validator fields
@@ -182,7 +182,7 @@ class Int8(IntValidatorBase):
     _max: ClassVar[int] = 2**7 - 1
 
     def __init__(self):
-        ...
+        pass
 
 
 class Int16(IntValidatorBase):
@@ -192,7 +192,7 @@ class Int16(IntValidatorBase):
     _max: ClassVar[int] = 2**15 - 1
 
     def __init__(self):
-        ...
+        pass
 
 
 class Int32(IntValidatorBase):
@@ -202,7 +202,7 @@ class Int32(IntValidatorBase):
     _max: ClassVar[int] = 2**31 - 1
 
     def __init__(self):
-        ...
+        pass
 
 
 class Int64(IntValidatorBase):
@@ -212,7 +212,7 @@ class Int64(IntValidatorBase):
     _max: ClassVar[int] = 2**63 - 1
 
     def __init__(self):
-        ...
+        pass
 
 
 class Uint8(IntValidatorBase):
@@ -222,7 +222,7 @@ class Uint8(IntValidatorBase):
     _max: ClassVar[int] = 2**8 - 1
 
     def __init__(self):
-        ...
+        pass
 
 
 class Uint16(IntValidatorBase):
@@ -232,7 +232,7 @@ class Uint16(IntValidatorBase):
     _max: ClassVar[int] = 2**16 - 1
 
     def __init__(self):
-        ...
+        pass
 
 
 class Uint32(IntValidatorBase):
@@ -242,7 +242,7 @@ class Uint32(IntValidatorBase):
     _max: ClassVar[int] = 2**32 - 1
 
     def __init__(self):
-        ...
+        pass
 
 
 class Uint64(IntValidatorBase):
@@ -252,7 +252,7 @@ class Uint64(IntValidatorBase):
     _max: ClassVar[int] = 2**64 - 1
 
     def __init__(self):
-        ...
+        pass
 
 
 class String(FieldValidator[_P, str], Generic[_P]):
