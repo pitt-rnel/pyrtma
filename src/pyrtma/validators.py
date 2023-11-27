@@ -112,12 +112,12 @@ class Float(FloatValidatorBase):
         ...
 
     @overload
-    def __new__(cls, size: int) -> FloatArray[Float]:
+    def __new__(cls, length: int) -> FloatArray[Float]:
         ...
 
-    def __new__(cls, size=1):
-        if size > 1:
-            return FloatArray(Float, size)
+    def __new__(cls, length=1):
+        if length > 1:
+            return FloatArray(Float, length)
         else:
             return super().__new__(cls)
 
@@ -133,12 +133,12 @@ class Double(FloatValidatorBase):
         ...
 
     @overload
-    def __new__(cls, size: int) -> FloatArray[Double]:
+    def __new__(cls, length: int) -> FloatArray[Double]:
         ...
 
-    def __new__(cls, size=1):
-        if size > 1:
-            return FloatArray(Double, size)
+    def __new__(cls, length=1):
+        if length > 1:
+            return FloatArray(Double, length)
         else:
             return super().__new__(cls)
 
@@ -214,12 +214,12 @@ class Int8(IntValidatorBase):
         ...
 
     @overload
-    def __new__(cls, size: int) -> IntArray[Int8]:
+    def __new__(cls, length: int) -> IntArray[Int8]:
         ...
 
-    def __new__(cls, size=1):
-        if size > 1:
-            return IntArray(Int8, size)
+    def __new__(cls, length=1):
+        if length > 1:
+            return IntArray(Int8, length)
         else:
             return super().__new__(cls)
 
@@ -238,12 +238,12 @@ class Int16(IntValidatorBase):
         ...
 
     @overload
-    def __new__(cls, size: int) -> IntArray[Int16]:
+    def __new__(cls, length: int) -> IntArray[Int16]:
         ...
 
-    def __new__(cls, size=1):
-        if size > 1:
-            return IntArray(Int16, size)
+    def __new__(cls, length=1):
+        if length > 1:
+            return IntArray(Int16, length)
         else:
             return super().__new__(cls)
 
@@ -262,12 +262,12 @@ class Int32(IntValidatorBase):
         ...
 
     @overload
-    def __new__(cls, size: int) -> IntArray[Int32]:
+    def __new__(cls, length: int) -> IntArray[Int32]:
         ...
 
-    def __new__(cls, size=1):
-        if size > 1:
-            return IntArray(Int32, size)
+    def __new__(cls, length=1):
+        if length > 1:
+            return IntArray(Int32, length)
         else:
             return super().__new__(cls)
 
@@ -286,12 +286,12 @@ class Int64(IntValidatorBase):
         ...
 
     @overload
-    def __new__(cls, size: int) -> IntArray[Int64]:
+    def __new__(cls, length: int) -> IntArray[Int64]:
         ...
 
-    def __new__(cls, size=1):
-        if size > 1:
-            return IntArray(Int64, size)
+    def __new__(cls, length=1):
+        if length > 1:
+            return IntArray(Int64, length)
         else:
             return super().__new__(cls)
 
@@ -310,12 +310,12 @@ class Uint8(IntValidatorBase):
         ...
 
     @overload
-    def __new__(cls, size: int) -> IntArray[Uint8]:
+    def __new__(cls, length: int) -> IntArray[Uint8]:
         ...
 
-    def __new__(cls, size=1):
-        if size > 1:
-            return IntArray(Uint8, size)
+    def __new__(cls, length=1):
+        if length > 1:
+            return IntArray(Uint8, length)
         else:
             return super().__new__(cls)
 
@@ -334,12 +334,12 @@ class Uint16(IntValidatorBase):
         ...
 
     @overload
-    def __new__(cls, size: int) -> IntArray[Uint16]:
+    def __new__(cls, length: int) -> IntArray[Uint16]:
         ...
 
-    def __new__(cls, size=1):
-        if size > 1:
-            return IntArray(Uint16, size)
+    def __new__(cls, length=1):
+        if length > 1:
+            return IntArray(Uint16, length)
         else:
             return super().__new__(cls)
 
@@ -358,12 +358,12 @@ class Uint32(IntValidatorBase):
         ...
 
     @overload
-    def __new__(cls, size: int) -> IntArray[Uint32]:
+    def __new__(cls, length: int) -> IntArray[Uint32]:
         ...
 
-    def __new__(cls, size=1):
-        if size > 1:
-            return IntArray(Uint32, size)
+    def __new__(cls, length=1):
+        if length > 1:
+            return IntArray(Uint32, length)
         else:
             return super().__new__(cls)
 
@@ -382,12 +382,12 @@ class Uint64(IntValidatorBase):
         ...
 
     @overload
-    def __new__(cls, size: int) -> IntArray[Uint64]:
+    def __new__(cls, length: int) -> IntArray[Uint64]:
         ...
 
-    def __new__(cls, size=1):
-        if size > 1:
-            return IntArray(Uint64, size)
+    def __new__(cls, length=1):
+        if length > 1:
+            return IntArray(Uint64, length)
         else:
             return super().__new__(cls)
 
