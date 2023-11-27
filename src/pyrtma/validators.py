@@ -325,7 +325,7 @@ class Bytes(FieldValidator[_P, _B], Generic[_P, _B]):
 _FV = TypeVar("_FV", bound=FieldValidator)
 
 
-class ArrayField(FieldValidator, Generic[_FV]):
+class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
     def __init__(self, validator: Type[_FV], len: int):
         self._validator = validator()
         self._len = len
@@ -374,6 +374,16 @@ class ArrayField(FieldValidator, Generic[_FV]):
     def __repr__(self) -> str:
         return f"ArrayField({type(self._validator).__name__}, len={self._len}) at 0x{id(self):016X}"
 
+    def __eq__(self, value) -> bool:
+        if not isinstance(value, abc.Sequence):
+            return False
+        if len(value) != self._len:
+            return False
+        for self_val, comp_val in zip(self, value):
+            if self_val != comp_val:
+                return False
+        return True
+
     def validate_one(self, value):
         self._validator.validate_one(value)
 
@@ -389,7 +399,7 @@ class ArrayField(FieldValidator, Generic[_FV]):
 _IV = TypeVar("_IV", bound=IntValidatorBase)
 
 
-class IntArray(ArrayField[_IV]):
+class IntArray(ArrayField[_IV], Generic[_IV]):
     def __init__(self, validator: Type[_IV], len: int):
         self._validator = validator()
         self._len = len
@@ -433,7 +443,7 @@ class IntArray(ArrayField[_IV]):
 _FPV = TypeVar("_FPV", bound=FloatValidatorBase)
 
 
-class FloatArray(ArrayField[_FPV]):
+class FloatArray(ArrayField[_FPV], Generic[_FPV]):
     def __init__(self, validator: Type[_FPV], len: int):
         self._validator = validator()
         self._len = len
