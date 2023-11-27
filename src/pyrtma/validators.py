@@ -107,12 +107,40 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
 class Float(FloatValidatorBase):
     _float_type = ctypes.c_float
 
+    @overload
+    def __new__(cls) -> Float:
+        ...
+
+    @overload
+    def __new__(cls, size: int) -> FloatArray[Float]:
+        ...
+
+    def __new__(cls, size=1):
+        if size > 1:
+            return FloatArray(Float, size)
+        else:
+            return super().__new__(cls)
+
     def __init__(self):
         pass
 
 
 class Double(FloatValidatorBase):
     _float_type = ctypes.c_double
+
+    @overload
+    def __new__(cls) -> Double:
+        ...
+
+    @overload
+    def __new__(cls, size: int) -> FloatArray[Double]:
+        ...
+
+    def __new__(cls, size=1):
+        if size > 1:
+            return FloatArray(Double, size)
+        else:
+            return super().__new__(cls)
 
     def __init__(self):
         pass
@@ -181,6 +209,20 @@ class Int8(IntValidatorBase):
     _min: ClassVar[int] = -(2**7)
     _max: ClassVar[int] = 2**7 - 1
 
+    @overload
+    def __new__(cls) -> Int8:
+        ...
+
+    @overload
+    def __new__(cls, size: int) -> IntArray[Int8]:
+        ...
+
+    def __new__(cls, size=1):
+        if size > 1:
+            return IntArray(Int8, size)
+        else:
+            return super().__new__(cls)
+
     def __init__(self):
         pass
 
@@ -190,6 +232,20 @@ class Int16(IntValidatorBase):
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**15)
     _max: ClassVar[int] = 2**15 - 1
+
+    @overload
+    def __new__(cls) -> Int16:
+        ...
+
+    @overload
+    def __new__(cls, size: int) -> IntArray[Int16]:
+        ...
+
+    def __new__(cls, size=1):
+        if size > 1:
+            return IntArray(Int16, size)
+        else:
+            return super().__new__(cls)
 
     def __init__(self):
         pass
@@ -201,6 +257,20 @@ class Int32(IntValidatorBase):
     _min: ClassVar[int] = -(2**31)
     _max: ClassVar[int] = 2**31 - 1
 
+    @overload
+    def __new__(cls) -> Int32:
+        ...
+
+    @overload
+    def __new__(cls, size: int) -> IntArray[Int32]:
+        ...
+
+    def __new__(cls, size=1):
+        if size > 1:
+            return IntArray(Int32, size)
+        else:
+            return super().__new__(cls)
+
     def __init__(self):
         pass
 
@@ -210,6 +280,20 @@ class Int64(IntValidatorBase):
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**63)
     _max: ClassVar[int] = 2**63 - 1
+
+    @overload
+    def __new__(cls) -> Int64:
+        ...
+
+    @overload
+    def __new__(cls, size: int) -> IntArray[Int64]:
+        ...
+
+    def __new__(cls, size=1):
+        if size > 1:
+            return IntArray(Int64, size)
+        else:
+            return super().__new__(cls)
 
     def __init__(self):
         pass
@@ -221,6 +305,20 @@ class Uint8(IntValidatorBase):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**8 - 1
 
+    @overload
+    def __new__(cls) -> Uint8:
+        ...
+
+    @overload
+    def __new__(cls, size: int) -> IntArray[Uint8]:
+        ...
+
+    def __new__(cls, size=1):
+        if size > 1:
+            return IntArray(Uint8, size)
+        else:
+            return super().__new__(cls)
+
     def __init__(self):
         pass
 
@@ -230,6 +328,20 @@ class Uint16(IntValidatorBase):
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**16 - 1
+
+    @overload
+    def __new__(cls) -> Uint16:
+        ...
+
+    @overload
+    def __new__(cls, size: int) -> IntArray[Uint16]:
+        ...
+
+    def __new__(cls, size=1):
+        if size > 1:
+            return IntArray(Uint16, size)
+        else:
+            return super().__new__(cls)
 
     def __init__(self):
         pass
@@ -241,6 +353,20 @@ class Uint32(IntValidatorBase):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**32 - 1
 
+    @overload
+    def __new__(cls) -> Uint32:
+        ...
+
+    @overload
+    def __new__(cls, size: int) -> IntArray[Uint32]:
+        ...
+
+    def __new__(cls, size=1):
+        if size > 1:
+            return IntArray(Uint32, size)
+        else:
+            return super().__new__(cls)
+
     def __init__(self):
         pass
 
@@ -250,6 +376,20 @@ class Uint64(IntValidatorBase):
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**64 - 1
+
+    @overload
+    def __new__(cls) -> Uint64:
+        ...
+
+    @overload
+    def __new__(cls, size: int) -> IntArray[Uint64]:
+        ...
+
+    def __new__(cls, size=1):
+        if size > 1:
+            return IntArray(Uint64, size)
+        else:
+            return super().__new__(cls)
 
     def __init__(self):
         pass
