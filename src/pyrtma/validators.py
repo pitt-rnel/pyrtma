@@ -395,6 +395,68 @@ class Uint64(IntValidatorBase):
         pass
 
 
+class Byte(Uint8, Generic[_P]):
+    @overload
+    def __new__(cls) -> Byte:
+        ...
+
+    @overload
+    def __new__(cls, length: int) -> Bytes:
+        ...
+
+    def __new__(cls, length=1):
+        if length > 1:
+            return Bytes(length)
+        else:
+            return super().__new__(cls)
+
+    def __init__(self):
+        pass
+
+    def __get__(self, obj: _P, objtype=None) -> bytes:
+        return getattr(obj, self.private_name).to_bytes(1, "little")
+
+    def __set__(self, obj: _P, value: Union[int, bytes, bytearray]):
+        self.validate_one(value)
+        if isinstance(value, (bytes, bytearray)):
+            int_value = int.from_bytes(value, "little")
+            setattr(obj, self.private_name, int_value)
+            return
+        setattr(obj, self.private_name, value)
+
+    def validate_one(self, value: Union[int, bytes, bytearray]):
+        if isinstance(value, int):
+            if value < self._min:
+                raise ValueError(f"Expected {value} to be at least {self._min}")
+            if value > self._max:
+                raise ValueError(f"Expected {value} to be no more than {self._max}")
+            return
+
+        if not isinstance(value, (bytes, bytearray)):
+            raise TypeError(f"Expected {value} to be bytes or int")
+
+        if len(value) != 1:
+            raise ValueError(f"Expected {value} to be no longer than 1")
+
+    def validate_many(self, value: Union[Iterable[int], bytes, bytearray]):
+        if isinstance(value, (bytes, bytearray)):
+            return
+
+        if any(not isinstance(v, int) for v in value):
+            raise TypeError(
+                f"Expected {value} to be an int sequence, bytes, or bytearray."
+            )
+
+        if any((v < self._min for v in value)):
+            raise ValueError(f"Expected {value} to be {self._min} or greater.")
+
+        if any((v > self._max for v in value)):
+            raise ValueError(f"Expected {value} to be no more than {self._max}")
+
+    def __repr__(self):
+        return f"Byte(len=1) at 0x{id(self):016X}"
+
+
 class String(FieldValidator[_P, str], Generic[_P]):
     def __init__(self, len: int = 1):
         self.len = len
@@ -418,48 +480,6 @@ class String(FieldValidator[_P, str], Generic[_P]):
 
     def __repr__(self):
         return f"String(len={self.len}) at 0x{id(self):016X}"
-
-
-_B = TypeVar("_B", bytes, bytearray)
-
-
-class Bytes(FieldValidator[_P, _B], Generic[_P, _B]):
-    _min: ClassVar[int] = 0
-    _max: ClassVar[int] = 2**8 - 1
-
-    def __init__(self, len: int = 1):
-        self.len = len
-
-    def __get__(self, obj: _P, objtype=None) -> _B:
-        return getattr(obj, self.private_name)
-
-    def __set__(self, obj: _P, value: _B):
-        self.validate_one(value)
-        if self.len == 1 and isinstance(value, bytes):
-            int_value = int.from_bytes(value, "little")
-            setattr(obj, self.private_name, int_value)
-            return
-        setattr(obj, self.private_name, value)
-
-    def validate_one(self, value: Union[int, bytes]):
-        if isinstance(value, int):
-            if value < self._min:
-                raise ValueError(f"Expected {value} to be at least {self._min}")
-            if value > self._max:
-                raise ValueError(f"Expected {value} to be no more than {self._max}")
-            return
-
-        if not isinstance(value, (bytes, bytearray)):
-            raise TypeError(f"Expected {value} to be bytes")
-
-        if len(value) > self.len:
-            raise ValueError(f"Expected {value} to be no bigger than {self.len}")
-
-    def validate_many(self, value):
-        raise NotImplementedError
-
-    def __repr__(self):
-        return f"Bytes(len={self.len}) at 0x{id(self):016X}"
 
 
 _FV = TypeVar("_FV", bound=FieldValidator)
@@ -579,8 +599,108 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
 
         return getattr(self._bound_obj, self.private_name)[key]
 
+    def __repr__(self) -> str:
+        return f"IntArray({type(self._validator).__name__}, len={self._len}) at 0x{id(self):016X}"
+
 
 _FPV = TypeVar("_FPV", bound=FloatValidatorBase)
+
+
+class Bytes(ArrayField[Byte]):
+    def __init__(self, len: int):
+        self._validator = Byte()
+        self._len = len
+        self._bound_obj: Optional[MessageBase] = None
+
+    @classmethod
+    def _bound(cls, obj: Bytes, bound_obj: MessageBase) -> Bytes:
+        new_obj = super().__new__(cls)
+        new_obj._bound_obj = bound_obj
+        new_obj._validator = obj._validator
+        new_obj._len = obj._len
+        new_obj.owner = obj.owner
+        new_obj.public_name = obj.public_name
+        new_obj.private_name = obj.private_name
+
+        return new_obj
+
+    def __get__(self, obj: MessageBase, objtype=None) -> Bytes:
+        return Bytes._bound(self, obj)
+        # return getattr(obj, self.private_name)
+
+    def __set__(self, obj: MessageBase, value: Bytes):
+        self.validate_array(value)
+        setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
+
+    @overload
+    def __getitem__(self, key: int) -> bytearray:
+        ...
+
+    @overload
+    def __getitem__(self, key: slice) -> bytearray:
+        ...
+
+    def __getitem__(self, key) -> bytearray:
+        if self._bound_obj is None:
+            raise AttributeError("Array descriptor is not bound to an instance object.")
+
+        int_vals = getattr(self._bound_obj, self.private_name)[key]
+        try:
+            barray = [x.to_bytes(1, "little") for x in int_vals]
+        except TypeError:
+            barray = [int_vals.to_bytes(1, "little")]
+
+        return bytearray().join(barray)
+
+    def __setitem__(self, key, value):
+        if self._bound_obj is None:
+            raise AttributeError("Array descriptor is not bound to an instance object.")
+
+        if isinstance(value, abc.Iterable):
+            self.validate_many(value)
+        else:
+            self.validate_one(value)
+
+        if isinstance(value, (bytes, bytearray)):
+            if len(value) == 1:
+                value = int.from_bytes(value, "little")
+            else:
+                value = [v for v in value]
+
+        getattr(self._bound_obj, self.private_name)[key] = value
+
+    def __repr__(self) -> str:
+        return f"Bytes(len={self._len}) at 0x{id(self):016X}"
+
+    # def __set__(self, obj: _P, value: int):
+    #    self.validate_one(value)
+    #    if self.len == 1 and isinstance(value, bytes):
+    #        int_value = int.from_bytes(value, "little")
+    #        setattr(obj, self.private_name, int_value)
+    #        return
+    #    setattr(obj, self.private_name, value)
+
+    # def validate_one(self, value: Union[int, bytes]):
+    #    if isinstance(value, int):
+    #        if value < self._min:
+    #            raise ValueError(f"Expected {value} to be at least {self._min}")
+    #        if value > self._max:
+    #            raise ValueError(f"Expected {value} to be no more than {self._max}")
+    #        return
+
+
+#
+#    if not isinstance(value, (bytes, bytearray)):
+#        raise TypeError(f"Expected {value} to be bytes")
+#
+#    if len(value) > self.len:
+#        raise ValueError(f"Expected {value} to be no bigger than {self.len}")
+
+# def validate_many(self, value):
+#    raise NotImplementedError
+
+# def __repr__(self):
+#    return f"Bytes(len={self.len}) at 0x{id(self):016X}"
 
 
 class FloatArray(ArrayField[_FPV], Generic[_FPV]):
@@ -622,6 +742,9 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
         return getattr(self._bound_obj, self.private_name)[key]
+
+    def __repr__(self) -> str:
+        return f"FloatArray({type(self._validator).__name__}, len={self._len}) at 0x{id(self):016X}"
 
 
 _S = TypeVar("_S", bound=MessageBase)
