@@ -628,6 +628,20 @@ _S = TypeVar("_S", bound=MessageBase)
 
 
 class Struct(FieldValidator, Generic[_S]):
+    @overload
+    def __new__(cls, stype: Type[_S]) -> Struct:
+        ...
+
+    @overload
+    def __new__(cls, stype: Type[_S], length: int) -> StructArray[_S]:
+        ...
+
+    def __new__(cls, stype: Type[_S], length=1):
+        if length > 1:
+            return StructArray(stype, length)
+        else:
+            return super().__new__(cls)
+
     def __init__(self, stype: Type[_S]):
         self.stype = stype
 
@@ -659,7 +673,7 @@ class Struct(FieldValidator, Generic[_S]):
         return f"Struct({self.stype.__name__}) at 0x{id(self):016X}"
 
 
-class StructArray(FieldValidator, Generic[_S]):
+class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
     def __init__(self, msg_struct: Type[_S], len: int):
         self._validator = Struct(msg_struct)
         self._len = len
@@ -708,6 +722,16 @@ class StructArray(FieldValidator, Generic[_S]):
 
     def __repr__(self) -> str:
         return f"StructArray({self._validator.stype.__name__}, len={self._len}) at 0x{id(self):016X}"
+
+    def __eq__(self, value) -> bool:
+        if not isinstance(value, abc.Sequence):
+            return False
+        if len(value) != self._len:
+            return False
+        for self_val, comp_val in zip(self, value):
+            if self_val != comp_val:
+                return False
+        return True
 
     def validate_one(self, value: _S):
         self._validator.validate_one(value)
