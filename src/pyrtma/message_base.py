@@ -25,7 +25,11 @@ class MessageBase(ctypes.Structure):
                 if hasattr(val, "_type_"):
                     class_name = val._type_.__name__
                 val = print_ctype_array(val)
-            str += f"\n" + "\t" * (add_tabs + 1) + f"{field_name} = ({class_name}){val}"
+            str += (
+                f"\n"
+                + "\t" * (add_tabs + 1)
+                + f"{field_name[1:]} = ({class_name}){val}"
+            )
         return str
 
     def hexdump(self, length=16, sep=" "):
