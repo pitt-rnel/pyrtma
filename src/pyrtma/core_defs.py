@@ -21,6 +21,7 @@ from pyrtma.validators import (
     FloatArray,
     StructArray,
     String,
+    Byte,
     Bytes,
 )
 
@@ -191,7 +192,7 @@ class MDF_FAILED_MESSAGE(MessageData):
     ] = "'FAILED_MESSAGE:\n  id: 8\n  fields:\n    dest_mod_id: MODULE_ID\n    reserved: short[3]\n    time_of_failure: double\n    msg_header: RTMA_MSG_HEADER'"
 
     dest_mod_id: Int16 = Int16()
-    reserved: IntArray[Int16] = IntArray(Int16, 3)
+    reserved: IntArray[Int16] = Int16(3)
     time_of_failure: Double = Double()
     msg_header: Struct[RTMA_MSG_HEADER] = Struct(RTMA_MSG_HEADER)
 
@@ -367,8 +368,8 @@ class MDF_TIMING_MESSAGE(MessageData):
         str
     ] = "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: unsigned short[MAX_MESSAGE_TYPES]\n    ModulePID: int[MAX_MODULES]\n    send_time: double'"
 
-    timing: IntArray[Uint16] = IntArray(Uint16, 10000)
-    ModulePID: IntArray[Int32] = IntArray(Int32, 200)
+    timing: IntArray[Uint16] = Uint16(10000)
+    ModulePID: IntArray[Int32] = Int32(200)
     send_time: Double = Double()
 
 
