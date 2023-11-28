@@ -24,6 +24,17 @@ type_map = {
     "char": "ctypes.c_char",
     "unsigned char": "ctypes.c_ubyte",
     "byte": "ctypes.c_ubyte",
+    "float": "ctypes.c_float",
+    "double": "ctypes.c_double",
+    "uint8": "ctypes.c_uint8",
+    "uint16": "ctypes.c_uint16",
+    "uint32": "ctypes.c_uint32",
+    "uint64": "ctypes.c_uint64",
+    "int8": "ctypes.c_int8",
+    "int16": "ctypes.c_int16",
+    "int32": "ctypes.c_int32",
+    "int64": "ctypes.c_int64",
+    # following unsized types are deprecated
     "int": "ctypes.c_int32",
     "signed int": "ctypes.c_int32",
     "unsigned int": "ctypes.c_uint32",
@@ -37,52 +48,23 @@ type_map = {
     "long long": "ctypes.c_int64",
     "signed long long": "ctypes.c_int64",
     "unsigned long long": "ctypes.c_uint64",
-    "float": "ctypes.c_float",
-    "double": "ctypes.c_double",
-    "uint8": "ctypes.c_uint8",
-    "uint16": "ctypes.c_uint16",
-    "uint32": "ctypes.c_uint32",
-    "uint64": "ctypes.c_uint64",
-    "int8": "ctypes.c_int8",
-    "int16": "ctypes.c_int16",
-    "int32": "ctypes.c_int32",
-    "int64": "ctypes.c_int64",
-}
-
-# Field type name to ctypes (in python file)
-pytype_map = {
-    "char": "str",
-    "unsigned char": "bytes",
-    "byte": "bytes",
-    "int": "int",
-    "signed int": "int",
-    "unsigned int": "int",
-    "unsigned": "int",
-    "short": "int",
-    "signed short": "int",
-    "unsigned short": "int",
-    "long": "int",
-    "signed long": "int",
-    "unsigned long": "int",
-    "long long": "int",
-    "signed long long": "int",
-    "unsigned long long": "int",
-    "float": "float",
-    "double": "float",
-    "uint8": "int",
-    "uint16": "int",
-    "uint32": "int",
-    "uint64": "int",
-    "int8": "int",
-    "int16": "int",
-    "int32": "int",
-    "int64": "int",
 }
 
 desctype_map = {
     "char": "String",
     "byte": "Byte",
     "unsigned char": "Byte",
+    "float": "Float",
+    "double": "Double",
+    "uint8": "Uint8",
+    "uint16": "Uint16",
+    "uint32": "Uint32",
+    "uint64": "Uint64",
+    "int8": "Int8",
+    "int16": "Int16",
+    "int32": "Int32",
+    "int64": "Int64",
+    # following unsized types are deprecated
     "int": "Int32",
     "signed int": "Int32",
     "unsigned int": "Uint32",
@@ -96,16 +78,6 @@ desctype_map = {
     "long long": "Int64",
     "signed long long": "Int64",
     "unsigned long long": "Uint64",
-    "float": "Float",
-    "double": "Double",
-    "uint8": "Uint8",
-    "uint16": "Uint16",
-    "uint32": "Uint32",
-    "uint64": "Uint64",
-    "int8": "Int8",
-    "int16": "Int16",
-    "int32": "Int32",
-    "int64": "Int64",
 }
 DEFAULT_BLACK_LEN = 88  # preferred line length
 TAB = "    "
@@ -141,7 +113,7 @@ class PyDefCompiler:
     def get_descriptor(self, ftype: str, flen: int) -> str:
         if ftype in type_map.keys():
             dtype = desctype_map[ftype]
-            if flen > 0:
+            if flen > 1:
                 if dtype.startswith("Int") or dtype.startswith("Uint"):
                     return f":IntArray[{dtype}] = {dtype}({flen})"
                 elif dtype.startswith("Float") or dtype.startswith("Double"):
@@ -208,7 +180,7 @@ class PyDefCompiler:
                     raise RuntimeError(f"Unknown field name {field.name} in {sdf.name}")
 
                 f.append(
-                    f"{tab *4}(\"_{field.name}\", {ftype}{' * ' + str(flen) if flen else ''}){nl}"
+                    f"{tab *4}(\"_{field.name}\", {ftype}{' * ' + str(flen) if flen > 1 else ''}){nl}"
                 )
 
                 desc = self.get_descriptor(field.type_name, flen)
@@ -243,45 +215,6 @@ class PyDefCompiler:
         """
         return dedent(template)
 
-    def generate_struct_stub(self, sdf: SDF) -> str:
-        f = []
-        fnum = len(sdf.fields)
-        fstr = ""
-        fstr += "\n"
-        for i, field in enumerate(sdf.fields, start=1):
-            flen = field.length
-            nl = "\n" if i < fnum else ""
-            if field.type_name in type_map.keys():
-                if flen and field.type_name != "char":
-                    ftype = f"ctypes.Array[{type_map[field.type_name]}]"
-                else:
-                    ftype = pytype_map[field.type_name]
-            elif field.type_name in self.parser.message_defs.keys():
-                ftype = f"MDF_{field.type_name}"
-            elif field.type_name in self.parser.struct_defs.keys():
-                ftype = f"{field.type_name}"
-            elif field.type_name in self.parser.aliases.keys():
-                type_name = self.parser.aliases[field.type_name].type_name
-                if type_name in type_map.keys():
-                    if flen and type_name != "char":
-                        ftype = f"ctypes.Array[{type_map[type_name]}]"
-                    else:
-                        ftype = pytype_map[type_name]
-                else:
-                    ftype = f"{field.type_name}"
-            else:
-                raise RuntimeError(f"Unknown field name {field.name} in {sdf.name}")
-            comment = f"  # length: {flen}" if flen else ""
-            f.append(f"{TAB *3}{field.name}: {ftype}{comment}{nl}")
-        fstr += "".join(f)
-        if not fstr:
-            fstr = " ..."
-
-        template = f"""\
-        class {sdf.name}(ctypes.Structure):{fstr}
-        """
-        return dedent(template)
-
     def generate_msg_def(self, mdf: MDF) -> str:
         f = []
         fnum = len(mdf.fields)
@@ -311,7 +244,7 @@ class PyDefCompiler:
                     raise RuntimeError(f"Unknown field name {field.name} in {mdf.name}")
 
                 f.append(
-                    f"{tab *4}(\"_{field.name}\", {ftype}{' * ' + str(flen) if flen else ''}){nl}"
+                    f"{tab *4}(\"_{field.name}\", {ftype}{' * ' + str(flen) if flen > 1 else ''}){nl}"
                 )
 
                 desc = self.get_descriptor(field.type_name, flen)
@@ -346,46 +279,6 @@ class PyDefCompiler:
             {type_def_line}
 
             {dstr}
-        """
-        return dedent(template)
-
-    def generate_msg_stub(self, mdf: MDF) -> str:
-        f = []
-        fnum = len(mdf.fields)
-        fstr = ""
-        if fnum:
-            fstr += "\n"
-        for i, field in enumerate(mdf.fields, start=1):
-            flen = field.length
-            nl = "\n" if i < fnum else ""
-            if field.type_name in type_map.keys():
-                if flen and field.type_name != "char":
-                    ftype = f"ctypes.Array[{type_map[field.type_name]}]"
-                else:
-                    ftype = pytype_map[field.type_name]
-            elif field.type_name in self.parser.message_defs.keys():
-                ftype = f"MDF_{field.type_name}"
-            elif field.type_name in self.parser.struct_defs.keys():
-                ftype = f"{field.type_name}"
-            elif field.type_name in self.parser.aliases.keys():
-                type_name = self.parser.aliases[field.type_name].type_name
-                if type_name in type_map.keys():
-                    if flen and type_name != "char":
-                        ftype = f"ctypes.Array[{type_map[type_name]}]"
-                    else:
-                        ftype = pytype_map[type_name]
-                else:
-                    ftype = f"{field.type_name}"
-            else:
-                raise RuntimeError(f"Unknown field name {field.name} in {mdf.name}")
-            comment = f"  # length: {flen}" if flen else ""
-            f.append(f"{TAB *3}{field.name}: {ftype}{comment}{nl}")
-        fstr += "".join(f)
-        if not fstr:
-            fstr = " ..."
-
-        template = f"""\
-        class MDF_{mdf.name}(pyrtma.MessageData):{fstr}
         """
         return dedent(template)
 
@@ -508,66 +401,5 @@ class PyDefCompiler:
 
             f.write(self.generate_type_info())
             f.write("\n")
-        # run black formatter
-        subprocess.run([sys.executable, "-m", "black", out_filepath], cwd=os.getcwd())
-
-    def generate_stub(self, out_filepath: pathlib.Path):
-        with open(out_filepath, mode="w") as f:
-            f.write(self.generate_imports())
-            f.write("\n")
-
-            f.write("# Constants\n")
-            obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
-            for obj in self.parser.constants.values():
-                f.write(self.generate_constant(obj))
-            f.write("\n")
-
-            f.write("# String Constants\n")
-            for obj in self.parser.string_constants.values():
-                f.write(self.generate_string_constant(obj))
-            f.write("\n")
-
-            f.write("# Type Aliases\n")
-            for obj in self.parser.aliases.values():
-                f.write(self.generate_type_alias(obj))
-            f.write("\n")
-
-            f.write("# Host IDs\n")
-            for obj in self.parser.host_ids.values():
-                f.write(self.generate_host_id(obj))
-            f.write("\n")
-
-            f.write("# Module IDs\n")
-            for obj in self.parser.module_ids.values():
-                f.write(self.generate_module_id(obj))
-            f.write("\n")
-
-            f.write("# Message Type IDs\n")
-            for obj in self.parser.message_ids.values():
-                f.write(self.generate_msg_type_id(obj))
-            f.write("\n")
-
-            f.write("# Struct Definitions\n")
-            new_line_flag = False
-            for i, obj in enumerate(self.parser.struct_defs.values()):
-                struct_txt = self.generate_struct_stub(obj)
-                end_flag = struct_txt[-4:] != "...\n"
-                if i and (end_flag or new_line_flag):
-                    f.write("\n")
-                f.write(struct_txt)
-                # if new line may be needed for next class
-                new_line_flag = end_flag
-            f.write("\n")
-
-            f.write("# Message Definitions\n")
-            new_line_flag = False
-            for i, obj in enumerate(self.parser.message_defs.values()):
-                mdf_text = self.generate_msg_stub(obj)
-                end_flag = mdf_text[-4:] != "...\n"
-                if i and (end_flag or new_line_flag):
-                    f.write("\n")
-                f.write(mdf_text)
-                # if new line may be needed for next class
-                new_line_flag = end_flag
         # run black formatter
         subprocess.run([sys.executable, "-m", "black", out_filepath], cwd=os.getcwd())
