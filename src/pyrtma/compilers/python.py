@@ -52,8 +52,8 @@ type_map = {
 # Field type name to ctypes (in python file)
 pytype_map = {
     "char": "str",
-    "unsigned char": "int",
-    "byte": "int",
+    "unsigned char": "bytes",
+    "byte": "bytes",
     "int": "int",
     "signed int": "int",
     "unsigned int": "int",
@@ -81,8 +81,8 @@ pytype_map = {
 
 desctype_map = {
     "char": "String",
-    "byte": "Bytes",
-    "unsigned char": "Bytes",
+    "byte": "Byte",
+    "unsigned char": "Byte",
     "int": "Int32",
     "signed int": "Int32",
     "unsigned int": "Uint32",
@@ -143,12 +143,12 @@ class PyDefCompiler:
             dtype = desctype_map[ftype]
             if flen > 0:
                 if dtype.startswith("Int") or dtype.startswith("Uint"):
-                    return f":IntArray[{dtype}] = IntArray({dtype}, {flen})"
+                    return f":IntArray[{dtype}] = {dtype}({flen})"
                 elif dtype.startswith("Float") or dtype.startswith("Double"):
-                    return f":FloatArray[{dtype}] = FloatArray({dtype}, {flen})"
+                    return f":FloatArray[{dtype}] = {dtype}({flen})"
                 elif dtype.startswith("String"):
                     return f":String = String({flen})"
-                elif dtype.startswith("Bytes"):
+                elif dtype.startswith("Byte"):
                     return f":Bytes = Bytes({flen})"
                 else:
                     raise RuntimeError(f"Unknown field descriptor{dtype}")
@@ -398,7 +398,7 @@ class PyDefCompiler:
 
         from pyrtma.message_base import MessageBase
         from pyrtma.message_data import MessageData
-        from pyrtma.validators import Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float, Double, Struct, IntArray, FloatArray, StructArray, String, Bytes
+        from pyrtma.validators import Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float, Double, Struct, IntArray, FloatArray, StructArray, String, Byte, Bytes
         
         """
         return dedent(s)
