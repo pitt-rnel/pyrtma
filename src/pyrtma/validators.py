@@ -70,7 +70,7 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
     _float_type = ctypes.c_float
 
     @abstractmethod
-    def __init__(self):
+    def __init__(self, *args):
         ...
 
     def __get__(self, obj: _P, objtype=None) -> float:
@@ -121,7 +121,7 @@ class Float(FloatValidatorBase):
         else:
             return super().__new__(cls)
 
-    def __init__(self):
+    def __init__(self, *args):
         pass
 
 
@@ -142,7 +142,7 @@ class Double(FloatValidatorBase):
         else:
             return super().__new__(cls)
 
-    def __init__(self):
+    def __init__(self, *args):
         pass
 
 
@@ -154,7 +154,7 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
     _max: ClassVar[int] = 2**8 - 1
 
     @abstractmethod
-    def __init__(self):
+    def __init__(self, *args):
         ...
 
     @property
@@ -223,7 +223,7 @@ class Int8(IntValidatorBase):
         else:
             return super().__new__(cls)
 
-    def __init__(self):
+    def __init__(self, *args):
         pass
 
 
@@ -247,7 +247,7 @@ class Int16(IntValidatorBase):
         else:
             return super().__new__(cls)
 
-    def __init__(self):
+    def __init__(self, *args):
         pass
 
 
@@ -271,7 +271,7 @@ class Int32(IntValidatorBase):
         else:
             return super().__new__(cls)
 
-    def __init__(self):
+    def __init__(self, *args):
         pass
 
 
@@ -295,7 +295,7 @@ class Int64(IntValidatorBase):
         else:
             return super().__new__(cls)
 
-    def __init__(self):
+    def __init__(self, *args):
         pass
 
 
@@ -319,7 +319,7 @@ class Uint8(IntValidatorBase):
         else:
             return super().__new__(cls)
 
-    def __init__(self):
+    def __init__(self, *args):
         pass
 
 
@@ -343,7 +343,7 @@ class Uint16(IntValidatorBase):
         else:
             return super().__new__(cls)
 
-    def __init__(self):
+    def __init__(self, *args):
         pass
 
 
@@ -367,7 +367,7 @@ class Uint32(IntValidatorBase):
         else:
             return super().__new__(cls)
 
-    def __init__(self):
+    def __init__(self, *args):
         pass
 
 
@@ -391,7 +391,7 @@ class Uint64(IntValidatorBase):
         else:
             return super().__new__(cls)
 
-    def __init__(self):
+    def __init__(self, *args):
         pass
 
 
@@ -410,7 +410,7 @@ class Byte(Uint8, Generic[_P]):
         else:
             return super().__new__(cls)
 
-    def __init__(self):
+    def __init__(self, *args):
         pass
 
     def __get__(self, obj: _P, objtype=None) -> bytes:
