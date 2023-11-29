@@ -549,6 +549,12 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
     def __repr__(self) -> str:
         return f"ArrayField({type(self._validator).__name__}, len={self._len}) at 0x{id(self):016X}"
 
+    def __str__(self):
+        if self._bound_obj:
+            return str(getattr(self._bound_obj, self.private_name)[:])
+        else:
+            return self.__repr__()
+
     def __eq__(self, value) -> bool:
         if not isinstance(value, abc.Sequence):
             return False
@@ -865,6 +871,30 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
     def __repr__(self) -> str:
         return f"StructArray({self._validator._ctype.__name__}, len={self._len}) at 0x{id(self):016X}"
 
+    def __str__(self):
+        return self.pretty_print()
+
+    def pretty_print(self, add_tabs=0):
+        if self._bound_obj:
+            max_len = 5
+            val = getattr(self._bound_obj, self.private_name)
+            tab = "\t" * add_tabs
+            if self._len <= max_len:
+                return (
+                    f"{tab}[\n"
+                    + "\n".join(x.pretty_print(add_tabs) for x in val)
+                    + f"\n{tab}]"
+                )
+            else:
+                return (
+                    f"{tab}[\n"
+                    + "\n".join(
+                        f"{val[i].pretty_print(add_tabs)}" for i in range(max_len)
+                    )
+                    + f"\n{tab}...]"
+                )
+        else:
+            return self.__repr__()
 
     def __eq__(self, value) -> bool:
         if not isinstance(value, abc.Sequence):

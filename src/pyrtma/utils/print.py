@@ -2,13 +2,13 @@ def print_ctype_array(arr):
     """expand and print ctype arrays"""
     max_len = 20
     arr_len = len(arr)
-    str = "{"
+    str = "["
     for i in range(0, min(arr_len, max_len)):
         str += f"{arr[i]}, "
     if arr_len > max_len:
-        str += "...}"
+        str += "...]"
     else:
-        str = str[:-2] + "}"
+        str = str[:-2] + "]"
     return str
 
 

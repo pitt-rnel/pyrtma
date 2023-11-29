@@ -30,21 +30,47 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         return ctypes.sizeof(self)
 
     def pretty_print(self, add_tabs=0) -> str:
-        str = "\t" * add_tabs + f"{type(self).__name__}:"
+        max_len = 20
+        pstr = "\t" * add_tabs + f"{type(self).__name__}:"
         for field_name, field_type in self._fields_:
+            if field_name[0] == "_":
+                field_name = field_name[1:]
             val = getattr(self, field_name)
             class_name = field_type.__name__
+            if type(val) is str:
+                sval = f'"{val}"'
+            elif hasattr(val, "pretty_print"):
+                sval = val.pretty_print(add_tabs + 1)
             # expand arrays
-            if hasattr(val, "__len__"):
+            elif hasattr(val, "__len__"):
                 if hasattr(val, "_type_"):
                     class_name = val._type_.__name__
-                val = print_ctype_array(val)
-            str += (
-                f"\n"
-                + "\t" * (add_tabs + 1)
-                + f"{field_name[1:]} = ({class_name}){val}"
-            )
-        return str
+                if hasattr(val, "pretty_print"):
+                    sval = val.pretty_print(add_tabs + 1)
+                elif (
+                    type(val) not in (bytes, bytearray)
+                    and type(val[0]) is not bytearray
+                ):
+                    sval = print_ctype_array(val)
+                elif len(val) > max_len:
+                    sval = f"{val[:max_len]}..."
+                else:
+                    sval = str(val)
+            else:
+                sval = str(val)
+            if hasattr(val, "pretty_print"):
+                pstr += (
+                    f"\n"
+                    + "\t" * (add_tabs + 1)
+                    + f"{field_name} = ({class_name})\n{sval}"
+                )
+            else:
+                pstr += (
+                    f"\n"
+                    + "\t" * (add_tabs + 1)
+                    + f"{field_name} = ({class_name}){sval}"
+                )
+        return pstr
 
     def hexdump(self, length=16, sep=" "):
         hexdump(bytes(self), length, sep)
