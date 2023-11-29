@@ -9,15 +9,17 @@ from .exceptions import JSONDecodingError
 MB = TypeVar("MB", bound="MessageBase")
 
 
-# MessageBase Metaclass - reserved for future use (runtime ctypes field generation)
+# MessageBase Metaclass - (for runtime ctypes field generation)
 class MessageMeta(type(ctypes.Structure)):
     def __new__(cls, name, bases, namespace):
-        if "_fields_" in namespace:
-            pass  # TODO generate _fields_
-            # namespace['_fields_'].extend([...])
-        else:
-            pass  # TODO generate _fields_
-            # namespace['_fields_'] = [...]
+        fields = []
+        for key in namespace.keys():
+            if hasattr(namespace[key], "_ctype"):
+                fname = "_" + key
+                ftype = namespace[key]._ctype
+                fields.append((fname, ftype))
+        if fields:
+            namespace["_fields_"] = fields
         return super().__new__(cls, name, bases, namespace)
 
 
