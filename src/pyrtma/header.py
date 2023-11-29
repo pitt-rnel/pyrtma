@@ -59,12 +59,12 @@ class MessageHeader(_RTMA_MSG_HEADER):
 
 class TimeCodeMessageHeader(MessageHeader):
     _fields_ = [
-        ("utc_seconds", ctypes.c_uint),
-        ("utc_fraction", ctypes.c_uint),
+        ("_utc_seconds", ctypes.c_uint),
+        ("_utc_fraction", ctypes.c_uint),
     ]
 
-    utc_seconds: Int32 = Int32()
-    utc_fraction: Int32 = Int32()
+    utc_seconds: Uint32 = Uint32()
+    utc_fraction: Uint32 = Uint32()
 
 
 def get_header_cls(timecode: bool = False) -> Type[MessageHeader]:
