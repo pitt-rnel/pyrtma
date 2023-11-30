@@ -20,6 +20,10 @@ class MessageMeta(type(ctypes.Structure)):
                 fields.append((fname, ftype))
         if fields:
             namespace["_fields_"] = fields
+        elif "_fields_" not in namespace:
+            # else important to not overwrite v1 message def fields
+            namespace["_fields_"] = []
+
         return super().__new__(cls, name, bases, namespace)
 
 
