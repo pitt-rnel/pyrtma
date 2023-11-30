@@ -31,7 +31,7 @@ CStruct = TypeVar("CStruct", bound=ctypes.Structure)
 
 def _random_struct(obj: CStruct) -> CStruct:
     for _name, ftype in obj._fields_:
-        name = _name[1:]
+        name = _name[1:] if _name[0] == "_" else _name
         if issubclass(ftype, ctypes.Structure):
             setattr(obj, name, _random_struct(getattr(obj, name)))
         elif issubclass(ftype, ctypes.Array):
