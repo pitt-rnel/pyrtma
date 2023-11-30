@@ -134,7 +134,7 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         # need to convert chars from bytes to str
         if type(value) is bytes:
             fnames, ftypes = zip(*self._fields_)
-            if name in fnames:
+            if name in fnames and name[0] != "_":  # v1 fields
                 i = fnames.index(name)
                 ftype = ftypes[i]
                 if ftype is ctypes.c_char or (
@@ -148,7 +148,7 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         # can be deprecated
         if type(value) is str:
             fnames, ftypes = zip(*self._fields_)
-            if name in fnames:
+            if name in fnames and name[0] != "_":  # v1 fields
                 i = fnames.index(name)
                 ftype = ftypes[i]
                 if ftype is ctypes.c_char or (
