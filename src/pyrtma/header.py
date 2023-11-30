@@ -37,12 +37,21 @@ class MessageHeader(MessageBase):
 
 
 class TimeCodeMessageHeader(MessageHeader):
+    """Variant of MessageHeader with additional Timecode fields"""
 
     utc_seconds: Uint32 = Uint32()
     utc_fraction: Uint32 = Uint32()
 
 
 def get_header_cls(timecode: bool = False) -> Type[MessageHeader]:
+    """Get the correct header class depending on whether timecode is used
+
+    Args:
+        timecode (bool, optional): Flag indicating if timecode fields are needed. Defaults to False.
+
+    Returns:
+        Type[MessageHeader]: MessageHeader class
+    """
     if timecode:
         return TimeCodeMessageHeader
     else:

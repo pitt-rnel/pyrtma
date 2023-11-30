@@ -6,23 +6,69 @@ from typing import List, TypeVar
 
 
 def _random_str(length: int) -> str:
+    """Utility to generate random string
+
+    Args:
+        length (int): String length
+
+    Returns:
+        str: Random string
+    """
     return "".join(random.choice(string.printable) for _ in range(length))
 
 
 def _random_int_array(length: int, min: int = 0, max: int = 9) -> List[int]:
+    """Utility to generate random int array
+
+    Args:
+        length (int): Array length
+        min (int, optional): Minimum value. Defaults to 0.
+        max (int, optional): Maximum value. Defaults to 9.
+
+    Returns:
+        List[int]: List of random ints
+    """
     return [random.randint(min, max) for _ in range(length)]
 
 
 def _random_float_array(length: int) -> List[float]:
+    """Utility to generate random float array
+
+    Restricted to values that can be represented by 32-bit float
+
+    Args:
+        length (int): Array length
+
+    Returns:
+        List[float]: List of random floats
+    """
     context = decimal.Context(prec=5, rounding=decimal.ROUND_DOWN)
     return [round(random.random(), 6) for _ in range(length)]
 
 
 def _random_double_array(length: int) -> List[float]:
+    """Utility to generate random float array
+
+    Values are of double (64-bit) precision
+
+    Args:
+        length (int): Array length
+
+    Returns:
+        List[float]: List of random floats
+    """
     return [random.random() for _ in range(length)]
 
 
 def _random_byte_array(length: int) -> bytes:
+    """Utility to generate random byte string
+
+    Args:
+        length (int): byte string length
+
+    Returns:
+        bytes: Random byte string
+    """
     return bytes([random.randint(0, 255) for _ in range(length)])
 
 
@@ -30,6 +76,14 @@ CStruct = TypeVar("CStruct", bound=ctypes.Structure)
 
 
 def _random_struct(obj: CStruct) -> CStruct:
+    """Utility to generate random CStructure values
+
+    Args:
+        obj (CStruct): CStructure instance
+
+    Returns:
+        CStruct: CStructure with random values
+    """
     for _name, ftype in obj._fields_:
         name = _name[1:] if _name[0] == "_" else _name
         if issubclass(ftype, ctypes.Structure):

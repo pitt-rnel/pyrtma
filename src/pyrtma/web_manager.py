@@ -25,13 +25,24 @@ from websocket_server import (  # type: ignore
     OPCODE_TEXT,
 )
 
-from typing import Optional, List, Callable, Any
+from typing import Optional, List, Callable, Any, Dict
 
 
 class RTMAWebSocketHandler(WebSocketHandler):
+    """RTMA Web Socket Handler class"""
+
     disable_nagle_algorithm = True
 
     def __init__(self, socket, addr, server):
+        """RTMA Web Socket Handler
+
+        Initializes and handles RTMA Proxy connection
+
+        Args:
+            socket: socket object
+            addr: client address
+            server: server object
+        """
         # Initialize RTMA Proxy connection
         self.mm_ip = server.mm_ip
         self.proxy = Client()
@@ -39,6 +50,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         WebSocketHandler.__init__(self, socket, addr, server)
 
     def handle(self):
+        """Handle RTMA proxy connection"""
         if not self.handshake_done:
             self.handshake()
 
@@ -82,10 +94,21 @@ class RTMAWebSocketHandler(WebSocketHandler):
                         print("X")
 
     def pong_received(self, msg: str):
+        """Log that pong was received
+
+        Args:
+            msg (str): Ignored
+        """
         logger.info("Websocket PONG received.")
 
     def process_json_message(self, message: str):
-        """Called when a client receives a message over websocket."""
+        """Process incoming json message
+
+        Called when a client receives a message over websocket
+
+        Args:
+            message (str): JSON message string
+        """
         try:
             msg = pyrtma.Message.from_json(message)
         except RTMAMessageError as e:
@@ -95,6 +118,11 @@ class RTMAWebSocketHandler(WebSocketHandler):
         self.proxy.forward_message(msg.header, msg.data or None)
 
     def read_ws_message(self) -> Optional[str]:
+        """Read websocket message
+
+        Returns:
+            Optional[str]: Websocket message string
+        """
         try:
             b1, b2 = self.read_bytes(2)
         except SocketError as e:  # to be replaced with ConnectionResetError for py3
@@ -152,6 +180,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         return message_bytes.decode("utf8")
 
     def finish(self):
+        """Close RTMA connection"""
         # Disconnect on behalf of the web client if still connected here
         if self.proxy.connected:
             self.proxy.disconnect()
@@ -161,15 +190,28 @@ class RTMAWebSocketHandler(WebSocketHandler):
 
 
 class WebMessageManager(WebsocketServer):
+    """WebMessageManager class"""
+
     def __init__(
         self,
         host="127.0.0.1",
         port=0,
         mm_ip: str = "127.0.0.1:7111",
-        loglevel=logging.WARNING,
+        loglevel: int = logging.WARNING,
         key=None,
         cert=None,
     ):
+        """WebMessageManager class
+
+        Args:
+            host (str, optional): IP for WebMessageManager to listen for connections. Defaults to "127.0.0.1".
+            port (int, optional): Port for WebMessageManager to bind to. Defaults to 0.
+            mm_ip (str, optional): Address for RTMA MessageManager. Defaults to "127.0.0.1:7111".
+            loglevel (int, optional): Loging level. Defaults to logging.WARNING.
+            key (optional): Path to SSL key. Defaults to None.
+            cert (optional): Path to SSL cert. Defaults to None.
+        """
+
         logger.setLevel(loglevel)
         TCPServer.__init__(self, (host, port), RTMAWebSocketHandler)
         self.host = host
@@ -190,13 +232,25 @@ class WebMessageManager(WebsocketServer):
         self.mm_ip = mm_ip
 
 
-def ws_client_connect(client, server):
-    """Called for every client connecting (after handshake)"""
-    (f"Client connected -> id:{client['id']}")
+def ws_client_connect(client: Dict[str, Any], server: WebMessageManager):
+    """Websocket client connect
+
+        Called for every client connecting (after handshake)
+    Args:
+        client (Dict[str, Any]): Client dictionary
+        server: WebMessageManager Server object
+    """
+    print(f"Client connected -> id:{client['id']}")
 
 
-def ws_client_disconnect(client, server):
-    """Called for every client disconnecting"""
+def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
+    """Websocket client disconnect
+
+        Called for every client disconnecting
+    Args:
+        client (Dict[str, Any]): Client dictionary
+        server: WebMessageManager Server object
+    """
     print(f"Client disconnected -> id:{client['id']}")
 
 

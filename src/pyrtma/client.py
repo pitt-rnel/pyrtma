@@ -525,6 +525,7 @@ class Client(object):
             timeout (optional): Timeout to wait for a message to be available for reading.
                 Defaults to -1 (blocking).
             ack (optional): Reserved for future use. Defaults to False.
+            sync_check (optional): Validate message definition matches header version. Defaults to False.
 
         Raises:
             ConnectionLost: Connection error to message manager server

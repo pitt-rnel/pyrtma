@@ -29,6 +29,24 @@ def compile(
     combined: bool = False,
     debug: bool = False,
 ):
+    """compile message defs
+
+    Args:
+        defs_files (List[str]): Root YAML message defintion file to parse. List of C header file(s) will use v1 python compiler (deprecated)
+        out_name (str): Output directory for compiled files. For v1 compiler (deprecated), full output filename.
+        python (bool, optional): Output python .py file. Defaults to False.
+        javascript (bool, optional): Output javascript .js file. Defaults to False.
+        matlab (bool, optional): Output matlab .m file. Defaults to False.
+        c_lang (bool, optional): Output C .h file. Defaults to False.
+        info (bool, optional): Output info .txt file. Defaults to False.
+        combined (bool, optional): Output combined YAML file. Defaults to False.
+        debug (bool, optional): Debug mode. Defaults to False.
+
+    Raises:
+        FileFormatError: Issue with input file format
+        FileExistsError: Output file is not a directory
+        RuntimeError: Invalid output filename
+    """
     # determine if using v1 or v2 compiler
     file1_ext = pathlib.Path(defs_files[0]).suffix
     if file1_ext.lower() == ".h":
@@ -176,7 +194,7 @@ def main():
         "--js",
         dest="javascript",
         action="store_true",
-        help="Output javascrip .js file",
+        help="Output javascript .js file",
     )
 
     parser.add_argument(

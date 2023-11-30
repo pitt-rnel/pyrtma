@@ -1,3 +1,4 @@
+"""Message definition YAML parser"""
 import re
 import json
 import pathlib
@@ -291,7 +292,14 @@ RTMAObject = Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, MDF, SDF, 
 
 
 class Parser:
+    """Parser class"""
+
     def __init__(self, debug: bool = False):
+        """Parser class
+
+        Args:
+            debug (bool, optional): Flag for debug mode. Defaults to False.
+        """
         self.included_files: List[pathlib.Path] = []
         self.current_file = pathlib.Path()
         self.root_path = pathlib.Path()

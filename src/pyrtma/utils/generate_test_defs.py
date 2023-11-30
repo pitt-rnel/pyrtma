@@ -1,10 +1,10 @@
 import pathlib
 import random
 from ruamel.yaml import YAML
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 
 # Field type name to ctypes
-type_map = (
+type_map = [
     "char",
     "unsigned char",
     "float",
@@ -17,10 +17,12 @@ type_map = (
     "int16",
     "int32",
     "int64",
-)
+]
 
 
 class TestDefGenerator:
+    """Class to generate random message defs for testing"""
+
     def __init__(self):
         self._id = 1000
         self.constants = {}
@@ -33,26 +35,56 @@ class TestDefGenerator:
         return self._id
 
     def random_nfields(self) -> int:
+        """Randomly pick number of fields between 0-5
+
+        Returns:
+            int: Random int 0-5
+        """
         return random.randint(0, 5)
 
-    def random_flen(self) -> int:
+    def random_flen(self) -> Union[str, int]:
+        """Random field length
+
+        Returns:
+            Union[str, int]: Random field length, either 0 or a random expression
+        """
         if random.random() > 0.5:
             return 0
         return self.random_expression()
 
     def random_value(self) -> int:
+        """Random int value 1-4
+
+        Returns:
+            int: Random int 1-4
+        """
         return random.randint(1, 4)
 
     def random_op(self) -> str:
+        """Random operation
+
+        Returns:
+            str: Randomly add, multiply or no operation
+        """
         return random.choice(["", "+", "*"])
 
-    def random_constant(self) -> str:
+    def random_constant(self) -> Union[str, int]:
+        """Randomly pick a constant
+
+        Returns:
+            Union[str, int]: Constant expression or random int value
+        """
         if len(self.constants):
             return random.choice(list(self.constants.keys()))
         else:
             return self.random_value()
 
-    def random_expression(self) -> str:
+    def random_expression(self) -> Union[str, int]:
+        """Random expression
+
+        Returns:
+            Union[str, int]: Random expression (may include math operation) or int value
+        """
         if random.random() > 0.66:
             c = self.random_constant()
         else:
@@ -66,7 +98,15 @@ class TestDefGenerator:
 
         return c
 
-    def random_ftype(self, nested: bool = False) -> int:
+    def random_ftype(self, nested: bool = False) -> str:
+        """Random field type name
+
+        Args:
+            nested (bool, optional): Flag for nested type. Defaults to False.
+
+        Returns:
+            str: Field type name
+        """
         if not nested:
             return random.choice(type_map)
 
@@ -88,11 +128,21 @@ class TestDefGenerator:
             return random.choice(m or type_map)
 
     def generate_constants(self, n: int):
+        """Generate random constants
+
+        Args:
+            n (int): Number of constants to generate
+        """
         for i in range(1, n):
             name = f"C_{i:02d}"
             self.constants[name] = self.random_expression()
 
     def generate_structs(self, n: int):
+        """Generate random structs
+
+        Args:
+            n (int): Number of structs to generate
+        """
         for i in range(1, n):
             name = f"SRCT_{i:02d}"
             fields = {}
@@ -109,6 +159,11 @@ class TestDefGenerator:
             self.struct_defs[name] = dict(fields=fields)
 
     def generate_message_defs(self, n: int):
+        """Generate random message defs
+
+        Args:
+            n (int): Number of message defs to generate
+        """
         for i in range(1, n):
             name = f"MSG_{i:03d}"
             fields = {}
@@ -125,6 +180,11 @@ class TestDefGenerator:
             self.message_defs[name] = dict(id=self.id, fields=fields or None)
 
     def generate(self, out_filepath: pathlib.Path):
+        """Generate yaml file with random test message defs
+
+        Args:
+            out_filepath (pathlib.Path): output filepath
+        """
         self.generate_constants(24)
         self.generate_structs(10)
         self.generate_message_defs(256)

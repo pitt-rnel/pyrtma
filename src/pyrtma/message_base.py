@@ -11,6 +11,11 @@ MB = TypeVar("MB", bound="MessageBase")
 
 # MessageBase Metaclass - (for runtime ctypes field generation)
 class MessageMeta(type(ctypes.Structure)):
+    """MessageMeta metaclass
+
+    Responsible for generating ctypes fields from descriptor attributes prior to class creation
+    """
+
     def __new__(cls, name, bases, namespace):
         fields = []
         for key in namespace.keys():
@@ -29,11 +34,24 @@ class MessageMeta(type(ctypes.Structure)):
 
 # "abstract" base class for MessageHeader and MessageData
 class MessageBase(ctypes.Structure, metaclass=MessageMeta):
+    """MessageBase base class
+
+    This class should be treated as if abstract and not instantiated directly.
+    """
+
     @property
     def size(self) -> int:
         return ctypes.sizeof(self)
 
     def pretty_print(self, add_tabs=0) -> str:
+        """Generate formatted message structure string for pretty printing
+
+        Args:
+            add_tabs (int, optional): Indentation level, used for recursively calling. Defaults to 0.
+
+        Returns:
+            str: Formatted string
+        """
         max_len = 20
         pstr = "\t" * add_tabs + f"{type(self).__name__}:"
         for field_name, field_type in self._fields_:
@@ -77,12 +95,32 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         return pstr
 
     def hexdump(self, length=16, sep=" "):
+        """hexdump of message
+
+        Args:
+            length (int, optional): Row length. Defaults to 16.
+            sep (str, optional): Separator for non-printable ascii chars. Defaults to " ".
+        """
         hexdump(bytes(self), length, sep)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert message to dictionary
+
+        Returns:
+            Dict[str, Any]: Message dictionary
+        """
         return _to_dict(self)
 
     def to_json(self, minify: bool = False, **kwargs) -> str:
+        """Convert message to json string
+
+        Args:
+            minify (bool, optional): Flag to minify (compact format). Defaults to False.
+            kwargs for json.dumps
+
+        Returns:
+            str: json string
+        """
         if minify:
             return json.dumps(
                 self, cls=RTMAJSONEncoder, separators=(",", ":"), **kwargs
@@ -91,7 +129,17 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
             return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
 
     def get_field_raw(self, name: str) -> bytes:
-        """return copy of raw bytes for ctypes field 'name'"""
+        """return copy of raw bytes for ctypes field
+
+        Args:
+            name (str): Message fieldname
+
+        Raises:
+            KeyError: Invalid fieldname
+
+        Returns:
+            bytes: Copy of message field data bytes
+        """
         meta = getattr(type(self), f"_{name}")
         if name not in [x[0] for x in self._fields_]:
             raise KeyError(f"{name} is not a field of {self.__name__}")
@@ -102,7 +150,14 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         return bytes(memoryview(self).cast("c")[offset : offset + sz])
 
     @classmethod
-    def from_dict(cls: Type[MB], data) -> MB:
+    def from_dict(cls: Type[MB], data: Dict[str, Any]) -> MB:
+        """Generate message instance from dictionary
+
+        Args:
+            data (Dict[str, Any]): Message dictionary
+        Raises:
+            JSONDecodingError: Unable to decode dictionary
+        """
         obj = cls()
         try:
             _from_dict(obj, data)
@@ -113,12 +168,18 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
             )
 
     @classmethod
-    def from_json(cls: Type[MB], s) -> MB:
+    def from_json(cls: Type[MB], s: str) -> MB:
+        """Generate message instance from JSON string
+
+        Args:
+            s (str): Message JSON string
+        """
         obj = cls.from_dict(json.loads(s))
         return obj
 
     @classmethod
     def from_random(cls: Type[MB]) -> MB:
+        """Generate message instance with random values"""
         obj = _random_struct(cls())
         return obj
 
@@ -179,6 +240,14 @@ class RTMAJSONEncoder(json.JSONEncoder):
     """
 
     def default(self, o: Any) -> Any:
+        """Default method to return serializable objects
+
+        Args:
+            o (Any): data to serialize
+
+        Returns:
+            Any: Serializable data
+        """
         if isinstance(o, MessageBase):
             return o.to_dict()
 
@@ -191,7 +260,13 @@ class RTMAJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def _from_dict(obj, data):
+def _from_dict(obj: MessageBase, data: Dict[str, Any]):
+    """Helper function to set message fields from dictionary values
+
+    Args:
+        obj (MessageBase): Message object
+        data (Dict[str, Any]): Message data dictionary
+    """
     for _name, ftype in obj._fields_:
         name = _name[1:] if _name[0] == "_" else _name
         if issubclass(ftype, MessageBase):
@@ -208,7 +283,15 @@ def _from_dict(obj, data):
             setattr(obj, name, data[name])
 
 
-def _to_dict(obj) -> Dict[str, Any]:
+def _to_dict(obj: MessageBase) -> Dict[str, Any]:
+    """Helper function to create dictionary from message fields
+
+    Args:
+        obj (MessageBase): Message object
+
+    Returns:
+        Dict[str, Any]: Dictionary
+    """
     data = {}
     for _name, ftype in obj._fields_:
         name = _name[1:]

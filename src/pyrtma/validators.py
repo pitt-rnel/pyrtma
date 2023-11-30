@@ -44,8 +44,9 @@ _P = TypeVar("_P")  # Parent
 _V = TypeVar("_V")  # Value
 
 
-# Base Class for all type validator descriptors
 class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
+    """Abstract base class for all message field validator descriptors"""
+
     def __set_name__(self, owner: _P, name: str):
         self.owner = owner
         self.public_name = name
@@ -69,6 +70,8 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
 
 
 class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMeta):
+    """Abstract base class for float type validators"""
+
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_float
 
     @abstractmethod
@@ -83,8 +86,17 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
         setattr(obj, self.private_name, value)
 
     def validate_one(self, value: float):
+        """Validate a float value
+
+        Args:
+            value (float): Float value
+
+        Raises:
+            TypeError: Wrong type
+            ValueError: Value cannot be precisely represented with this datatype
+        """
         if not isinstance(value, (float, int)):
-            raise TypeError(f"Expected {value} to be an float")
+            raise TypeError(f"Expected {value} to be a float")
 
         if not math.isclose(self._ctype(value).value, value, rel_tol=1e-6):
             raise ValueError(
@@ -92,8 +104,17 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
             )
 
     def validate_many(self, value: Iterable[float]):
+        """Validate multiple float values
+
+        Args:
+            value (Iterable[float]): Iterable of floats to validate
+
+        Raises:
+            TypeError: Wrong type
+            ValueError: Value cannot be precisely represented with this datatype
+        """
         if any(not isinstance(v, (float, int)) for v in value):
-            raise TypeError(f"Expected {value!r} to be an int.")
+            raise TypeError(f"Expected {value!r} to be a float.")
 
         if any(not math.isclose(self._ctype(v).value, v, rel_tol=1e-6) for v in value):
             raise ValueError(
@@ -105,6 +126,8 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
 
 
 class Float(FloatValidatorBase):
+    """32-bit Float validator class"""
+
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_float
 
     @overload
@@ -126,6 +149,8 @@ class Float(FloatValidatorBase):
 
 
 class Double(FloatValidatorBase):
+    """Double (64-bit float) validator class"""
+
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_double
 
     @overload
@@ -148,6 +173,8 @@ class Double(FloatValidatorBase):
 
 # Base Class for int validator fields
 class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
+    """Abstract base class for integer type validators"""
+
     _size: ClassVar[int] = 1
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = 0
@@ -182,6 +209,15 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
         setattr(obj, self.private_name, value)
 
     def validate_one(self, value: int):
+        """Validate an integer value
+
+        Args:
+            value (int): Integer to validate
+
+        Raises:
+            TypeError: Wrong type
+            ValueError: Integer out of range for this datatype
+        """
         if not isinstance(value, int):
             raise TypeError(f"Expected {value} to be an int")
 
@@ -191,6 +227,15 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
             raise ValueError(f"Expected {value} to be no more than {self._max}")
 
     def validate_many(self, value: Iterable[int]):
+        """Validate multiple integer values
+
+        Args:
+            value (Iterable[int]): Iterable of integers to validate
+
+        Raises:
+            TypeError: Wrong type
+            ValueError: Integer out of range for this datatype
+        """
         if any(not isinstance(v, int) for v in value):
             raise TypeError(f"Expected {value} to be an int.")
 
@@ -205,6 +250,8 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
 
 
 class Int8(IntValidatorBase):
+    """Validator for 8-bit integers"""
+
     _size: ClassVar[int] = 1
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**7)
@@ -230,6 +277,8 @@ class Int8(IntValidatorBase):
 
 
 class Int16(IntValidatorBase):
+    """Validator for 16-bit integers"""
+
     _size: ClassVar[int] = 2
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**15)
@@ -255,6 +304,8 @@ class Int16(IntValidatorBase):
 
 
 class Int32(IntValidatorBase):
+    """Validator for 32-bit integers"""
+
     _size: ClassVar[int] = 4
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**31)
@@ -280,6 +331,8 @@ class Int32(IntValidatorBase):
 
 
 class Int64(IntValidatorBase):
+    """Validator for 64-bit integers"""
+
     _size: ClassVar[int] = 8
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**63)
@@ -305,6 +358,8 @@ class Int64(IntValidatorBase):
 
 
 class Uint8(IntValidatorBase):
+    """Validator for unsigned 8-bit integers"""
+
     _size: ClassVar[int] = 1
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
@@ -330,6 +385,8 @@ class Uint8(IntValidatorBase):
 
 
 class Uint16(IntValidatorBase):
+    """Validator for unsigned 16-bit integers"""
+
     _size: ClassVar[int] = 2
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
@@ -355,6 +412,8 @@ class Uint16(IntValidatorBase):
 
 
 class Uint32(IntValidatorBase):
+    """Validator for unsigned 32-bit integers"""
+
     _size: ClassVar[int] = 4
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
@@ -380,6 +439,8 @@ class Uint32(IntValidatorBase):
 
 
 class Uint64(IntValidatorBase):
+    """Validator for unsigned 64-bit integers"""
+
     _size: ClassVar[int] = 8
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
@@ -405,6 +466,8 @@ class Uint64(IntValidatorBase):
 
 
 class Byte(Uint8, Generic[_P]):
+    """Validator for single byte values"""
+
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_ubyte
 
     @overload
@@ -436,6 +499,16 @@ class Byte(Uint8, Generic[_P]):
         setattr(obj, self.private_name, value)
 
     def validate_one(self, value: Union[int, bytes, bytearray]):
+        """validate a single byte value
+
+        Args:
+            value (Union[int, bytes, bytearray]): Byte value to validate
+
+        Raises:
+            ValueError: Value out of range
+            TypeError: Wrong type
+        """
+
         if isinstance(value, int):
             if value < self._min:
                 raise ValueError(f"Expected {value} to be at least {self._min}")
@@ -450,6 +523,15 @@ class Byte(Uint8, Generic[_P]):
             raise ValueError(f"Expected {value} to be no longer than 1")
 
     def validate_many(self, value: Union[Iterable[int], bytes, bytearray]):
+        """Validate multiple byte values
+
+        Args:
+            value (Union[Iterable[int], bytes, bytearray]): Byte values to validate
+
+        Raises:
+            TypeError: Wrong type
+            ValueError: Value out of range
+        """
         if isinstance(value, (bytes, bytearray)):
             return
 
@@ -469,6 +551,8 @@ class Byte(Uint8, Generic[_P]):
 
 
 class String(FieldValidator[_P, str], Generic[_P]):
+    """Validator for strings (char arrays)"""
+
     def __init__(self, len: int = 1):
         self.len = len
         if len > 1:
@@ -484,6 +568,15 @@ class String(FieldValidator[_P, str], Generic[_P]):
         setattr(obj, self.private_name, value.encode())
 
     def validate_one(self, value: str):
+        """Validate a string value
+
+        Args:
+            value (str): String value
+
+        Raises:
+            TypeError: Wrong type
+            ValueError: String exceeds max length
+        """
         if not isinstance(value, str):
             raise TypeError(f"Expected {value} to be an str")
 
@@ -491,6 +584,13 @@ class String(FieldValidator[_P, str], Generic[_P]):
             raise ValueError(f'Expected "{value}" to be no longer than {self.len}')
 
     def validate_many(self, value):
+        """Validate multiple strings
+
+        Not implemented
+
+        Raises:
+            NotImplementedError
+        """
         raise NotImplementedError
 
     def __repr__(self):
@@ -501,7 +601,15 @@ _FV = TypeVar("_FV", bound=FieldValidator)
 
 
 class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
+    """Array field validator base class"""
+
     def __init__(self, validator: Type[_FV], len: int):
+        """Array field validator base class
+
+        Args:
+            validator (Type[_FV]): Field validator class for datatype
+            len (int): Field length
+        """
         self._validator = validator()
         self._len = len
         self._bound_obj: Optional[MessageBase] = None
@@ -567,12 +675,30 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
         return True
 
     def validate_one(self, value):
+        """Validate one value
+
+        Args:
+            value: Value to validate
+        """
         self._validator.validate_one(value)
 
     def validate_many(self, value):
+        """Validate multiple values
+
+        Args:
+            value: Values to validate
+        """
         self._validator.validate_many(value)
 
-    def validate_array(self, value):
+    def validate_array(self, value: ArrayField):
+        """Validate array
+
+        Args:
+            value (ArrayField): Array value to validate
+
+        Raises:
+            TypeError: Wrong type
+        """
         if not isinstance(value._validator, type(self._validator)):
             raise TypeError(f"Expected an ArrayField({type(self._validator).__name__}")
         return
@@ -582,7 +708,15 @@ _IV = TypeVar("_IV", bound=IntValidatorBase)
 
 
 class IntArray(ArrayField[_IV], Generic[_IV]):
+    """IntArray validator class"""
+
     def __init__(self, validator: Type[_IV], len: int):
+        """IntArray validator class
+
+        Args:
+            validator (Type[IV]): Field validator class for Int type
+            len (int): Field length
+        """
         self._validator = validator()
         self._len = len
         self._bound_obj: Optional[MessageBase] = None
@@ -630,7 +764,14 @@ _FPV = TypeVar("_FPV", bound=FloatValidatorBase)
 
 
 class Bytes(ArrayField[Byte]):
+    """Validator class for Bytes arrays"""
+
     def __init__(self, len: int):
+        """Validator class for Bytes arrays
+
+        Args:
+            len (int): Byte array length
+        """
         self._validator = Byte()
         self._len = len
         self._bound_obj: Optional[MessageBase] = None
@@ -728,7 +869,15 @@ class Bytes(ArrayField[Byte]):
 
 
 class FloatArray(ArrayField[_FPV], Generic[_FPV]):
+    """Validator class for float arrays"""
+
     def __init__(self, validator: Type[_FPV], len: int):
+        """Validator class for float arrays
+
+        Args:
+            validator (Type[_FPV]): Float type validator
+            len (int): Array length
+        """
         self._validator = validator()
         self._len = len
         self._bound_obj: Optional[MessageBase] = None
@@ -776,6 +925,8 @@ _S = TypeVar("_S", bound=MessageBase)
 
 
 class Struct(FieldValidator, Generic[_S]):
+    """Validator class for Structures"""
+
     @overload
     def __new__(cls, _ctype: Type[_S]) -> Struct:
         ...
@@ -810,10 +961,26 @@ class Struct(FieldValidator, Generic[_S]):
         setattr(obj, self.private_name, value)
 
     def validate_one(self, value: _S):
+        """Validate a structure
+
+        Args:
+            value (_S): Structure value to validate
+
+        Raises:
+            TypeError: Wrong type
+        """
         if not isinstance(value, self._ctype):
             raise TypeError(f"Expected {self._ctype.__name__}")
 
     def validate_many(self, value: Iterable[_S]):
+        """Validate multiple structures
+
+        Args:
+            value (Iterable[_S]): Iterable of structures to validate
+
+        Raises:
+            TypeError: Wrong type
+        """
         if any(not isinstance(v, self._ctype) for v in value):
             raise TypeError(f"Expected {value} to be an {self._ctype.__name__}.")
 
@@ -822,7 +989,15 @@ class Struct(FieldValidator, Generic[_S]):
 
 
 class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
+    """Validator for structure arrays"""
+
     def __init__(self, msg_struct: Type[_S], len: int):
+        """Validator for structure arrays
+
+        Args:
+            msg_struct (Type[_S]): Structure class
+            len (int): Array length
+        """
         self._validator = Struct(msg_struct)
         self._len = len
         self._bound_obj: Optional[MessageBase] = None
@@ -876,6 +1051,14 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         return self.pretty_print()
 
     def pretty_print(self, add_tabs=0):
+        """Generate formatted string for structure array
+
+        Args:
+            add_tabs (int, optional): Indent level. Defaults to 0.
+
+        Returns:
+            str: Formatted string
+        """
         if self._bound_obj:
             max_len = 5
             val = getattr(self._bound_obj, self.private_name)
@@ -908,12 +1091,30 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         return True
 
     def validate_one(self, value: _S):
+        """Validate a structure
+
+        Args:
+            value (_S): Structure value to validate
+        """
         self._validator.validate_one(value)
 
     def validate_many(self, value: Iterable[_S]):
+        """Validate multiple structures
+
+        Args:
+            value (Iterable[_S]): Structure values to validate
+        """
         self._validator.validate_many(value)
 
     def validate_array(self, value: StructArray[_S]):
+        """Validate structure array
+
+        Args:
+            value (StructArray[_S]): StructArray to validate
+
+        Raises:
+            TypeError: Wrong type
+        """
         if not isinstance(value._validator._ctype, type(self._validator._ctype)):
             raise TypeError(f"Expected a StructArray({self._validator._ctype.__name__}")
         return

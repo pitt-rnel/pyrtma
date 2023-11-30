@@ -1,4 +1,6 @@
 """pyrtma.messaage: RTMA message classes"""
+from __future__ import annotations
+
 import json
 
 from typing import Type, Dict, Any, TypeVar
@@ -36,6 +38,17 @@ msg_def = message_def
 
 
 def get_msg_cls(id: int) -> Type[MessageData]:
+    """get msg class for a given message type ID
+
+    Args:
+        id (int): Message Type ID
+
+    Raises:
+        UnknownMessageType: Message type is undefined
+
+    Returns:
+        Type[MessageData]: Message class
+    """
     try:
         return msg_defs[id]
     except KeyError as e:
@@ -46,6 +59,11 @@ def get_msg_cls(id: int) -> Type[MessageData]:
 
 @dataclass
 class Message:
+    """Message dataclass
+
+    Contains message header and data
+    """
+
     header: MessageHeader
     data: MessageData
 
@@ -63,14 +81,35 @@ class Message:
         return self.header == other.header and self.data == other.data
 
     def pretty_print(self, add_tabs: int = 0) -> str:
+        """Generate formatted string for pretty printing of message
+
+        Args:
+            add_tabs (int, optional): Indent level. Defaults to 0.
+
+        Returns:
+            str: Formatted string
+        """
         return (
             self.header.pretty_print(add_tabs) + "\n" + self.data.pretty_print(add_tabs)
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert message to dictionary
+
+        Returns:
+            Dict[str, Any]: Message dictionary
+        """
         return dict(header=self.header.to_dict(), data=self.data.to_dict())
 
     def to_json(self, minify: bool = False, **kwargs) -> str:
+        """Convert message to JSON string
+
+        Args:
+            minify (bool, optional): Flag to minify (compact format). Defaults to False.
+
+        Returns:
+            str: JSON message string
+        """
         d = dict(header=self.header.to_dict(), data=self.data.to_dict())
         if minify:
             return json.dumps(d, separators=(",", ":"), **kwargs)
@@ -78,7 +117,18 @@ class Message:
             return json.dumps(self, indent=2, **kwargs)
 
     @classmethod
-    def from_json(cls, s: str) -> "Message":
+    def from_json(cls, s: str) -> Message:
+        """Create message object from JSON string
+
+        Args:
+            s (str): JSON message string
+
+        Raises:
+            InvalidMessageDefinition: JSON data does not match expected message defintion
+
+        Returns:
+            Message: Message object
+        """
         # Convert json string to dict
         d = json.loads(s)
 
@@ -93,7 +143,7 @@ class Message:
         # This can removed once all clients support this field.
         if hdr.version != 0 and hdr.version != msg_cls.type_hash:
             raise InvalidMessageDefinition(
-                f"Client's message definition does not match senders version: {msg_cls.type_name}"
+                f"Client's message definition does not match sender's version: {msg_cls.type_name}"
             )
 
         msg_data = msg_cls.from_dict(d["data"])

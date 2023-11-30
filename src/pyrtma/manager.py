@@ -41,10 +41,17 @@ class Module:
     is_logger: bool = False
 
     def send_message(self, header: MessageHeader, payload: Union[bytes, MessageData]):
+        """Send a message
+
+        Args:
+            header (MessageHeader): Message header
+            payload (Union[bytes, MessageData]): Message data
+        """
         self.conn.sendall(header)
         self.conn.sendall(payload)
 
     def send_ack(self):
+        """Send ACKNOWLEDGE signal header"""
         # Just send a header
         header = self.header_cls()
         header.msg_type = cd.MT_ACKNOWLEDGE
@@ -56,6 +63,7 @@ class Module:
         self.conn.sendall(header)
 
     def close(self):
+        """Close connection"""
         self.conn.close()
 
     def __str__(self):
@@ -81,6 +89,16 @@ class MessageManager:
         debug=False,
         send_msg_timing=True,
     ):
+        """MessageManager class
+
+        RTMA Message Manager server implemented in python.
+
+        Args:
+            ip_address (str, optional): server IP address. Defaults to "".
+            timecode (bool, optional): Flag to use message header with timecode values. Defaults to False.
+            debug (bool, optional): Flag for debug mode. Defaults to False.
+            send_msg_timing (bool, optional): Flag to send TIMING_MSG. Defaults to True.
+        """
         self.ip_address = ip_address
         self.port = port
 
@@ -160,6 +178,14 @@ class MessageManager:
         self.logger.addHandler(console)
 
     def assign_module_id(self) -> int:
+        """Assign module ID dynamically to connecting module
+
+        Raises:
+            RuntimeError: Exceeded maximum number of allowed dynamic modules
+
+        Returns:
+            int: module ID
+        """
         current_ids = [mod.id for mod in self.modules.values()]
 
         MAX_DYN_IDS = cd.MAX_MODULES - cd.DYN_MOD_ID_START
@@ -184,9 +210,16 @@ class MessageManager:
     def header(self) -> MessageHeader:
         return self.header_cls.from_buffer(self.header_view)
 
-    def connect_module(
-        self, src_module: Module, msg: Message
-    ):  # returns a success code
+    def connect_module(self, src_module: Module, msg: Message) -> bool:
+        """Connect module
+
+        Args:
+            src_module (Module): Connecting module
+            msg (Message): Incoming connect message
+
+        Returns:
+            bool: success code
+        """
         src_mod_id = msg.header.src_mod_id
         if src_mod_id == 0:
             src_module.id = self.assign_module_id()
@@ -209,6 +242,11 @@ class MessageManager:
         return True
 
     def remove_module(self, module: Module):
+        """Remove connected module
+
+        Args:
+            module (Module): Module object to remove
+        """
         # Drop all subscriptions for this module
         for msg_type, subscriber_set in self.subscriptions.items():
             subscriber_set.discard(module)
@@ -221,31 +259,74 @@ class MessageManager:
         del self.modules[module.conn]
 
     def disconnect_module(self, src_module: Module):
+        """Disconnect module
+
+        Args:
+            src_module (Module): Module object to disconnect
+        """
         # src_module.send_ack() # moved to process_message
         self.remove_module(src_module)
 
     def add_subscription(self, src_module: Module, msg: Message):
+        """Add message subscription
+
+        Args:
+            src_module (Module): Subscribing module
+            msg (Message): incoming SUBSCRIBE message
+        """
         sub = cd.MDF_SUBSCRIBE.from_buffer(msg.data)
         self.subscriptions[sub.msg_type].add(src_module)
         self.logger.info(f"SUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
 
     def remove_subscription(self, src_module: Module, msg: Message):
+        """Remove message subscription
+
+        Args:
+            src_module (Module): Unsubscribing module
+            msg (Message): incoming UNSUBSCRIBE message
+        """
         sub = cd.MDF_UNSUBSCRIBE.from_buffer(msg.data)
         # Silently let modules unsubscribe from messages that they are not subscribed to.
         self.subscriptions[sub.msg_type].discard(src_module)
         self.logger.info(f"UNSUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
 
     def resume_subscription(self, src_module: Module, msg: Message):
+        """Resume message subscription
+
+        Args:
+            src_module (Module): Subscribing module
+            msg (Message): incoming RESUME_SUBSCRIPTION message
+        """
         self.add_subscription(src_module, msg)
 
     def pause_subscription(self, src_module: Module, msg: Message):
+        """Pause message subscription
+
+        Args:
+            src_module (Module): Subscribing module
+            msg (Message): incoming PAUSE_SUBSCRIPTION message
+        """
         self.remove_subscription(src_module, msg)
 
     def register_module_ready(self, src_module: Module, msg: Message):
+        """Handle MODULE_READY message and register PID
+
+        Args:
+            src_module (Module): Module that is ready
+            msg (Message): Incoming MODULE_READY message
+        """
         mr = cd.MDF_MODULE_READY.from_buffer(msg.data)
         src_module.pid = mr.pid
 
     def read_message(self, sock: socket.socket) -> bool:
+        """Read an incoming message
+
+        Args:
+            sock (socket.socket): socket to read from
+
+        Returns:
+            bool: Success code
+        """
         # Read RTMA Header Section
         nbytes = sock.recv_into(
             self.header_buffer, self.header_size, socket.MSG_WAITALL
@@ -289,9 +370,9 @@ class MessageManager:
             - if the message has no destination address, it will be forwarded to all subscribed modules
 
         Args:
-            header: Message Header
-            data: Message Data
-            wlist: sockets ready for writing
+            header (MessageHeader): Message Header
+            data (Union[bytes, MessageData]): Message Data
+            wlist (List[socket.socket]): sockets ready for writing
         """
 
         dest_mod_id = header.dest_mod_id
@@ -354,8 +435,18 @@ class MessageManager:
                 self.send_failed_message(module, header, time.perf_counter(), wlist)
 
     def send_to_loggers(
-        self, header: MessageHeader, payload, wlist: List[socket.socket]
+        self,
+        header: MessageHeader,
+        payload: Union[bytes, MessageData],
+        wlist: List[socket.socket],
     ):
+        """Forward message to registered logger modules
+
+        Args:
+            header (MessageHeader): Message header to send
+            payload (Union[bytes, MessageData]): Message data to send
+            wlist (List[socket.socket]): Sockets ready for writing
+        """
         for module in self.logger_modules:
             if module.conn not in wlist:
                 # Block until logger is ready
@@ -370,6 +461,12 @@ class MessageManager:
                 )  # this could result in inifite recursion, this is prevented by send_failed_message returning if failed message type is failed_message.
 
     def send_ack(self, src_module: Module, wlist: List[socket.socket]):
+        """Send ACKNOWLEDGE signal header
+
+        Args:
+            src_module (Module): Module to send ACK to
+            wlist (List[socket.socket]): Sockets ready for writing
+        """
         # src_module.send_ack()
 
         header = self.header_cls()
@@ -396,6 +493,14 @@ class MessageManager:
         time_of_failure: float,
         wlist: List[socket.socket],
     ):
+        """Send FAILED_MESSAGE
+
+        Args:
+            dest_module (Module): Intended destination
+            header (MessageHeader): Header of failed message
+            time_of_failure (float): Time of send failure
+            wlist (List[socket.socket]): Sockets ready for writing
+        """
         out_header = self.header_cls()
         data = cd.MDF_FAILED_MESSAGE()
 
@@ -423,6 +528,11 @@ class MessageManager:
         self.message_counts[out_header.msg_type] += 1
 
     def send_timing_message(self, wlist: List[socket.socket]):
+        """Send TIMING_MESSAGE
+
+        Args:
+            wlist (List[socket.socket]): Sockets ready for writing
+        """
         header = self.header_cls()
         data = cd.MDF_TIMING_MESSAGE()
 
@@ -448,6 +558,12 @@ class MessageManager:
         return Message(hdr, get_msg_cls(hdr.msg_type).from_buffer(self.data_buffer))
 
     def process_message(self, src_module: Module, wlist: List[socket.socket]):
+        """Process incoming message
+
+        Args:
+            src_module (Module): Message source module
+            wlist (List[socket.socket]): Sockets ready for writing
+        """
         hdr = self.header
         msg_type = hdr.msg_type
 
@@ -490,6 +606,7 @@ class MessageManager:
             self.t_last_message_count = time.perf_counter()
 
     def close(self):
+        """Close manager server"""
         self._keep_running = False
 
     def run(self):
