@@ -121,7 +121,10 @@ class PyDefCompiler:
                 elif dtype.startswith("String"):
                     return f":String = String({flen})"
                 elif dtype.startswith("Byte"):
-                    return f":Bytes = Bytes({flen})"
+                    if flen > 1:
+                        return f":Bytes = Bytes({flen})"
+                    else:
+                        return f":Byte = Byte()"
                 else:
                     raise RuntimeError(f"Unknown field descriptor{dtype}")
             else:
@@ -151,46 +154,10 @@ class PyDefCompiler:
             raise RuntimeError(f"Unknown field name {ftype}")
 
     def generate_struct(self, sdf: SDF) -> str:
-        f = []
-        fnum = len(sdf.fields)
-        fstr = "["
         dstr = "\n"
-        if fnum == 0:
-            fstr += "]"
-        else:
-            if fnum > 2:
-                tab = TAB
-                fstr += "\n"
-            else:
-                tab = ""
-
-            for i, field in enumerate(sdf.fields, start=1):
-                flen = field.length or 0
-                nl = ",\n" if fnum > 2 else ", " if i < fnum else ""
-
-                if field.type_name in type_map.keys():
-                    ftype = type_map[field.type_name]
-                elif field.type_name in self.parser.message_defs.keys():
-                    ftype = f"MDF_{field.type_name}"
-                elif field.type_name in self.parser.struct_defs.keys():
-                    ftype = f"{field.type_name}"
-                elif field.type_name in self.parser.aliases.keys():
-                    ftype = f"{field.type_name}"
-                else:
-                    raise RuntimeError(f"Unknown field name {field.name} in {sdf.name}")
-
-                f.append(
-                    f"{tab *4}(\"_{field.name}\", {ftype}{' * ' + str(flen) if flen > 1 else ''}){nl}"
-                )
-
-                desc = self.get_descriptor(field.type_name, flen)
-                dstr += f"{'    ' * 3}{field.name}{desc}\n"
-
-            fstr += "".join(f)
-            if fnum > 2:
-                fstr += f"{tab * 3}]"
-            else:
-                fstr += "]"
+        for field in sdf.fields:
+            desc = self.get_descriptor(field.type_name, field.length or 0)
+            dstr += f"{'    ' * 3}{field.name}{desc}\n"
 
         msg_src = sdf.src.as_posix()
         type_def_str = repr(sdf.raw)
@@ -204,7 +171,6 @@ class PyDefCompiler:
 
         template = f"""\
         class {sdf.name}(MessageBase):
-            _fields_ = {fstr}
             type_name: ClassVar[str] = \"{sdf.name}\"
             type_hash: ClassVar[int] = 0x{sdf.hash[:8].upper()}
             type_size: ClassVar[int] = {sdf.size}
@@ -216,45 +182,10 @@ class PyDefCompiler:
         return dedent(template)
 
     def generate_msg_def(self, mdf: MDF) -> str:
-        f = []
-        fnum = len(mdf.fields)
         dstr = "\n"
-        fstr = "["
-        if fnum == 0:
-            fstr += "]"
-        else:
-            if fnum > 2:
-                tab = TAB
-                fstr += "\n"
-            else:
-                tab = ""
-            for i, field in enumerate(mdf.fields, start=1):
-                flen = field.length or 0
-                nl = ",\n" if fnum > 2 else ", " if i < fnum else ""
-
-                if field.type_name in type_map.keys():
-                    ftype = type_map[field.type_name]
-                elif field.type_name in self.parser.message_defs.keys():
-                    ftype = f"MDF_{field.type_name}"
-                elif field.type_name in self.parser.struct_defs.keys():
-                    ftype = f"{field.type_name}"
-                elif field.type_name in self.parser.aliases.keys():
-                    ftype = f"{field.type_name}"
-                else:
-                    raise RuntimeError(f"Unknown field name {field.name} in {mdf.name}")
-
-                f.append(
-                    f"{tab *4}(\"_{field.name}\", {ftype}{' * ' + str(flen) if flen > 1 else ''}){nl}"
-                )
-
-                desc = self.get_descriptor(field.type_name, flen)
-                dstr += f"{'    ' * 3}{field.name}{desc}\n"
-
-            fstr += "".join(f)
-            if fnum > 2:
-                fstr += f"{tab * 3}]"
-            else:
-                fstr += "]"
+        for field in mdf.fields:
+            desc = self.get_descriptor(field.type_name, field.length or 0)
+            dstr += f"{'    ' * 3}{field.name}{desc}\n"
 
         msg_id = mdf.type_id
         msg_src = mdf.src.as_posix()
@@ -270,7 +201,6 @@ class PyDefCompiler:
         template = f"""\
         @pyrtma.message_def
         class MDF_{mdf.name}(MessageData):
-            _fields_ = {fstr}
             type_id: ClassVar[int] = {msg_id}
             type_name: ClassVar[str] = \"{mdf.name}\"
             type_hash: ClassVar[int] = 0x{mdf.hash[:8].upper()}
