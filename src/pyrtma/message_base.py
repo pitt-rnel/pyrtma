@@ -122,6 +122,15 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         obj = _random_struct(cls())
         return obj
 
+    @classmethod
+    def copy(cls: Type[MB], m: MB) -> MB:
+        """Generate a copy of a message structure
+
+        Args:
+            m: Message structure to copy
+        """
+        return cls.from_buffer_copy(m)
+
     def __str__(self) -> str:
         return self.pretty_print()
 
