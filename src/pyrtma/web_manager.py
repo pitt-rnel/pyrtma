@@ -5,7 +5,7 @@ import errno
 import struct
 
 from pyrtma.client import Client
-from pyrtma.message import RTMAMessageError
+from pyrtma.exceptions import RTMAMessageError
 
 from socket import error as SocketError
 from socketserver import TCPServer
