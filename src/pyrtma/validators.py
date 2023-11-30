@@ -25,6 +25,7 @@ __all__ = [
     "Int16",
     "Int32",
     "Int64",
+    "Byte",
     "Uint8",
     "Uint16",
     "Uint32",
