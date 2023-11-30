@@ -550,7 +550,7 @@ class MessageManager:
                 mod.close()
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-a",
@@ -588,3 +588,7 @@ if __name__ == "__main__":
     )
 
     msg_mgr.run()
+
+
+if __name__ == "__main__":
+    main()

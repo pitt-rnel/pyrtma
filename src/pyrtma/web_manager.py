@@ -200,7 +200,7 @@ def ws_client_disconnect(client, server):
     print(f"Client disconnected -> id:{client['id']}")
 
 
-if __name__ == "__main__":
+def main():
     import argparse
     import importlib
     import pathlib
@@ -258,3 +258,7 @@ if __name__ == "__main__":
     importlib.import_module(fname)
 
     websocket_server.run_forever()
+
+
+if __name__ == "__main__":
+    main()

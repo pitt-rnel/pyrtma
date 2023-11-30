@@ -40,3 +40,8 @@ pyrtma = ["py.typed", "*.yaml"]
 [project.urls]
 "Homepage" = "https://github.com/pitt-rnel/pyrtma"
 "Bug Tracker" = "https://github.com/pitt-rnel/pyrtma/issues"
+
+[project.scripts]
+message_manager = "pyrtma.manager:main"
+web_manager = "pyrtma.web_manager:main"
+rtma_compiler = "pyrtma.compile:main"

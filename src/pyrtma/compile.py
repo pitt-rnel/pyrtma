@@ -141,7 +141,7 @@ def compile(
     print("DONE.")
 
 
-if __name__ == "__main__":
+def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="pyrtma Message Definition Compiler.")
@@ -242,3 +242,7 @@ if __name__ == "__main__":
         raise
 
     sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
