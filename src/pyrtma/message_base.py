@@ -176,7 +176,7 @@ class RTMAJSONEncoder(json.JSONEncoder):
         if isinstance(o, ctypes.Array):
             return list(o)
 
-        if isinstance(o, bytes):
+        if isinstance(o, (bytes, bytearray)):
             return [int(x) for x in o]
 
         return super().default(o)
@@ -184,7 +184,7 @@ class RTMAJSONEncoder(json.JSONEncoder):
 
 def _from_dict(obj, data):
     for _name, ftype in obj._fields_:
-        name = _name[1:]
+        name = _name[1:] if _name[0] == "_" else _name
         if issubclass(ftype, MessageBase):
             _from_dict(getattr(obj, name), data[name])
         elif issubclass(ftype, ctypes.Array):
@@ -212,8 +212,12 @@ def _to_dict(obj) -> Dict[str, Any]:
                     data[name].append(_to_dict(elem))
             elif ftype._type_ is ctypes.c_char:
                 data[name] = getattr(obj, name)
+            elif ftype._type_ is ctypes.c_ubyte:
+                data[name] = getattr(obj, name)[:].copy()
             else:
                 data[name] = getattr(obj, name)[:]
+        elif ftype is ctypes.c_ubyte:
+            data[name] = int.from_bytes(getattr(obj, name), "little")
         else:
             data[name] = getattr(obj, name)
 
