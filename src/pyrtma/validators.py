@@ -32,9 +32,10 @@ __all__ = [
     "Uint64",
     "Float",
     "Double",
-    "String",
-    "Bytes",
+    "Char",
     "Struct",
+    "String",
+    "ByteArray",
     "IntArray",
     "FloatArray",
     "StructArray",
@@ -475,12 +476,12 @@ class Byte(Uint8, Generic[_P]):
         ...
 
     @overload
-    def __new__(cls, length: int) -> Bytes:
+    def __new__(cls, length: int) -> ByteArray:
         ...
 
     def __new__(cls, length=1):
         if length > 1:
-            return Bytes(length)
+            return ByteArray(length)
         else:
             return super().__new__(cls)
 
@@ -550,22 +551,34 @@ class Byte(Uint8, Generic[_P]):
         return f"Byte(len=1) at 0x{id(self):016X}"
 
 
-class String(FieldValidator[_P, str], Generic[_P]):
-    """Validator for strings (char arrays)"""
+class Char(FieldValidator[_P, str], Generic[_P]):
+    """Validator for scalar char values"""
 
-    def __init__(self, len: int = 1):
-        self.len = len
-        if len > 1:
-            self._ctype = ctypes.c_char * len
+    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_char
+
+    @overload
+    def __new__(cls) -> Char:
+        ...
+
+    @overload
+    def __new__(cls, length: int) -> String:
+        ...
+
+    def __new__(cls, length=1):
+        if length > 1:
+            return String(length)
         else:
-            self._ctype = ctypes.c_char
+            return super().__new__(cls)
+
+    def __init__(self):
+        self.len = 1
 
     def __get__(self, obj: _P, objtype=None) -> str:
-        return getattr(obj, self.private_name).decode()
+        return getattr(obj, self.private_name).decode("ascii")
 
     def __set__(self, obj: _P, value: str):
         self.validate_one(value)
-        setattr(obj, self.private_name, value.encode())
+        setattr(obj, self.private_name, value.encode("ascii"))
 
     def validate_one(self, value: str):
         """Validate a string value
@@ -582,6 +595,57 @@ class String(FieldValidator[_P, str], Generic[_P]):
 
         if len(value) > self.len:
             raise ValueError(f'Expected "{value}" to be no longer than {self.len}')
+
+        if any(ord(c) > 127 for c in value):
+            raise TypeError(f"Expected {value} to be a valid ascii point")
+
+    def validate_many(self, value):
+        """Validate multiple strings
+
+        Not implemented
+
+        Raises:
+            NotImplementedError
+        """
+        raise NotImplementedError
+
+    def __repr__(self):
+        return f"Char() at 0x{id(self):016X}"
+
+
+class String(FieldValidator[_P, str], Generic[_P]):
+    """Validator for strings (char arrays)"""
+
+    def __init__(self, len: int):
+        assert len > 1
+        self.len = len
+        self._ctype = ctypes.c_char * len
+
+    def __get__(self, obj: _P, objtype=None) -> str:
+        return getattr(obj, self.private_name).decode("ascii")
+
+    def __set__(self, obj: _P, value: str):
+        self.validate_one(value)
+        setattr(obj, self.private_name, value.encode("ascii"))
+
+    def validate_one(self, value: str):
+        """Validate a string value
+
+        Args:
+            value (str): String value
+
+        Raises:
+            TypeError: Wrong type
+            ValueError: String exceeds max length
+        """
+        if not isinstance(value, str):
+            raise TypeError(f"Expected {value} to be an str")
+
+        if len(value) > self.len:
+            raise ValueError(f'Expected "{value}" to be no longer than {self.len}')
+
+        if any(ord(c) > 127 for c in value):
+            raise TypeError(f"Expected {value} to only containt valid ascii points")
 
     def validate_many(self, value):
         """Validate multiple strings
@@ -763,7 +827,7 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
 _FPV = TypeVar("_FPV", bound=FloatValidatorBase)
 
 
-class Bytes(ArrayField[Byte]):
+class ByteArray(ArrayField[Byte]):
     """Validator class for Bytes arrays"""
 
     def __init__(self, len: int):
@@ -772,13 +836,14 @@ class Bytes(ArrayField[Byte]):
         Args:
             len (int): Byte array length
         """
+        assert len > 1
         self._validator = Byte()
         self._len = len
         self._bound_obj: Optional[MessageBase] = None
         self._ctype = ctypes.c_ubyte * len
 
     @classmethod
-    def _bound(cls, obj: Bytes, bound_obj: MessageBase) -> Bytes:
+    def _bound(cls, obj: ByteArray, bound_obj: MessageBase) -> ByteArray:
         new_obj = super().__new__(cls)
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
@@ -789,11 +854,11 @@ class Bytes(ArrayField[Byte]):
 
         return new_obj
 
-    def __get__(self, obj: MessageBase, objtype=None) -> Bytes:
-        return Bytes._bound(self, obj)
+    def __get__(self, obj: MessageBase, objtype=None) -> ByteArray:
+        return ByteArray._bound(self, obj)
         # return getattr(obj, self.private_name)
 
-    def __set__(self, obj: MessageBase, value: Bytes):
+    def __set__(self, obj: MessageBase, value: ByteArray):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
@@ -835,7 +900,7 @@ class Bytes(ArrayField[Byte]):
         getattr(self._bound_obj, self.private_name)[key] = value
 
     def __repr__(self) -> str:
-        return f"Bytes(len={self._len}) at 0x{id(self):016X}"
+        return f"ByteArray(len={self._len}) at 0x{id(self):016X}"
 
     # def __set__(self, obj: _P, value: int):
     #    self.validate_one(value)

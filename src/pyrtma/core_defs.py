@@ -21,9 +21,10 @@ from pyrtma.validators import (
     IntArray,
     FloatArray,
     StructArray,
+    Char,
     String,
     Byte,
-    Bytes,
+    ByteArray,
 )
 
 
@@ -256,7 +257,7 @@ class MDF_SAVE_MESSAGE_LOG(MessageData):
         str
     ] = "'SAVE_MESSAGE_LOG:\n  id: 56\n  fields:\n    pathname: char[MAX_LOGGER_FILENAME_LENGTH]\n    pathname_length: int'"
 
-    pathname: String = String(256)
+    pathname: String = Char(256)
     pathname_length: Int32 = Int32()
 
 

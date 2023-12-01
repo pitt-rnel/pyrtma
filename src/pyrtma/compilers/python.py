@@ -51,7 +51,7 @@ type_map = {
 }
 
 desctype_map = {
-    "char": "String",
+    "char": "Char",
     "byte": "Byte",
     "unsigned char": "Byte",
     "float": "Float",
@@ -113,23 +113,23 @@ class PyDefCompiler:
     def get_descriptor(self, ftype: str, flen: int) -> str:
         if ftype in type_map.keys():
             dtype = desctype_map[ftype]
-            if flen > 1:
-                if dtype.startswith("Int") or dtype.startswith("Uint"):
-                    return f":IntArray[{dtype}] = {dtype}({flen})"
-                elif dtype.startswith("Float") or dtype.startswith("Double"):
-                    return f":FloatArray[{dtype}] = {dtype}({flen})"
-                elif dtype.startswith("String"):
-                    return f":String = String({flen})"
-                elif dtype.startswith("Byte"):
-                    if flen > 1:
-                        return f":Bytes = Bytes({flen})"
-                    else:
-                        return f":Byte = Byte()"
-                else:
-                    raise RuntimeError(f"Unknown field descriptor{dtype}")
-            else:
+            # Scalar Field
+            if flen <= 1:
                 return f":{dtype} = {dtype}()"
 
+            # Array Field
+            if dtype.startswith("Int") or dtype.startswith("Uint"):
+                return f":IntArray[{dtype}] = {dtype}({flen})"
+            elif dtype.startswith("Float") or dtype.startswith("Double"):
+                return f":FloatArray[{dtype}] = {dtype}({flen})"
+            elif dtype.startswith("Char"):
+                return f":String = Char({flen})"
+            elif dtype.startswith("Byte"):
+                return f":ByteArray = Byte({flen})"
+            else:
+                raise RuntimeError(f"Unknown field descriptor {dtype}")
+
+        # Message Def (Struct) Field
         elif ftype in self.parser.message_defs.keys():
             ftype = f"MDF_{ftype}"
             return (
@@ -138,6 +138,7 @@ class PyDefCompiler:
                 else f":StructArray[{ftype}] = StructArray({ftype}, {flen})"
             )
 
+        # Struct Field
         elif ftype in self.parser.struct_defs.keys():
             ftype = f"{ftype}"
             return (
@@ -146,6 +147,7 @@ class PyDefCompiler:
                 else f":StructArray[{ftype}] = StructArray({ftype}, {flen})"
             )
 
+        # Alias Field
         elif ftype in self.parser.aliases.keys():
             ftype = self.parser.aliases[ftype].type_name
             return self.get_descriptor(ftype, flen)
@@ -225,7 +227,7 @@ class PyDefCompiler:
 
         from pyrtma.message_base import MessageBase
         from pyrtma.message_data import MessageData
-        from pyrtma.validators import Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float, Double, Struct, IntArray, FloatArray, StructArray, String, Byte, Bytes
+        from pyrtma.validators import Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float, Double, Struct, IntArray, FloatArray, StructArray, Char, String, Byte, ByteArray
         
         """
         return dedent(s)
