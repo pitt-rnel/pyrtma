@@ -551,68 +551,6 @@ class Byte(Uint8, Generic[_P]):
         return f"Byte(len=1) at 0x{id(self):016X}"
 
 
-class Char(FieldValidator[_P, str], Generic[_P]):
-    """Validator for scalar char values"""
-
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_char
-
-    @overload
-    def __new__(cls) -> Char:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> String:
-        ...
-
-    def __new__(cls, length=1):
-        if length > 1:
-            return String(length)
-        else:
-            return super().__new__(cls)
-
-    def __init__(self):
-        self.len = 1
-
-    def __get__(self, obj: _P, objtype=None) -> str:
-        return getattr(obj, self.private_name).decode("ascii")
-
-    def __set__(self, obj: _P, value: str):
-        self.validate_one(value)
-        setattr(obj, self.private_name, value.encode("ascii"))
-
-    def validate_one(self, value: str):
-        """Validate a string value
-
-        Args:
-            value (str): String value
-
-        Raises:
-            TypeError: Wrong type
-            ValueError: String exceeds max length
-        """
-        if not isinstance(value, str):
-            raise TypeError(f"Expected {value} to be an str")
-
-        if len(value) > self.len:
-            raise ValueError(f'Expected "{value}" to be no longer than {self.len}')
-
-        if any(ord(c) > 127 for c in value):
-            raise TypeError(f"Expected {value} to be a valid ascii point")
-
-    def validate_many(self, value):
-        """Validate multiple strings
-
-        Not implemented
-
-        Raises:
-            NotImplementedError
-        """
-        raise NotImplementedError
-
-    def __repr__(self):
-        return f"Char() at 0x{id(self):016X}"
-
-
 class String(FieldValidator[_P, str], Generic[_P]):
     """Validator for strings (char arrays)"""
 
@@ -639,7 +577,7 @@ class String(FieldValidator[_P, str], Generic[_P]):
             ValueError: String exceeds max length
         """
         if not isinstance(value, str):
-            raise TypeError(f"Expected {value} to be an str")
+            raise TypeError(f"Expected {value} to be a str")
 
         if len(value) > self.len:
             raise ValueError(f'Expected "{value}" to be no longer than {self.len}')
@@ -662,6 +600,31 @@ class String(FieldValidator[_P, str], Generic[_P]):
 
 
 _FV = TypeVar("_FV", bound=FieldValidator)
+
+
+class Char(String):
+    """Validator for scalar char values"""
+
+    @overload
+    def __new__(cls) -> Char:
+        ...
+
+    @overload
+    def __new__(cls, length: int) -> String:
+        ...
+
+    def __new__(cls, length=1):
+        if length > 1:
+            return String(length)
+        else:
+            return super().__new__(cls)
+
+    def __init__(self):
+        self._ctype = ctypes.c_char
+        self.len = 1
+
+    def __repr__(self):
+        return f"Char() at 0x{id(self):016X}"
 
 
 class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
