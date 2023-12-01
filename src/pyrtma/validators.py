@@ -902,36 +902,6 @@ class ByteArray(ArrayField[Byte]):
     def __repr__(self) -> str:
         return f"ByteArray(len={self._len}) at 0x{id(self):016X}"
 
-    # def __set__(self, obj: _P, value: int):
-    #    self.validate_one(value)
-    #    if self.len == 1 and isinstance(value, bytes):
-    #        int_value = int.from_bytes(value, "little")
-    #        setattr(obj, self.private_name, int_value)
-    #        return
-    #    setattr(obj, self.private_name, value)
-
-    # def validate_one(self, value: Union[int, bytes]):
-    #    if isinstance(value, int):
-    #        if value < self._min:
-    #            raise ValueError(f"Expected {value} to be at least {self._min}")
-    #        if value > self._max:
-    #            raise ValueError(f"Expected {value} to be no more than {self._max}")
-    #        return
-
-
-#
-#    if not isinstance(value, (bytes, bytearray)):
-#        raise TypeError(f"Expected {value} to be bytes")
-#
-#    if len(value) > self.len:
-#        raise ValueError(f"Expected {value} to be no bigger than {self.len}")
-
-# def validate_many(self, value):
-#    raise NotImplementedError
-
-# def __repr__(self):
-#    return f"Bytes(len={self.len}) at 0x{id(self):016X}"
-
 
 class FloatArray(ArrayField[_FPV], Generic[_FPV]):
     """Validator class for float arrays"""
