@@ -3,6 +3,10 @@ import logging
 import select
 import errno
 import struct
+import argparse
+import importlib
+import pathlib
+import sys
 
 from pyrtma.client import Client
 from pyrtma.exceptions import RTMAMessageError
@@ -255,9 +259,7 @@ def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
 
 
 def main():
-    import argparse
-    import importlib
-    import pathlib
+    """Main function for starting web_manager"""
 
     parser = argparse.ArgumentParser(description="Touch Demo Server Application")
 
@@ -267,7 +269,7 @@ def main():
         default="127.0.0.1:7111",
         dest="mm_ip",
         type=str,
-        help="Ip address of message manager. Defaults to using 127.0.0.1:7111.",
+        help="IP address of Message Manager. Defaults to 127.0.0.1:7111.",
     )
 
     parser.add_argument(
@@ -275,7 +277,7 @@ def main():
         default="127.0.0.1",
         dest="host",
         type=str,
-        help="Host ip address.",
+        help="Host IP address, defaults to 127.0.0.1.",
     )
 
     parser.add_argument(
@@ -284,7 +286,7 @@ def main():
         default=5678,
         dest="port",
         type=int,
-        help="Port to listen for websocket clients.",
+        help="Port to listen for websocket clients. Defaults to 5678.",
     )
 
     parser.add_argument(
@@ -292,8 +294,12 @@ def main():
         "--defs",
         dest="defs_file",
         type=str,
-        help="Path to python message definitions file.",
+        help="Path to python message definitions file. Required argument.",
     )
+
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
     args = parser.parse_args()
 
     websocket_server = WebMessageManager(
@@ -305,8 +311,6 @@ def main():
 
     base = pathlib.Path(args.defs_file).absolute().parent
     fname = pathlib.Path(args.defs_file).stem
-
-    import sys
 
     sys.path.insert(0, (str(base.absolute())))
     importlib.import_module(fname)
