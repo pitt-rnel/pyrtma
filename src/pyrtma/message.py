@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
+from .message_base import RTMAJSONEncoder
 from .exceptions import InvalidMessageDefinition, UnknownMessageType
 
 __all__ = [
@@ -112,9 +113,11 @@ class Message:
         """
         d = dict(header=self.header.to_dict(), data=self.data.to_dict())
         if minify:
-            return json.dumps(d, separators=(",", ":"), **kwargs)
+            return json.dumps(
+                self, cls=RTMAJSONEncoder, separators=(",", ":"), **kwargs
+            )
         else:
-            return json.dumps(self, indent=2, **kwargs)
+            return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
 
     @classmethod
     def from_json(cls, s: str) -> Message:

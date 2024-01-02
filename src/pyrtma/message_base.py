@@ -1,6 +1,6 @@
 import ctypes
 import json
-
+from dataclasses import is_dataclass
 from typing import TypeVar, Any, Type, Dict
 from .utils.print import print_ctype_array, hexdump
 from .utils.random_fields import _random_struct
@@ -248,7 +248,7 @@ class RTMAJSONEncoder(json.JSONEncoder):
         Returns:
             Any: Serializable data
         """
-        if isinstance(o, MessageBase):
+        if isinstance(o, MessageBase) or (is_dataclass(o) and hasattr(o, "to_dict")):
             return o.to_dict()
 
         if isinstance(o, ctypes.Array):
