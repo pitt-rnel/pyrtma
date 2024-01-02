@@ -17,6 +17,8 @@ from typing import (
     Type,
 )
 from abc import abstractmethod, ABCMeta
+import numbers
+
 
 from .message_base import MessageBase
 
@@ -96,7 +98,7 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
             TypeError: Wrong type
             ValueError: Value cannot be precisely represented with this datatype
         """
-        if not isinstance(value, (float, int)):
+        if not isinstance(value, numbers.Number):
             raise TypeError(f"Expected {value} to be a float")
 
         if not math.isclose(self._ctype(value).value, value, rel_tol=1e-6):
@@ -114,7 +116,7 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
             TypeError: Wrong type
             ValueError: Value cannot be precisely represented with this datatype
         """
-        if any(not isinstance(v, (float, int)) for v in value):
+        if any(not isinstance(v, numbers.Number) for v in value):
             raise TypeError(f"Expected {value!r} to be a float.")
 
         if any(not math.isclose(self._ctype(v).value, v, rel_tol=1e-6) for v in value):
@@ -219,7 +221,7 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
             TypeError: Wrong type
             ValueError: Integer out of range for this datatype
         """
-        if not isinstance(value, int):
+        if not isinstance(value, numbers.Integral):
             raise TypeError(f"Expected {value} to be an int")
 
         if value < self._min:
@@ -237,7 +239,7 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
             TypeError: Wrong type
             ValueError: Integer out of range for this datatype
         """
-        if any(not isinstance(v, int) for v in value):
+        if any(not isinstance(v, numbers.Integral) for v in value):
             raise TypeError(f"Expected {value} to be an int.")
 
         if any((v < self._min for v in value)):
