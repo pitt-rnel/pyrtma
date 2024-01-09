@@ -198,7 +198,7 @@ class WebMessageManager(WebsocketServer):
 
     def __init__(
         self,
-        host="127.0.0.1",
+        host="",
         port=0,
         mm_ip: str = "127.0.0.1:7111",
         loglevel: int = logging.WARNING,
@@ -208,7 +208,7 @@ class WebMessageManager(WebsocketServer):
         """WebMessageManager class
 
         Args:
-            host (str, optional): IP for WebMessageManager to listen for connections. Defaults to "127.0.0.1".
+            host (str, optional): IP for WebMessageManager to listen for connections. Defaults to "" (any local IP).
             port (int, optional): Port for WebMessageManager to bind to. Defaults to 0.
             mm_ip (str, optional): Address for RTMA MessageManager. Defaults to "127.0.0.1:7111".
             loglevel (int, optional): Loging level. Defaults to logging.WARNING.
@@ -261,7 +261,7 @@ def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
 def main():
     """Main function for starting web_manager"""
 
-    parser = argparse.ArgumentParser(description="Touch Demo Server Application")
+    parser = argparse.ArgumentParser(description="Websocket Message Manager")
 
     parser.add_argument(
         "-m",
@@ -274,10 +274,10 @@ def main():
 
     parser.add_argument(
         "--host",
-        default="127.0.0.1",
+        default="",
         dest="host",
         type=str,
-        help="Host IP address, defaults to 127.0.0.1.",
+        help='Host IP address, defaults to "" (any local IP).',
     )
 
     parser.add_argument(
