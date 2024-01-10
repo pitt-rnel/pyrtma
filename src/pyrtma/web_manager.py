@@ -10,6 +10,7 @@ import sys
 
 from pyrtma.client import Client
 from pyrtma.exceptions import RTMAMessageError
+import pyrtma.core_defs as cd
 
 from socket import error as SocketError
 from socketserver import TCPServer
@@ -82,7 +83,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
             if self.rfile in rd:
                 self.read_ws_message()
 
-            if self.proxy.sock in rd:
+            if self.proxy.sock in rd and self.proxy.connected:
                 try:
                     msg = self.proxy.read_message(timeout=None)
                 except RTMAMessageError as e:
@@ -119,7 +120,11 @@ class RTMAWebSocketHandler(WebSocketHandler):
             logger.error(e, stack_info=False)
             return
 
-        self.proxy.forward_message(msg.header, msg.data or None)
+        if msg.header.msg_type == cd.MT_DISCONNECT:
+            self.proxy.disconnect()
+            logger.debug("Received disconnect, disconnected proxy from MM.")
+        else:
+            self.proxy.forward_message(msg.header, msg.data or None)
 
     def read_ws_message(self) -> Optional[str]:
         """Read websocket message
@@ -255,7 +260,7 @@ def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
         client (Dict[str, Any]): Client dictionary
         server: WebMessageManager Server object
     """
-    print(f"Client disconnected -> id:{client['id']}")
+    print(f"Client disconnected -> id:{client['id']}\n")
 
 
 def main():
