@@ -111,6 +111,7 @@ class Client(object):
         self._recv_buffer = bytearray(1024**2)
         self._subscribed_types: Set[int] = set()
         self._paused_types: Set[int] = set()
+        self._dynamic_id: bool = module_id == 0
 
     def __del__(self):
         if self._connected:
@@ -168,6 +169,10 @@ class Client(object):
         # Setup the underlying socket connection
         self._socket_connect(server_name)
 
+        # Reset the module_id to zero for dynamic assignment
+        if self._dynamic_id:
+            self._module_id = 0
+
         msg = cd.MDF_CONNECT()
         msg.logger_status = int(logger_status)
         msg.daemon_status = int(daemon_status)
@@ -188,9 +193,6 @@ class Client(object):
         try:
             if self._connected:
                 self.send_signal(cd.MT_DISCONNECT)
-                ack_msg = self.wait_for_acknowledgement(timeout=0.5)
-        except AcknowledgementTimeout:
-            pass
         finally:
             self._sock.close()
             self._connected = False
