@@ -141,7 +141,7 @@ class Float(FloatValidatorBase):
     def __new__(cls, length: int) -> FloatArray[Float]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length: int = 1) -> Union[Float, FloatArray[Float]]:
         if length > 1:
             return FloatArray(Float, length)
         else:
@@ -164,7 +164,7 @@ class Double(FloatValidatorBase):
     def __new__(cls, length: int) -> FloatArray[Double]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Double, FloatArray[Double]]:
         if length > 1:
             return FloatArray(Double, length)
         else:
@@ -269,7 +269,7 @@ class Int8(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Int8]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Int8, IntArray[Int8]]:
         if length > 1:
             return IntArray(Int8, length)
         else:
@@ -296,7 +296,7 @@ class Int16(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Int16]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Int16, IntArray[Int16]]:
         if length > 1:
             return IntArray(Int16, length)
         else:
@@ -323,7 +323,7 @@ class Int32(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Int32]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Int32, IntArray[Int32]]:
         if length > 1:
             return IntArray(Int32, length)
         else:
@@ -350,7 +350,7 @@ class Int64(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Int64]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Int64, IntArray[Int64]]:
         if length > 1:
             return IntArray(Int64, length)
         else:
@@ -377,7 +377,7 @@ class Uint8(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Uint8]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Uint8, IntArray[Uint8]]:
         if length > 1:
             return IntArray(Uint8, length)
         else:
@@ -404,7 +404,7 @@ class Uint16(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Uint16]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Uint16, IntArray[Uint16]]:
         if length > 1:
             return IntArray(Uint16, length)
         else:
@@ -431,7 +431,7 @@ class Uint32(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Uint32]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Uint32, IntArray[Uint32]]:
         if length > 1:
             return IntArray(Uint32, length)
         else:
@@ -458,7 +458,7 @@ class Uint64(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Uint64]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Uint64, IntArray[Uint64]]:
         if length > 1:
             return IntArray(Uint64, length)
         else:
@@ -935,7 +935,7 @@ class Struct(FieldValidator, Generic[_S]):
     def __new__(cls, _ctype: Type[_S], length: int) -> StructArray[_S]:
         ...
 
-    def __new__(cls, _ctype: Type[_S], length=1):
+    def __new__(cls, _ctype: Type[_S], length=1) -> Union[Struct, StructArray[_S]]:
         if length > 1:
             return StructArray(_ctype, length)
         else:
