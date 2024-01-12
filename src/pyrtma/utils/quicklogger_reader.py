@@ -27,14 +27,14 @@ class QLReader:
         self.defs_path = None
         self.file_header = QLFileHeader()
         self.headers: List[MessageHeader] = []
-        self.data: List[MessageData] = []
+        self.data: List[Union[MessageData, object]] = []
 
     def clear(self):
         self.file_path = None
         self.defs_path = None
         self.file_header = QLFileHeader()
         self.headers: List[MessageHeader] = []
-        self.data: List[MessageData] = []
+        self.data: List[Union[MessageData, object]] = []
 
     def load(self, binfile: Union[str, os.PathLike], msgdefs: Union[str, os.PathLike]):
         self.defs_path = pathlib.Path(msgdefs)
@@ -47,7 +47,7 @@ class QLReader:
         importlib.import_module(fname)
 
         headers = []
-        data = []
+        data: List[Union[MessageData, object]] = []
         with open(self.file_path, "rb") as f:
             # Parse binary file header
             file_header = QLFileHeader.from_buffer_copy(
@@ -108,21 +108,19 @@ class QLReader:
         with open(save_path, "w") as f:
             for header, data in zip(self.headers, self.data, strict=True):
                 # Skip any messages that could not be decoded
-                if data is UKNOWN_MESSAGE_DEF:
-                    continue
+                if isinstance(data, MessageData):  # not UKNOWN_MESSAGE_DEF:
+                    # Open json object
+                    f.write("{")
 
-                # Open json object
-                f.write("{")
+                    # Header json object
+                    f.write('"header":')
+                    f.write(header.to_json(minify=True))
 
-                # Header json object
-                f.write('"header":')
-                f.write(header.to_json(minify=True))
+                    f.write(",")
 
-                f.write(",")
+                    # Data json object
+                    f.write('"data":')
+                    f.write(data.to_json(minify=True))
 
-                # Data json object
-                f.write('"data":')
-                f.write(data.to_json(minify=True))
-
-                # Close json object
-                f.write("}\n")
+                    # Close json object
+                    f.write("}\n")
