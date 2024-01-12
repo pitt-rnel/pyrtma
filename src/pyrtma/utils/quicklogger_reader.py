@@ -7,7 +7,7 @@ import pyrtma
 import base64
 import json
 
-from typing import List, Union
+from typing import List, Union, Optional
 from ..message import MessageData, MessageHeader
 
 
@@ -42,9 +42,9 @@ class QLFileHeader(ctypes.Structure):
 
 
 class QLReader:
-    def __init__(self):
-        self.file_path = None
-        self.defs_path = None
+    def __init__(self) -> None:
+        self.file_path: Optional[pathlib.Path] = None
+        self.defs_path: Optional[pathlib.Path] = None
         self.file_header = QLFileHeader()
         self.headers: List[MessageHeader] = []
         self.data: List[Union[MessageData, UnknownMessageData]] = []
@@ -95,6 +95,7 @@ class QLReader:
                 msg_cls = pyrtma.msg_defs.get(header.msg_type)
                 raw_bytes = d[offset : offset + header.num_data_bytes]
 
+                msg: Union[UnknownMessageData, MessageData]
                 if msg_cls is None:
                     print(f"Unknown message definition: MT={header.msg_type}")
                     msg = UnknownMessageData(raw_bytes)

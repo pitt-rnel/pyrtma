@@ -1,8 +1,8 @@
 from typing import ClassVar
-from .message_base import MessageBase
+from .message_base import MessageBase, MessageMeta
 
 
-class MessageData(MessageBase):
+class MessageData(MessageBase, metaclass=MessageMeta):
     """MessageData base class
 
     This is intended to be treated as an abstract class and
