@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 
 from typing import Type, Dict, Any, TypeVar
-from dataclasses import dataclass
 
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
