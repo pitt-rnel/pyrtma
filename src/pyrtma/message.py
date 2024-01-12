@@ -58,13 +58,10 @@ def get_msg_cls(id: int) -> Type[MessageData]:
 
 
 class Message:
-    """Message dataclass
+    """Message class
 
     Contains message header and data
     """
-
-    header: MessageHeader
-    data: MessageData
 
     def __init__(self, header: MessageHeader, data: MessageData):
         self.header = header
