@@ -15,7 +15,18 @@ from .exceptions import InvalidMessageDefinition
 from . import core_defs as cd
 
 from functools import wraps
-from typing import Optional, Tuple, Type, Union, Iterable, Set
+from typing import (
+    Optional,
+    Tuple,
+    Type,
+    Union,
+    Iterable,
+    Set,
+    Callable,
+    Any,
+    TypeVar,
+    cast,
+)
 from warnings import warn
 
 __all__ = [
@@ -72,17 +83,20 @@ class InvalidDestinationHost(ClientError):
     pass
 
 
-def requires_connection(func):
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+def requires_connection(func: F) -> F:
     """Decorator wrapper for Client methods that require a connection"""
 
     @wraps(func)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self, *args, **kwargs) -> F:
         if not self.connected:
             raise NotConnectedError
         else:
             return func(self, *args, **kwargs)
 
-    return wrapper
+    return cast(F, wrapper)
 
 
 class Client(object):
