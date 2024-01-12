@@ -68,3 +68,6 @@ class TestEncoding(unittest.TestCase):
                 # Unsubscribe from message type
                 subscriber.unsubscribe([mdf.type_id])
                 subscriber.wait_for_acknowledgement()
+
+        subscriber.disconnect()
+        publisher.disconnect()
