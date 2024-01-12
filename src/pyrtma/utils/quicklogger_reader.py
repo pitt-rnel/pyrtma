@@ -4,10 +4,30 @@ import os
 import sys
 import importlib
 import pyrtma
+import base64
+import json
+
 from typing import List, Union
 from ..message import MessageData, MessageHeader
 
-UKNOWN_MESSAGE_DEF = object()
+
+class UnknownMessageData:
+    def __init__(self, raw: bytes):
+        self._data = raw
+
+    @property
+    def data(self) -> bytes:
+        return self._data
+
+    def to_b64(self) -> str:
+        return base64.b64encode(self._data).decode()
+
+    def to_json(self, minify=True, **kwargs) -> str:
+        d = dict(_raw=self.to_b64())
+        if minify:
+            return json.dumps(d, separators=(",", ":"))
+        else:
+            return json.dumps(d, indent=2)
 
 
 class QLFileHeader(ctypes.Structure):
@@ -27,14 +47,14 @@ class QLReader:
         self.defs_path = None
         self.file_header = QLFileHeader()
         self.headers: List[MessageHeader] = []
-        self.data: List[Union[MessageData, object]] = []
+        self.data: List[Union[MessageData, UnknownMessageData]] = []
 
     def clear(self):
         self.file_path = None
         self.defs_path = None
         self.file_header = QLFileHeader()
-        self.headers: List[MessageHeader] = []
-        self.data: List[Union[MessageData, object]] = []
+        self.headers.clear()
+        self.data.clear()
 
     def load(self, binfile: Union[str, os.PathLike], msgdefs: Union[str, os.PathLike]):
         self.defs_path = pathlib.Path(msgdefs)
@@ -47,7 +67,7 @@ class QLReader:
         importlib.import_module(fname)
 
         headers = []
-        data: List[Union[MessageData, object]] = []
+        data: List[Union[MessageData, UnknownMessageData]] = []
         with open(self.file_path, "rb") as f:
             # Parse binary file header
             file_header = QLFileHeader.from_buffer_copy(
@@ -73,20 +93,20 @@ class QLReader:
             for n, offset in enumerate(offsets):
                 header = headers[n]
                 msg_cls = pyrtma.msg_defs.get(header.msg_type)
+                raw_bytes = d[offset : offset + header.num_data_bytes]
+
                 if msg_cls is None:
                     print(f"Unknown message definition: MT={header.msg_type}")
-                    msg = UKNOWN_MESSAGE_DEF
+                    msg = UnknownMessageData(raw_bytes)
 
                 else:
                     if msg_cls.type_size != header.num_data_bytes:
                         print(
                             f"Warning: Message header indicates a message data size ({header.num_data_bytes}) that does not match the expected size of message type {msg_cls.type_name} ({msg_cls.type_size}). Message definitions may be out of sync."
                         )
-                        msg = UKNOWN_MESSAGE_DEF
+                        msg = UnknownMessageData(raw_bytes)
                     else:
-                        msg = msg_cls.from_buffer_copy(
-                            d[offset : offset + header.num_data_bytes]
-                        )
+                        msg = msg_cls.from_buffer_copy(raw_bytes)
 
                 data.append(msg)
 
@@ -107,20 +127,18 @@ class QLReader:
         # Write each message json object on a separate line
         with open(save_path, "w") as f:
             for header, data in zip(self.headers, self.data, strict=True):
-                # Skip any messages that could not be decoded
-                if isinstance(data, MessageData):  # not UKNOWN_MESSAGE_DEF:
-                    # Open json object
-                    f.write("{")
+                # Open json object
+                f.write("{")
 
-                    # Header json object
-                    f.write('"header":')
-                    f.write(header.to_json(minify=True))
+                # Header json object
+                f.write('"header":')
+                f.write(header.to_json(minify=True))
 
-                    f.write(",")
+                f.write(",")
 
-                    # Data json object
-                    f.write('"data":')
-                    f.write(data.to_json(minify=True))
+                # Data json object
+                f.write('"data":')
+                f.write(data.to_json(minify=True))
 
-                    # Close json object
-                    f.write("}\n")
+                # Close json object
+                f.write("}\n")
