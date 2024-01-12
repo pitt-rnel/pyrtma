@@ -3,6 +3,10 @@ import timeit
 import statistics
 
 
+# Import message defs to add to pyrtma.msg_defs map
+from .test_msg_defs.test_defs import *
+
+
 def convert_to_json(n=1000):
     stats = {}
     for mdf in pyrtma.msg_defs.values():

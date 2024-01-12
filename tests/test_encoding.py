@@ -10,6 +10,9 @@ from pyrtma.client import Client
 import pyrtma.manager
 from pyrtma.manager import MessageManager
 
+# Import message defs to add to pyrtma.msg_defs map
+from .test_msg_defs.test_defs import *
+
 
 class TestEncoding(unittest.TestCase):
     """Test sending messages through MessageManager."""
