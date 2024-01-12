@@ -572,7 +572,6 @@ class MessageManager:
                 self.send_ack(src_module, wlist)
                 self.logger.info(f"CONNECT - {src_module!s}")
         elif msg_type == cd.MT_DISCONNECT:
-            self.send_ack(src_module, wlist)
             self.disconnect_module(src_module)
             self.logger.info(f"DISCONNECT - {src_module!s}")
         elif msg_type == cd.MT_SUBSCRIBE:
