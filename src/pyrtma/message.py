@@ -58,7 +58,6 @@ def get_msg_cls(id: int) -> Type[MessageData]:
         ) from e
 
 
-@dataclass
 class Message:
     """Message dataclass
 
@@ -67,6 +66,10 @@ class Message:
 
     header: MessageHeader
     data: MessageData
+
+    def __init__(self, header: MessageHeader, data: MessageData):
+        self.header = header
+        self.data = data
 
     @property
     def type_id(self) -> int:
