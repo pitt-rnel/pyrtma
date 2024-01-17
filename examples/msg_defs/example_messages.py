@@ -134,12 +134,12 @@ class TEST_STRUCT(MessageBase, metaclass=MessageMeta):
     type_name: ClassVar[str] = "TEST_STRUCT"
     type_hash: ClassVar[int] = 0x025479D2
     type_size: ClassVar[int] = 36
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[
         str
     ] = "'TEST_STRUCT:\n  fields:\n    value_str: char[STR_SIZE]\n    value_int: int'"
 
-    value_str: String = Char(32)
+    value_str: String = String(32)
     value_int: Int32 = Int32()
 
 
@@ -202,7 +202,7 @@ class MDF_FAILED_MESSAGE(MessageData, metaclass=MessageMeta):
     ] = "'FAILED_MESSAGE:\n  id: 8\n  fields:\n    dest_mod_id: MODULE_ID\n    reserved: short[3]\n    time_of_failure: double\n    msg_header: RTMA_MSG_HEADER'"
 
     dest_mod_id: Int16 = Int16()
-    reserved: IntArray[Int16] = Int16(3)
+    reserved: IntArray[Int16] = IntArray(Int16, 3)
     time_of_failure: Double = Double()
     msg_header: Struct[RTMA_MSG_HEADER] = Struct(RTMA_MSG_HEADER)
 
@@ -293,7 +293,7 @@ class MDF_SAVE_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
         str
     ] = "'SAVE_MESSAGE_LOG:\n  id: 56\n  fields:\n    pathname: char[MAX_LOGGER_FILENAME_LENGTH]\n    pathname_length: int'"
 
-    pathname: String = Char(256)
+    pathname: String = String(256)
     pathname_length: Int32 = Int32()
 
 
@@ -358,8 +358,8 @@ class MDF_TIMING_MESSAGE(MessageData, metaclass=MessageMeta):
         str
     ] = "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: unsigned short[MAX_MESSAGE_TYPES]\n    ModulePID: int[MAX_MODULES]\n    send_time: double'"
 
-    timing: IntArray[Uint16] = Uint16(10000)
-    ModulePID: IntArray[Int32] = Int32(200)
+    timing: IntArray[Uint16] = IntArray(Uint16, 10000)
+    ModulePID: IntArray[Int32] = IntArray(Int32, 200)
     send_time: Double = Double()
 
 
@@ -421,12 +421,12 @@ class MDF_PERSON_MESSAGE(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "PERSON_MESSAGE"
     type_hash: ClassVar[int] = 0x3A9C5C31
     type_size: ClassVar[int] = 36
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[
         str
     ] = "'PERSON_MESSAGE:\n  id: 1234\n  fields:\n    name: char[STR_SIZE]\n    age: AGE_TYPE'"
 
-    name: String = Char(32)
+    name: String = String(32)
     age: Int32 = Int32()
 
 
@@ -436,7 +436,7 @@ class MDF_ANOTHER_EXAMPLE(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "ANOTHER_EXAMPLE"
     type_hash: ClassVar[int] = 0x76C035B3
     type_size: ClassVar[int] = 48
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[
         str
     ] = "'ANOTHER_EXAMPLE:\n  id: 5678\n  fields:\n    value_struct: TEST_STRUCT\n    value_float: float\n    value_double: double'"
@@ -452,7 +452,7 @@ class MDF_USER_SIGNAL(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "USER_SIGNAL"
     type_hash: ClassVar[int] = 0xD79169AA
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'USER_SIGNAL:\n  id: 2468\n  fields: null'"
 
 
@@ -462,7 +462,7 @@ class MDF_PERSON_LIST(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "PERSON_LIST"
     type_hash: ClassVar[int] = 0x8F180975
     type_size: ClassVar[int] = 1152
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[
         str
     ] = "'PERSON_LIST:\n  id: 1357\n  fields:\n    person: PERSON_MESSAGE[32]'"
@@ -476,7 +476,7 @@ class MDF_EMPLOYEES(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "EMPLOYEES"
     type_hash: ClassVar[int] = 0xCBE5197A
     type_size: ClassVar[int] = 1152
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[
         str
     ] = "'EMPLOYEES:\n  id: 1368\n  fields:\n\n\n\n\nf\ni\ne\nl\nd\ns\n:\n\nP\nE\nR\nS\nO\nN\n_\nL\nI\nS\nT'"
@@ -490,7 +490,7 @@ class MDF__RESERVED_001000(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "_RESERVED_001000"
     type_hash: ClassVar[int] = 0x08E66D54
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'_RESERVED_001000:\n  id: 1000\n  fields: null'"
 
 
@@ -500,7 +500,7 @@ class MDF__RESERVED_001002(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "_RESERVED_001002"
     type_hash: ClassVar[int] = 0xBD402EAA
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'_RESERVED_001002:\n  id: 1002\n  fields: null'"
 
 
@@ -510,7 +510,7 @@ class MDF__RESERVED_001003(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "_RESERVED_001003"
     type_hash: ClassVar[int] = 0x4D10FC66
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'_RESERVED_001003:\n  id: 1003\n  fields: null'"
 
 
@@ -520,7 +520,7 @@ class MDF__RESERVED_001004(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "_RESERVED_001004"
     type_hash: ClassVar[int] = 0x1F3379B5
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'_RESERVED_001004:\n  id: 1004\n  fields: null'"
 
 
@@ -530,7 +530,7 @@ class MDF__RESERVED_001005(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "_RESERVED_001005"
     type_hash: ClassVar[int] = 0x2A5253B3
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'_RESERVED_001005:\n  id: 1005\n  fields: null'"
 
 
@@ -540,7 +540,7 @@ class MDF__RESERVED_001006(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "_RESERVED_001006"
     type_hash: ClassVar[int] = 0xE67B66D3
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'_RESERVED_001006:\n  id: 1006\n  fields: null'"
 
 
@@ -550,7 +550,7 @@ class MDF__RESERVED_001007(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "_RESERVED_001007"
     type_hash: ClassVar[int] = 0x8DC1AAE8
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'_RESERVED_001007:\n  id: 1007\n  fields: null'"
 
 
@@ -560,7 +560,7 @@ class MDF__RESERVED_001008(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "_RESERVED_001008"
     type_hash: ClassVar[int] = 0x3ABE111F
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'_RESERVED_001008:\n  id: 1008\n  fields: null'"
 
 
@@ -570,7 +570,7 @@ class MDF__RESERVED_001009(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "_RESERVED_001009"
     type_hash: ClassVar[int] = 0x1E42BAA4
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'_RESERVED_001009:\n  id: 1009\n  fields: null'"
 
 
@@ -580,7 +580,7 @@ class MDF__RESERVED_001010(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "_RESERVED_001010"
     type_hash: ClassVar[int] = 0xAE4C92D4
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'_RESERVED_001010:\n  id: 1010\n  fields: null'"
 
 
@@ -590,7 +590,7 @@ class MDF__RESERVED_001011(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "_RESERVED_001011"
     type_hash: ClassVar[int] = 0x27E03BD7
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'_RESERVED_001011:\n  id: 1011\n  fields: null'"
 
 
@@ -600,7 +600,7 @@ class MDF__RESERVED_001012(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "_RESERVED_001012"
     type_hash: ClassVar[int] = 0x925028C4
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "message.yaml"
+    type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[str] = "'_RESERVED_001012:\n  id: 1012\n  fields: null'"
 
 
