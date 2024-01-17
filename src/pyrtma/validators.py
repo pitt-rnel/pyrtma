@@ -133,20 +133,6 @@ class Float(FloatValidatorBase):
 
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_float
 
-    @overload
-    def __new__(cls) -> Float:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> FloatArray[Float]:
-        ...
-
-    def __new__(cls, length: int = 1) -> Union[Float, FloatArray[Float]]:
-        if length > 1:
-            return FloatArray(Float, length)
-        else:
-            return super().__new__(cls)
-
     def __init__(self, *args):
         pass
 
@@ -155,20 +141,6 @@ class Double(FloatValidatorBase):
     """Double (64-bit float) validator class"""
 
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_double
-
-    @overload
-    def __new__(cls) -> Double:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> FloatArray[Double]:
-        ...
-
-    def __new__(cls, length=1) -> Union[Double, FloatArray[Double]]:
-        if length > 1:
-            return FloatArray(Double, length)
-        else:
-            return super().__new__(cls)
 
     def __init__(self, *args):
         pass
@@ -261,20 +233,6 @@ class Int8(IntValidatorBase):
     _max: ClassVar[int] = 2**7 - 1
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_int8
 
-    @overload
-    def __new__(cls) -> Int8:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> IntArray[Int8]:
-        ...
-
-    def __new__(cls, length=1) -> Union[Int8, IntArray[Int8]]:
-        if length > 1:
-            return IntArray(Int8, length)
-        else:
-            return super().__new__(cls)
-
     def __init__(self, *args):
         pass
 
@@ -287,20 +245,6 @@ class Int16(IntValidatorBase):
     _min: ClassVar[int] = -(2**15)
     _max: ClassVar[int] = 2**15 - 1
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_int16
-
-    @overload
-    def __new__(cls) -> Int16:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> IntArray[Int16]:
-        ...
-
-    def __new__(cls, length=1) -> Union[Int16, IntArray[Int16]]:
-        if length > 1:
-            return IntArray(Int16, length)
-        else:
-            return super().__new__(cls)
 
     def __init__(self, *args):
         pass
@@ -315,20 +259,6 @@ class Int32(IntValidatorBase):
     _max: ClassVar[int] = 2**31 - 1
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_int32
 
-    @overload
-    def __new__(cls) -> Int32:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> IntArray[Int32]:
-        ...
-
-    def __new__(cls, length=1) -> Union[Int32, IntArray[Int32]]:
-        if length > 1:
-            return IntArray(Int32, length)
-        else:
-            return super().__new__(cls)
-
     def __init__(self, *args):
         pass
 
@@ -341,20 +271,6 @@ class Int64(IntValidatorBase):
     _min: ClassVar[int] = -(2**63)
     _max: ClassVar[int] = 2**63 - 1
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_int64
-
-    @overload
-    def __new__(cls) -> Int64:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> IntArray[Int64]:
-        ...
-
-    def __new__(cls, length=1) -> Union[Int64, IntArray[Int64]]:
-        if length > 1:
-            return IntArray(Int64, length)
-        else:
-            return super().__new__(cls)
 
     def __init__(self, *args):
         pass
@@ -369,20 +285,6 @@ class Uint8(IntValidatorBase):
     _max: ClassVar[int] = 2**8 - 1
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_uint8
 
-    @overload
-    def __new__(cls) -> Uint8:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> IntArray[Uint8]:
-        ...
-
-    def __new__(cls, length=1) -> Union[Uint8, IntArray[Uint8]]:
-        if length > 1:
-            return IntArray(Uint8, length)
-        else:
-            return super().__new__(cls)
-
     def __init__(self, *args):
         pass
 
@@ -395,20 +297,6 @@ class Uint16(IntValidatorBase):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**16 - 1
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_uint16
-
-    @overload
-    def __new__(cls) -> Uint16:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> IntArray[Uint16]:
-        ...
-
-    def __new__(cls, length=1) -> Union[Uint16, IntArray[Uint16]]:
-        if length > 1:
-            return IntArray(Uint16, length)
-        else:
-            return super().__new__(cls)
 
     def __init__(self, *args):
         pass
@@ -423,20 +311,6 @@ class Uint32(IntValidatorBase):
     _max: ClassVar[int] = 2**32 - 1
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_uint32
 
-    @overload
-    def __new__(cls) -> Uint32:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> IntArray[Uint32]:
-        ...
-
-    def __new__(cls, length=1) -> Union[Uint32, IntArray[Uint32]]:
-        if length > 1:
-            return IntArray(Uint32, length)
-        else:
-            return super().__new__(cls)
-
     def __init__(self, *args):
         pass
 
@@ -450,20 +324,6 @@ class Uint64(IntValidatorBase):
     _max: ClassVar[int] = 2**64 - 1
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_uint64
 
-    @overload
-    def __new__(cls) -> Uint64:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> IntArray[Uint64]:
-        ...
-
-    def __new__(cls, length=1) -> Union[Uint64, IntArray[Uint64]]:
-        if length > 1:
-            return IntArray(Uint64, length)
-        else:
-            return super().__new__(cls)
-
     def __init__(self, *args):
         pass
 
@@ -476,20 +336,6 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**8 - 1
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_ubyte
-
-    @overload
-    def __new__(cls) -> Byte:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> ByteArray:
-        ...
-
-    def __new__(cls, length=1) -> Union[Byte, ByteArray]:
-        if length > 1:
-            return ByteArray(length)
-        else:
-            return super().__new__(cls)
 
     def __init__(self, *args):
         pass
@@ -627,20 +473,6 @@ _FV = TypeVar("_FV", bound=FieldValidator)
 class Char(String):
     """Validator for scalar char values"""
 
-    @overload
-    def __new__(cls) -> Char:
-        ...
-
-    @overload
-    def __new__(cls, length: int) -> String:
-        ...
-
-    def __new__(cls, length=1):
-        if length > 1:
-            return String(length)
-        else:
-            return super().__new__(cls)
-
     def __init__(self):
         self._ctype = ctypes.c_char
         self.len = 1
@@ -659,7 +491,7 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
             validator (Type[_FV]): Field validator class for datatype
             len (int): Field length
         """
-        self._validator = validator()
+        self._validator: FieldValidator = validator()
         self._len = len
         self._bound_obj: Optional[MessageBase] = None
         # self._ctype = self._validator._ctype * len
@@ -946,20 +778,6 @@ _S = TypeVar("_S", bound=MessageBase)
 
 class Struct(FieldValidator, Generic[_S]):
     """Validator class for Structures"""
-
-    @overload
-    def __new__(cls, _ctype: Type[_S]) -> Struct:
-        ...
-
-    @overload
-    def __new__(cls, _ctype: Type[_S], length: int) -> StructArray[_S]:
-        ...
-
-    def __new__(cls, _ctype: Type[_S], length=1) -> Union[Struct, StructArray[_S]]:
-        if length > 1:
-            return StructArray(_ctype, length)
-        else:
-            return super().__new__(cls)
 
     def __init__(self, _ctype: Type[_S]):
         self._ctype = _ctype
