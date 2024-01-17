@@ -51,9 +51,9 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
     """Abstract base class for all message field validator descriptors"""
 
     def __set_name__(self, owner: _P, name: str):
-        self.owner = owner
-        self.public_name = name
-        self.private_name = "_" + name
+        self._owner = owner
+        self._public_name = name
+        self._private_name = "_" + name
 
     @abstractmethod
     def __get__(self, obj: _P, objtype=None):
@@ -82,11 +82,11 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
         ...
 
     def __get__(self, obj: _P, objtype=None) -> float:
-        return getattr(obj, self.private_name)
+        return getattr(obj, self._private_name)
 
     def __set__(self, obj: _P, value: float):
         self.validate_one(value)
-        setattr(obj, self.private_name, value)
+        setattr(obj, self._private_name, value)
 
     def validate_one(self, value: float):
         """Validate a float value
@@ -177,11 +177,11 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
         return self._max
 
     def __get__(self, obj: _P, objtype=None) -> int:
-        return getattr(obj, self.private_name)
+        return getattr(obj, self._private_name)
 
     def __set__(self, obj: _P, value: int):
         self.validate_one(value)
-        setattr(obj, self.private_name, value)
+        setattr(obj, self._private_name, value)
 
     def validate_one(self, value: int):
         """Validate an integer value
@@ -357,15 +357,15 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
         return self._max
 
     def __get__(self, obj: _P, objtype=None) -> bytes:
-        return getattr(obj, self.private_name).to_bytes(1, "little")
+        return getattr(obj, self._private_name).to_bytes(1, "little")
 
     def __set__(self, obj: _P, value: Union[int, bytes, bytearray]):
         self.validate_one(value)
         if isinstance(value, (bytes, bytearray)):
             int_value = int.from_bytes(value, "little")
-            setattr(obj, self.private_name, int_value)
+            setattr(obj, self._private_name, int_value)
             return
-        setattr(obj, self.private_name, value)
+        setattr(obj, self._private_name, value)
 
     def validate_one(self, value: Union[int, bytes, bytearray]):
         """validate a single byte value
@@ -428,11 +428,11 @@ class String(FieldValidator[_P, str], Generic[_P]):
         self._ctype = ctypes.c_char * len
 
     def __get__(self, obj: _P, objtype=None) -> str:
-        return getattr(obj, self.private_name).decode("ascii")
+        return getattr(obj, self._private_name).decode("ascii")
 
     def __set__(self, obj: _P, value: str):
         self.validate_one(value)
-        setattr(obj, self.private_name, value.encode("ascii"))
+        setattr(obj, self._private_name, value.encode("ascii"))
 
     def validate_one(self, value: str):
         """Validate a string value
@@ -502,9 +502,9 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
         new_obj._len = obj._len
-        new_obj.owner = obj.owner
-        new_obj.public_name = obj.public_name
-        new_obj.private_name = obj.private_name
+        new_obj._owner = obj._owner
+        new_obj._public_name = obj._public_name
+        new_obj._private_name = obj._private_name
 
         return new_obj
 
@@ -514,13 +514,13 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
 
     def __set__(self, obj: MessageBase, value: ArrayField[_FV]):
         self.validate_array(value)
-        setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
+        setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     def __getitem__(self, key):
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
-        return getattr(self._bound_obj, self.private_name)[key]
+        return getattr(self._bound_obj, self._private_name)[key]
 
     def __setitem__(self, key, value):
         if self._bound_obj is None:
@@ -531,7 +531,7 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
         else:
             self.validate_one(value)
 
-        getattr(self._bound_obj, self.private_name)[key] = value
+        getattr(self._bound_obj, self._private_name)[key] = value
 
     def __len__(self) -> int:
         return self._len
@@ -541,7 +541,7 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
 
     def __str__(self):
         if self._bound_obj:
-            return str(getattr(self._bound_obj, self.private_name)[:])
+            return str(getattr(self._bound_obj, self._private_name)[:])
         else:
             return self.__repr__()
 
@@ -609,9 +609,9 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
         new_obj._len = obj._len
-        new_obj.owner = obj.owner
-        new_obj.public_name = obj.public_name
-        new_obj.private_name = obj.private_name
+        new_obj._owner = obj._owner
+        new_obj._public_name = obj._public_name
+        new_obj._private_name = obj._private_name
 
         return new_obj
 
@@ -621,7 +621,7 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
 
     def __set__(self, obj: MessageBase, value: ArrayField[_IV]):
         self.validate_array(value)
-        setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
+        setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     @overload
     def __getitem__(self, key: int) -> int:
@@ -635,7 +635,7 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
-        return getattr(self._bound_obj, self.private_name)[key]
+        return getattr(self._bound_obj, self._private_name)[key]
 
     def __repr__(self) -> str:
         return f"IntArray({type(self._validator).__name__}, len={self._len}) at 0x{id(self):016X}"
@@ -665,19 +665,19 @@ class ByteArray(ArrayField[Byte]):
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
         new_obj._len = obj._len
-        new_obj.owner = obj.owner
-        new_obj.public_name = obj.public_name
-        new_obj.private_name = obj.private_name
+        new_obj._owner = obj._owner
+        new_obj._public_name = obj._public_name
+        new_obj._private_name = obj._private_name
 
         return new_obj
 
     def __get__(self, obj: MessageBase, objtype=None) -> ByteArray:
         return ByteArray._bound(self, obj)
-        # return getattr(obj, self.private_name)
+        # return getattr(obj, self._private_name)
 
     def __set__(self, obj: MessageBase, value: ArrayField[Byte]):
         self.validate_array(value)
-        setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
+        setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     @overload
     def __getitem__(self, key: int) -> bytearray:
@@ -691,7 +691,7 @@ class ByteArray(ArrayField[Byte]):
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
-        int_vals = getattr(self._bound_obj, self.private_name)[key]
+        int_vals = getattr(self._bound_obj, self._private_name)[key]
         try:
             barray = [x.to_bytes(1, "little") for x in int_vals]
         except TypeError:
@@ -714,7 +714,7 @@ class ByteArray(ArrayField[Byte]):
             else:
                 value = [v for v in value]
 
-        getattr(self._bound_obj, self.private_name)[key] = value
+        getattr(self._bound_obj, self._private_name)[key] = value
 
     def __repr__(self) -> str:
         return f"ByteArray(len={self._len}) at 0x{id(self):016X}"
@@ -741,9 +741,9 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
         new_obj._len = obj._len
-        new_obj.owner = obj.owner
-        new_obj.public_name = obj.public_name
-        new_obj.private_name = obj.private_name
+        new_obj._owner = obj._owner
+        new_obj._public_name = obj._public_name
+        new_obj._private_name = obj._private_name
 
         return new_obj
 
@@ -753,7 +753,7 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
 
     def __set__(self, obj: MessageBase, value: ArrayField[_FPV]):
         self.validate_array(value)
-        setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
+        setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     @overload
     def __getitem__(self, key: int) -> float:
@@ -767,7 +767,7 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
-        return getattr(self._bound_obj, self.private_name)[key]
+        return getattr(self._bound_obj, self._private_name)[key]
 
     def __repr__(self) -> str:
         return f"FloatArray({type(self._validator).__name__}, len={self._len}) at 0x{id(self):016X}"
@@ -783,7 +783,7 @@ class Struct(FieldValidator, Generic[_S]):
         self._ctype = _ctype
 
     def __get__(self, obj, objtype=None) -> _S:
-        return getattr(obj, self.private_name)
+        return getattr(obj, self._private_name)
 
     @overload
     def __set__(self, obj: MessageBase, value: _S):
@@ -796,7 +796,7 @@ class Struct(FieldValidator, Generic[_S]):
     def __set__(self, obj, value):
         self.validate_one(value)
         # Note: ctypes already copies the data here
-        setattr(obj, self.private_name, value)
+        setattr(obj, self._private_name, value)
 
     def validate_one(self, value: _S):
         """Validate a structure
@@ -847,9 +847,9 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
         new_obj._len = obj._len
-        new_obj.owner = obj.owner
-        new_obj.public_name = obj.public_name
-        new_obj.private_name = obj.private_name
+        new_obj._owner = obj._owner
+        new_obj._public_name = obj._public_name
+        new_obj._private_name = obj._private_name
 
         return new_obj
 
@@ -859,7 +859,7 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
 
     def __set__(self, obj, value):
         self.validate_array(value)
-        setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
+        setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     @overload
     def __getitem__(self, key: int) -> _S:
@@ -872,7 +872,7 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
     def __getitem__(self, key) -> Union[_S, List[_S]]:
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
-        return getattr(self._bound_obj, self.private_name)[key]
+        return getattr(self._bound_obj, self._private_name)[key]
 
     def __setitem__(self, key, value):
         if self._bound_obj is None:
@@ -885,7 +885,7 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         else:
             self.validate_one(value)
 
-        getattr(self._bound_obj, self.private_name)[key] = value
+        getattr(self._bound_obj, self._private_name)[key] = value
 
     def __len__(self) -> int:
         return self._len
@@ -907,7 +907,7 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         """
         if self._bound_obj:
             max_len = 5
-            val = getattr(self._bound_obj, self.private_name)
+            val = getattr(self._bound_obj, self._private_name)
             tab = "\t" * add_tabs
             if self._len <= max_len:
                 return (
