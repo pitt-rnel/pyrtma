@@ -474,12 +474,12 @@ class MDF_PERSON_LIST(MessageData, metaclass=MessageMeta):
 class MDF_EMPLOYEES(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1368
     type_name: ClassVar[str] = "EMPLOYEES"
-    type_hash: ClassVar[int] = 0xCBE5197A
+    type_hash: ClassVar[int] = 0x40C66A09
     type_size: ClassVar[int] = 1152
     type_source: ClassVar[str] = "example_messages.yaml"
     type_def: ClassVar[
         str
-    ] = "'EMPLOYEES:\n  id: 1368\n  fields:\n\n\n\n\nf\ni\ne\nl\nd\ns\n:\n\nP\nE\nR\nS\nO\nN\n_\nL\nI\nS\nT'"
+    ] = "'EMPLOYEES:\n  id: 1368\n  fields:\n    fields: PERSON_LIST'"
 
     person: StructArray[MDF_PERSON_MESSAGE] = StructArray(MDF_PERSON_MESSAGE, 32)
 
