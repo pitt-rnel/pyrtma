@@ -119,13 +119,13 @@ class PyDefCompiler:
 
             # Array Field
             if dtype.startswith("Int") or dtype.startswith("Uint"):
-                return f":IntArray[{dtype}] = {dtype}({flen})"
+                return f":IntArray[{dtype}] = IntArray({dtype}, {flen})"
             elif dtype.startswith("Float") or dtype.startswith("Double"):
-                return f":FloatArray[{dtype}] = {dtype}({flen})"
+                return f":FloatArray[{dtype}] = FloatArray({dtype}, {flen})"
             elif dtype.startswith("Char"):
-                return f":String = Char({flen})"
+                return f":String = String({flen})"
             elif dtype.startswith("Byte"):
-                return f":ByteArray = Byte({flen})"
+                return f":ByteArray = ByteArray({flen})"
             else:
                 raise RuntimeError(f"Unknown field descriptor {dtype}")
 

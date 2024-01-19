@@ -6,7 +6,7 @@ sys.path.append(str(pathlib.Path(__file__).parent))
 import pyrtma
 
 # Import the users compiled message defintions
-import msg_defs.message as md
+import msg_defs.example_messages as md
 
 from typing import cast
 

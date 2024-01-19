@@ -1049,7 +1049,7 @@ class Parser:
             f = f"    fields: {mdf['fields']}"
         else:
             f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
-        f = "\n".join(f)
+            f = "\n".join(f)
         raw = f"{name}:\n  id: {mdf['id']}\n  fields:\n{f}"
 
         raw = textwrap.dedent(raw)
