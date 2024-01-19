@@ -52,7 +52,7 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
 
     def __init__(self):
         self._ctype: Type[ctypes._CData] = ctypes._CData
-    
+
     def __set_name__(self, owner: _P, name: str):
         self._owner = owner
         self._public_name = name
@@ -78,11 +78,9 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
 class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMeta):
     """Abstract base class for float type validators"""
 
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_float
-
     @abstractmethod
     def __init__(self, *args):
-        ...
+        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_float
 
     def __get__(self, obj: _P, objtype=None) -> float:
         return getattr(obj, self._private_name)
@@ -134,19 +132,15 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
 class Float(FloatValidatorBase):
     """32-bit Float validator class"""
 
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_float
-
     def __init__(self, *args):
-        pass
+        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_float
 
 
 class Double(FloatValidatorBase):
     """Double (64-bit float) validator class"""
 
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_double
-
     def __init__(self, *args):
-        pass
+        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_double
 
 
 # Base Class for int validator fields
@@ -157,7 +151,6 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**8 - 1
-    _ctype: ClassVar[Type[ctypes._SimpleCData]]
 
     @abstractmethod
     def __init__(self, *args):
@@ -234,10 +227,9 @@ class Int8(IntValidatorBase):
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**7)
     _max: ClassVar[int] = 2**7 - 1
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_int8
 
     def __init__(self, *args):
-        pass
+        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int8
 
 
 class Int16(IntValidatorBase):
@@ -247,10 +239,9 @@ class Int16(IntValidatorBase):
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**15)
     _max: ClassVar[int] = 2**15 - 1
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_int16
 
     def __init__(self, *args):
-        pass
+        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int16
 
 
 class Int32(IntValidatorBase):
@@ -260,10 +251,9 @@ class Int32(IntValidatorBase):
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**31)
     _max: ClassVar[int] = 2**31 - 1
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_int32
 
     def __init__(self, *args):
-        pass
+        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int32
 
 
 class Int64(IntValidatorBase):
@@ -273,10 +263,9 @@ class Int64(IntValidatorBase):
     _unsigned: ClassVar[bool] = False
     _min: ClassVar[int] = -(2**63)
     _max: ClassVar[int] = 2**63 - 1
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_int64
 
     def __init__(self, *args):
-        pass
+        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int64
 
 
 class Uint8(IntValidatorBase):
@@ -286,10 +275,9 @@ class Uint8(IntValidatorBase):
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**8 - 1
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_uint8
 
     def __init__(self, *args):
-        pass
+        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint8
 
 
 class Uint16(IntValidatorBase):
@@ -299,10 +287,9 @@ class Uint16(IntValidatorBase):
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**16 - 1
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_uint16
 
     def __init__(self, *args):
-        pass
+        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint16
 
 
 class Uint32(IntValidatorBase):
@@ -312,10 +299,9 @@ class Uint32(IntValidatorBase):
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**32 - 1
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_uint32
 
     def __init__(self, *args):
-        pass
+        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint32
 
 
 class Uint64(IntValidatorBase):
@@ -325,10 +311,9 @@ class Uint64(IntValidatorBase):
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**64 - 1
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_uint64
 
     def __init__(self, *args):
-        pass
+        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint64
 
 
 class Byte(FieldValidator[_P, int], Generic[_P]):
@@ -338,10 +323,9 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
     _unsigned: ClassVar[bool] = True
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**8 - 1
-    _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_ubyte
 
     def __init__(self, *args):
-        pass
+        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_ubyte
 
     @property
     def size(self) -> int:
@@ -679,7 +663,6 @@ class ByteArray(ArrayField[Byte]):
 
     def __get__(self, obj: MessageBase, objtype=None) -> ByteArray:
         return ByteArray._bound(self, obj)
-        # return getattr(obj, self._private_name)
 
     def __set__(self, obj: MessageBase, value: ArrayField[Byte]):
         self.validate_array(value)
