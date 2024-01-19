@@ -1,7 +1,7 @@
 import ctypes
 from typing import Type
 
-from .message_base import MessageBase
+from .message_base import MessageBase, MessageMeta
 from .validators import Int16, Double, Int32, Uint32
 
 # Type Aliases
@@ -11,7 +11,7 @@ MSG_TYPE = ctypes.c_int
 MSG_COUNT = ctypes.c_int
 
 
-class MessageHeader(MessageBase):
+class MessageHeader(MessageBase, metaclass=MessageMeta):
     """RTMA Message Header class"""
 
     msg_type: Int32 = Int32()
@@ -36,7 +36,7 @@ class MessageHeader(MessageBase):
         self.reserved = value
 
 
-class TimeCodeMessageHeader(MessageHeader):
+class TimeCodeMessageHeader(MessageHeader, metaclass=MessageMeta):
     """Variant of MessageHeader with additional Timecode fields"""
 
     utc_seconds: Uint32 = Uint32()

@@ -4,7 +4,7 @@ import ctypes
 import pyrtma
 from typing import ClassVar
 
-from pyrtma.message_base import MessageBase
+from pyrtma.message_base import MessageBase, MessageMeta
 from pyrtma.message_data import MessageData
 from pyrtma.validators import (
     Int8,
@@ -84,7 +84,7 @@ MT_LM_READY: int = 96
 
 
 # Struct Definitions
-class RTMA_MSG_HEADER(MessageBase):
+class RTMA_MSG_HEADER(MessageBase, metaclass=MessageMeta):
     type_name: ClassVar[str] = "RTMA_MSG_HEADER"
     type_hash: ClassVar[int] = 0x9A4D7016
     type_size: ClassVar[int] = 48
@@ -109,7 +109,7 @@ class RTMA_MSG_HEADER(MessageBase):
 
 # Message Definitions
 @pyrtma.message_def
-class MDF_EXIT(MessageData):
+class MDF_EXIT(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 0
     type_name: ClassVar[str] = "EXIT"
     type_hash: ClassVar[int] = 0x095E0546
@@ -119,7 +119,7 @@ class MDF_EXIT(MessageData):
 
 
 @pyrtma.message_def
-class MDF_KILL(MessageData):
+class MDF_KILL(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1
     type_name: ClassVar[str] = "KILL"
     type_hash: ClassVar[int] = 0x82FC702D
@@ -129,7 +129,7 @@ class MDF_KILL(MessageData):
 
 
 @pyrtma.message_def
-class MDF_ACKNOWLEDGE(MessageData):
+class MDF_ACKNOWLEDGE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 2
     type_name: ClassVar[str] = "ACKNOWLEDGE"
     type_hash: ClassVar[int] = 0xB725B581
@@ -139,7 +139,7 @@ class MDF_ACKNOWLEDGE(MessageData):
 
 
 @pyrtma.message_def
-class MDF_FAIL_SUBSCRIBE(MessageData):
+class MDF_FAIL_SUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 6
     type_name: ClassVar[str] = "FAIL_SUBSCRIBE"
     type_hash: ClassVar[int] = 0x9AD70A15
@@ -155,7 +155,7 @@ class MDF_FAIL_SUBSCRIBE(MessageData):
 
 
 @pyrtma.message_def
-class MDF_FAILED_MESSAGE(MessageData):
+class MDF_FAILED_MESSAGE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 8
     type_name: ClassVar[str] = "FAILED_MESSAGE"
     type_hash: ClassVar[int] = 0xDCA545B2
@@ -172,7 +172,7 @@ class MDF_FAILED_MESSAGE(MessageData):
 
 
 @pyrtma.message_def
-class MDF_CONNECT(MessageData):
+class MDF_CONNECT(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 13
     type_name: ClassVar[str] = "CONNECT"
     type_hash: ClassVar[int] = 0x6F2E3CA5
@@ -187,7 +187,7 @@ class MDF_CONNECT(MessageData):
 
 
 @pyrtma.message_def
-class MDF_DISCONNECT(MessageData):
+class MDF_DISCONNECT(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 14
     type_name: ClassVar[str] = "DISCONNECT"
     type_hash: ClassVar[int] = 0xD0126BF9
@@ -197,7 +197,7 @@ class MDF_DISCONNECT(MessageData):
 
 
 @pyrtma.message_def
-class MDF_SUBSCRIBE(MessageData):
+class MDF_SUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 15
     type_name: ClassVar[str] = "SUBSCRIBE"
     type_hash: ClassVar[int] = 0xF5B437C8
@@ -211,7 +211,7 @@ class MDF_SUBSCRIBE(MessageData):
 
 
 @pyrtma.message_def
-class MDF_UNSUBSCRIBE(MessageData):
+class MDF_UNSUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 16
     type_name: ClassVar[str] = "UNSUBSCRIBE"
     type_hash: ClassVar[int] = 0x193FB9E0
@@ -225,7 +225,7 @@ class MDF_UNSUBSCRIBE(MessageData):
 
 
 @pyrtma.message_def
-class MDF_MODULE_READY(MessageData):
+class MDF_MODULE_READY(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 26
     type_name: ClassVar[str] = "MODULE_READY"
     type_hash: ClassVar[int] = 0x0DF81813
@@ -237,7 +237,7 @@ class MDF_MODULE_READY(MessageData):
 
 
 @pyrtma.message_def
-class MDF_LM_EXIT(MessageData):
+class MDF_LM_EXIT(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 55
     type_name: ClassVar[str] = "LM_EXIT"
     type_hash: ClassVar[int] = 0x35DD547B
@@ -247,7 +247,7 @@ class MDF_LM_EXIT(MessageData):
 
 
 @pyrtma.message_def
-class MDF_SAVE_MESSAGE_LOG(MessageData):
+class MDF_SAVE_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 56
     type_name: ClassVar[str] = "SAVE_MESSAGE_LOG"
     type_hash: ClassVar[int] = 0x515569E9
@@ -262,7 +262,7 @@ class MDF_SAVE_MESSAGE_LOG(MessageData):
 
 
 @pyrtma.message_def
-class MDF_MESSAGE_LOG_SAVED(MessageData):
+class MDF_MESSAGE_LOG_SAVED(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 57
     type_name: ClassVar[str] = "MESSAGE_LOG_SAVED"
     type_hash: ClassVar[int] = 0x66E84AE5
@@ -272,7 +272,7 @@ class MDF_MESSAGE_LOG_SAVED(MessageData):
 
 
 @pyrtma.message_def
-class MDF_PAUSE_MESSAGE_LOGGING(MessageData):
+class MDF_PAUSE_MESSAGE_LOGGING(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 58
     type_name: ClassVar[str] = "PAUSE_MESSAGE_LOGGING"
     type_hash: ClassVar[int] = 0x20C1E922
@@ -282,7 +282,7 @@ class MDF_PAUSE_MESSAGE_LOGGING(MessageData):
 
 
 @pyrtma.message_def
-class MDF_RESUME_MESSAGE_LOGGING(MessageData):
+class MDF_RESUME_MESSAGE_LOGGING(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 59
     type_name: ClassVar[str] = "RESUME_MESSAGE_LOGGING"
     type_hash: ClassVar[int] = 0x0D1A3E77
@@ -292,7 +292,7 @@ class MDF_RESUME_MESSAGE_LOGGING(MessageData):
 
 
 @pyrtma.message_def
-class MDF_RESET_MESSAGE_LOG(MessageData):
+class MDF_RESET_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 60
     type_name: ClassVar[str] = "RESET_MESSAGE_LOG"
     type_hash: ClassVar[int] = 0x68EC4AAB
@@ -302,7 +302,7 @@ class MDF_RESET_MESSAGE_LOG(MessageData):
 
 
 @pyrtma.message_def
-class MDF_DUMP_MESSAGE_LOG(MessageData):
+class MDF_DUMP_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 61
     type_name: ClassVar[str] = "DUMP_MESSAGE_LOG"
     type_hash: ClassVar[int] = 0xF9D7E2BF
@@ -312,7 +312,7 @@ class MDF_DUMP_MESSAGE_LOG(MessageData):
 
 
 @pyrtma.message_def
-class MDF_TIMING_MESSAGE(MessageData):
+class MDF_TIMING_MESSAGE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 80
     type_name: ClassVar[str] = "TIMING_MESSAGE"
     type_hash: ClassVar[int] = 0x3595C23E
@@ -328,7 +328,7 @@ class MDF_TIMING_MESSAGE(MessageData):
 
 
 @pyrtma.message_def
-class MDF_FORCE_DISCONNECT(MessageData):
+class MDF_FORCE_DISCONNECT(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 82
     type_name: ClassVar[str] = "FORCE_DISCONNECT"
     type_hash: ClassVar[int] = 0xC37C54E8
@@ -342,7 +342,7 @@ class MDF_FORCE_DISCONNECT(MessageData):
 
 
 @pyrtma.message_def
-class MDF_PAUSE_SUBSCRIPTION(MessageData):
+class MDF_PAUSE_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 85
     type_name: ClassVar[str] = "PAUSE_SUBSCRIPTION"
     type_hash: ClassVar[int] = 0x22338A6D
@@ -356,7 +356,7 @@ class MDF_PAUSE_SUBSCRIPTION(MessageData):
 
 
 @pyrtma.message_def
-class MDF_RESUME_SUBSCRIPTION(MessageData):
+class MDF_RESUME_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 86
     type_name: ClassVar[str] = "RESUME_SUBSCRIPTION"
     type_hash: ClassVar[int] = 0xC56A97F2
@@ -370,7 +370,7 @@ class MDF_RESUME_SUBSCRIPTION(MessageData):
 
 
 @pyrtma.message_def
-class MDF_LM_READY(MessageData):
+class MDF_LM_READY(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 96
     type_name: ClassVar[str] = "LM_READY"
     type_hash: ClassVar[int] = 0x4863B960

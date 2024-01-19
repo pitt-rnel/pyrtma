@@ -10,7 +10,12 @@ MB = TypeVar("MB", bound="MessageBase")
 
 
 # MessageBase Metaclass - (for runtime ctypes field generation)
-class MessageMeta(type(ctypes.Structure)):
+CStructType: type = type(
+    ctypes.Structure
+)  # technically incorrect typehint, but makes mypy happy
+
+
+class MessageMeta(CStructType):
     """MessageMeta metaclass
 
     Responsible for generating ctypes fields from descriptor attributes prior to class creation
@@ -292,7 +297,7 @@ def _to_dict(obj: MessageBase) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: Dictionary
     """
-    data = {}
+    data: Dict[str, Any] = {}
     for _name, ftype in obj._fields_:
         name = _name[1:]
         if issubclass(ftype, MessageBase):

@@ -13,7 +13,7 @@ from ruamel.yaml import YAML
 
 from copy import copy
 from hashlib import sha256
-from typing import List, Optional, Any, Union, Tuple, Dict, Type
+from typing import List, Optional, Any, Union, Tuple, Dict, Type, Literal
 from dataclasses import dataclass, field, is_dataclass, asdict
 
 
@@ -607,6 +607,8 @@ class Parser:
         npad = 0  # padding field count
         n = 0  # field index
 
+        pad_len: Union[int, Literal[""]]
+
         # Loop over all fields in struct
         while n < len(s.fields):
             # Get the next field object
@@ -765,6 +767,7 @@ class Parser:
         }
 
         f = []
+        cobj: Any
         for n, field in enumerate(s.fields):
             if isinstance(field.type_obj, (MDF, SDF)):
                 cobj = self.get_ctype_cls(field.type_obj)

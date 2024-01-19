@@ -671,14 +671,18 @@ class Client(object):
         """Read and discard messages in socket buffer up to timeout.
         Returns: True if all messages available have been read.
         """
-        msg = 1
-        time_remaining = timeout
         start_time = time.perf_counter()
-        while msg is not None and time_remaining > 0:
-            msg = self.read_message(timeout=0)
+
+        def read_and_time():
+            msg = self.read_message(0)
             time_now = time.perf_counter()
             time_waited = time_now - start_time
             time_remaining = timeout - time_waited
+            return msg, time_remaining
+
+        msg, time_remaining = read_and_time()
+        while msg is not None and time_remaining > 0:
+            msg, time_remaining = read_and_time()
         return not msg
 
     def __str__(self) -> str:

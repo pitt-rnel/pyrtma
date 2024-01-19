@@ -68,7 +68,7 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
         ...
 
     @abstractmethod
-    def validate_many(self, value: _V):
+    def validate_many(self, value: Iterable[_V]):
         ...
 
 
@@ -141,7 +141,7 @@ class Float(FloatValidatorBase):
     def __new__(cls, length: int) -> FloatArray[Float]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length: int = 1) -> Union[Float, FloatArray[Float]]:
         if length > 1:
             return FloatArray(Float, length)
         else:
@@ -164,7 +164,7 @@ class Double(FloatValidatorBase):
     def __new__(cls, length: int) -> FloatArray[Double]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Double, FloatArray[Double]]:
         if length > 1:
             return FloatArray(Double, length)
         else:
@@ -269,7 +269,7 @@ class Int8(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Int8]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Int8, IntArray[Int8]]:
         if length > 1:
             return IntArray(Int8, length)
         else:
@@ -296,7 +296,7 @@ class Int16(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Int16]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Int16, IntArray[Int16]]:
         if length > 1:
             return IntArray(Int16, length)
         else:
@@ -323,7 +323,7 @@ class Int32(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Int32]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Int32, IntArray[Int32]]:
         if length > 1:
             return IntArray(Int32, length)
         else:
@@ -350,7 +350,7 @@ class Int64(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Int64]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Int64, IntArray[Int64]]:
         if length > 1:
             return IntArray(Int64, length)
         else:
@@ -377,7 +377,7 @@ class Uint8(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Uint8]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Uint8, IntArray[Uint8]]:
         if length > 1:
             return IntArray(Uint8, length)
         else:
@@ -404,7 +404,7 @@ class Uint16(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Uint16]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Uint16, IntArray[Uint16]]:
         if length > 1:
             return IntArray(Uint16, length)
         else:
@@ -431,7 +431,7 @@ class Uint32(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Uint32]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Uint32, IntArray[Uint32]]:
         if length > 1:
             return IntArray(Uint32, length)
         else:
@@ -458,7 +458,7 @@ class Uint64(IntValidatorBase):
     def __new__(cls, length: int) -> IntArray[Uint64]:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Uint64, IntArray[Uint64]]:
         if length > 1:
             return IntArray(Uint64, length)
         else:
@@ -468,9 +468,13 @@ class Uint64(IntValidatorBase):
         pass
 
 
-class Byte(Uint8, Generic[_P]):
+class Byte(FieldValidator[_P, int], Generic[_P]):
     """Validator for single byte values"""
 
+    _size: ClassVar[int] = 1
+    _unsigned: ClassVar[bool] = True
+    _min: ClassVar[int] = 0
+    _max: ClassVar[int] = 2**8 - 1
     _ctype: ClassVar[Type[ctypes._SimpleCData]] = ctypes.c_ubyte
 
     @overload
@@ -481,7 +485,7 @@ class Byte(Uint8, Generic[_P]):
     def __new__(cls, length: int) -> ByteArray:
         ...
 
-    def __new__(cls, length=1):
+    def __new__(cls, length=1) -> Union[Byte, ByteArray]:
         if length > 1:
             return ByteArray(length)
         else:
@@ -489,6 +493,22 @@ class Byte(Uint8, Generic[_P]):
 
     def __init__(self, *args):
         pass
+
+    @property
+    def size(self) -> int:
+        return self._size
+
+    @property
+    def unsigned(self) -> bool:
+        return self._unsigned
+
+    @property
+    def min(self) -> int:
+        return self._min
+
+    @property
+    def max(self) -> int:
+        return self._max
 
     def __get__(self, obj: _P, objtype=None) -> bytes:
         return getattr(obj, self.private_name).to_bytes(1, "little")
@@ -520,10 +540,10 @@ class Byte(Uint8, Generic[_P]):
             return
 
         if not isinstance(value, (bytes, bytearray)):
-            raise TypeError(f"Expected {value} to be bytes or int")
+            raise TypeError(f"Expected {value!r} to be bytes or int")
 
         if len(value) != 1:
-            raise ValueError(f"Expected {value} to be no longer than 1")
+            raise ValueError(f"Expected {value!r} to be no longer than 1")
 
     def validate_many(self, value: Union[Iterable[int], bytes, bytearray]):
         """Validate multiple byte values
@@ -752,7 +772,7 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
         self._ctype = self._validator._ctype * len
 
     @classmethod
-    def _bound(cls, obj: IntArray[_IV], bound_obj: MessageBase) -> IntArray[_IV]:
+    def _bound(cls, obj: ArrayField[_IV], bound_obj: MessageBase) -> IntArray[_IV]:
         new_obj = super().__new__(cls)
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
@@ -767,7 +787,7 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
         """Return an Array bound to a message obj instance."""
         return IntArray._bound(self, obj)
 
-    def __set__(self, obj: MessageBase, value: IntArray[_IV]):
+    def __set__(self, obj: MessageBase, value: ArrayField[_IV]):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
@@ -808,7 +828,7 @@ class ByteArray(ArrayField[Byte]):
         self._ctype = ctypes.c_ubyte * len
 
     @classmethod
-    def _bound(cls, obj: ByteArray, bound_obj: MessageBase) -> ByteArray:
+    def _bound(cls, obj: ArrayField[Byte], bound_obj: MessageBase) -> ByteArray:
         new_obj = super().__new__(cls)
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
@@ -823,7 +843,7 @@ class ByteArray(ArrayField[Byte]):
         return ByteArray._bound(self, obj)
         # return getattr(obj, self.private_name)
 
-    def __set__(self, obj: MessageBase, value: ByteArray):
+    def __set__(self, obj: MessageBase, value: ArrayField[Byte]):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
@@ -884,7 +904,7 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
         self._ctype = self._validator._ctype * len
 
     @classmethod
-    def _bound(cls, obj: FloatArray[_FPV], bound_obj: MessageBase) -> FloatArray[_FPV]:
+    def _bound(cls, obj: ArrayField[_FPV], bound_obj: MessageBase) -> FloatArray[_FPV]:
         new_obj = super().__new__(cls)
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
@@ -899,7 +919,7 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
         """Return an Array bound to a message obj instance."""
         return FloatArray._bound(self, obj)
 
-    def __set__(self, obj: MessageBase, value: FloatArray[_FPV]):
+    def __set__(self, obj: MessageBase, value: ArrayField[_FPV]):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
 
@@ -935,7 +955,7 @@ class Struct(FieldValidator, Generic[_S]):
     def __new__(cls, _ctype: Type[_S], length: int) -> StructArray[_S]:
         ...
 
-    def __new__(cls, _ctype: Type[_S], length=1):
+    def __new__(cls, _ctype: Type[_S], length=1) -> Union[Struct, StructArray[_S]]:
         if length > 1:
             return StructArray(_ctype, length)
         else:
@@ -1022,6 +1042,14 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
     def __set__(self, obj, value):
         self.validate_array(value)
         setattr(obj, self.private_name, getattr(value._bound_obj, value.private_name))
+
+    @overload
+    def __getitem__(self, key: int) -> _S:
+        ...
+
+    @overload
+    def __getitem__(self, key: slice) -> List[_S]:
+        ...
 
     def __getitem__(self, key) -> Union[_S, List[_S]]:
         if self._bound_obj is None:

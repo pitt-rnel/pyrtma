@@ -8,7 +8,7 @@ import base64
 import json
 import copy
 
-from typing import List, Union, Tuple, Generator, Dict, Any
+from typing import List, Union, Tuple, Generator, Dict, Any, Optional
 from ..message import RTMAJSONEncoder, MessageHeader
 
 
@@ -28,9 +28,9 @@ class QLFileHeader(ctypes.Structure):
 
 
 class QLReader:
-    def __init__(self):
-        self.file_path = None
-        self.defs_path = None
+    def __init__(self) -> None:
+        self.file_path: Optional[pathlib.Path] = None
+        self.defs_path: Optional[pathlib.Path] = None
         self.file_header = QLFileHeader()
         self.headers: List[Dict[str, Any]] = []
         self.offsets: List[int] = []

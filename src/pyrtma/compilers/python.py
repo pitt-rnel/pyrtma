@@ -172,7 +172,7 @@ class PyDefCompiler:
             type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
 
         template = f"""\
-        class {sdf.name}(MessageBase):
+        class {sdf.name}(MessageBase, metaclass=MessageMeta):
             type_name: ClassVar[str] = \"{sdf.name}\"
             type_hash: ClassVar[int] = 0x{sdf.hash[:8].upper()}
             type_size: ClassVar[int] = {sdf.size}
@@ -202,7 +202,7 @@ class PyDefCompiler:
 
         template = f"""\
         @pyrtma.message_def
-        class MDF_{mdf.name}(MessageData):
+        class MDF_{mdf.name}(MessageData, metaclass=MessageMeta):
             type_id: ClassVar[int] = {msg_id}
             type_name: ClassVar[str] = \"{mdf.name}\"
             type_hash: ClassVar[int] = 0x{mdf.hash[:8].upper()}
@@ -225,7 +225,7 @@ class PyDefCompiler:
         import pyrtma
         from typing import ClassVar
 
-        from pyrtma.message_base import MessageBase
+        from pyrtma.message_base import MessageBase, MessageMeta
         from pyrtma.message_data import MessageData
         from pyrtma.validators import Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float, Double, Struct, IntArray, FloatArray, StructArray, Char, String, Byte, ByteArray
         
