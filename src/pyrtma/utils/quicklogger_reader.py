@@ -10,21 +10,21 @@ import copy
 
 from typing import List, Union, Tuple, Generator, Dict, Any, Optional
 from ..message import RTMAJSONEncoder, MessageHeader
+from ..message_base import MessageBase, MessageMeta
+from pyrtma.validators import Uint32
 
 
 def create_unknown(raw: bytes):
     return dict(_unknown=base64.b64encode(raw).decode())
 
 
-class QLFileHeader(ctypes.Structure):
-    _fields_ = [
-        ("format_version", ctypes.c_uint32),
-        ("total_bytes", ctypes.c_uint32),
-        ("num_messages", ctypes.c_uint32),
-        ("message_header_size", ctypes.c_uint32),
-        ("data_block_offset_size", ctypes.c_uint32),
-        ("num_data_bytes", ctypes.c_uint32),
-    ]
+class QLFileHeader(MessageBase, metaclass=MessageMeta):
+    format_version: Uint32 = Uint32()
+    total_bytes: Uint32 = Uint32()
+    num_messages: Uint32 = Uint32()
+    message_header_size: Uint32 = Uint32()
+    data_block_offset_size: Uint32 = Uint32()
+    num_data_bytes: Uint32 = Uint32()
 
 
 class QLReader:
@@ -87,14 +87,14 @@ class QLReader:
                 self.offsets = list(map(int, offsets))
 
                 # Read the entire data block remaining
-                d = f.read()
+                d_bytes = f.read()
 
                 unknown: List[int] = []
                 # Extract the message data for each message
                 for n, offset in enumerate(offsets):
                     header = headers[n]
                     msg_cls = pyrtma.msg_defs.get(header["msg_type"])
-                    raw_bytes = d[offset : offset + header["num_data_bytes"]]
+                    raw_bytes = d_bytes[offset : offset + header["num_data_bytes"]]
 
                     if msg_cls is None:
                         print(f"Unknown message definition: MT={header['msg_type']}")
