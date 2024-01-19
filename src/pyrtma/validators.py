@@ -50,6 +50,9 @@ _V = TypeVar("_V")  # Value
 class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
     """Abstract base class for all message field validator descriptors"""
 
+    def __init__(self):
+        self._ctype: Type[ctypes._CData] = ctypes._CData
+    
     def __set_name__(self, owner: _P, name: str):
         self._owner = owner
         self._public_name = name
@@ -494,7 +497,7 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
         self._validator: FieldValidator = validator()
         self._len = len
         self._bound_obj: Optional[MessageBase] = None
-        # self._ctype = self._validator._ctype * len
+        self._ctype = self._validator._ctype * len
 
     @classmethod
     def _bound(cls, obj: ArrayField[_FV], bound_obj: MessageBase) -> ArrayField[_FV]:
@@ -502,6 +505,7 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
         new_obj._len = obj._len
+        new_obj._ctype = obj._ctype
         new_obj._owner = obj._owner
         new_obj._public_name = obj._public_name
         new_obj._private_name = obj._private_name
@@ -609,6 +613,7 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
         new_obj._len = obj._len
+        new_obj._ctype = obj._ctype
         new_obj._owner = obj._owner
         new_obj._public_name = obj._public_name
         new_obj._private_name = obj._private_name
@@ -665,6 +670,7 @@ class ByteArray(ArrayField[Byte]):
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
         new_obj._len = obj._len
+        new_obj._ctype = obj._ctype
         new_obj._owner = obj._owner
         new_obj._public_name = obj._public_name
         new_obj._private_name = obj._private_name
@@ -741,6 +747,7 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
         new_obj._len = obj._len
+        new_obj._ctype = obj._ctype
         new_obj._owner = obj._owner
         new_obj._public_name = obj._public_name
         new_obj._private_name = obj._private_name
@@ -847,6 +854,7 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         new_obj._bound_obj = bound_obj
         new_obj._validator = obj._validator
         new_obj._len = obj._len
+        new_obj._ctype = obj._ctype
         new_obj._owner = obj._owner
         new_obj._public_name = obj._public_name
         new_obj._private_name = obj._private_name
