@@ -4,9 +4,9 @@ import os
 import sys
 import importlib
 import pyrtma
+import pyrtma.message
 import base64
 import json
-import copy
 import warnings
 
 from typing import List, Union, Tuple, Generator, Dict, Any, Optional
@@ -60,12 +60,15 @@ class QLReader:
         fname = self.defs_path.stem
 
         # Copy the current message def context before importing
-        ctx = copy.deepcopy(pyrtma.msg_defs)
+        ctx = pyrtma.message.get_msg_defs()
 
         sys.path.insert(0, (str(base.absolute())))
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", VersionMismatchWarning)
-            importlib.import_module(fname)
+            if fname in sys.modules:
+                importlib.reload(sys.modules[fname])
+            else:
+                importlib.import_module(fname)
 
         try:
             headers: List[Dict[str, Any]] = []
@@ -97,7 +100,7 @@ class QLReader:
                 # Extract the message data for each message
                 for n, offset in enumerate(offsets):
                     header = headers[n]
-                    msg_cls = pyrtma.msg_defs.get(header["msg_type"])
+                    msg_cls = pyrtma.get_msg_cls(header["msg_type"])
                     raw_bytes = d_bytes[offset : offset + header["num_data_bytes"]]
 
                     if msg_cls is None:
@@ -118,7 +121,7 @@ class QLReader:
 
         finally:
             # Restore the orignal message def context
-            pyrtma.msg_defs = ctx
+            pyrtma.message.set_msg_defs(ctx)
 
         # Store the results in the object
         self.file_header = file_header

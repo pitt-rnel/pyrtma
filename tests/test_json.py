@@ -1,4 +1,5 @@
 import pyrtma
+import pyrtma.message
 import ctypes
 import unittest
 from typing import cast
@@ -37,7 +38,7 @@ def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
 
 class TestJSONConversion(unittest.TestCase):
     def test_dict(self):
-        for mdf in pyrtma.msg_defs.values():
+        for mdf in pyrtma.message.get_msg_defs().values():
             # Fill the message with random data
             in_msg = mdf.from_random()
 
@@ -56,7 +57,7 @@ class TestJSONConversion(unittest.TestCase):
             self.assertEqual(in_dict, out_dict)
 
     def test_json(self):
-        for mdf in pyrtma.msg_defs.values():
+        for mdf in pyrtma.message.get_msg_defs().values():
             # Fill the message with random data
             in_msg = mdf.from_random()
 

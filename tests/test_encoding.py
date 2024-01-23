@@ -5,6 +5,7 @@ import time
 import logging
 
 import pyrtma
+import pyrtma.message
 
 from pyrtma.client import Client
 import pyrtma.manager
@@ -48,7 +49,7 @@ class TestEncoding(unittest.TestCase):
         subscriber.connect(self.addr)
         time.sleep(0.250)
 
-        for mdf in pyrtma.msg_defs.values():
+        for mdf in pyrtma.message.get_msg_defs().values():
             if mdf.type_id > 1000:
                 # Subscribe from message type
                 subscriber.subscribe([mdf.type_id])
