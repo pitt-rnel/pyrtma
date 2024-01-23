@@ -7,10 +7,12 @@ import pyrtma
 import base64
 import json
 import copy
+import warnings
 
 from typing import List, Union, Tuple, Generator, Dict, Any, Optional
 from ..message import RTMAJSONEncoder, MessageHeader
 from ..message_base import MessageBase, MessageMeta
+from ..exceptions import VersionMismatchWarning
 from pyrtma.validators import Uint32
 
 
@@ -61,7 +63,9 @@ class QLReader:
         ctx = copy.deepcopy(pyrtma.msg_defs)
 
         sys.path.insert(0, (str(base.absolute())))
-        importlib.import_module(fname)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", VersionMismatchWarning)
+            importlib.import_module(fname)
 
         try:
             headers: List[Dict[str, Any]] = []

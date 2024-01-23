@@ -26,6 +26,7 @@ dependencies = [
   "websocket-server",
   "rich",
   "black",
+  "packaging",
 ]
 
 [tool.setuptools.packages.find]

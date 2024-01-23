@@ -20,3 +20,9 @@ class InvalidMessageDefinition(RTMAMessageError):
     """Raised when there is message definition is out of sync with sent data."""
 
     pass
+
+
+class VersionMismatchWarning(UserWarning):
+    """Raised when import message defs were compiled with a different pyrtma version"""
+
+    pass

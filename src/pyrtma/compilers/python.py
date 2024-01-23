@@ -224,6 +224,7 @@ class PyDefCompiler:
         import ctypes
 
         import pyrtma
+        from pyrtma.__version__ import check_compiled_version
         from typing import ClassVar
 
         from pyrtma.message_base import MessageBase, MessageMeta
@@ -297,7 +298,8 @@ class PyDefCompiler:
             f.write("\n")
 
             # Version
-            f.write(f'COMPILED_PYRTMA_VERSION: str = "{__version__}"\n\n')
+            f.write(f'COMPILED_PYRTMA_VERSION: str = "{__version__}"\n')
+            f.write("check_compiled_version(COMPILED_PYRTMA_VERSION)\n\n")
 
             f.write("# Constants\n")
             obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]

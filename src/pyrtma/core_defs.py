@@ -2,6 +2,7 @@
 import ctypes
 
 import pyrtma
+from pyrtma.__version__ import check_compiled_version
 from typing import ClassVar
 
 from pyrtma.message_base import MessageBase, MessageMeta
@@ -29,6 +30,7 @@ from pyrtma.validators import (
 
 
 COMPILED_PYRTMA_VERSION: str = "2.0.8"
+check_compiled_version(COMPILED_PYRTMA_VERSION)
 
 # Constants
 MAX_MODULES: int = 200
