@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import copy
 
 from typing import Type, Dict, Any, TypeVar
 
@@ -15,13 +16,13 @@ __all__ = [
     "MessageHeader",
     "MessageData",
     "get_header_cls",
-    "msg_defs",
+    "get_msg_cls",
     "message_def",
     "msg_def",  # deprecated
 ]
 
 # Main Map of all internal message types
-msg_defs: Dict[int, Type[MessageData]] = {}
+_msg_defs: Dict[int, Type[MessageData]] = {}
 
 
 _MD = TypeVar("_MD", bound=MessageData)  # Parent
@@ -29,12 +30,29 @@ _MD = TypeVar("_MD", bound=MessageData)  # Parent
 
 def message_def(msg_cls: Type[_MD], *args, **kwargs) -> Type[_MD]:
     """Decorator to add user message definitions."""
-    msg_defs[msg_cls.type_id] = msg_cls
+    _msg_defs[msg_cls.type_id] = msg_cls
     return msg_cls
 
 
 # backwards compatibility: deprecated name
 msg_def = message_def
+
+
+def set_msg_defs(defs: Dict[int, Type[MessageData]]):
+    _msg_defs.clear()
+    _msg_defs.update(defs)
+
+
+def get_msg_defs() -> Dict[int, Type[MessageData]]:
+    return copy.deepcopy(_msg_defs)
+
+
+def update_msg_defs(defs: Dict[int, Type[MessageData]]):
+    _msg_defs.update(defs)
+
+
+def clear_msg_defs():
+    _msg_defs.clear()
 
 
 def get_msg_cls(id: int) -> Type[MessageData]:
@@ -50,7 +68,7 @@ def get_msg_cls(id: int) -> Type[MessageData]:
         Type[MessageData]: Message class
     """
     try:
-        return msg_defs[id]
+        return _msg_defs[id]
     except KeyError as e:
         raise UnknownMessageType(
             f"There is no message definition associated with id:{id}"
