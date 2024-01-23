@@ -1291,7 +1291,7 @@ class Parser:
             self.parse_options(defs_path)
             coredefs_option = self.compiler_options.get("IMPORT_COREDEFS")
             if coredefs_option:
-                self.IMPORT_COREDEFS = coredefs_option.value
+                self.IMPORT_COREDEFS = bool(coredefs_option.value)
             else:
                 self.IMPORT_COREDEFS = True
 
