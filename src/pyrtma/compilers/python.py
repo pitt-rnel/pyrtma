@@ -234,63 +234,6 @@ class PyDefCompiler:
         """
         return dedent(s)
 
-    def generate_type_info(self) -> str:
-        s = "# Collect all info into one object\n"
-        s += "class _constants:\n"
-        obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
-        for obj in self.parser.constants.values():
-            s += f"{TAB}{obj.name} = {obj.value}\n"
-        for obj in self.parser.string_constants.values():
-            s += f"{TAB}{obj.name} = {obj.value}\n"
-        s += "\n" * 2
-
-        s += "class _HID:\n"
-        for obj in self.parser.host_ids.values():
-            s += f"{TAB}{obj.name} = {obj.value}\n"
-        s += "\n" * 2
-
-        s += "class _MID:\n"
-        for obj in self.parser.module_ids.values():
-            s += f"{TAB}{obj.name} = {obj.value}\n"
-        s += "\n" * 2
-
-        s += "class _aliases:\n"
-        for obj in self.parser.aliases.values():
-            s += f"{TAB}{obj.name} = {obj.name}\n"
-        s += "\n" * 2
-
-        s += "class _SDF:\n"
-        for obj in self.parser.struct_defs.values():
-            s += f"{TAB}{obj.name} = {obj.name}\n"
-        s += "\n" * 2
-
-        s += "class _MT:\n"
-        for obj in self.parser.message_ids.values():
-            s += f"{TAB}{obj.name} = {obj.value}\n"
-        s += "\n" * 2
-
-        s += "class _MDF:\n"
-        for obj in self.parser.message_defs.values():
-            mdf_txt = f"{TAB}{obj.name} = MDF_{obj.name}\n"
-            if len(mdf_txt) > DEFAULT_BLACK_LEN:
-                mdf_txt = f"{TAB}{obj.name} = (\n{TAB*2}MDF_{obj.name}\n{TAB})\n"
-            s += mdf_txt
-        s += "\n" * 2
-
-        s += "class _RTMA:\n"
-        s += f"{TAB}constants = _constants\n"
-        s += f"{TAB}HID = _HID\n"
-        s += f"{TAB}MID = _MID\n"
-        s += f"{TAB}aliases = _aliases\n"
-        s += f"{TAB}MT = _MT\n"
-        s += f"{TAB}MDF = _MDF\n"
-        s += f"{TAB}SDF = _SDF\n"
-        s += "\n" * 2
-
-        s += "RTMA: _RTMA = _RTMA()"
-
-        return dedent(s)
-
     def generate(self, out_filepath: pathlib.Path):
         with open(out_filepath, mode="w") as f:
             f.write(self.generate_docstr())
@@ -342,7 +285,5 @@ class PyDefCompiler:
                 f.write(self.generate_msg_def(obj))
                 f.write("\n\n")
 
-            f.write(self.generate_type_info())
-            f.write("\n")
         # run black formatter
         subprocess.run([sys.executable, "-m", "black", out_filepath], cwd=os.getcwd())
