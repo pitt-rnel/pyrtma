@@ -211,6 +211,9 @@ class Client(object):
             if self._connected:
                 self.send_signal(cd.MT_DISCONNECT)
         finally:
+            # Allow some time for signal to reach MM
+            time.sleep(0.100)
+            self._sock.shutdown(socket.SHUT_RDWR)
             self._sock.close()
             self._connected = False
             # reset subscribed and paused types

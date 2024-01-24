@@ -6,7 +6,7 @@ import logging
 
 import pyrtma
 from .test_msg_defs import test_defs as td
-
+import time
 from pyrtma.client import Client
 from pyrtma.message import *
 import pyrtma.manager
@@ -37,8 +37,6 @@ class TestSync(unittest.TestCase):
     def tearDown(self):
         self.manager.close()
         self.manager_thread.join()
-        for mod in self.manager.modules:
-            mod.close()
 
     def test_version_mismatch(self):
         publisher = Client()
@@ -64,6 +62,9 @@ class TestSync(unittest.TestCase):
         with self.assertRaises(pyrtma.message.InvalidMessageDefinition):
             msg = subscriber.read_message(timeout=0.100, sync_check=True)
 
+        subscriber.disconnect()
+        publisher.disconnect()
+
     def test_size_mismatch(self):
         publisher = Client()
         publisher.connect(self.addr)
@@ -87,3 +88,7 @@ class TestSync(unittest.TestCase):
 
         with self.assertRaises(pyrtma.message.InvalidMessageDefinition):
             msg = subscriber.read_message(timeout=0.100, sync_check=True)
+
+        subscriber.disconnect()
+        publisher.disconnect()
+        time.sleep(0.5)

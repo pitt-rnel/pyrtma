@@ -39,8 +39,6 @@ class TestEncoding(unittest.TestCase):
     def tearDown(self):
         self.manager.close()
         self.manager_thread.join()
-        for mod in self.manager.modules:
-            mod.close()
 
     def test_message_encoding(self):
         publisher = Client()
@@ -72,3 +70,4 @@ class TestEncoding(unittest.TestCase):
 
         subscriber.disconnect()
         publisher.disconnect()
+        time.sleep(0.5)
