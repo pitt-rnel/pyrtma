@@ -111,6 +111,9 @@ class Message:
             self.header.pretty_print(add_tabs) + "\n" + self.data.pretty_print(add_tabs)
         )
 
+    def __str__(self) -> str:
+        return self.pretty_print()
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert message to dictionary
 
@@ -130,11 +133,9 @@ class Message:
         """
         d = dict(header=self.header.to_dict(), data=self.data.to_dict())
         if minify:
-            return json.dumps(
-                self, cls=RTMAJSONEncoder, separators=(",", ":"), **kwargs
-            )
+            return json.dumps(d, cls=RTMAJSONEncoder, separators=(",", ":"), **kwargs)
         else:
-            return json.dumps(self, cls=RTMAJSONEncoder, indent=2, **kwargs)
+            return json.dumps(d, cls=RTMAJSONEncoder, indent=2, **kwargs)
 
     @classmethod
     def from_json(cls, s: str) -> Message:
@@ -171,3 +172,14 @@ class Message:
         obj = cls(hdr, msg_data)
 
         return obj
+
+    @classmethod
+    def copy(cls, m: Message) -> Message:
+        """Generate a copy of a message structure
+
+        Args:
+            m: Message structure to copy
+        """
+        return Message(
+            MessageHeader.from_buffer_copy(m.header), m.data.from_buffer_copy(m.data)
+        )
