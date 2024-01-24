@@ -1148,9 +1148,7 @@ class Parser:
             if isinstance(e, int):
                 reserved.append(e)
             elif isinstance(e, str):
-                m = re.search(
-                    r"\s*(?P<start>[0-9]+)\s*(\-|to)\s*(?P<end>[0-9]+)\s*", e
-                )
+                m = re.search(r"\s*(?P<start>[0-9]+)\s*(\-|to)\s*(?P<end>[0-9]+)\s*", e)
                 if m is None:
                     raise RTMASyntaxError(f"_RESERVED_.id has invalid entry: {e}")
 
@@ -1180,7 +1178,7 @@ class Parser:
 
         # Parse the yaml file
         try:
-            yaml = YAML(typ="safe", pure=True) #typ="unsafe", pure=True)
+            yaml = YAML(typ="safe", pure=True)  # typ="unsafe", pure=True)
             data = yaml.load(text)
         except Exception as e:
             raise YAMLSyntaxError(
@@ -1197,7 +1195,7 @@ class Parser:
 
         # Parse the yaml file
         try:
-            yaml = YAML(typ='safe') #typ="unsafe", pure=True)
+            yaml = YAML(typ="safe")  # typ="unsafe", pure=True)
             data = yaml.load(text)
         except Exception as e:
             raise YAMLSyntaxError(
@@ -1276,12 +1274,12 @@ class Parser:
     def check_key_value_separation(self, text: str):
         for n, line in enumerate(text.splitlines(), start=1):
             # strip comments
-            if '#' in line:
-                idx = line.index('#')
+            if "#" in line:
+                idx = line.index("#")
                 line = line[:idx]
             if ":" in line:
-                idx = line.index(':') # check first :
-                if idx+1 < len(line) and not line[idx+1].isspace():
+                idx = line.index(":")  # check first :
+                if idx + 1 < len(line) and not line[idx + 1].isspace():
                     raise RTMASyntaxError(
                         f"Key-Value pairs must be separated with a ':' followed by a space. Add a space after the colon.\n{self.current_file}: line {n}\n{line}"
                     )

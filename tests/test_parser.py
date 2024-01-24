@@ -529,7 +529,7 @@ class TestParser(unittest.TestCase):
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
-        # Illegal field aname
+        # Illegal field name
         text = textwrap.dedent(
             """
             message_defs:
@@ -634,7 +634,6 @@ class TestParser(unittest.TestCase):
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.InvalidTypeError):
             self.parser.parse(self.tmp.path)
-
 
         text = textwrap.dedent(
             """
