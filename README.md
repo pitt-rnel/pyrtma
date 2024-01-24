@@ -131,8 +131,10 @@ message_defs:
 
     # A block of message ids can be reserved by a file for future use
     # Ranges are inclusive on both ends
+    # Note that ':' cannot be used to indicate a range, as this will cause
+    # the yaml parser to throw an error
     _RESERVED_:
-        id: [1000, 1002:1005, 1006 - 1008, 1009 to 1012]
+        id: [1000, 1002 - 1008, 1009 to 1012]
 ```
 
 Run the following command to compile the yaml file into Python, C, Matlab, or Javascript files. This will output a message.(py|h|m|js) file.

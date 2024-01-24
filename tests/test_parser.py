@@ -622,8 +622,19 @@ class TestParser(unittest.TestCase):
             """
         )
         self.tmp.write(text)
+        with self.assertRaises(pyrtma.parser.YAMLSyntaxError):
+            self.parser.parse(self.tmp.path)
+
+        text = textwrap.dedent(
+            """
+            message_defs:
+                _RESERVED_: [1-2-10]
+            """
+        )
+        self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.InvalidTypeError):
             self.parser.parse(self.tmp.path)
+
 
         text = textwrap.dedent(
             """
