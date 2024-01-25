@@ -5,19 +5,71 @@ import sys
 import importlib
 import pyrtma
 import pyrtma.message
-import base64
 import json
 import warnings
 
-from typing import List, Union, Tuple, Generator, Dict, Any, Optional
-from ..message import RTMAJSONEncoder, MessageHeader
+from typing import List, Union, Tuple, Generator, Dict, Any, Optional, Type
+from ..validators import ByteArray
+from ..message import RTMAJSONEncoder, Message, MessageHeader, MessageData
 from ..message_base import MessageBase, MessageMeta
 from ..exceptions import VersionMismatchWarning
-from pyrtma.validators import Uint32
+from pyrtma.validators import Uint32, String
 
 
-def create_unknown(raw: bytes):
-    return dict(_unknown=base64.b64encode(raw).decode())
+_unknown: Dict[int, Type[MessageData]] = {}
+
+
+def legacy_variable_len_msg(msg_type: int) -> bool:
+    var_msgs = set([31, 33, 34, 35, 37, 38, 46, 47, 64, 66, 67, 68, 77, 91, 93])
+    return msg_type in var_msgs
+
+
+def create_unknown(hdr: MessageHeader, raw: bytes) -> MessageData:
+    if legacy_variable_len_msg(hdr.msg_type):
+        name = f"LegacyMessageDef_{hdr.msg_type:04d}"
+        cls = _unknown.get(hdr.msg_type)
+        if cls is None:
+            cls = type(
+                name,
+                (MessageData,),
+                dict(
+                    metaclass=MessageMeta,
+                    type_name=name,
+                    type_id=hdr.msg_type,
+                    type_size=max(hdr.num_data_bytes, len(raw)),
+                    var_length_text=String(256),
+                ),
+            )
+
+        obj = cls()
+        obj.var_length_text = raw[: min(256, len(raw))].decode()
+
+    else:
+        if len(raw) == hdr.num_data_bytes:
+            name = f"UnknownMessageDef_{hdr.msg_type:04d}"
+        else:
+            name = f"InvalidMessageDef_{hdr.msg_type:04d}"
+
+        cls = _unknown.get(hdr.msg_type)
+        if cls is None:
+            cls = type(
+                name,
+                (MessageData,),
+                dict(
+                    metaclass=MessageMeta,
+                    type_name=name,
+                    type_id=hdr.msg_type,
+                    type_size=max(hdr.num_data_bytes, len(raw)),
+                    raw=ByteArray(max(hdr.num_data_bytes, len(raw))),
+                ),
+            )
+
+        obj = cls()
+        obj.raw[:] = raw
+
+    _unknown[hdr.msg_type] = cls
+
+    return obj
 
 
 class QLFileHeader(MessageBase, metaclass=MessageMeta):
@@ -34,9 +86,12 @@ class QLReader:
         self.file_path: Optional[pathlib.Path] = None
         self.defs_path: Optional[pathlib.Path] = None
         self.file_header = QLFileHeader()
-        self.headers: List[Dict[str, Any]] = []
+        self.headers: List[MessageHeader] = []
         self.offsets: List[int] = []
-        self.data: List[Dict[str, Any]] = []
+        self.data: List[MessageData] = []
+        self.messages: List[Message] = []
+        self.context: Dict[str, Any] = {}
+        self.skipped = 0
 
     def clear(self):
         self.file_path = None
@@ -45,6 +100,9 @@ class QLReader:
         self.headers.clear()
         self.offsets.clear()
         self.data.clear()
+        self.context.clear()
+        self.messages.clear()
+        self.skipped = 0
 
     def load(
         self,
@@ -52,6 +110,7 @@ class QLReader:
         msgdefs: Union[str, os.PathLike],
         skip_unknown: bool = True,
     ):
+        self.clear()
         self.defs_path = pathlib.Path(msgdefs)
         self.file_path = pathlib.Path(binfile)
 
@@ -66,13 +125,19 @@ class QLReader:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", VersionMismatchWarning)
             if fname in sys.modules:
-                importlib.reload(sys.modules[fname])
+                mod = importlib.reload(sys.modules[fname])
             else:
-                importlib.import_module(fname)
+                mod = importlib.import_module(fname)
+
+        # Cache all the user defined objects associated with the data
+        self.context = mod.get_context()
 
         try:
-            headers: List[Dict[str, Any]] = []
-            data: List[Dict[str, Any]] = []
+            messages = []
+            headers = []
+            data = []
+
+            mt_to_mdf = {v.type_id: v for v in self.context["mdf"].values()}
 
             with open(self.file_path, "rb") as f:
                 # Parse binary file header
@@ -84,7 +149,7 @@ class QLReader:
                 # Extract the message headers
                 for _ in range(file_header.num_messages):
                     raw = f.read(msg_header_size)
-                    headers.append(MessageHeader.from_buffer_copy(raw).to_dict())
+                    headers.append(MessageHeader.from_buffer_copy(raw))
 
                 # Extract the message data offsets for each message
                 offset_size = file_header.data_block_offset_size
@@ -100,24 +165,25 @@ class QLReader:
                 # Extract the message data for each message
                 for n, offset in enumerate(offsets):
                     header = headers[n]
-                    msg_cls = pyrtma.get_msg_cls(header["msg_type"])
-                    raw_bytes = d_bytes[offset : offset + header["num_data_bytes"]]
+                    msg_cls = mt_to_mdf.get(header.msg_type)
+                    raw_bytes = d_bytes[offset : offset + header.num_data_bytes]
 
                     if msg_cls is None:
-                        print(f"Unknown message definition: MT={header['msg_type']}")
-                        msg = create_unknown(raw_bytes)
+                        print(f"Unknown message definition: MT={header.msg_type}")
+                        msg_data = create_unknown(header, raw_bytes)
                         unknown.append(n)
 
-                    elif msg_cls.type_size != header["num_data_bytes"]:
+                    elif msg_cls.type_size != header.num_data_bytes:
                         print(
-                            f"Warning: Message header indicates a message data size ({header['num_data_bytes']}) that does not match the expected size of message type {msg_cls.type_name} ({msg_cls.type_size}). Message definitions may be out of sync."
+                            f"Warning: Message header indicates a message data size ({header.num_data_bytes}) that does not match the expected size of message type {msg_cls.type_name} ({msg_cls.type_size}). Message definitions may be out of sync."
                         )
-                        msg = create_unknown(raw_bytes)
+                        msg_data = create_unknown(header, raw_bytes)
                         unknown.append(n)
                     else:
-                        msg = msg_cls.from_buffer_copy(raw_bytes).to_dict()
+                        msg_data = msg_cls.from_buffer_copy(raw_bytes)
 
-                    data.append(msg)
+                    data.append(msg_data)
+                    messages.append(Message(header, msg_data))
 
         finally:
             # Restore the orignal message def context
@@ -127,15 +193,19 @@ class QLReader:
         self.file_header = file_header
         self.headers = []
         self.data = []
+        self.messages = []
         if skip_unknown:
-            for n, (h, d) in enumerate(zip(headers, data, strict=True)):
+            self.skipped = len(unknown)
+            for n, (h, d, m) in enumerate(zip(headers, data, messages, strict=True)):
                 if n not in unknown:
                     self.headers.append(h)
                     self.data.append(d)
+                    self.messages.append(m)
 
         else:
-            self.headers = headers
-            self.data = data
+            self.headers.extend(headers)
+            self.data.extend(data)
+            self.messages.extend(messages)
 
     def export_json(self, file: Union[str, os.PathLike]):
         save_path = pathlib.Path(file)
@@ -148,34 +218,25 @@ class QLReader:
 
         # Write each message json object on a separate line
         with open(save_path, "w") as f:
-            for header, data in zip(self.headers, self.data, strict=True):
+            for msg in self.messages:
                 # Open json object
                 f.write("{")
 
                 # Header json object
-                f.write('"header":')
-                f.write(json.dumps(header, cls=RTMAJSONEncoder, separators=(",", ":")))
-
-                f.write(",")
-
-                # Data json object
-                f.write('"data":')
-                f.write(json.dumps(data, cls=RTMAJSONEncoder, separators=(",", ":")))
+                f.write(msg.to_json(minify=True))
 
                 # Close json object
                 f.write("}\n")
 
-    def iter_by_mt(
-        self, msg_type: int
-    ) -> Generator[Tuple[Dict[str, Any], Dict[str, Any]], Any, None]:
-        for header, data in zip(self.headers, self.data, strict=True):
-            if header["msg_type"] == msg_type:
-                yield (header, data)
+    def iter_by_mt(self, msg_type: int) -> Generator[Message, Any, None]:
+        for msg in self.messages:
+            if msg.type_id == msg_type:
+                yield (msg)
 
     def iter_by_src(
         self,
         mod_id: int,
-    ) -> Generator[Tuple[Dict[str, Any], Dict[str, Any]], Any, None]:
-        for header, data in zip(self.headers, self.data, strict=True):
-            if header["src_mod_id"] == mod_id:
-                yield (header, data)
+    ) -> Generator[Message, Any, None]:
+        for msg in self.messages:
+            if msg.header.src_mod_id == mod_id:
+                yield msg
