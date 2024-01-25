@@ -920,7 +920,7 @@ class Parser:
 
                 if not isinstance(fstr, str):
                     raise InvalidTypeError(
-                        f"Field types must be a string not type not {type(fstr).__name__}: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
+                        f"Field types must be a string not {type(fstr).__name__}: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
                     )
 
                 m = re.match(FIELD_REGEX, fstr)
