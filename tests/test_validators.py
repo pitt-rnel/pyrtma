@@ -401,6 +401,25 @@ class TestEncoding(unittest.TestCase):
 
         A.struct_arr[0] = VALIDATOR_STRUCT()
 
+        A.int8_arr[:] = [1, 2, 3, 4]
+        A.int16_arr[:] = [1, 2, 3, 4]
+        A.int32_arr[:] = [1, 2, 3, 4]
+        A.int64_arr[:] = [1, 2, 3, 4]
+        A.uint8_arr[:] = [1, 2, 3, 4]
+        A.uint16_arr[:] = [1, 2, 3, 4]
+        A.uint32_arr[:] = [1, 2, 3, 4]
+        A.uint64_arr[:] = [1, 2, 3, 4]
+        A.float_arr[:] = [1.0, 2.0, 3.0, 4.0]
+        A.double_arr[:] = [1.0, 2.0, 3.0, 4.0]
+
+        A.float_arr[:] = [1, 2, 3, 4]
+        A.double_arr[:] = [1, 2, 3, 4]
+
+        A.byte_arr[:] = [1, 2, 3, 4]
+        A.byte_arr[:] = b"ABCD"
+        A.byte_arr[:] = bytes(4)
+        A.byte_arr[:] = bytearray(4)
+
     def test_refs(self):
         A = MDF_VALIDATOR_A()
         B = MDF_VALIDATOR_A()
