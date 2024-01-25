@@ -343,8 +343,8 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
     def max(self) -> int:
         return self._max
 
-    def __get__(self, obj: _P, objtype=None) -> bytes:
-        return getattr(obj, self._private_name).to_bytes(1, "little")
+    def __get__(self, obj: _P, objtype=None) -> int:
+        return getattr(obj, self._private_name)
 
     def __set__(self, obj: _P, value: Union[int, bytes, bytearray]):
         self.validate_one(value)

@@ -314,7 +314,7 @@ def _to_dict(obj: MessageBase) -> Dict[str, Any]:
             else:
                 data[name] = getattr(obj, name)[:]
         elif ftype is ctypes.c_ubyte:
-            data[name] = int.from_bytes(getattr(obj, name), "little")
+            data[name] = getattr(obj, name)
         else:
             data[name] = getattr(obj, name)
 
