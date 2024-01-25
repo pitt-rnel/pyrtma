@@ -253,7 +253,7 @@ class RTMAJSONEncoder(json.JSONEncoder):
         Returns:
             Any: Serializable data
         """
-        if isinstance(o, MessageBase) or (is_dataclass(o) and hasattr(o, "to_dict")):
+        if isinstance(o, MessageBase) or (hasattr(o, "to_dict")):
             return o.to_dict()
 
         if isinstance(o, ctypes.Array):
