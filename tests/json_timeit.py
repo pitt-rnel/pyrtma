@@ -1,4 +1,5 @@
 import pyrtma
+from pyrtma.message import get_msg_defs
 import timeit
 import statistics
 
@@ -9,9 +10,10 @@ from .test_msg_defs.test_defs import *
 
 def convert_to_json(n=1000):
     stats = {}
-    for mdf in pyrtma.msg_defs.values():
+    for mdf in get_msg_defs().values():
         # Fill the message with random data
         hdr = pyrtma.MessageHeader()
+        hdr.msg_type = mdf.type_id
         data = mdf.from_random()
         msg = pyrtma.Message(hdr, data)
 
@@ -27,9 +29,10 @@ def convert_to_json(n=1000):
 
 def convert_from_json(n=1000):
     stats = {}
-    for mdf in pyrtma.msg_defs.values():
+    for mdf in get_msg_defs().values():
         # Fill the message with random data
         hdr = pyrtma.MessageHeader()
+        hdr.msg_type = mdf.type_id
         data = mdf.from_random()
         msg = pyrtma.Message(hdr, data)
         json_msg = msg.to_json(minify=True)
