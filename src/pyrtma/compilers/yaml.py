@@ -45,16 +45,20 @@ class YAMLCompiler:
         for k, v in meta_dict.items():
             if d["metadata"] is None:
                 d["metadata"] = {}
-            if d["metadata"] and isinstance(v, dict) and len(v) == 0:
+            if isinstance(d["metadata"], dict) and isinstance(v, dict) and len(v) == 0:
                 d["metadata"][k] = None
-            elif d["metadata"]:
+            elif isinstance(d["metadata"], dict):
                 d["metadata"][k] = v
         for k, v in options_dict.items():
             if d["compiler_options"] is None:
                 d["compiler_options"] = {}
-            if d["compiler_options"] and isinstance(v, dict) and len(v) == 0:
+            if (
+                isinstance(d["compiler_options"], dict)
+                and isinstance(v, dict)
+                and len(v) == 0
+            ):
                 d["compiler_options"][k] = None
-            elif d["compiler_options"]:
+            elif isinstance(d["compiler_options"], dict):
                 d["compiler_options"][k] = v
 
         yaml.dump(d, out_filepath)
