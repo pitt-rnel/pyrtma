@@ -308,7 +308,12 @@ RTMAObject = Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, MDF, SDF, 
 class Parser:
     """Parser class"""
 
-    def __init__(self, debug: bool = False):
+    def __init__(
+        self,
+        debug: bool = False,
+        validate_alignment: bool = True,
+        auto_pad: bool = True,
+    ):
         """Parser class
 
         Args:
@@ -318,6 +323,8 @@ class Parser:
         self.current_file = pathlib.Path()
         self.root_path = pathlib.Path()
         self.debug = debug
+        self.validate_alignment = validate_alignment
+        self.auto_pad = auto_pad
 
         self.yaml_dict: Dict[str, Dict[str, Any]] = dict(
             metadata={},
@@ -660,7 +667,7 @@ class Parser:
             name, int(value), src=self.trim_root(self.current_file)
         )
 
-    def check_alignment(self, s: Union[SDF, MDF], auto_pad: bool = True):
+    def check_alignment(self, s: Union[SDF, MDF]):
         """Confirm 64 bit alignment of structures"""
 
         # This value will represent the memory address currently pointed to in the struct layout
@@ -689,7 +696,7 @@ class Parser:
                 continue
 
             # Bail if auto padding is disabled
-            if not auto_pad:
+            if not self.auto_pad:
                 raise AlignmentError(
                     f"{s.name}.{field.name} does not start on a valid memory boundary for type: {field.type_name}. Add padding fields prior for 64-bit alignment."
                 )
@@ -748,7 +755,7 @@ class Parser:
                 break
 
             # Bail if auto padding is disabled
-            if not auto_pad:
+            if not self.auto_pad:
                 raise AlignmentError(
                     f"{s.name} requires trailing padding of {pad_len} bytes for 64-bit alignment."
                 )
@@ -877,7 +884,8 @@ class Parser:
         ), f"Message and Struct definitions must have at least one field: {mdf.name} -> {self.current_file}"
 
         # Check memory alignment layout
-        self.check_alignment(mdf, auto_pad=True)
+        if self.validate_alignment:
+            self.check_alignment(mdf)
 
         # Check size
         if mdf.size > 65535:

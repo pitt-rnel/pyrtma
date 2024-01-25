@@ -28,6 +28,8 @@ def compile(
     info: bool = False,
     combined: bool = False,
     debug: bool = False,
+    validate_alignment: bool = True,
+    auto_pad: bool = True,
 ):
     """compile message defs
 
@@ -41,6 +43,9 @@ def compile(
         info (bool, optional): Output info .txt file. Defaults to False.
         combined (bool, optional): Output combined YAML file. Defaults to False.
         debug (bool, optional): Debug mode. Defaults to False.
+        validate_alignment(bool, optional): Validate message 64-bit alignment. Defaults to True.
+        auto_pad(bool, optional): Automatically pad messages failing 64-bit alignment validation. Defaults to True. Has no effect if validate_alignment is False.
+
 
     Raises:
         FileFormatError: Issue with input file format
@@ -72,7 +77,9 @@ def compile(
     # else continue with compiler V2
 
     defs_file = defs_files[0]
-    parser = Parser(debug=debug)
+    parser = Parser(
+        debug=debug, validate_alignment=validate_alignment, auto_pad=auto_pad
+    )
     parser.parse(pathlib.Path(defs_file))
 
     if debug:
@@ -241,6 +248,20 @@ def main():
         dest="debug",
         action="store_true",
         help="Debug compiler",
+    )
+
+    parser.add_argument(
+        "--no_val_align",
+        dest="validate_alignment",
+        action="store_false",
+        help="Disable 64-bit alignment validation",
+    )
+
+    parser.add_argument(
+        "--no_auto_pad",
+        dest="auto_pad",
+        action="store_false",
+        help="Disable 64-bit alignment auto-padding",
     )
 
     args = parser.parse_args()
