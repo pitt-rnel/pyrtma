@@ -99,10 +99,11 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
             TypeError: Wrong type
             ValueError: Value cannot be precisely represented with this datatype
         """
+
         if not isinstance(value, numbers.Number):
             raise TypeError(f"Expected {value} to be a float")
 
-        if not math.isclose(self._ctype(value).value, value, rel_tol=1e-6):
+        if math.isinf(self._ctype(value).value):
             raise ValueError(
                 f"The {value} can not be represented as a {type(self).__name__}"
             )
@@ -120,7 +121,7 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
         if any(not isinstance(v, numbers.Number) for v in value):
             raise TypeError(f"Expected {value!r} to be a float.")
 
-        if any(not math.isclose(self._ctype(v).value, v, rel_tol=1e-6) for v in value):
+        if any(math.isinf(self._ctype(v).value) for v in value):
             raise ValueError(
                 f"{value} contains value(s) that can not be represented as a {type(self).__name__}"
             )
