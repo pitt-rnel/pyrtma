@@ -51,7 +51,8 @@ class TestEncoding(unittest.TestCase):
             if mdf.type_id > 1000:
                 # Subscribe from message type
                 subscriber.subscribe([mdf.type_id])
-                subscriber.wait_for_acknowledgement()
+                subscriber._wait_for_acknowledgement()
+                time.sleep(0.01)
 
                 # Publish a random message of the subscribed type
                 in_msg = mdf.from_random()
@@ -66,7 +67,7 @@ class TestEncoding(unittest.TestCase):
 
                 # Unsubscribe from message type
                 subscriber.unsubscribe([mdf.type_id])
-                subscriber.wait_for_acknowledgement()
+                subscriber._wait_for_acknowledgement()
 
         subscriber.disconnect()
         publisher.disconnect()

@@ -8,6 +8,7 @@ import select
 import time
 import os
 import ctypes
+from contextlib import contextmanager
 
 from .message import Message, get_msg_cls
 from .message_data import MessageData
@@ -196,7 +197,7 @@ class Client(object):
         msg.daemon_status = int(daemon_status)
 
         self.send_message(msg)
-        ack_msg = self.wait_for_acknowledgement()
+        ack_msg = self._wait_for_acknowledgement()
 
         # save own module ID from ACK if asked to be assigned dynamic ID
         if self._module_id == 0:
@@ -360,6 +361,48 @@ class Client(object):
     def resume_all_subscriptions(self):
         """Resume all paused subscriptions"""
         self.resume_subscription(self.paused_subscribed_types)
+
+    @contextmanager
+    def subscription_context(self, msg_list: Iterable[int]):
+        """Context manager to subscribe to a list of message types
+
+        Message types will automatically unsubscribe after exiting context.
+
+        Args:
+            msg_list (Iterable[int]): A list of numeric message IDs to subscribe to
+        """
+        msg_list = list(msg_list)  # cast arbitrary iterable to list
+        for mt in msg_list:
+            if mt in self.subscribed_types:
+                warn(
+                    f"Message ID {mt} is already subscribed, ignored from subscription_context"
+                )
+                msg_list.remove(mt)
+
+        self.subscribe(msg_list)
+        yield
+        self.unsubscribe(msg_list)
+
+    @contextmanager
+    def paused_subscription_context(self, msg_list: Iterable[int]):
+        """Context manager to pause subscriptions to a list of message types
+
+        Message types will automatically resume subscriptions after exiting context.
+
+        Args:
+            msg_list (Iterable[int]): A list of numeric message IDs to temporarily unsubscribe to
+        """
+        msg_list = list(msg_list)  # cast arbitrary iterable to list
+        for mt in msg_list:
+            if mt not in self.subscribed_types:
+                warn(
+                    f"Message ID {mt} is not subscribed, ignored from paused_subscription_context"
+                )
+                msg_list.remove(mt)
+
+        self.pause_subscription(msg_list)
+        yield
+        self.resume_subscription(msg_list)
 
     @requires_connection
     def send_signal(
@@ -547,7 +590,7 @@ class Client(object):
         Args:
             timeout (optional): Timeout to wait for a message to be available for reading.
                 Defaults to -1 (blocking).
-            ack (optional): Reserved for future use. Defaults to False.
+            ack (optional): Primarily for internal use. When True, will not discard ACK messages. Defaults to False.
             sync_check (optional): Validate message definition matches header version. Defaults to False.
 
         Raises:
@@ -556,6 +599,32 @@ class Client(object):
         Returns:
             Message object. If no message is read before timeout, returns None.
         """
+        t0 = time.perf_counter()
+        M = self._read_message(timeout, ack, sync_check)
+
+        # filter out unsubscribed messages that may still be in queue
+        while M and M.header.msg_type not in self.subscribed_types:
+            if (
+                ack and M.header.msg_type == cd.MT_ACKNOWLEDGE
+            ):  # ack input allows ACK to be read and not discarded
+                break
+            if timeout is None:  # blocking
+                t_rem = None  # continue blocking until subscribed message recv'd
+            elif timeout == 0:  # no timeout
+                M = None  # discard unsub'd msg and break
+                break
+            else:  # subtract time elapsed from timeout and read again
+                t_rem = max(timeout - (time.perf_counter() - t0), 0)
+            M = self._read_message(timeout, ack, sync_check)
+
+        return M
+
+    @requires_connection
+    def _read_message(
+        self, timeout: Union[int, float, None] = -1, ack=False, sync_check=False
+    ) -> Optional[Message]:
+        """Read message without filtering for subscribed messages (helper called by read_message)"""
+
         if timeout is None:
             # Skip select call
             pass
@@ -617,12 +686,10 @@ class Client(object):
 
         return Message(header, data)
 
-    def wait_for_acknowledgement(self, timeout: float = 3) -> Message:
+    def _wait_for_acknowledgement(self, timeout: float = 3) -> Message:
         """Wait for acknowledgement from message manager module
 
         Used internally when acknowledgement replies from message manager are expected
-
-        TODO rename to _wait_for_acknowledgement()?
 
         Args:
             timeout (optional): Timeout in seconds to wait for ack message. Defaults to 3.

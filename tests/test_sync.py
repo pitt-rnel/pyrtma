@@ -46,7 +46,7 @@ class TestSync(unittest.TestCase):
         time.sleep(0.250)
 
         subscriber.subscribe([td.MT_SET_START])
-        subscriber.wait_for_acknowledgement()
+        subscriber._wait_for_acknowledgement()
 
         header = MessageHeader()
         header.msg_type = td.MT_SET_START
@@ -73,7 +73,7 @@ class TestSync(unittest.TestCase):
         time.sleep(0.250)
 
         subscriber.subscribe([td.MT_SET_START])
-        subscriber.wait_for_acknowledgement()
+        subscriber._wait_for_acknowledgement()
 
         header = MessageHeader()
         header.msg_type = td.MT_SET_START
