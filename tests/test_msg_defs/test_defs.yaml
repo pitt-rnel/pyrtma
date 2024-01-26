@@ -1733,21 +1733,21 @@ message_defs:
       uint16: uint16
       uint32: uint32
       uint64: uint64
-      int8_arr: int8[4]
-      int16_arr: int16[4]
-      int32_arr: int32[4]
-      int64_arr: int64[4]
-      uint8_arr: uint8[4]
-      uint16_arr: uint16[4]
-      uint32_arr: uint32[4]
-      uint64_arr: uint64[4]
+      int8_arr: int8[8]
+      int16_arr: int16[8]
+      int32_arr: int32[8]
+      int64_arr: int64[8]
+      uint8_arr: uint8[8]
+      uint16_arr: uint16[8]
+      uint32_arr: uint32[8]
+      uint64_arr: uint64[8]
       byte: byte
-      byte_arr: byte[4]
-      string: char[4]
+      byte_arr: byte[8]
+      string: char[8]
       float: float
       double: double
-      float_arr: float[4]
-      double_arr: double[4]
+      float_arr: float[8]
+      double_arr: double[8]
       struct: VALIDATOR_STRUCT 
-      struct_arr: VALIDATOR_STRUCT[4]
+      struct_arr: VALIDATOR_STRUCT[8]
 

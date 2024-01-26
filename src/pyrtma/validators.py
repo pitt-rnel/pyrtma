@@ -569,8 +569,26 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
         Raises:
             TypeError: Wrong type
         """
+        if not isinstance(value, type(self)):
+            raise TypeError(
+                f"Expected a {self.__class__.__name__}({type(self._validator).__name__}). Got {type(value).__name__}."
+            )
+
         if not isinstance(value._validator, type(self._validator)):
-            raise TypeError(f"Expected an ArrayField({type(self._validator).__name__}")
+            raise TypeError(
+                f"Expected an {self.__class__.__name__}({type(self._validator).__name__}, {len(self)}). Got {type(value).__name__}({type(value._validator).__name__}, {len(value)})."
+            )
+
+        if len(value) != len(self):
+            raise ValueError(
+                f"Array size mismatch. Expected an {self.__class__.__name__}({type(self._validator).__name__}, {len(self)}). Got {type(value).__name__}({type(value._validator).__name__}, {len(value)})."
+            )
+
+        if value._bound_obj is None:
+            raise ValueError(
+                f"The instance of {type(value).__name__}({type(value._validator).__name__}, {len(value)}) is not bound to a MessageBase object."
+            )
+
         return
 
 
@@ -953,6 +971,24 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         Raises:
             TypeError: Wrong type
         """
-        if not isinstance(value._validator._ctype, type(self._validator._ctype)):
-            raise TypeError(f"Expected a StructArray({self._validator._ctype.__name__}")
+        if not isinstance(value, StructArray):
+            raise TypeError(
+                f"Expected a StructArray({self._validator._ctype.__name__}, {len(self)}). Got {type(value).__name__}."
+            )
+
+        if value._validator._ctype is not self._validator._ctype:
+            raise TypeError(
+                f"Expected a StructArray({self._validator._ctype.__name__}, {len(self)}). Got {type(value).__name__}({value._validator._ctype.__name__}, {len(value)})."
+            )
+
+        if len(value) != len(self):
+            raise ValueError(
+                f"Array size mismatch. Expected an {self.__class__.__name__}({self._validator._ctype.__name__}, {len(self)}). Got {type(value).__name__}({value._validator._ctype.__name__}, {len(value)})."
+            )
+
+        if value._bound_obj is None:
+            raise ValueError(
+                f"The instance of {type(value).__name__}({value._validator._ctype.__name__}, {len(value)}) is not bound to a MessageBase object."
+            )
+
         return

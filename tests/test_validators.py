@@ -354,6 +354,202 @@ class TestEncoding(unittest.TestCase):
         self.assertIsInstance(m.struct_arr[0:2], list)
         self.assertIsInstance(m.struct_arr[0:2][0], VALIDATOR_STRUCT)
 
+    def test_invalid_set_types(self):
+        A = MDF_VALIDATOR_A()
+        B = MDF_VALIDATOR_B()
+
+        with self.assertRaises(TypeError):
+            A.char = 1
+
+        with self.assertRaises(TypeError):
+            A.int8 = "a"
+
+        with self.assertRaises(TypeError):
+            A.int16 = [1, 2, 3]
+
+        with self.assertRaises(TypeError):
+            A.int32 = b"1"
+
+        with self.assertRaises(TypeError):
+            A.int64 = dict()
+
+        with self.assertRaises(TypeError):
+            A.uint8 = "abc"
+
+        with self.assertRaises(TypeError):
+            A.uint16 = object()
+
+        with self.assertRaises(TypeError):
+            A.uint32 = "a"
+
+        with self.assertRaises(TypeError):
+            A.uint64 = "a"
+
+        with self.assertRaises(TypeError):
+            A.float = "a"
+
+        with self.assertRaises(TypeError):
+            A.double = b"1"
+
+        with self.assertRaises(TypeError):
+            A.byte = "a"
+
+        with self.assertRaises(TypeError):
+            A.string = 1
+
+        # Int8
+        with self.assertRaises(TypeError):
+            A.int8_arr = [1, 2, 3, 4]
+
+        with self.assertRaises(ValueError):
+            A.int8_arr = B.int8_arr
+
+        with self.assertRaises(TypeError):
+            A.int8_arr = IntArray(Int16, 4)
+
+        with self.assertRaises(ValueError):
+            A.int8_arr = IntArray(Int8, 4)
+
+        # Int16
+        with self.assertRaises(TypeError):
+            A.int16_arr = [1, 2, 3, 4]
+
+        with self.assertRaises(ValueError):
+            A.int16_arr = B.int16_arr
+
+        with self.assertRaises(TypeError):
+            A.int16_arr = IntArray(Int8, 4)
+
+        with self.assertRaises(ValueError):
+            A.int16_arr = IntArray(Int16, 4)
+
+        # Int32
+        with self.assertRaises(TypeError):
+            A.int32_arr = [1, 2, 3, 4]
+
+        with self.assertRaises(ValueError):
+            A.int32_arr = B.int32_arr
+
+        with self.assertRaises(TypeError):
+            A.int32_arr = IntArray(Int16, 4)
+
+        with self.assertRaises(ValueError):
+            A.int32_arr = IntArray(Int32, 4)
+
+        # Int64
+        with self.assertRaises(TypeError):
+            A.int64_arr = [1, 2, 3, 4]
+
+        with self.assertRaises(ValueError):
+            A.int64_arr = B.int64_arr
+
+        with self.assertRaises(TypeError):
+            A.int64_arr = IntArray(Int16, 4)
+
+        with self.assertRaises(ValueError):
+            A.int64_arr = IntArray(Int64, 4)
+
+        # Uint8
+        with self.assertRaises(TypeError):
+            A.uint8_arr = [1, 2, 3, 4]
+
+        with self.assertRaises(ValueError):
+            A.uint8_arr = B.uint8_arr
+
+        with self.assertRaises(TypeError):
+            A.uint8_arr = IntArray(Int16, 4)
+
+        with self.assertRaises(ValueError):
+            A.uint8_arr = IntArray(Uint8, 4)
+
+        # Uint16
+        with self.assertRaises(TypeError):
+            A.uint16_arr = [1, 2, 3, 4]
+
+        with self.assertRaises(ValueError):
+            A.uint16_arr = B.uint16_arr
+
+        with self.assertRaises(TypeError):
+            A.uint16_arr = IntArray(Int16, 4)
+
+        with self.assertRaises(ValueError):
+            A.uint16_arr = IntArray(Uint16, 4)
+
+        # Uint32
+        with self.assertRaises(TypeError):
+            A.uint32_arr = [1, 2, 3, 4]
+
+        with self.assertRaises(ValueError):
+            A.uint32_arr = B.uint32_arr
+
+        with self.assertRaises(TypeError):
+            A.uint32_arr = IntArray(Int16, 4)
+
+        with self.assertRaises(ValueError):
+            A.uint32_arr = IntArray(Uint32, 4)
+
+        # Uint64
+        with self.assertRaises(TypeError):
+            A.uint64_arr = [1, 2, 3, 4]
+
+        with self.assertRaises(ValueError):
+            A.uint64_arr = B.uint64_arr
+
+        with self.assertRaises(TypeError):
+            A.uint64_arr = IntArray(Int16, 4)
+
+        with self.assertRaises(ValueError):
+            A.uint64_arr = IntArray(Uint64, 4)
+
+        # Float
+        with self.assertRaises(TypeError):
+            A.float_arr = [1, 2, 3, 4]
+
+        with self.assertRaises(ValueError):
+            A.float_arr = B.float_arr
+
+        with self.assertRaises(TypeError):
+            A.float_arr = FloatArray(Double, 4)
+
+        with self.assertRaises(ValueError):
+            A.float_arr = FloatArray(Float, 4)
+
+        # Double
+        with self.assertRaises(TypeError):
+            A.double_arr = [1, 2, 3, 4]
+
+        with self.assertRaises(ValueError):
+            A.double_arr = B.double_arr
+
+        with self.assertRaises(TypeError):
+            A.double_arr = FloatArray(Float, 4)
+
+        with self.assertRaises(ValueError):
+            A.double_arr = FloatArray(Double, 4)
+
+        # Byte
+        with self.assertRaises(TypeError):
+            A.byte_arr = [1, 2, 3, 4]
+
+        with self.assertRaises(ValueError):
+            A.byte_arr = B.byte_arr
+
+        with self.assertRaises(ValueError):
+            A.byte_arr = ByteArray(4)
+
+        # Struct
+        with self.assertRaises(TypeError):
+            A.struct_arr = [1, 2, 3, 4]
+
+        with self.assertRaises(ValueError):
+            A.struct_arr = B.struct_arr
+
+        with self.assertRaises(TypeError):
+            A.struct_arr = StructArray(MDF_VALIDATOR_B, 4)
+
+        with self.assertRaises(ValueError):
+            A.struct_arr = StructArray(VALIDATOR_STRUCT, 4)
+
     def test_valid_set_types(self):
         A = MDF_VALIDATOR_A()
 
