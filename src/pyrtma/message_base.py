@@ -303,18 +303,32 @@ def _to_dict(obj: MessageBase) -> Dict[str, Any]:
         if issubclass(ftype, MessageBase):
             data[name] = _to_dict(getattr(obj, name))
         elif issubclass(ftype, ctypes.Array):
+            # Struct
             if issubclass(ftype._type_, MessageBase):  # type: ignore
                 data[name] = []
                 for elem in getattr(obj, name):
                     data[name].append(_to_dict(elem))
+
+            # String
             elif ftype._type_ is ctypes.c_char:
                 data[name] = getattr(obj, name)
-            elif ftype._type_ is ctypes.c_ubyte:
+
+            # Int8 Array
+            elif ftype._type_ is ctypes.c_byte:
                 data[name] = getattr(obj, name)[:].copy()
+
+            # Uint8 or Byte Array
+            elif ftype._type_ is ctypes.c_ubyte:
+                if type(getattr(obj, name)).__name__ == "ByteArray":
+                    # ByteArray
+                    data[name] = bytes(getattr(obj, name)[:])
+                else:
+                    # Uint8Array
+                    data[name] = getattr(obj, name)[:].copy()
+
+            # Any other Array Type
             else:
                 data[name] = getattr(obj, name)[:]
-        elif ftype is ctypes.c_ubyte:
-            data[name] = getattr(obj, name)
         else:
             data[name] = getattr(obj, name)
 
