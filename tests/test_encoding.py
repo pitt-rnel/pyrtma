@@ -7,7 +7,7 @@ import logging
 import pyrtma
 import pyrtma.message
 
-from pyrtma.client import Client
+from pyrtma.client import Client, client_context
 import pyrtma.manager
 from pyrtma.manager import MessageManager
 
@@ -41,34 +41,25 @@ class TestEncoding(unittest.TestCase):
         self.manager_thread.join()
 
     def test_message_encoding(self):
-        publisher = Client()
-        publisher.connect(self.addr)
-        subscriber = Client()
-        subscriber.connect(self.addr)
-        time.sleep(0.250)
+        with client_context(server_name=self.addr) as publisher:
+            with client_context(server_name=self.addr) as subscriber:
+                time.sleep(0.250)
 
-        for mdf in pyrtma.message.get_msg_defs().values():
-            if mdf.type_id > 1000:
-                # Subscribe from message type
-                subscriber.subscribe([mdf.type_id])
-                subscriber._wait_for_acknowledgement()
-                time.sleep(0.01)
+                for mdf in pyrtma.message.get_msg_defs().values():
+                    if mdf.type_id > 1000:
+                        # Subscribe from message type
+                        with subscriber.subscription_context([mdf.type_id]):
+                            time.sleep(0.01)
 
-                # Publish a random message of the subscribed type
-                in_msg = mdf.from_random()
-                publisher.send_message(in_msg)
+                            # Publish a random message of the subscribed type
+                            in_msg = mdf.from_random()
+                            publisher.send_message(in_msg)
 
-                # Wait for the message and compare for equality of the data segment
-                out_msg = subscriber.read_message(timeout=0.020)
-                if out_msg is None:
-                    self.fail("Subscriber did not receive packet.")
-                else:
-                    self.assertEqual(in_msg, out_msg.data)
+                            # Wait for the message and compare for equality of the data segment
+                            out_msg = subscriber.read_message(timeout=0.020)
+                            if out_msg is None:
+                                self.fail("Subscriber did not receive packet.")
+                            else:
+                                self.assertEqual(in_msg, out_msg.data)
 
-                # Unsubscribe from message type
-                subscriber.unsubscribe([mdf.type_id])
-                subscriber._wait_for_acknowledgement()
-
-        subscriber.disconnect()
-        publisher.disconnect()
         time.sleep(0.5)

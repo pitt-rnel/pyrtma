@@ -665,7 +665,7 @@ class Client(object):
         data = get_msg_cls(header.msg_type)()
         if data.type_size != header.num_data_bytes:
             raise InvalidMessageDefinition(
-                f"Received message header indicating a message data size that does not match the expected size of message type {data.type_name}. Message definitions may be out of sync across systems."
+                f"Received message header indicating a message data size ({header.num_data_bytes}) that does not match the expected size ({data.type_size}) of message type {data.type_name}. Message definitions may be out of sync across systems."
             )
 
         # Note: Ignore the sync check if header.version is not filled in
