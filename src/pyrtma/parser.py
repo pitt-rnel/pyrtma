@@ -1,4 +1,5 @@
 """Message definition YAML parser"""
+
 import re
 import json
 import pathlib

@@ -59,20 +59,16 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
         self._private_name = "_" + name
 
     @abstractmethod
-    def __get__(self, obj: _P, objtype=None):
-        ...
+    def __get__(self, obj: _P, objtype=None): ...
 
     @abstractmethod
-    def __set__(self, obj: _P, value: _V):
-        ...
+    def __set__(self, obj: _P, value: _V): ...
 
     @abstractmethod
-    def validate_one(self, value: _V):
-        ...
+    def validate_one(self, value: _V): ...
 
     @abstractmethod
-    def validate_many(self, value: Iterable[_V]):
-        ...
+    def validate_many(self, value: Iterable[_V]): ...
 
 
 class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMeta):
@@ -154,8 +150,7 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
     _max: ClassVar[int] = 2**8 - 1
 
     @abstractmethod
-    def __init__(self, *args):
-        ...
+    def __init__(self, *args): ...
 
     @property
     def size(self) -> int:
@@ -632,12 +627,10 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
         setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     @overload
-    def __getitem__(self, key: int) -> int:
-        ...
+    def __getitem__(self, key: int) -> int: ...
 
     @overload
-    def __getitem__(self, key: slice) -> List[int]:
-        ...
+    def __getitem__(self, key: slice) -> List[int]: ...
 
     def __getitem__(self, key) -> Union[int, List[int]]:
         if self._bound_obj is None:
@@ -688,12 +681,10 @@ class ByteArray(ArrayField[Byte]):
         setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     @overload
-    def __getitem__(self, key: int) -> bytearray:
-        ...
+    def __getitem__(self, key: int) -> bytearray: ...
 
     @overload
-    def __getitem__(self, key: slice) -> bytearray:
-        ...
+    def __getitem__(self, key: slice) -> bytearray: ...
 
     def __getitem__(self, key) -> bytearray:
         if self._bound_obj is None:
@@ -765,12 +756,10 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
         setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     @overload
-    def __getitem__(self, key: int) -> float:
-        ...
+    def __getitem__(self, key: int) -> float: ...
 
     @overload
-    def __getitem__(self, key: slice) -> List[float]:
-        ...
+    def __getitem__(self, key: slice) -> List[float]: ...
 
     def __getitem__(self, key) -> Union[float, List[float]]:
         if self._bound_obj is None:
@@ -795,12 +784,10 @@ class Struct(FieldValidator, Generic[_S]):
         return getattr(obj, self._private_name)
 
     @overload
-    def __set__(self, obj: MessageBase, value: _S):
-        ...
+    def __set__(self, obj: MessageBase, value: _S): ...
 
     @overload
-    def __set__(self, obj: StructArray, value: Struct[_S]):
-        ...
+    def __set__(self, obj: StructArray, value: Struct[_S]): ...
 
     def __set__(self, obj, value):
         self.validate_one(value)
@@ -872,12 +859,10 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     @overload
-    def __getitem__(self, key: int) -> _S:
-        ...
+    def __getitem__(self, key: int) -> _S: ...
 
     @overload
-    def __getitem__(self, key: slice) -> List[_S]:
-        ...
+    def __getitem__(self, key: slice) -> List[_S]: ...
 
     def __getitem__(self, key) -> Union[_S, List[_S]]:
         if self._bound_obj is None:

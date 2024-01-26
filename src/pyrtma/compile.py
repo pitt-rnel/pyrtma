@@ -1,4 +1,5 @@
 """pyrtma.compile Message Type Compiler """
+
 import pathlib
 import re
 import sys

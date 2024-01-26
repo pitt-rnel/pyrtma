@@ -2,6 +2,7 @@
 
 Includes :py:class:`~Client` class and associated exception classes
 """
+
 import socket
 import select
 import time
