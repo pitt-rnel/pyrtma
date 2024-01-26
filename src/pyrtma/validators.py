@@ -18,6 +18,8 @@ from typing import (
 )
 from abc import abstractmethod, ABCMeta
 import numbers
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 
 from .message_base import MessageBase
@@ -41,7 +43,22 @@ __all__ = [
     "IntArray",
     "FloatArray",
     "StructArray",
+    "disable_message_validation",
 ]
+
+_VALIDATION_ENABLED: ContextVar[bool] = ContextVar("_VALIDATION_ENABLED", default=True)
+
+
+@contextmanager
+def disable_message_validation():
+    """Context manager function to temporarily disable message field validation
+    Use with `with` keyword:
+    `with disable_message_validation():`
+    """
+    token = _VALIDATION_ENABLED.set(False)
+    yield
+    _VALIDATION_ENABLED.reset(token)
+
 
 _P = TypeVar("_P")  # Parent
 _V = TypeVar("_V")  # Value
@@ -82,7 +99,8 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
         return getattr(obj, self._private_name)
 
     def __set__(self, obj: _P, value: float):
-        self.validate_one(value)
+        if _VALIDATION_ENABLED.get():
+            self.validate_one(value)
         setattr(obj, self._private_name, value)
 
     def validate_one(self, value: float):
@@ -172,7 +190,8 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
         return getattr(obj, self._private_name)
 
     def __set__(self, obj: _P, value: int):
-        self.validate_one(value)
+        if _VALIDATION_ENABLED.get():
+            self.validate_one(value)
         setattr(obj, self._private_name, value)
 
     def validate_one(self, value: int):
@@ -343,11 +362,12 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
         return getattr(obj, self._private_name)
 
     def __set__(self, obj: _P, value: Union[int, bytes, bytearray]):
-        self.validate_one(value)
-        if isinstance(value, (bytes, bytearray)):
-            int_value = int.from_bytes(value, "little")
-            setattr(obj, self._private_name, int_value)
-            return
+        if _VALIDATION_ENABLED.get():
+            self.validate_one(value)
+            if isinstance(value, (bytes, bytearray)):
+                int_value = int.from_bytes(value, "little")
+                setattr(obj, self._private_name, int_value)
+                return
         setattr(obj, self._private_name, value)
 
     def validate_one(self, value: Union[int, bytes, bytearray]):
@@ -414,7 +434,8 @@ class String(FieldValidator[_P, str], Generic[_P]):
         return getattr(obj, self._private_name).decode("ascii")
 
     def __set__(self, obj: _P, value: str):
-        self.validate_one(value)
+        if _VALIDATION_ENABLED.get():
+            self.validate_one(value)
         setattr(obj, self._private_name, value.encode("ascii"))
 
     def validate_one(self, value: str):
@@ -497,7 +518,8 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
         return ArrayField._bound(self, obj)
 
     def __set__(self, obj: MessageBase, value: ArrayField[_FV]):
-        self.validate_array(value)
+        if _VALIDATION_ENABLED.get():
+            self.validate_array(value)
         setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     def __getitem__(self, key):
@@ -510,10 +532,11 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
-        if isinstance(value, abc.Iterable):
-            self.validate_many(value)
-        else:
-            self.validate_one(value)
+        if _VALIDATION_ENABLED.get():
+            if isinstance(value, abc.Iterable):
+                self.validate_many(value)
+            else:
+                self.validate_one(value)
 
         getattr(self._bound_obj, self._private_name)[key] = value
 
@@ -623,7 +646,8 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
         return IntArray._bound(self, obj)
 
     def __set__(self, obj: MessageBase, value: ArrayField[_IV]):
-        self.validate_array(value)
+        if _VALIDATION_ENABLED.get():
+            self.validate_array(value)
         setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     @overload
@@ -677,7 +701,8 @@ class ByteArray(ArrayField[Byte]):
         return ByteArray._bound(self, obj)
 
     def __set__(self, obj: MessageBase, value: ArrayField[Byte]):
-        self.validate_array(value)
+        if _VALIDATION_ENABLED.get():
+            self.validate_array(value)
         setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     @overload
@@ -702,16 +727,17 @@ class ByteArray(ArrayField[Byte]):
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
-        if isinstance(value, abc.Iterable):
-            self.validate_many(value)
-        else:
-            self.validate_one(value)
-
-        if isinstance(value, (bytes, bytearray)):
-            if len(value) == 1:
-                value = int.from_bytes(value, "little")
+        if _VALIDATION_ENABLED.get():
+            if isinstance(value, abc.Iterable):
+                self.validate_many(value)
             else:
-                value = [v for v in value]
+                self.validate_one(value)
+
+            if isinstance(value, (bytes, bytearray)):
+                if len(value) == 1:
+                    value = int.from_bytes(value, "little")
+                else:
+                    value = [v for v in value]
 
         getattr(self._bound_obj, self._private_name)[key] = value
 
@@ -752,7 +778,8 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
         return FloatArray._bound(self, obj)
 
     def __set__(self, obj: MessageBase, value: ArrayField[_FPV]):
-        self.validate_array(value)
+        if _VALIDATION_ENABLED.get():
+            self.validate_array(value)
         setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     @overload
@@ -790,7 +817,8 @@ class Struct(FieldValidator, Generic[_S]):
     def __set__(self, obj: StructArray, value: Struct[_S]): ...
 
     def __set__(self, obj, value):
-        self.validate_one(value)
+        if _VALIDATION_ENABLED.get():
+            self.validate_one(value)
         # Note: ctypes already copies the data here
         setattr(obj, self._private_name, value)
 
@@ -855,7 +883,8 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         return StructArray._bound(self, obj)
 
     def __set__(self, obj, value):
-        self.validate_array(value)
+        if _VALIDATION_ENABLED.get():
+            self.validate_array(value)
         setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
 
     @overload
@@ -875,10 +904,11 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
                 "StructArray descriptor is not bound to an instance object."
             )
 
-        if isinstance(value, abc.Iterable):
-            self.validate_many(value)
-        else:
-            self.validate_one(value)
+        if _VALIDATION_ENABLED.get():
+            if isinstance(value, abc.Iterable):
+                self.validate_many(value)
+            else:
+                self.validate_one(value)
 
         getattr(self._bound_obj, self._private_name)[key] = value
 
