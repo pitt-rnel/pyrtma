@@ -40,6 +40,7 @@ __all__ = [
     "InvalidDestinationModule",
     "InvalidDestinationHost",
     "Client",
+    "client_context",
 ]
 
 
@@ -759,3 +760,45 @@ class Client(object):
     def __str__(self) -> str:
         # TODO: Make this better.
         return f"Client(module_id={self.module_id}, server={self.server}, connected={self.connected}."
+
+
+@contextmanager
+def client_context(
+    module_id: int = 0,
+    server_name: str = "localhost:7111",
+    msg_list: Optional[Iterable[int]] = None,
+    host_id: int = 0,
+    timecode: bool = False,
+    logger_status: bool = False,
+    daemon_status: bool = False,
+):
+    """Context manager function to simplify initializing a pyrtma Client
+
+    Context manager will yield a Client object after connecting to message manager,
+    optionally subscribing to msg_list, and after calling send_module_ready().
+    Client will disconnect when exiting context.
+
+    Args:
+        module_id (optional): Static module ID, which must be unique.
+            Defaults to 0, which generates a dynamic module ID.
+        server_name (optional): IP_addr:port_num string associated with message manager.
+                Defaults to "localhost:7111".
+        msg_list (optional): A list of numeric message IDs to subscribe to
+        host_id (optional): Host ID. Defaults to 0.
+        timecode (optional): Add additional timecode fields to message
+            header, used by some projects at RNEL. Defaults to False.
+        logger_status (optional): Flag to declare client as a logger module.
+            Logger modules are automatically subscribed to all message types.
+            Defaults to False.
+        daemon_status (optional): Flag to declare client as a daemon. Defaults to False.
+
+    Yields:
+        Client: initialized pyrtma Client object
+    """
+    c = Client(module_id, host_id, timecode)
+    c.connect(server_name, logger_status, daemon_status)
+    if msg_list:
+        c.subscribe(msg_list)
+    c.send_module_ready()
+    yield c
+    c.disconnect()
