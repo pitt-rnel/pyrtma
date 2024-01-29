@@ -2,17 +2,33 @@
 
 Includes :py:class:`~Client` class and associated exception classes
 """
+
 import socket
 import select
 import time
 import os
 import ctypes
+from contextlib import contextmanager
 
-from .message import *
-from .core_defs import *
+from .message import Message, get_msg_cls
+from .message_data import MessageData
+from .header import MessageHeader, get_header_cls
+from .exceptions import InvalidMessageDefinition
+from . import core_defs as cd
 
 from functools import wraps
-from typing import Optional, Tuple, Type, Union, Iterable, Set
+from typing import (
+    Optional,
+    Tuple,
+    Type,
+    Union,
+    Iterable,
+    Set,
+    Callable,
+    Any,
+    TypeVar,
+    cast,
+)
 from warnings import warn
 
 __all__ = [
@@ -24,6 +40,7 @@ __all__ = [
     "InvalidDestinationModule",
     "InvalidDestinationHost",
     "Client",
+    "client_context",
 ]
 
 
@@ -69,17 +86,20 @@ class InvalidDestinationHost(ClientError):
     pass
 
 
-def requires_connection(func):
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+def requires_connection(func: F) -> F:
     """Decorator wrapper for Client methods that require a connection"""
 
     @wraps(func)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self, *args, **kwargs) -> F:
         if not self.connected:
             raise NotConnectedError
         else:
             return func(self, *args, **kwargs)
 
-    return wrapper
+    return cast(F, wrapper)
 
 
 class Client(object):
@@ -99,6 +119,9 @@ class Client(object):
         host_id: int = 0,
         timecode: bool = False,
     ):
+        if module_id >= cd.DYN_MOD_ID_START or module_id < 0:
+            raise ValueError(f"Module ID must be >= 0 and < {cd.DYN_MOD_ID_START}")
+
         self._module_id = module_id
         self._host_id = host_id
         self._msg_count = 0
@@ -106,8 +129,9 @@ class Client(object):
         self._connected = False
         self._header_cls = get_header_cls(timecode)
         self._recv_buffer = bytearray(1024**2)
-        self._subscribed_types = set()
-        self._paused_types = set()
+        self._subscribed_types: Set[int] = set()
+        self._paused_types: Set[int] = set()
+        self._dynamic_id: bool = module_id == 0
 
     def __del__(self):
         if self._connected:
@@ -165,12 +189,16 @@ class Client(object):
         # Setup the underlying socket connection
         self._socket_connect(server_name)
 
-        msg = MDF_CONNECT()
+        # Reset the module_id to zero for dynamic assignment
+        if self._dynamic_id:
+            self._module_id = 0
+
+        msg = cd.MDF_CONNECT()
         msg.logger_status = int(logger_status)
         msg.daemon_status = int(daemon_status)
 
         self.send_message(msg)
-        ack_msg = self.wait_for_acknowledgement()
+        ack_msg = self._wait_for_acknowledgement()
 
         # save own module ID from ACK if asked to be assigned dynamic ID
         if self._module_id == 0:
@@ -184,11 +212,11 @@ class Client(object):
         """Disconnect from message manager server"""
         try:
             if self._connected:
-                self.send_signal(MT_DISCONNECT)
-                ack_msg = self.wait_for_acknowledgement(timeout=0.5)
-        except AcknowledgementTimeout:
-            pass
+                self.send_signal(cd.MT_DISCONNECT)
         finally:
+            # Allow some time for signal to reach MM
+            time.sleep(0.100)
+            self._sock.shutdown(socket.SHUT_RDWR)
             self._sock.close()
             self._connected = False
             # reset subscribed and paused types
@@ -251,26 +279,27 @@ class Client(object):
 
         This method also sends the client's process ID to message manager.
         """
-        msg = MDF_MODULE_READY()
+        msg = cd.MDF_MODULE_READY()
         msg.pid = os.getpid()
         self.send_message(msg)
 
     def _subscription_control(self, msg_list: Iterable[int], ctrl_msg: str):
         msg_set = set(msg_list)
+        msg: MessageData
         if ctrl_msg == "Subscribe":
-            msg = MDF_SUBSCRIBE()
+            msg = cd.MDF_SUBSCRIBE()
             self._subscribed_types |= msg_set
             self._paused_types -= msg_set
         elif ctrl_msg == "Unsubscribe":
-            msg = MDF_UNSUBSCRIBE()
+            msg = cd.MDF_UNSUBSCRIBE()
             self._subscribed_types -= msg_set
             self._paused_types -= msg_set
         elif ctrl_msg == "PauseSubscription":
-            msg = MDF_PAUSE_SUBSCRIPTION()
+            msg = cd.MDF_PAUSE_SUBSCRIPTION()
             self._subscribed_types -= msg_set
             self._paused_types |= msg_set
         elif ctrl_msg == "ResumeSubscription":
-            msg = MDF_RESUME_SUBSCRIPTION()
+            msg = cd.MDF_RESUME_SUBSCRIPTION()
             self._subscribed_types |= msg_set
             self._paused_types -= msg_set
         else:
@@ -334,6 +363,48 @@ class Client(object):
         """Resume all paused subscriptions"""
         self.resume_subscription(self.paused_subscribed_types)
 
+    @contextmanager
+    def subscription_context(self, msg_list: Iterable[int]):
+        """Context manager to subscribe to a list of message types
+
+        Message types will automatically unsubscribe after exiting context.
+
+        Args:
+            msg_list (Iterable[int]): A list of numeric message IDs to subscribe to
+        """
+        msg_list = list(msg_list)  # cast arbitrary iterable to list
+        for mt in msg_list:
+            if mt in self.subscribed_types:
+                warn(
+                    f"Message ID {mt} is already subscribed, ignored from subscription_context"
+                )
+                msg_list.remove(mt)
+
+        self.subscribe(msg_list)
+        yield
+        self.unsubscribe(msg_list)
+
+    @contextmanager
+    def paused_subscription_context(self, msg_list: Iterable[int]):
+        """Context manager to pause subscriptions to a list of message types
+
+        Message types will automatically resume subscriptions after exiting context.
+
+        Args:
+            msg_list (Iterable[int]): A list of numeric message IDs to temporarily unsubscribe to
+        """
+        msg_list = list(msg_list)  # cast arbitrary iterable to list
+        for mt in msg_list:
+            if mt not in self.subscribed_types:
+                warn(
+                    f"Message ID {mt} is not subscribed, ignored from paused_subscription_context"
+                )
+                msg_list.remove(mt)
+
+        self.pause_subscription(msg_list)
+        yield
+        self.resume_subscription(msg_list)
+
     @requires_connection
     def send_signal(
         self,
@@ -360,10 +431,10 @@ class Client(object):
             InvalidDestinationHost: Specified destination host is invalid
         """
         # Verify that the module & host ids are valid
-        if dest_mod_id < 0 or dest_mod_id > MAX_MODULES:
+        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULES:
             raise InvalidDestinationModule(f"Invalid dest_mod_id  of [{dest_mod_id}]")
 
-        if dest_host_id < 0 or dest_host_id > MAX_HOSTS:
+        if dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS:
             raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
 
         if timeout >= 0:
@@ -418,10 +489,10 @@ class Client(object):
             InvalidDestinationHost: Specified destination host is invalid
         """
         # Verify that the module & host ids are valid
-        if dest_mod_id < 0 or dest_mod_id > MAX_MODULES:
+        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULES:
             raise InvalidDestinationModule(f"Invalid dest_mod_id of [{dest_mod_id}]")
 
-        if dest_host_id < 0 or dest_host_id > MAX_HOSTS:
+        if dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS:
             raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
 
         if timeout >= 0:
@@ -520,7 +591,8 @@ class Client(object):
         Args:
             timeout (optional): Timeout to wait for a message to be available for reading.
                 Defaults to -1 (blocking).
-            ack (optional): Reserved for future use. Defaults to False.
+            ack (optional): Primarily for internal use. When True, will not discard ACK messages. Defaults to False.
+            sync_check (optional): Validate message definition matches header version. Defaults to False.
 
         Raises:
             ConnectionLost: Connection error to message manager server
@@ -528,6 +600,32 @@ class Client(object):
         Returns:
             Message object. If no message is read before timeout, returns None.
         """
+        t0 = time.perf_counter()
+        M = self._read_message(timeout, ack, sync_check)
+
+        # filter out unsubscribed messages that may still be in queue
+        while M and M.header.msg_type not in self.subscribed_types:
+            if (
+                ack and M.header.msg_type == cd.MT_ACKNOWLEDGE
+            ):  # ack input allows ACK to be read and not discarded
+                break
+            if timeout is None:  # blocking
+                t_rem = None  # continue blocking until subscribed message recv'd
+            elif timeout == 0:  # no timeout
+                M = None  # discard unsub'd msg and break
+                break
+            else:  # subtract time elapsed from timeout and read again
+                t_rem = max(timeout - (time.perf_counter() - t0), 0)
+            M = self._read_message(timeout, ack, sync_check)
+
+        return M
+
+    @requires_connection
+    def _read_message(
+        self, timeout: Union[int, float, None] = -1, ack=False, sync_check=False
+    ) -> Optional[Message]:
+        """Read message without filtering for subscribed messages (helper called by read_message)"""
+
         if timeout is None:
             # Skip select call
             pass
@@ -564,11 +662,10 @@ class Client(object):
             raise ConnectionLost
 
         # Read Data Section
-        data = header.get_data()
-
+        data = get_msg_cls(header.msg_type)()
         if data.type_size != header.num_data_bytes:
             raise InvalidMessageDefinition(
-                f"Received message header indicating a message data size that does not match the expected size of message type {data.type_name}. Message definitions may be out of sync across systems."
+                f"Received message header indicating a message data size ({header.num_data_bytes}) that does not match the expected size ({data.type_size}) of message type {data.type_name}. Message definitions may be out of sync across systems."
             )
 
         # Note: Ignore the sync check if header.version is not filled in
@@ -590,12 +687,10 @@ class Client(object):
 
         return Message(header, data)
 
-    def wait_for_acknowledgement(self, timeout: float = 3) -> Message:
+    def _wait_for_acknowledgement(self, timeout: float = 3) -> Message:
         """Wait for acknowledgement from message manager module
 
         Used internally when acknowledgement replies from message manager are expected
-
-        TODO rename to _wait_for_acknowledgement()?
 
         Args:
             timeout (optional): Timeout in seconds to wait for ack message. Defaults to 3.
@@ -613,7 +708,7 @@ class Client(object):
             while True:
                 msg = self.read_message(ack=True)
                 if msg is not None:
-                    if msg.header.msg_type == MT_ACKNOWLEDGE:
+                    if msg.header.msg_type == cd.MT_ACKNOWLEDGE:
                         break
             return msg
         else:
@@ -623,7 +718,7 @@ class Client(object):
             while time_remaining > 0:
                 msg = self.read_message(timeout=time_remaining, ack=True)
                 if msg is not None:
-                    if msg.header.msg_type == MT_ACKNOWLEDGE:
+                    if msg.header.msg_type == cd.MT_ACKNOWLEDGE:
                         return msg
 
                 time_now = time.perf_counter()
@@ -648,16 +743,62 @@ class Client(object):
         """Read and discard messages in socket buffer up to timeout.
         Returns: True if all messages available have been read.
         """
-        msg = 1
-        time_remaining = timeout
         start_time = time.perf_counter()
-        while msg is not None and time_remaining > 0:
-            msg = self.read_message(timeout=0)
+
+        def read_and_time():
+            msg = self.read_message(0)
             time_now = time.perf_counter()
             time_waited = time_now - start_time
             time_remaining = timeout - time_waited
+            return msg, time_remaining
+
+        msg, time_remaining = read_and_time()
+        while msg is not None and time_remaining > 0:
+            msg, time_remaining = read_and_time()
         return not msg
 
     def __str__(self) -> str:
         # TODO: Make this better.
         return f"Client(module_id={self.module_id}, server={self.server}, connected={self.connected}."
+
+
+@contextmanager
+def client_context(
+    module_id: int = 0,
+    server_name: str = "localhost:7111",
+    msg_list: Optional[Iterable[int]] = None,
+    host_id: int = 0,
+    timecode: bool = False,
+    logger_status: bool = False,
+    daemon_status: bool = False,
+):
+    """Context manager function to simplify initializing a pyrtma Client
+
+    Context manager will yield a Client object after connecting to message manager,
+    optionally subscribing to msg_list, and after calling send_module_ready().
+    Client will disconnect when exiting context.
+
+    Args:
+        module_id (optional): Static module ID, which must be unique.
+            Defaults to 0, which generates a dynamic module ID.
+        server_name (optional): IP_addr:port_num string associated with message manager.
+                Defaults to "localhost:7111".
+        msg_list (optional): A list of numeric message IDs to subscribe to
+        host_id (optional): Host ID. Defaults to 0.
+        timecode (optional): Add additional timecode fields to message
+            header, used by some projects at RNEL. Defaults to False.
+        logger_status (optional): Flag to declare client as a logger module.
+            Logger modules are automatically subscribed to all message types.
+            Defaults to False.
+        daemon_status (optional): Flag to declare client as a daemon. Defaults to False.
+
+    Yields:
+        Client: initialized pyrtma Client object
+    """
+    c = Client(module_id, host_id, timecode)
+    c.connect(server_name, logger_status, daemon_status)
+    if msg_list:
+        c.subscribe(msg_list)
+    c.send_module_ready()
+    yield c
+    c.disconnect()

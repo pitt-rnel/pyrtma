@@ -1,3 +1,11 @@
+tests/test_msg_defs/*.m
+tests/test_msg_defs/*.py
+tests/test_msg_defs/*.pyi
+tests/test_msg_defs/*.h
+tests/test_msg_defs/*.txt
+tests/test_msg_defs/*.js
+tests/test_msg_defs/*_combined.yaml
+
 # IDEs
 .vscode/
 

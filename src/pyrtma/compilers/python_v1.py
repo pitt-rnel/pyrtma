@@ -1,9 +1,8 @@
 """v1 Message Type Compiler: .h to .py
 """
 
-from io import TextIOWrapper
 import re
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple, IO
 import ctypes
 
 # Field type name to ctypes
@@ -61,13 +60,13 @@ def preprocess(text: str) -> str:
 
 
 def parse_defines(text: str) -> Dict:
-    defines = {}
+    defines: Dict[str, Dict[str, str]] = {}
     defines["MT"] = {}
     defines["MID"] = {}
     defines["constants"] = {}
 
     # Get Defines (Only simple one line constants here)
-    macros = re.findall(
+    macros: List[Tuple[str, str]] = re.findall(
         r"#define\s*(?P<name>\w+)\s+(?P<expression>[\(\)\[\]\w \*/\+-\.]+)\n", text
     )
 
@@ -129,8 +128,10 @@ def parse_typedefs(text: str) -> Dict:
     return typedefs
 
 
-def parse_structs(msg_types, text: str) -> Dict:
-    structs = {}
+def parse_structs(
+    msg_types: Dict[str, str], text: str
+) -> Dict[str, Optional[List[Tuple[str, str, Optional[str]]]]]:
+    structs: Dict[str, Optional[List[Tuple[str, str, Optional[str]]]]] = {}
 
     # Strip Newlines
     text = re.sub(r"\n", "", text)
@@ -140,10 +141,10 @@ def parse_structs(msg_types, text: str) -> Dict:
     )
 
     for m in c_msg_defs:
-        name = m.group("name").strip()
+        name: str = m.group("name").strip()
         fields = m.group("def").split(sep=";")
         fields = [f.strip() for f in fields if f.strip() != ""]
-        c_fields = []
+        c_fields: List[Tuple[str, str, Optional[str]]] = []
 
         for field in fields:
             fmatch = re.match(
@@ -189,7 +190,7 @@ def parse_structs(msg_types, text: str) -> Dict:
     return structs
 
 
-def generate_constant(name, value):
+def generate_constant(name: str, value: str):
     return f"{name} = {value}"
 
 
@@ -259,9 +260,7 @@ class {name}(pyrtma.MessageData):
     return template
 
 
-def print_content(
-    content: str = "", end: str = "\n", out_file: Optional[TextIOWrapper] = None
-):
+def print_content(content: str = "", end: str = "\n", out_file: Optional[IO] = None):
     """Print content to the console and optionally write to file"""
     if out_file and not out_file.closed:
         out_file.write(f"{content}{end}")
@@ -279,7 +278,7 @@ def parse_file(filename, seq: int = 1, out_filename: Optional[str] = None):
     with open(filename, "r") as f:
         text = f.read()
 
-    out_file = None
+    out_file: Optional[IO] = None
     if out_filename:
         mode = "w" if seq == 1 else "a"
         out_file = open(out_filename, mode=mode)

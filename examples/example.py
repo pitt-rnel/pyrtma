@@ -6,7 +6,9 @@ sys.path.append(str(pathlib.Path(__file__).parent))
 import pyrtma
 
 # Import the users compiled message defintions
-import msg_defs.message as md
+import msg_defs.example_messages as md
+
+from typing import cast
 
 
 def publisher(server="127.0.0.1:7111", timecode=False):
@@ -48,6 +50,8 @@ def subscriber(server="127.0.0.1:7111", timecode=False):
 
             if msg is not None:
                 if msg.type_id == md.MT_PERSON_MESSAGE:
+                    # optional cast for better type hinting
+                    msg.data = cast(md.MDF_PERSON_MESSAGE, msg)
                     print("Recv:")
                     print(msg.data.to_json())
                 elif msg.type_id == md.MT_EXIT:

@@ -1,9 +1,11 @@
+"""Message definition YAML parser"""
+
 import re
 import json
 import pathlib
 import os
 import textwrap
-import struct
+import ctypes
 import logging
 import string
 
@@ -12,7 +14,7 @@ from ruamel.yaml import YAML
 
 from copy import copy
 from hashlib import sha256
-from typing import List, Optional, Any, Union, Tuple, Dict
+from typing import List, Optional, Any, Union, Tuple, Dict, Type, Literal
 from dataclasses import dataclass, field, is_dataclass, asdict
 
 
@@ -133,6 +135,26 @@ class AlignmentError(ParserError):
     pass
 
 
+class InvalidMessageSize(ParserError):
+    """Raised when a message is too large"""
+
+    pass
+
+
+@dataclass
+class Metadata:
+    name: str
+    value: Union[int, float, bool, str]
+    src: pathlib.Path
+
+
+@dataclass
+class CompilerOptions:
+    name: str
+    value: Union[int, float, bool, str]
+    src: pathlib.Path
+
+
 @dataclass
 class Import:
     file: pathlib.Path
@@ -188,11 +210,11 @@ class TypeAlias:
         return self.type_obj.size
 
     @property
-    def boundary(self) -> int:
+    def alignment(self) -> int:
         if isinstance(self.type_obj, NativeType):
             return self.type_obj.size
         else:
-            return self.type_obj.boundary
+            return self.type_obj.alignment
 
     @property
     def format(self) -> str:
@@ -207,6 +229,7 @@ class Field:
     length_expression: Optional[str] = None
     length_expanded: Optional[str] = None
     length: Optional[int] = None
+    offset: int = -1
 
     @property
     def base_size(self) -> int:
@@ -217,11 +240,11 @@ class Field:
         return self.type_obj.size * (self.length or 1)
 
     @property
-    def boundary(self) -> int:
+    def alignment(self) -> int:
         if isinstance(self.type_obj, NativeType):
             return self.type_obj.size
         else:
-            return self.type_obj.boundary
+            return self.type_obj.alignment
 
     @property
     def format(self) -> str:
@@ -239,6 +262,7 @@ class MDF:
     type_id: int
     src: pathlib.Path
     fields: List[Field] = field(default_factory=list)
+    alignment: int = 8
 
     @property
     def signal(self) -> bool:
@@ -247,14 +271,6 @@ class MDF:
     @property
     def size(self) -> int:
         return sum([f.size for f in self.fields])
-
-    @property
-    def boundary(self) -> int:
-        f0 = self.fields[0]
-        if isinstance(f0.type_obj, NativeType):
-            return f0.type_obj.size
-        else:
-            return f0.type_obj.boundary
 
     @property
     def format(self) -> str:
@@ -272,18 +288,11 @@ class SDF:
     name: str
     src: pathlib.Path
     fields: List[Field] = field(default_factory=list)
+    alignment: int = 8
 
     @property
     def size(self) -> int:
         return sum([f.size for f in self.fields])
-
-    @property
-    def boundary(self) -> int:
-        f0 = self.fields[0]
-        if isinstance(f0.type_obj, NativeType):
-            return f0.type_obj.size
-        else:
-            return f0.type_obj.boundary
 
     @property
     def format(self) -> str:
@@ -298,13 +307,29 @@ RTMAObject = Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, MDF, SDF, 
 
 
 class Parser:
-    def __init__(self, debug: bool = False):
-        self.included_files = []
+    """Parser class"""
+
+    def __init__(
+        self,
+        debug: bool = False,
+        validate_alignment: bool = True,
+        auto_pad: bool = True,
+    ):
+        """Parser class
+
+        Args:
+            debug (bool, optional): Flag for debug mode. Defaults to False.
+        """
+        self.included_files: List[pathlib.Path] = []
         self.current_file = pathlib.Path()
         self.root_path = pathlib.Path()
         self.debug = debug
+        self.validate_alignment = validate_alignment
+        self.auto_pad = auto_pad
 
-        self.yaml_dict = dict(
+        self.yaml_dict: Dict[str, Dict[str, Any]] = dict(
+            metadata={},
+            compiler_options={},
             imports={},
             constants={},
             string_constants={},
@@ -315,6 +340,8 @@ class Parser:
             message_defs={},
         )
 
+        self.metadata: Dict[str, Metadata] = {}
+        self.compiler_options: Dict[str, CompilerOptions] = {}
         self.imports: List[Import] = []
         self.constants: Dict[str, ConstantExpr] = {}
         self.string_constants: Dict[str, ConstantString] = {}
@@ -324,6 +351,9 @@ class Parser:
         self.struct_defs: Dict[str, SDF] = {}
         self.message_ids: Dict[str, MT] = {}
         self.message_defs: Dict[str, MDF] = {}
+
+        # compiler options
+        self.IMPORT_COREDEFS = False
 
         self.logger = logging.getLogger("pyrtma.parser")
         self.logger.propagate = False
@@ -341,11 +371,12 @@ class Parser:
 
     def warning(self, msg: str):
         self.logger.warning(msg)
-        input("Hit enter to continue...")
 
     def clear(self):
         self.current_file = pathlib.Path()
         self.yaml_dict = dict(
+            metadata={},
+            compiler_options={},
             imports={},
             constants={},
             string_constants={},
@@ -356,9 +387,11 @@ class Parser:
             message_defs={},
         )
         self.included_files = []
+        self.metadata = {}
+        self.compiler_options = {}
         self.imports = []
         self.constants = {}
-        self.string_constants: Dict[str, ConstantString] = {}
+        self.string_constants = {}
         self.aliases = {}
         self.host_ids = {}
         self.module_ids = {}
@@ -433,8 +466,42 @@ class Parser:
 
         if imp.file.suffix == ".yml":
             self.warning(f"Please change {imp.file} to use '.yaml' extension.")
+            input("Hit enter to continue...")
 
         self.parse_file(imp.file.absolute())
+
+    def handle_metadata(self, name: str, value: Union[int, float, bool, str]):
+        self.check_name(name)
+        self.check_duplicate_name(
+            "metadata",
+            name,
+            namespaces=("metadata",),
+        )
+
+        if not isinstance(value, (int, float, bool, str)):
+            raise InvalidTypeError(
+                f"Values in 'metadata' section must be of type int, float, bool, or string not{type(value).__name__}. {name} -> {self.current_file}"
+            )
+
+        self.metadata[name] = Metadata(
+            name,
+            value,
+            src=self.trim_root(self.current_file),
+        )
+
+    def handle_compiler_options(self, name: str, value: Union[int, float, bool, str]):
+        self.check_name(name)
+        self.check_duplicate_name(
+            "compiler_options",
+            name,
+            namespaces=("compiler_options",),
+        )
+
+        self.compiler_options[name] = CompilerOptions(
+            name,
+            value,
+            src=self.trim_root(self.current_file),
+        )
 
     def handle_expression(self, name: str, expression: Union[int, float, str]):
         self.check_name(name)
@@ -558,7 +625,7 @@ class Parser:
             )
 
         if value < 10 or value > 32767:
-            if self.current_file.name != "core_defs.yaml":
+            if self.current_file.name != "core_defs.yaml" and self.IMPORT_COREDEFS:
                 raise RTMASyntaxError(
                     f"Value outside of valid range [0 - 32767] for host_id: {name}: {value}"
                 )
@@ -582,7 +649,11 @@ class Parser:
             )
 
         if value < 10 or (99 < value < 200):
-            if self.current_file.name != "core_defs.yaml" and value != 0:
+            if (
+                self.current_file.name != "core_defs.yaml"
+                and value != 0
+                and self.IMPORT_COREDEFS
+            ):
                 raise RTMASyntaxError(
                     f"Value outside of valid range [10 - 99 or > 200] for module_id: {name}: {value} -> {self.current_file}"
                 )
@@ -597,63 +668,198 @@ class Parser:
             name, int(value), src=self.trim_root(self.current_file)
         )
 
-    def check_alignment(self, s: Union[SDF, MDF], auto_pad: bool = True):
+    def check_alignment(self, s: Union[SDF, MDF]):
         """Confirm 64 bit alignment of structures"""
-        npad = 0
-        ptr = 0
-        n = 0
-        while n < len(s.fields):
-            field = s.fields[n]
-            boundary = field.boundary
-            if ptr % boundary != 0:
-                if not auto_pad:
-                    raise AlignmentError(
-                        f"{s.name}.{field.name} does not start on a valid memory boundary for type: {field.type_name}. Add padding fields prior for 64-bit alignment."
-                    )
-                else:
-                    length = boundary - (ptr % boundary)
-                    padding = Field(
-                        name=f"padding_{npad}_",
-                        type_name="char",
-                        type_obj=supported_types["char"],
-                        length_expression=f'"{length}"',
-                        length_expanded=f'"{length}"',
-                        length=length,
-                    )
 
-                    self.warning(
-                        f"Adding {length} padding byte(s) before {s.name}.{field.name}."
-                    )
-                    s.fields.insert(n, padding)
-                    n += 2
-                    npad += 1
-                    ptr += padding.size
-                    ptr += field.size
-            else:
-                n += 1
+        # This value will represent the memory address currently pointed to in the struct layout
+        ptr = 0
+
+        npad = 0  # padding field count
+        n = 0  # field index
+
+        pad_len: Union[int, Literal[""]]
+
+        # Loop over all fields in struct
+        while n < len(s.fields):
+            # Get the next field object
+            field = s.fields[n]
+
+            # Check if current address meets alignment requirement of the field
+            if (ptr % field.alignment) == 0:
+                # Store the fields offset in struct
+                field.offset = ptr
+
+                # Stride by an amount equal to the field size
                 ptr += field.size
 
-        # Align the end of the struct to 64 bit pointer boundary.
-        # if ptr % 8 != 0:
-        #     length = 8 - (ptr % 8)
-        #     if length == 1:
-        #         length = ""
+                # Go on to the next field (No padding required)
+                n += 1
+                continue
 
-        #     padding = Field(
-        #         name=f"padding_{npad}_",
-        #         type_name="char",
-        #         type_obj=supported_types["char"],
-        #         length_expression=f'"{length}"',
-        #         length_expanded=f'"{length}"',
-        #         length=length or None,
-        #     )
-        #     s.fields.append(padding)
-        #     self.warning(f"WARNING: Adding {length} trailing padding byte(s) at end of {s.name}.")
+            # Bail if auto padding is disabled
+            if not self.auto_pad:
+                raise AlignmentError(
+                    f"{s.name}.{field.name} does not start on a valid memory boundary for type: {field.type_name}. Add padding fields prior for 64-bit alignment."
+                )
 
-        # Final size check using Python's builtin struct module
-        assert s.size == struct.calcsize(
-            s.format
-        ), f"{s.name} is not 64-bit aligned. s.size = {s.size}, struct size = {struct.calcsize(s.format)}."
+            # Calculate number of bytes needed to get to next alignment boundary
+            pad_len = field.alignment - (ptr % field.alignment)
+
+            # Create the required padding field
+            padding = Field(
+                name=f"padding_{npad}_",
+                type_name="char",
+                type_obj=supported_types["char"],
+                length_expression=f'"{pad_len}"',
+                length_expanded=f'"{pad_len}"',
+                length=pad_len,
+                offset=ptr,
+            )
+
+            # Insert the padding into MDF or SDF object before the current field
+            s.fields.insert(n, padding)
+
+            # Stride by an amount equal to the field size
+            ptr += padding.size
+
+            # Ideally the user should explicitly pad their struct layout
+            self.warning(
+                f"Adding {pad_len} padding byte(s) before {s.name}.{field.name}."
+            )
+
+            # Store the fields offset in struct
+            field.offset = ptr
+
+            # Stride by an amount equal to the field size
+            ptr += field.size
+
+            # Skip 2 since len of fields has been extended
+            n += 2
+            npad += 1
+
+        # Note: ptr currently points to the byte immediately following the struct
+
+        # Explicitly align the end of the struct to allow for the strictest alignment to be satisfied
+        # Must account for C packing of array of structs and striding using sizeof
+        # We do this by calculating the padding required for consecutive structs
+
+        pad_len = 0  # Start with no padding
+        while 1:
+            # Check if any fields do not meet their required alignment
+            if any([(pad_len + ptr + f.offset) % f.alignment for f in s.fields]):
+                # Increase the padding and try again
+                pad_len += 1
+                continue
+
+            # No padding required
+            if pad_len == 0:
+                break
+
+            # Bail if auto padding is disabled
+            if not self.auto_pad:
+                raise AlignmentError(
+                    f"{s.name} requires trailing padding of {pad_len} bytes for 64-bit alignment."
+                )
+
+            # Don't make an array type if we only need one byte padding
+            if pad_len == 1:
+                pad_len = ""
+
+            # Create the required padding field
+            padding = Field(
+                name=f"padding_{npad}_",
+                type_name="char",
+                type_obj=supported_types["char"],
+                length_expression=f'"{pad_len}"',
+                length_expanded=f'"{pad_len}"',
+                length=pad_len or None,
+            )
+
+            # Stride by an amount equal to the field size
+            ptr += padding.size
+
+            # Append the padding at the end of the MDF or SDF object
+            s.fields.append(padding)
+
+            # Ideally the user should explicitly pad their struct layout
+            self.warning(
+                f"WARNING: Adding {pad_len} trailing padding byte(s) at end of {s.name}."
+            )
+
+            # Exit loop
+            break
+
+        # Determine the alignment requirement for the struct
+        strictest_alignment = max(f.alignment for f in s.fields)
+        for a in (8, 4, 2, 1):
+            # Find where the current ptr aligns
+            if (ptr % a) == 0:
+                s.alignment = min(a, strictest_alignment)
+                break
+        else:
+            # Note: This should never happen
+            raise RuntimeError(f"Unable to determine alignment required for {s.name}")
+
+        # Final size check using Python's builtin ctypes module
+        assert s.size == self.get_ctype_size(
+            s
+        ), f"{s.name} is not 64-bit aligned. s.size = {s.size}, struct size = {self.get_ctype_size(s)}."
+
+    def get_ctype_cls(self, s: Union[MDF, SDF]) -> Type[ctypes.Structure]:
+        # Field type name to ctypes
+        type_map = {
+            "char": ctypes.c_char,
+            "unsigned char": ctypes.c_ubyte,
+            "byte": ctypes.c_ubyte,
+            "int": ctypes.c_int32,
+            "signed int": ctypes.c_int32,
+            "unsigned int": ctypes.c_uint32,
+            "unsigned": ctypes.c_uint32,
+            "short": ctypes.c_int16,
+            "signed short": ctypes.c_int16,
+            "unsigned short": ctypes.c_uint16,
+            "long": ctypes.c_int32,
+            "signed long": ctypes.c_int32,
+            "unsigned long": ctypes.c_uint32,
+            "long long": ctypes.c_int64,
+            "signed long long": ctypes.c_int64,
+            "unsigned long long": ctypes.c_uint64,
+            "float": ctypes.c_float,
+            "double": ctypes.c_double,
+            "uint8": ctypes.c_uint8,
+            "uint16": ctypes.c_uint16,
+            "uint32": ctypes.c_uint32,
+            "uint64": ctypes.c_uint64,
+            "int8": ctypes.c_int8,
+            "int16": ctypes.c_int16,
+            "int32": ctypes.c_int32,
+            "int64": ctypes.c_int64,
+        }
+
+        f = []
+        cobj: Any
+        for n, field in enumerate(s.fields):
+            if isinstance(field.type_obj, (MDF, SDF)):
+                cobj = self.get_ctype_cls(field.type_obj)
+            elif isinstance(field.type_obj, NativeType):
+                cobj = type_map[field.type_obj.name]
+            elif isinstance(field.type_obj, TypeAlias):
+                if isinstance(field.type_obj.type_obj, NativeType):
+                    cobj = type_map[field.type_obj.type_obj.name]
+                else:
+                    cobj = self.get_ctype_size(field.type_obj.type_obj)
+            else:
+                raise RuntimeError(f"Unexpected type {type(field.type_obj)}")
+
+            if field.length:
+                f.append((f"f{n}", cobj * (field.length)))
+            else:
+                f.append((f"f{n}", cobj))
+
+        return type(s.name, (ctypes.Structure,), {"_fields_": f})
+
+    def get_ctype_size(self, s: Union[MDF, SDF]) -> int:
+        return ctypes.sizeof(self.get_ctype_cls(s))
 
     def validate_msg_id(self, name: str, msg_id: int):
         if not isinstance(msg_id, int):
@@ -679,7 +885,14 @@ class Parser:
         ), f"Message and Struct definitions must have at least one field: {mdf.name} -> {self.current_file}"
 
         # Check memory alignment layout
-        self.check_alignment(mdf, auto_pad=True)
+        if self.validate_alignment:
+            self.check_alignment(mdf)
+
+        # Check size
+        if mdf.size > 65535:
+            raise InvalidMessageSize(
+                f"{mdf.name} size of {mdf.size} exceeds maximum allowe of 65535 bytes."
+            )
 
     def add_fields(self, mdf: Union[SDF, MDF], fields: Union[Dict, str]):
         # Pattern to parse field specs
@@ -716,7 +929,7 @@ class Parser:
 
                 if not isinstance(fstr, str):
                     raise InvalidTypeError(
-                        f"Field types must be a string not type not {type(fstr).__name__}: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
+                        f"Field types must be a string not {type(fstr).__name__}: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
                     )
 
                 m = re.match(FIELD_REGEX, fstr)
@@ -739,6 +952,7 @@ class Parser:
                     )
 
                 # Check for a valid type
+                ftype_obj: Union[NativeType, TypeAlias, MDF, SDF]
                 if ftype in supported_types.keys():
                     ftype_obj = supported_types[ftype]
                 elif ftype in self.aliases.keys():
@@ -832,6 +1046,7 @@ class Parser:
                 )
 
         # Create a string representation of the defintion to hash
+        f: Union[str, List[str]]
         if isinstance(sdf["fields"], str):
             f = f"    fields: {sdf['fields']}"
         else:
@@ -900,11 +1115,12 @@ class Parser:
             return
 
         # Create a string representation of the defintion to hash
+        f: Union[str, List[str]]
         if isinstance(mdf["fields"], str):
             f = f"    fields: {mdf['fields']}"
         else:
             f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
-        f = "\n".join(f)
+            f = "\n".join(f)
         raw = f"{name}:\n  id: {mdf['id']}\n  fields:\n{f}"
 
         raw = textwrap.dedent(raw)
@@ -941,9 +1157,7 @@ class Parser:
             if isinstance(e, int):
                 reserved.append(e)
             elif isinstance(e, str):
-                m = re.search(
-                    r"\s*(?P<start>[0-9]+)\s*(:|\-|to)\s*(?P<end>[0-9]+)\s*", e
-                )
+                m = re.search(r"\s*(?P<start>[0-9]+)\s*(\-|to)\s*(?P<end>[0-9]+)\s*", e)
                 if m is None:
                     raise RTMASyntaxError(f"_RESERVED_.id has invalid entry: {e}")
 
@@ -967,12 +1181,30 @@ class Parser:
             name = f"_RESERVED_{id:06d}"
             self.handle_signal(name, dict(id=id, fields=None))
 
+    def parse_options_text(self, text: str):
+        # parse compiler options from root file
+        self.check_key_value_separation(text)
+
+        # Parse the yaml file
+        try:
+            yaml = YAML(typ="safe", pure=True)  # typ="unsafe", pure=True)
+            data = yaml.load(text)
+        except Exception as e:
+            raise YAMLSyntaxError(
+                f"Error encountered by YAML parser in {self.current_file}"
+            ) from e
+
+        if data.get("compiler_options") is not None:
+            for name, value in data["compiler_options"].items():
+                self.handle_compiler_options(name, value)
+            self.yaml_dict["compiler_options"].update(data["compiler_options"])
+
     def parse_text(self, text: str):
         self.check_key_value_separation(text)
 
         # Parse the yaml file
         try:
-            yaml = YAML(typ="unsafe", pure=True)
+            yaml = YAML(typ="safe")  # typ="unsafe", pure=True)
             data = yaml.load(text)
         except Exception as e:
             raise YAMLSyntaxError(
@@ -980,6 +1212,8 @@ class Parser:
             ) from e
 
         valid_sections = (
+            "metadata",
+            "compiler_options",
             "imports",
             "constants",
             "string_constants",
@@ -996,6 +1230,11 @@ class Parser:
                 raise RTMASyntaxError(
                     f"Invalid top-level section '{section}' in message defs file -> {self.current_file}."
                 )
+
+        if data.get("metadata") is not None:
+            for name, value in data["metadata"].items():
+                self.handle_metadata(name, value)
+            self.yaml_dict["metadata"].update(data["metadata"])
 
         if data.get("imports") is not None:
             if isinstance(data["imports"], list):
@@ -1043,8 +1282,13 @@ class Parser:
 
     def check_key_value_separation(self, text: str):
         for n, line in enumerate(text.splitlines(), start=1):
+            # strip comments
+            if "#" in line:
+                idx = line.index("#")
+                line = line[:idx]
             if ":" in line:
-                if re.search(r"(:\s+)|(:$)", line) is None:
+                idx = line.index(":")  # check first :
+                if idx + 1 < len(line) and not line[idx + 1].isspace():
                     raise RTMASyntaxError(
                         f"Key-Value pairs must be separated with a ':' followed by a space. Add a space after the colon.\n{self.current_file}: line {n}\n{line}"
                     )
@@ -1053,13 +1297,23 @@ class Parser:
         # Get the current pwd
         cwd = pathlib.Path.cwd()
         try:
-            # Always start by parsing the core_defs.yaml file
-            pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
-            core_defs = pkg_dir / "core_defs/core_defs.yaml"
-            self.root_path = pkg_dir
-            self.parse_file(core_defs.absolute())
-
+            # first parse compiler options
             defs_path = pathlib.Path(msgdefs_file)
+            self.root_path = defs_path.parent.resolve()
+            self.parse_options(defs_path)
+            coredefs_option = self.compiler_options.get("IMPORT_COREDEFS")
+            if coredefs_option:
+                self.IMPORT_COREDEFS = bool(coredefs_option.value)
+            else:
+                self.IMPORT_COREDEFS = True
+
+            if self.IMPORT_COREDEFS:
+                # Parse the core_defs.yaml file first
+                pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
+                core_defs = pkg_dir / "core_defs/core_defs.yaml"
+                self.root_path = pkg_dir
+                self.parse_file(core_defs.absolute())
+
             self.root_path = defs_path.parent.resolve()
             self.parse_file(defs_path)
         except Exception as e:
@@ -1101,6 +1355,34 @@ class Parser:
             raise e
 
         self.parse_text(text)
+        self.current_file = prev_file
+
+        os.chdir(str(cwd.absolute()))
+
+    def parse_options(self, msgdefs_file: pathlib.Path):
+        # Change the working directory
+        cwd = pathlib.Path.cwd()
+        msgdefs_path = (cwd / msgdefs_file).resolve()
+        os.chdir(str(msgdefs_path.parent.absolute()))
+
+        self.logger.info(f"Parsing Compiler Options-> {msgdefs_path.absolute()}")
+        prev_file = self.current_file
+        self.current_file = msgdefs_path.absolute()
+
+        try:
+            with open(msgdefs_path, "rt") as f:
+                text = f.read()
+        except FileNotFoundError as e:
+            alt_ext = ".yaml" if msgdefs_path.suffix == ".yml" else ".yml"
+            alt_path = msgdefs_path.parent / (msgdefs_path.stem + alt_ext)
+            if alt_path.is_file() and alt_path.exists():
+                detail = f"\n\nCheck file extension -> Did you mean {alt_path}?"
+            else:
+                detail = ""
+            e.args = tuple([*e.args, msgdefs_path.absolute(), detail])
+            raise e
+
+        self.parse_options_text(text)
         self.current_file = prev_file
 
         os.chdir(str(cwd.absolute()))

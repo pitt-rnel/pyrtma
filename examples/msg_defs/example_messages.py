@@ -46,14 +46,18 @@ MAX_RTMA_MODULE_ID: int = 9
 MAX_LOGGER_FILENAME_LENGTH: int = 256
 MAX_CONTIGUOUS_MESSAGE_DATA: int = 9000
 ALL_MESSAGE_TYPES: int = 2147483647
+STR_SIZE: int = 32
+LONG_STRING: int = 64
 
 # String Constants
+default_msg: str = "hello_world"
 
 # Type Aliases
 MODULE_ID = ctypes.c_int16
 HOST_ID = ctypes.c_int16
 MSG_TYPE = ctypes.c_int32
 MSG_COUNT = ctypes.c_int32
+AGE_TYPE = ctypes.c_int32
 
 # Host IDs
 LOCAL_HOST: int = 0
@@ -62,6 +66,8 @@ ALL_HOSTS: int = 32767
 # Module IDs
 MID_MESSAGE_MANAGER: int = 0
 MID_QUICK_LOGGER: int = 5
+MID_PERSON_PUBLISHER: int = 213
+MID_PERSON_SUBSCRIBER: int = 214
 
 # Message Type IDs
 MT_EXIT: int = 0
@@ -86,6 +92,23 @@ MT_FORCE_DISCONNECT: int = 82
 MT_PAUSE_SUBSCRIPTION: int = 85
 MT_RESUME_SUBSCRIPTION: int = 86
 MT_LM_READY: int = 96
+MT_PERSON_MESSAGE: int = 1234
+MT_ANOTHER_EXAMPLE: int = 5678
+MT_USER_SIGNAL: int = 2468
+MT_PERSON_LIST: int = 1357
+MT_EMPLOYEES: int = 1368
+MT__RESERVED_001000: int = 1000
+MT__RESERVED_001002: int = 1002
+MT__RESERVED_001003: int = 1003
+MT__RESERVED_001004: int = 1004
+MT__RESERVED_001005: int = 1005
+MT__RESERVED_001006: int = 1006
+MT__RESERVED_001007: int = 1007
+MT__RESERVED_001008: int = 1008
+MT__RESERVED_001009: int = 1009
+MT__RESERVED_001010: int = 1010
+MT__RESERVED_001011: int = 1011
+MT__RESERVED_001012: int = 1012
 
 
 # Struct Definitions
@@ -110,6 +133,19 @@ class RTMA_MSG_HEADER(MessageBase, metaclass=MessageMeta):
     remaining_bytes: Int32 = Int32()
     is_dynamic: Int32 = Int32()
     reserved: Uint32 = Uint32()
+
+
+class TEST_STRUCT(MessageBase, metaclass=MessageMeta):
+    type_name: ClassVar[str] = "TEST_STRUCT"
+    type_hash: ClassVar[int] = 0x025479D2
+    type_size: ClassVar[int] = 36
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = (
+        "'TEST_STRUCT:\n  fields:\n    value_str: char[STR_SIZE]\n    value_int: int'"
+    )
+
+    value_str: String = String(32)
+    value_int: Int32 = Int32()
 
 
 # Message Definitions
@@ -382,3 +418,192 @@ class MDF_LM_READY(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "core_defs/core_defs.yaml"
     type_def: ClassVar[str] = "'LM_READY:\n  id: 96\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_PERSON_MESSAGE(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1234
+    type_name: ClassVar[str] = "PERSON_MESSAGE"
+    type_hash: ClassVar[int] = 0x3A9C5C31
+    type_size: ClassVar[int] = 36
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = (
+        "'PERSON_MESSAGE:\n  id: 1234\n  fields:\n    name: char[STR_SIZE]\n    age: AGE_TYPE'"
+    )
+
+    name: String = String(32)
+    age: Int32 = Int32()
+
+
+@pyrtma.message_def
+class MDF_ANOTHER_EXAMPLE(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 5678
+    type_name: ClassVar[str] = "ANOTHER_EXAMPLE"
+    type_hash: ClassVar[int] = 0x76C035B3
+    type_size: ClassVar[int] = 48
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = (
+        "'ANOTHER_EXAMPLE:\n  id: 5678\n  fields:\n    value_struct: TEST_STRUCT\n    value_float: float\n    value_double: double'"
+    )
+
+    value_struct: Struct[TEST_STRUCT] = Struct(TEST_STRUCT)
+    value_float: Float = Float()
+    value_double: Double = Double()
+
+
+@pyrtma.message_def
+class MDF_USER_SIGNAL(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 2468
+    type_name: ClassVar[str] = "USER_SIGNAL"
+    type_hash: ClassVar[int] = 0xD79169AA
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'USER_SIGNAL:\n  id: 2468\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_PERSON_LIST(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1357
+    type_name: ClassVar[str] = "PERSON_LIST"
+    type_hash: ClassVar[int] = 0x8F180975
+    type_size: ClassVar[int] = 1152
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = (
+        "'PERSON_LIST:\n  id: 1357\n  fields:\n    person: PERSON_MESSAGE[32]'"
+    )
+
+    person: StructArray[MDF_PERSON_MESSAGE] = StructArray(MDF_PERSON_MESSAGE, 32)
+
+
+@pyrtma.message_def
+class MDF_EMPLOYEES(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1368
+    type_name: ClassVar[str] = "EMPLOYEES"
+    type_hash: ClassVar[int] = 0x40C66A09
+    type_size: ClassVar[int] = 1152
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = (
+        "'EMPLOYEES:\n  id: 1368\n  fields:\n    fields: PERSON_LIST'"
+    )
+
+    person: StructArray[MDF_PERSON_MESSAGE] = StructArray(MDF_PERSON_MESSAGE, 32)
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001000(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1000
+    type_name: ClassVar[str] = "_RESERVED_001000"
+    type_hash: ClassVar[int] = 0x08E66D54
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'_RESERVED_001000:\n  id: 1000\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001002(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1002
+    type_name: ClassVar[str] = "_RESERVED_001002"
+    type_hash: ClassVar[int] = 0xBD402EAA
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'_RESERVED_001002:\n  id: 1002\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001003(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1003
+    type_name: ClassVar[str] = "_RESERVED_001003"
+    type_hash: ClassVar[int] = 0x4D10FC66
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'_RESERVED_001003:\n  id: 1003\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001004(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1004
+    type_name: ClassVar[str] = "_RESERVED_001004"
+    type_hash: ClassVar[int] = 0x1F3379B5
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'_RESERVED_001004:\n  id: 1004\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001005(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1005
+    type_name: ClassVar[str] = "_RESERVED_001005"
+    type_hash: ClassVar[int] = 0x2A5253B3
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'_RESERVED_001005:\n  id: 1005\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001006(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1006
+    type_name: ClassVar[str] = "_RESERVED_001006"
+    type_hash: ClassVar[int] = 0xE67B66D3
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'_RESERVED_001006:\n  id: 1006\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001007(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1007
+    type_name: ClassVar[str] = "_RESERVED_001007"
+    type_hash: ClassVar[int] = 0x8DC1AAE8
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'_RESERVED_001007:\n  id: 1007\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001008(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1008
+    type_name: ClassVar[str] = "_RESERVED_001008"
+    type_hash: ClassVar[int] = 0x3ABE111F
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'_RESERVED_001008:\n  id: 1008\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001009(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1009
+    type_name: ClassVar[str] = "_RESERVED_001009"
+    type_hash: ClassVar[int] = 0x1E42BAA4
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'_RESERVED_001009:\n  id: 1009\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001010(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1010
+    type_name: ClassVar[str] = "_RESERVED_001010"
+    type_hash: ClassVar[int] = 0xAE4C92D4
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'_RESERVED_001010:\n  id: 1010\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001011(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1011
+    type_name: ClassVar[str] = "_RESERVED_001011"
+    type_hash: ClassVar[int] = 0x27E03BD7
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'_RESERVED_001011:\n  id: 1011\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF__RESERVED_001012(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1012
+    type_name: ClassVar[str] = "_RESERVED_001012"
+    type_hash: ClassVar[int] = 0x925028C4
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example_messages.yaml"
+    type_def: ClassVar[str] = "'_RESERVED_001012:\n  id: 1012\n  fields: null'"

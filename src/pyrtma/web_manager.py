@@ -3,13 +3,18 @@ import logging
 import select
 import errno
 import struct
+import argparse
+import importlib
+import pathlib
+import sys
 
 from pyrtma.client import Client
-from pyrtma.message import RTMAMessageError
+from pyrtma.exceptions import RTMAMessageError
+import pyrtma.core_defs as cd
 
 from socket import error as SocketError
 from socketserver import TCPServer
-from websocket_server import (
+from websocket_server import (  # type: ignore
     WebsocketServer,
     WebSocketHandler,
     logger,
@@ -25,13 +30,24 @@ from websocket_server import (
     OPCODE_TEXT,
 )
 
-from typing import Optional
+from typing import Optional, List, Callable, Any, Dict
 
 
 class RTMAWebSocketHandler(WebSocketHandler):
+    """RTMA Web Socket Handler class"""
+
     disable_nagle_algorithm = True
 
     def __init__(self, socket, addr, server):
+        """RTMA Web Socket Handler
+
+        Initializes and handles RTMA Proxy connection
+
+        Args:
+            socket: socket object
+            addr: client address
+            server: server object
+        """
         # Initialize RTMA Proxy connection
         self.mm_ip = server.mm_ip
         self.proxy = Client()
@@ -39,6 +55,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         WebSocketHandler.__init__(self, socket, addr, server)
 
     def handle(self):
+        """Handle RTMA proxy connection"""
         if not self.handshake_done:
             self.handshake()
 
@@ -66,7 +83,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
             if self.rfile in rd:
                 self.read_ws_message()
 
-            if self.proxy.sock in rd:
+            if self.proxy.sock in rd and self.proxy.connected:
                 try:
                     msg = self.proxy.read_message(timeout=None)
                 except RTMAMessageError as e:
@@ -82,26 +99,46 @@ class RTMAWebSocketHandler(WebSocketHandler):
                         print("X")
 
     def pong_received(self, msg: str):
+        """Log that pong was received
+
+        Args:
+            msg (str): Ignored
+        """
         logger.info("Websocket PONG received.")
 
     def process_json_message(self, message: str):
-        """Called when a client receives a message over websocket."""
+        """Process incoming json message
+
+        Called when a client receives a message over websocket
+
+        Args:
+            message (str): JSON message string
+        """
         try:
             msg = pyrtma.Message.from_json(message)
         except RTMAMessageError as e:
             logger.error(e, stack_info=False)
             return
 
-        self.proxy.forward_message(msg.header, msg.data or None)
+        if msg.header.msg_type == cd.MT_DISCONNECT:
+            self.proxy.disconnect()
+            logger.debug("Received disconnect, disconnected proxy from MM.")
+        else:
+            self.proxy.forward_message(msg.header, msg.data or None)
 
     def read_ws_message(self) -> Optional[str]:
+        """Read websocket message
+
+        Returns:
+            Optional[str]: Websocket message string
+        """
         try:
             b1, b2 = self.read_bytes(2)
         except SocketError as e:  # to be replaced with ConnectionResetError for py3
             if e.errno == errno.ECONNRESET:
                 logger.info("Client closed connection.")
                 self.keep_alive = 0
-                return
+                return None
             b1, b2 = 0, 0
         except ValueError as e:
             b1, b2 = 0, 0
@@ -110,21 +147,22 @@ class RTMAWebSocketHandler(WebSocketHandler):
         opcode = b1 & OPCODE
         masked = b2 & MASKED
         payload_length = b2 & PAYLOAD_LEN
+        opcode_handler: Callable[[str], None]
 
         if opcode == OPCODE_CLOSE_CONN:
             logger.info("Client asked to close connection.")
             self.keep_alive = 0
-            return
+            return None
         if not masked:
             logger.warning("Client must always be masked.")
             self.keep_alive = 0
-            return
+            return None
         if opcode == OPCODE_CONTINUATION:
             logger.warning("Continuation frames are not supported.")
-            return
+            return None
         elif opcode == OPCODE_BINARY:
             logger.warning("Binary frames are not supported.")
-            return
+            return None
         elif opcode == OPCODE_TEXT:
             opcode_handler = self.process_json_message
         elif opcode == OPCODE_PING:
@@ -134,7 +172,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         else:
             logger.warning("Unknown opcode %#x." % opcode)
             self.keep_alive = 0
-            return
+            return None
 
         if payload_length == 126:
             payload_length = struct.unpack(">H", self.rfile.read(2))[0]
@@ -151,6 +189,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         return message_bytes.decode("utf8")
 
     def finish(self):
+        """Close RTMA connection"""
         # Disconnect on behalf of the web client if still connected here
         if self.proxy.connected:
             self.proxy.disconnect()
@@ -160,15 +199,28 @@ class RTMAWebSocketHandler(WebSocketHandler):
 
 
 class WebMessageManager(WebsocketServer):
+    """WebMessageManager class"""
+
     def __init__(
         self,
-        host="127.0.0.1",
+        host="",
         port=0,
         mm_ip: str = "127.0.0.1:7111",
-        loglevel=logging.WARNING,
+        loglevel: int = logging.WARNING,
         key=None,
         cert=None,
     ):
+        """WebMessageManager class
+
+        Args:
+            host (str, optional): IP for WebMessageManager to listen for connections. Defaults to "" (any local IP).
+            port (int, optional): Port for WebMessageManager to bind to. Defaults to 0.
+            mm_ip (str, optional): Address for RTMA MessageManager. Defaults to "127.0.0.1:7111".
+            loglevel (int, optional): Loging level. Defaults to logging.WARNING.
+            key (optional): Path to SSL key. Defaults to None.
+            cert (optional): Path to SSL cert. Defaults to None.
+        """
+
         logger.setLevel(loglevel)
         TCPServer.__init__(self, (host, port), RTMAWebSocketHandler)
         self.host = host
@@ -177,7 +229,7 @@ class WebMessageManager(WebsocketServer):
         self.key = key
         self.cert = cert
 
-        self.clients = []
+        self.clients: List[dict] = []
         self.id_counter = 0
         self.thread = None
 
@@ -189,22 +241,32 @@ class WebMessageManager(WebsocketServer):
         self.mm_ip = mm_ip
 
 
-def ws_client_connect(client, server):
-    """Called for every client connecting (after handshake)"""
-    (f"Client connected -> id:{client['id']}")
+def ws_client_connect(client: Dict[str, Any], server: WebMessageManager):
+    """Websocket client connect
+
+        Called for every client connecting (after handshake)
+    Args:
+        client (Dict[str, Any]): Client dictionary
+        server: WebMessageManager Server object
+    """
+    print(f"Client connected -> id:{client['id']}")
 
 
-def ws_client_disconnect(client, server):
-    """Called for every client disconnecting"""
-    print(f"Client disconnected -> id:{client['id']}")
+def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
+    """Websocket client disconnect
+
+        Called for every client disconnecting
+    Args:
+        client (Dict[str, Any]): Client dictionary
+        server: WebMessageManager Server object
+    """
+    print(f"Client disconnected -> id:{client['id']}\n")
 
 
-if __name__ == "__main__":
-    import argparse
-    import importlib
-    import pathlib
+def main():
+    """Main function for starting web_manager"""
 
-    parser = argparse.ArgumentParser(description="Touch Demo Server Application")
+    parser = argparse.ArgumentParser(description="Websocket Message Manager")
 
     parser.add_argument(
         "-m",
@@ -212,15 +274,15 @@ if __name__ == "__main__":
         default="127.0.0.1:7111",
         dest="mm_ip",
         type=str,
-        help="Ip address of message manager. Defaults to using 127.0.0.1:7111.",
+        help="IP address of Message Manager. Defaults to 127.0.0.1:7111.",
     )
 
     parser.add_argument(
         "--host",
-        default="127.0.0.1",
+        default="",
         dest="host",
         type=str,
-        help="Host ip address.",
+        help='Host IP address, defaults to "" (any local IP).',
     )
 
     parser.add_argument(
@@ -229,7 +291,7 @@ if __name__ == "__main__":
         default=5678,
         dest="port",
         type=int,
-        help="Port to listen for websocket clients.",
+        help="Port to listen for websocket clients. Defaults to 5678.",
     )
 
     parser.add_argument(
@@ -237,8 +299,12 @@ if __name__ == "__main__":
         "--defs",
         dest="defs_file",
         type=str,
-        help="Path to python message definitions file.",
+        help="Path to python message definitions file. Required argument.",
     )
+
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
     args = parser.parse_args()
 
     websocket_server = WebMessageManager(
@@ -251,9 +317,11 @@ if __name__ == "__main__":
     base = pathlib.Path(args.defs_file).absolute().parent
     fname = pathlib.Path(args.defs_file).stem
 
-    import sys
-
     sys.path.insert(0, (str(base.absolute())))
     importlib.import_module(fname)
 
     websocket_server.run_forever()
+
+
+if __name__ == "__main__":
+    main()

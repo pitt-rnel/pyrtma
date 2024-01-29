@@ -1,12 +1,19 @@
 """pyrtma.compile Message Type Compiler """
+
 import pathlib
 import re
 import sys
-from typing import List
+from typing import List, Union
 
 from .parser import Parser, ParserError, FileFormatError
 from rich.traceback import install
 import warnings
+from pyrtma.compilers.python import PyDefCompiler
+from pyrtma.compilers.javascript import JSDefCompiler
+from pyrtma.compilers.matlab import MatlabDefCompiler
+from pyrtma.compilers.c99 import CDefCompiler
+from pyrtma.compilers.yaml import YAMLCompiler
+from pyrtma.compilers.info import InfoCompiler
 
 install(word_wrap=True, show_locals=True)
 
@@ -22,7 +29,30 @@ def compile(
     info: bool = False,
     combined: bool = False,
     debug: bool = False,
+    validate_alignment: bool = True,
+    auto_pad: bool = True,
 ):
+    """compile message defs
+
+    Args:
+        defs_files (List[str]): Root YAML message defintion file to parse. List of C header file(s) will use v1 python compiler (deprecated)
+        out_name (str): Output directory for compiled files. For v1 compiler (deprecated), full output filename.
+        python (bool, optional): Output python .py file. Defaults to False.
+        javascript (bool, optional): Output javascript .js file. Defaults to False.
+        matlab (bool, optional): Output matlab .m file. Defaults to False.
+        c_lang (bool, optional): Output C .h file. Defaults to False.
+        info (bool, optional): Output info .txt file. Defaults to False.
+        combined (bool, optional): Output combined YAML file. Defaults to False.
+        debug (bool, optional): Debug mode. Defaults to False.
+        validate_alignment(bool, optional): Validate message 64-bit alignment. Defaults to True.
+        auto_pad(bool, optional): Automatically pad messages failing 64-bit alignment validation. Defaults to True. Has no effect if validate_alignment is False.
+
+
+    Raises:
+        FileFormatError: Issue with input file format
+        FileExistsError: Output file is not a directory
+        RuntimeError: Invalid output filename
+    """
     # determine if using v1 or v2 compiler
     file1_ext = pathlib.Path(defs_files[0]).suffix
     if file1_ext.lower() == ".h":
@@ -48,7 +78,9 @@ def compile(
     # else continue with compiler V2
 
     defs_file = defs_files[0]
-    parser = Parser(debug=debug)
+    parser = Parser(
+        debug=debug, validate_alignment=validate_alignment, auto_pad=auto_pad
+    )
     parser.parse(pathlib.Path(defs_file))
 
     if debug:
@@ -76,9 +108,16 @@ def compile(
     if re.search(r"[^a-zA-Z0-9_-]", filename):
         raise RuntimeError(f"Invalid out filename: {filename}")
 
+    compiler: Union[
+        PyDefCompiler,
+        JSDefCompiler,
+        MatlabDefCompiler,
+        CDefCompiler,
+        YAMLCompiler,
+        InfoCompiler,
+    ]
     if python:
         print("Building python message definitions...")
-        from pyrtma.compilers.python import PyDefCompiler
 
         compiler = PyDefCompiler(parser, debug=debug)
         ext = ".py"
@@ -87,7 +126,6 @@ def compile(
 
     if javascript:
         print("Building javascript message definitions...")
-        from pyrtma.compilers.javascript import JSDefCompiler
 
         compiler = JSDefCompiler(parser, debug=debug)
         ext = ".js"
@@ -96,7 +134,6 @@ def compile(
 
     if matlab:
         print("Building matlab message definitions...")
-        from pyrtma.compilers.matlab import MatlabDefCompiler
 
         compiler = MatlabDefCompiler(parser, debug=debug)
         ext = ".m"
@@ -105,7 +142,6 @@ def compile(
 
     if c_lang:
         print("Building C/C++ message definitions...")
-        from pyrtma.compilers.c99 import CDefCompiler
 
         compiler = CDefCompiler(parser, filename=filename, debug=debug)
         ext = ".h"
@@ -114,7 +150,6 @@ def compile(
 
     if combined:
         print("Building combined yaml file...")
-        from pyrtma.compilers.yaml import YAMLCompiler
 
         compiler = YAMLCompiler(parser, filename=filename, debug=debug)
         ext = ".yaml"
@@ -123,7 +158,6 @@ def compile(
 
     if info:
         print("Building info file...")
-        from pyrtma.compilers.info import InfoCompiler
 
         compiler = InfoCompiler(parser, filename=filename, debug=debug)
         ext = ".txt"
@@ -133,7 +167,7 @@ def compile(
     print("DONE.")
 
 
-if __name__ == "__main__":
+def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="pyrtma Message Definition Compiler.")
@@ -168,7 +202,7 @@ if __name__ == "__main__":
         "--js",
         dest="javascript",
         action="store_true",
-        help="Output javascrip .js file",
+        help="Output javascript .js file",
     )
 
     parser.add_argument(
@@ -217,6 +251,20 @@ if __name__ == "__main__":
         help="Debug compiler",
     )
 
+    parser.add_argument(
+        "--no_val_align",
+        dest="validate_alignment",
+        action="store_false",
+        help="Disable 64-bit alignment validation",
+    )
+
+    parser.add_argument(
+        "--no_auto_pad",
+        dest="auto_pad",
+        action="store_false",
+        help="Disable 64-bit alignment auto-padding",
+    )
+
     args = parser.parse_args()
     try:
         compile(**vars(args))
@@ -234,3 +282,7 @@ if __name__ == "__main__":
         raise
 
     sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

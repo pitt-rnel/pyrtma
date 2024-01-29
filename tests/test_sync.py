@@ -5,9 +5,9 @@ import time
 import logging
 
 import pyrtma
-from .test_msg_defs.test_defs import *
-
-from pyrtma.client import Client
+from .test_msg_defs import test_defs as td
+import time
+from pyrtma.client import client_context
 from pyrtma.message import *
 import pyrtma.manager
 from pyrtma.manager import MessageManager
@@ -37,53 +37,47 @@ class TestSync(unittest.TestCase):
     def tearDown(self):
         self.manager.close()
         self.manager_thread.join()
-        for mod in self.manager.modules:
-            mod.close()
 
     def test_version_mismatch(self):
-        publisher = Client()
-        publisher.connect(self.addr)
-        subscriber = Client()
-        subscriber.connect(self.addr)
-        time.sleep(0.250)
+        with client_context(server_name=self.addr) as publisher:
+            with client_context(
+                server_name=self.addr, msg_list=[td.MT_SET_START]
+            ) as subscriber:
+                time.sleep(0.250)
 
-        subscriber.subscribe([MT_SET_START])
-        subscriber.wait_for_acknowledgement()
+                header = MessageHeader()
+                header.msg_type = td.MT_SET_START
+                header.msg_count = 1
+                header.send_time = time.perf_counter()
+                header.num_data_bytes = 0
 
-        header = MessageHeader()
-        header.msg_type = MT_SET_START
-        header.msg_count = 1
-        header.send_time = time.perf_counter()
-        header.num_data_bytes = 0
+                # Change the version to create a mismatch between sender and receiver
+                header.version = 0xDEADBEEF
 
-        # Change the version to create a mismatch between sender and receiver
-        header.version = 0xDEADBEEF
+                publisher.forward_message(header, td.MDF_SET_START())
 
-        publisher.forward_message(header, MDF_SET_START())
-
-        with self.assertRaises(pyrtma.message.InvalidMessageDefinition):
-            msg = subscriber.read_message(timeout=0.100, sync_check=True)
+                with self.assertRaises(pyrtma.message.InvalidMessageDefinition):
+                    msg = subscriber.read_message(timeout=0.100, sync_check=True)
 
     def test_size_mismatch(self):
-        publisher = Client()
-        publisher.connect(self.addr)
-        subscriber = Client()
-        subscriber.connect(self.addr)
-        time.sleep(0.250)
+        with client_context(server_name=self.addr) as publisher:
+            with client_context(
+                server_name=self.addr, msg_list=[td.MT_SET_START]
+            ) as subscriber:
+                time.sleep(0.250)
 
-        subscriber.subscribe([MT_SET_START])
-        subscriber.wait_for_acknowledgement()
+                header = MessageHeader()
+                header.msg_type = td.MT_SET_START
+                header.msg_count = 1
+                header.send_time = time.perf_counter()
 
-        header = MessageHeader()
-        header.msg_type = MT_SET_START
-        header.msg_count = 1
-        header.send_time = time.perf_counter()
+                # Create a size mismatch between sender and receiver
+                data = td.MDF_TRIAL_METADATA()
+                header.num_data_bytes = data.type_size
 
-        # Create a size mismatch between sender and receiver
-        data = MDF_TRIAL_METADATA()
-        header.num_data_bytes = data.type_size
+                publisher.forward_message(header, data)
 
-        publisher.forward_message(header, data)
+                with self.assertRaises(pyrtma.message.InvalidMessageDefinition):
+                    msg = subscriber.read_message(timeout=0.100, sync_check=True)
 
-        with self.assertRaises(pyrtma.message.InvalidMessageDefinition):
-            msg = subscriber.read_message(timeout=0.100, sync_check=True)
+        time.sleep(0.5)

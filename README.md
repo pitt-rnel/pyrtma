@@ -10,13 +10,14 @@ RTMA/Dragonfly client written in python with no external dependencies. Based on 
 pyrtma is [available on PyPI](https://pypi.org/project/pyrtma/)
 
 ```shell
-pip install pyrtma
+pip install pyrtma --upgrade
 ```
 
 ### Installing for pyrtma development
 
 This is only necessary for individuals who would like to contribute to pyrtma.
 
+From pyrtma git repo directory:
 ```shell
 pip install --upgrade pip setuptools
 pip install -e .
@@ -27,7 +28,11 @@ pip install -e .
 ### Launch Manager
 
 ```shell
-python -m pyrtma.manager -a "127.0.0.1"
+python -m pyrtma.manager
+```
+or
+```shell
+message_manager
 ```
 
 ### Create a message in message.yaml
@@ -47,30 +52,18 @@ Notes about yaml format:
 
 List of supported native data types:
 
-- char
-- unsigned char
-- byte
-- int
-- signed int
-- unsigned int
-- short
-- unsigned short
-- long
-- signed long
-- unsigned long
-- long long
-- signed long long
-- unsigned long long
-- float
-- double
-- int8
-- uint8
-- int16
-- uint16
-- int32
-- uint32
-- int64
-- uint64
+- `char`
+- `byte`
+- `float`
+- `double`
+- `int8`
+- `int16`
+- `int32`
+- `int64`
+- `uint8`
+- `uint16`
+- `uint32`
+- `uint64`
 
 Below is an example:
 
@@ -96,14 +89,14 @@ module_ids:
 
 # Alias a type by another name
 aliases:
-    AGE_TYPE: int
+    AGE_TYPE: int32
 
 # Non-message structured data (no id field)
 struct_defs:
     TEST_STRUCT:
         fields:
             value_str: char[STR_SIZE]
-            value_int: int
+            value_int: int32
 
 # Message defintions with user assigned id field
 message_defs:
@@ -138,14 +131,20 @@ message_defs:
 
     # A block of message ids can be reserved by a file for future use
     # Ranges are inclusive on both ends
+    # Note that ':' cannot be used to indicate a range, as this will cause
+    # the yaml parser to throw an error
     _RESERVED_:
-        id: [1000, 1002:1005, 1006 - 1008, 1009 to 1012]
+        id: [1000, 1002 - 1008, 1009 to 1012]
 ```
 
 Run the following command to compile the yaml file into Python, C, Matlab, or Javascript files. This will output a message.(py|h|m|js) file.
 
 ```shell
 python -m pyrtma.compile -i examples/msg_defs/message.yaml --py --c --mat --js
+```
+or
+```shell
+rtma_compiler -i examples/msg_defs/message.yaml --py --c --mat --js
 ```
 
 The msg_defs directory should now have message def files created for each language.
@@ -179,3 +178,18 @@ Start the subscriber in another:
 ```shell
 python ./examples/example.py --sub
 ```
+
+# Javascript
+Clients in javascript require the web_manager server to convert websocket messages to rtma messages.
+
+Run:
+```shell 
+python -m pyrtma.web_manager -m <MM_IP> -p <WEBSOCKET_PORT> -d <DEFS_FILE>
+```
+or
+```shell 
+web_manager -m <MM_IP> -p <WEBSOCKET_PORT> -d <DEFS_FILE>
+```
+to launch the web_manager which will listen to websocket connects on port <WEBSOCKET_PORT> and forward to message manager at <MM_IP>, using pyrtma message definitions defined in <DEFS_FILE>.
+
+See [rtma-js](https://github.com/pitt-rnel/rtma-js) for developing rtma clients in javascript.

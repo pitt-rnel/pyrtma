@@ -529,7 +529,7 @@ class TestParser(unittest.TestCase):
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
-        # Illegal field aname
+        # Illegal field name
         text = textwrap.dedent(
             """
             message_defs:
@@ -622,6 +622,16 @@ class TestParser(unittest.TestCase):
             """
         )
         self.tmp.write(text)
+        with self.assertRaises(pyrtma.parser.YAMLSyntaxError):
+            self.parser.parse(self.tmp.path)
+
+        text = textwrap.dedent(
+            """
+            message_defs:
+                _RESERVED_: [1-2-10]
+            """
+        )
+        self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.InvalidTypeError):
             self.parser.parse(self.tmp.path)
 
@@ -635,3 +645,45 @@ class TestParser(unittest.TestCase):
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.InvalidTypeError):
             self.parser.parse(self.tmp.path)
+
+    def test_auto_padding(self):
+        text = textwrap.dedent(
+            """
+            message_defs:
+                A:
+                    id: 1001
+                    fields:
+                        i: int
+                        d: double
+                        c: char
+                B:
+                    id: 1002
+                    fields:
+                        c: char
+                        i: int
+                        d: double
+                C:
+                    id: 1003
+                    fields:
+                        f: float[2]
+                        i: int64
+                        d: int32[3]
+                D:
+                    id: 1004
+                    fields:
+                        f: float
+                        i: int64
+                        c: char[7]
+                E:
+                    id: 1005
+                    fields:
+                        a: A
+                        b: B
+                        c: C
+                        d: D
+
+            """
+        )
+
+        self.tmp.write(text)
+        self.parser.parse(self.tmp.path)
