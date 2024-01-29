@@ -650,7 +650,12 @@ class TestEncoding(unittest.TestCase):
         A.byte_arr[:] = bytes(4)
         A.byte_arr[:] = bytearray(4)
 
-        A.struct_arr[:] = [VALIDATOR_STRUCT(), VALIDATOR_STRUCT(), VALIDATOR_STRUCT(), VALIDATOR_STRUCT()]
+        A.struct_arr[:] = [
+            VALIDATOR_STRUCT(),
+            VALIDATOR_STRUCT(),
+            VALIDATOR_STRUCT(),
+            VALIDATOR_STRUCT(),
+        ]
 
         # again without [:]
         A.int8_arr = [1, 2, 3, 4]
@@ -672,7 +677,12 @@ class TestEncoding(unittest.TestCase):
         A.byte_arr = bytes(4)
         A.byte_arr = bytearray(4)
 
-        A.struct_arr = [VALIDATOR_STRUCT(), VALIDATOR_STRUCT(), VALIDATOR_STRUCT(), VALIDATOR_STRUCT()]
+        A.struct_arr = [
+            VALIDATOR_STRUCT(),
+            VALIDATOR_STRUCT(),
+            VALIDATOR_STRUCT(),
+            VALIDATOR_STRUCT(),
+        ]
 
     def test_refs(self):
         A = MDF_VALIDATOR_A()
