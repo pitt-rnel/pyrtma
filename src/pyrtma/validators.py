@@ -15,6 +15,7 @@ from typing import (
     Optional,
     overload,
     Type,
+    Sequence,
 )
 from abc import abstractmethod, ABCMeta
 import numbers
@@ -517,10 +518,15 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
         """Return an Array bound to a message obj instance."""
         return ArrayField._bound(self, obj)
 
-    def __set__(self, obj: MessageBase, value: ArrayField[_FV]):
-        if _VALIDATION_ENABLED.get():
-            self.validate_array(value)
-        setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
+    def __set__(self, obj: MessageBase, value: Union[ArrayField[_FV], Sequence]):
+        if isinstance(value, ArrayField):
+            if _VALIDATION_ENABLED.get():
+                self.validate_array(value)
+            setattr(
+                obj, self._private_name, getattr(value._bound_obj, value._private_name)
+            )
+        else:
+            self.__get__(obj).__setitem__(slice(None), value)
 
     def __getitem__(self, key):
         if self._bound_obj is None:
@@ -645,10 +651,15 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
         """Return an Array bound to a message obj instance."""
         return IntArray._bound(self, obj)
 
-    def __set__(self, obj: MessageBase, value: ArrayField[_IV]):
-        if _VALIDATION_ENABLED.get():
-            self.validate_array(value)
-        setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
+    def __set__(self, obj: MessageBase, value: Union[ArrayField[_IV], Sequence[int]]):
+        if isinstance(value, ArrayField):
+            if _VALIDATION_ENABLED.get():
+                self.validate_array(value)
+            setattr(
+                obj, self._private_name, getattr(value._bound_obj, value._private_name)
+            )
+        else:
+            self.__get__(obj).__setitem__(slice(None), value)
 
     @overload
     def __getitem__(self, key: int) -> int: ...
@@ -700,10 +711,19 @@ class ByteArray(ArrayField[Byte]):
     def __get__(self, obj: MessageBase, objtype=None) -> ByteArray:
         return ByteArray._bound(self, obj)
 
-    def __set__(self, obj: MessageBase, value: ArrayField[Byte]):
-        if _VALIDATION_ENABLED.get():
-            self.validate_array(value)
-        setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
+    def __set__(
+        self,
+        obj: MessageBase,
+        value: Union[ArrayField[Byte], Sequence[int], bytes, bytearray],
+    ):
+        if isinstance(value, ArrayField):
+            if _VALIDATION_ENABLED.get():
+                self.validate_array(value)
+            setattr(
+                obj, self._private_name, getattr(value._bound_obj, value._private_name)
+            )
+        else:
+            self.__get__(obj).__setitem__(slice(None), value)
 
     @overload
     def __getitem__(self, key: int) -> bytearray: ...
@@ -777,10 +797,17 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
         """Return an Array bound to a message obj instance."""
         return FloatArray._bound(self, obj)
 
-    def __set__(self, obj: MessageBase, value: ArrayField[_FPV]):
-        if _VALIDATION_ENABLED.get():
-            self.validate_array(value)
-        setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
+    def __set__(
+        self, obj: MessageBase, value: Union[ArrayField[_FPV], Sequence[float]]
+    ):
+        if isinstance(value, ArrayField):
+            if _VALIDATION_ENABLED.get():
+                self.validate_array(value)
+            setattr(
+                obj, self._private_name, getattr(value._bound_obj, value._private_name)
+            )
+        else:
+            self.__get__(obj).__setitem__(slice(None), value)
 
     @overload
     def __getitem__(self, key: int) -> float: ...
@@ -882,10 +909,15 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         """Return an StructArray bound to a message obj instance."""
         return StructArray._bound(self, obj)
 
-    def __set__(self, obj, value):
-        if _VALIDATION_ENABLED.get():
-            self.validate_array(value)
-        setattr(obj, self._private_name, getattr(value._bound_obj, value._private_name))
+    def __set__(self, obj, value: Union[StructArray, Sequence[_S]]):
+        if isinstance(value, StructArray):
+            if _VALIDATION_ENABLED.get():
+                self.validate_array(value)
+            setattr(
+                obj, self._private_name, getattr(value._bound_obj, value._private_name)
+            )
+        else:
+            self.__get__(obj).__setitem__(slice(None), value)
 
     @overload
     def __getitem__(self, key: int) -> _S: ...

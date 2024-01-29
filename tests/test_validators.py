@@ -283,6 +283,73 @@ class TestEncoding(unittest.TestCase):
         with self.assertRaises(ValueError):
             m.byte_arr[:] = [1, 2, 3, 4, 5]
 
+        # test again without [:]
+        with self.assertRaises(ValueError):
+            m.int8_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.int8_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.uint8_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.uint8_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.int16_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.int16_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.uint16_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.uint16_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.int32_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.int32_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.uint32_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.uint32_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.int64_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.int64_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.uint64_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.uint64_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.float_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.float_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.double_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.double_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.byte_arr = [1, 2, 3, 4, 5]
+
+        with self.assertRaises(ValueError):
+            m.byte_arr = [1, 2, 3, 4, 5]
+
     def test_get_types(self):
         m = MDF_VALIDATOR_A()
         self.assertIsInstance(m.int8, int)
@@ -398,9 +465,6 @@ class TestEncoding(unittest.TestCase):
             A.string = 1
 
         # Int8
-        with self.assertRaises(TypeError):
-            A.int8_arr = [1, 2, 3, 4]
-
         with self.assertRaises(ValueError):
             A.int8_arr = B.int8_arr
 
@@ -411,9 +475,6 @@ class TestEncoding(unittest.TestCase):
             A.int8_arr = IntArray(Int8, 4)
 
         # Int16
-        with self.assertRaises(TypeError):
-            A.int16_arr = [1, 2, 3, 4]
-
         with self.assertRaises(ValueError):
             A.int16_arr = B.int16_arr
 
@@ -424,9 +485,6 @@ class TestEncoding(unittest.TestCase):
             A.int16_arr = IntArray(Int16, 4)
 
         # Int32
-        with self.assertRaises(TypeError):
-            A.int32_arr = [1, 2, 3, 4]
-
         with self.assertRaises(ValueError):
             A.int32_arr = B.int32_arr
 
@@ -437,9 +495,6 @@ class TestEncoding(unittest.TestCase):
             A.int32_arr = IntArray(Int32, 4)
 
         # Int64
-        with self.assertRaises(TypeError):
-            A.int64_arr = [1, 2, 3, 4]
-
         with self.assertRaises(ValueError):
             A.int64_arr = B.int64_arr
 
@@ -450,9 +505,6 @@ class TestEncoding(unittest.TestCase):
             A.int64_arr = IntArray(Int64, 4)
 
         # Uint8
-        with self.assertRaises(TypeError):
-            A.uint8_arr = [1, 2, 3, 4]
-
         with self.assertRaises(ValueError):
             A.uint8_arr = B.uint8_arr
 
@@ -463,9 +515,6 @@ class TestEncoding(unittest.TestCase):
             A.uint8_arr = IntArray(Uint8, 4)
 
         # Uint16
-        with self.assertRaises(TypeError):
-            A.uint16_arr = [1, 2, 3, 4]
-
         with self.assertRaises(ValueError):
             A.uint16_arr = B.uint16_arr
 
@@ -476,9 +525,6 @@ class TestEncoding(unittest.TestCase):
             A.uint16_arr = IntArray(Uint16, 4)
 
         # Uint32
-        with self.assertRaises(TypeError):
-            A.uint32_arr = [1, 2, 3, 4]
-
         with self.assertRaises(ValueError):
             A.uint32_arr = B.uint32_arr
 
@@ -489,9 +535,6 @@ class TestEncoding(unittest.TestCase):
             A.uint32_arr = IntArray(Uint32, 4)
 
         # Uint64
-        with self.assertRaises(TypeError):
-            A.uint64_arr = [1, 2, 3, 4]
-
         with self.assertRaises(ValueError):
             A.uint64_arr = B.uint64_arr
 
@@ -502,9 +545,6 @@ class TestEncoding(unittest.TestCase):
             A.uint64_arr = IntArray(Uint64, 4)
 
         # Float
-        with self.assertRaises(TypeError):
-            A.float_arr = [1, 2, 3, 4]
-
         with self.assertRaises(ValueError):
             A.float_arr = B.float_arr
 
@@ -515,9 +555,6 @@ class TestEncoding(unittest.TestCase):
             A.float_arr = FloatArray(Float, 4)
 
         # Double
-        with self.assertRaises(TypeError):
-            A.double_arr = [1, 2, 3, 4]
-
         with self.assertRaises(ValueError):
             A.double_arr = B.double_arr
 
@@ -528,9 +565,6 @@ class TestEncoding(unittest.TestCase):
             A.double_arr = FloatArray(Double, 4)
 
         # Byte
-        with self.assertRaises(TypeError):
-            A.byte_arr = [1, 2, 3, 4]
-
         with self.assertRaises(ValueError):
             A.byte_arr = B.byte_arr
 
@@ -615,6 +649,30 @@ class TestEncoding(unittest.TestCase):
         A.byte_arr[:] = b"ABCD"
         A.byte_arr[:] = bytes(4)
         A.byte_arr[:] = bytearray(4)
+
+        A.struct_arr[:] = [VALIDATOR_STRUCT(), VALIDATOR_STRUCT(), VALIDATOR_STRUCT(), VALIDATOR_STRUCT()]
+
+        # again without [:]
+        A.int8_arr = [1, 2, 3, 4]
+        A.int16_arr = [1, 2, 3, 4]
+        A.int32_arr = [1, 2, 3, 4]
+        A.int64_arr = [1, 2, 3, 4]
+        A.uint8_arr = [1, 2, 3, 4]
+        A.uint16_arr = [1, 2, 3, 4]
+        A.uint32_arr = [1, 2, 3, 4]
+        A.uint64_arr = [1, 2, 3, 4]
+        A.float_arr = [1.0, 2.0, 3.0, 4.0]
+        A.double_arr = [1.0, 2.0, 3.0, 4.0]
+
+        A.float_arr = [1, 2, 3, 4]
+        A.double_arr = [1, 2, 3, 4]
+
+        A.byte_arr = [1, 2, 3, 4]
+        A.byte_arr = b"ABCD"
+        A.byte_arr = bytes(4)
+        A.byte_arr = bytearray(4)
+
+        A.struct_arr = [VALIDATOR_STRUCT(), VALIDATOR_STRUCT(), VALIDATOR_STRUCT(), VALIDATOR_STRUCT()]
 
     def test_refs(self):
         A = MDF_VALIDATOR_A()
