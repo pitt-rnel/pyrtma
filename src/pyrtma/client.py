@@ -56,6 +56,12 @@ class MessageManagerNotFound(ClientError):
     pass
 
 
+class SocketOptionError(ClientError):
+    """Raised when unable to set socket options."""
+
+    pass
+
+
 class NotConnectedError(ClientError):
     """Raised when the client tries to read/write while not connected."""
 
@@ -153,8 +159,8 @@ class Client(object):
 
         # Connect to the message server
         try:
-            self._connected = True
             self._sock.connect(self._server)
+            self._connected = True
         except ConnectionRefusedError as e:
             self._connected = False
             raise MessageManagerNotFound(
@@ -162,9 +168,13 @@ class Client(object):
             ) from e
 
         # Disable Nagle Algorithm
-        self._sock.setsockopt(socket.getprotobyname("tcp"), socket.TCP_NODELAY, 1)
-
-        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            self._sock.setsockopt(socket.getprotobyname("tcp"), socket.TCP_NODELAY, 1)
+            self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        except Exception as e:
+            self._connected = False
+            self._sock.close()
+            raise SocketOptionError from e
 
     def connect(
         self,
@@ -213,10 +223,10 @@ class Client(object):
         try:
             if self._connected:
                 self.send_signal(cd.MT_DISCONNECT)
+                # Allow some time for signal to reach MM
+                time.sleep(0.100)
+                self._sock.shutdown(socket.SHUT_RDWR)
         finally:
-            # Allow some time for signal to reach MM
-            time.sleep(0.100)
-            self._sock.shutdown(socket.SHUT_RDWR)
             self._sock.close()
             self._connected = False
             # reset subscribed and paused types
