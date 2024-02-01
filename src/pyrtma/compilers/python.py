@@ -236,10 +236,10 @@ class PyDefCompiler:
 
     def generate_context(self):
         s = """\
-        def _create_context() -> Dict[str, Any]:
+        def _create_context() -> Dict[str, Dict[str, Any]]:
             import sys
 
-            ctx = dict(constants={}, typedefs={}, mid={}, sdf={}, mt={}, mdf={})
+            ctx: Dict[str, Dict[str, Any]] = dict(constants={}, typedefs={}, mid={}, sdf={}, mt={}, mdf={})
             mod = sys.modules[__name__]
             for k, v in mod.__dict__.items():
                 if k.startswith("_"):
@@ -248,7 +248,7 @@ class PyDefCompiler:
                 if k.startswith("MT_"):
                     ctx["mt"][k[3:]] = v
                 elif k.startswith("MID_"):
-                    ctx["mt"][k[4:]] = v
+                    ctx["mid"][k[4:]] = v
                 elif k.startswith("MDF_"):
                     ctx["mdf"][k[4:]] = v
                 elif k.isupper():
@@ -269,7 +269,7 @@ class PyDefCompiler:
         _ctx = _create_context()
 
 
-        def get_context() -> Dict[str, Any]:
+        def get_context() -> Dict[str, Dict[str, Any]]:
             import copy
 
             return copy.deepcopy(_ctx)
