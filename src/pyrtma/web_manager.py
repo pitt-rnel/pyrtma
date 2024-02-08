@@ -1,3 +1,4 @@
+from ast import Pass
 import pyrtma
 import logging
 import select
@@ -30,7 +31,7 @@ from websocket_server import (  # type: ignore
     OPCODE_TEXT,
 )
 
-from typing import Optional, List, Callable, Any, Dict
+from typing import Optional, List, Callable, Any, Dict, cast
 
 
 class RTMAWebSocketHandler(WebSocketHandler):
@@ -85,7 +86,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
 
             if self.proxy.sock in rd and self.proxy.connected:
                 try:
-                    msg = self.proxy.read_message(timeout=None)
+                    msg = self.proxy.read_message(timeout=None, ack=True)
                 except RTMAMessageError as e:
                     logger.error(e, stack_info=False)
                     break
@@ -123,6 +124,18 @@ class RTMAWebSocketHandler(WebSocketHandler):
         if msg.header.msg_type == cd.MT_DISCONNECT:
             self.proxy.disconnect()
             logger.debug("Received disconnect, disconnected proxy from MM.")
+        elif msg.header.msg_type == cd.MT_SUBSCRIBE:
+            msg.data = cast(cd.MDF_SUBSCRIBE, msg.data)
+            self.proxy.subscribe([msg.data.msg_type])
+        elif msg.header.msg_type == cd.MT_UNSUBSCRIBE:
+            msg.data = cast(cd.MDF_UNSUBSCRIBE, msg.data)
+            self.proxy.unsubscribe([msg.data.msg_type])
+        elif msg.header.msg_type == cd.MT_PAUSE_SUBSCRIPTION:
+            msg.data = cast(cd.MDF_PAUSE_SUBSCRIPTION, msg.data)
+            self.proxy.pause_subscription([msg.data.msg_type])
+        elif msg.header.msg_type == cd.MT_RESUME_SUBSCRIPTION:
+            msg.data = cast(cd.MDF_RESUME_SUBSCRIPTION, msg.data)
+            self.proxy.resume_subscription([msg.data.msg_type])
         else:
             self.proxy.forward_message(msg.header, msg.data or None)
 
