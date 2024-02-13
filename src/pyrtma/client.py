@@ -138,6 +138,7 @@ class Client(object):
         self._subscribed_types: Set[int] = set()
         self._paused_types: Set[int] = set()
         self._dynamic_id: bool = module_id == 0
+        self._sock = socket.socket()
 
     def __del__(self):
         if self._connected:
@@ -148,6 +149,10 @@ class Client(object):
                 pass
 
     def _socket_connect(self, server_name: str):
+        # Close the previously used socket
+        self._connected = False
+        self._sock.close()
+
         # Get the server ip info
         addr, port = server_name.split(":")
         self._server = (addr, int(port))
@@ -226,7 +231,8 @@ class Client(object):
                 # Allow some time for signal to reach MM
                 time.sleep(0.100)
         finally:
-            self._sock.close()
+            if hasattr(self, "_sock"):
+                self._sock.close()
             self._connected = False
             # reset subscribed and paused types
             self._subscribed_types = set()
