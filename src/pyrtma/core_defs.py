@@ -93,7 +93,7 @@ class RTMA_MSG_HEADER(MessageBase, metaclass=MessageMeta):
     type_name: ClassVar[str] = "RTMA_MSG_HEADER"
     type_hash: ClassVar[int] = 0x9A4D7016
     type_size: ClassVar[int] = 48
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
         "'RTMA_MSG_HEADER:\n  fields:\n    msg_type: MSG_TYPE\n    msg_count: MSG_COUNT\n    send_time: double\n    recv_time: double\n    src_host_id: HOST_ID\n    src_mod_id: MODULE_ID\n    dest_host_id: HOST_ID\n    dest_mod_id: MODULE_ID\n    num_data_bytes: int\n    remaining_bytes: int\n    is_dynamic: int\n    reserved: unsigned int'"
     )
@@ -119,7 +119,7 @@ class MDF_EXIT(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "EXIT"
     type_hash: ClassVar[int] = 0x095E0546
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = "'EXIT:\n  id: 0\n  fields: null'"
 
 
@@ -129,7 +129,7 @@ class MDF_KILL(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "KILL"
     type_hash: ClassVar[int] = 0x82FC702D
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = "'KILL:\n  id: 1\n  fields: null'"
 
 
@@ -139,7 +139,7 @@ class MDF_ACKNOWLEDGE(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "ACKNOWLEDGE"
     type_hash: ClassVar[int] = 0xB725B581
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = "'ACKNOWLEDGE:\n  id: 2\n  fields: null'"
 
 
@@ -149,7 +149,7 @@ class MDF_FAIL_SUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "FAIL_SUBSCRIBE"
     type_hash: ClassVar[int] = 0x9AD70A15
     type_size: ClassVar[int] = 8
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
         "'FAIL_SUBSCRIBE:\n  id: 6\n  fields:\n    mod_id: MODULE_ID\n    reserved: short\n    msg_type: MSG_TYPE'"
     )
@@ -165,7 +165,7 @@ class MDF_FAILED_MESSAGE(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "FAILED_MESSAGE"
     type_hash: ClassVar[int] = 0xDCA545B2
     type_size: ClassVar[int] = 64
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
         "'FAILED_MESSAGE:\n  id: 8\n  fields:\n    dest_mod_id: MODULE_ID\n    reserved: short[3]\n    time_of_failure: double\n    msg_header: RTMA_MSG_HEADER'"
     )
@@ -182,7 +182,7 @@ class MDF_CONNECT(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "CONNECT"
     type_hash: ClassVar[int] = 0x6F2E3CA5
     type_size: ClassVar[int] = 4
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
         "'CONNECT:\n  id: 13\n  fields:\n    logger_status: short\n    daemon_status: short'"
     )
@@ -197,7 +197,7 @@ class MDF_DISCONNECT(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "DISCONNECT"
     type_hash: ClassVar[int] = 0xD0126BF9
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = "'DISCONNECT:\n  id: 14\n  fields: null'"
 
 
@@ -207,7 +207,7 @@ class MDF_SUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "SUBSCRIBE"
     type_hash: ClassVar[int] = 0xF5B437C8
     type_size: ClassVar[int] = 4
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
         "'SUBSCRIBE:\n  id: 15\n  fields:\n    msg_type: MSG_TYPE'"
     )
@@ -221,7 +221,7 @@ class MDF_UNSUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "UNSUBSCRIBE"
     type_hash: ClassVar[int] = 0x193FB9E0
     type_size: ClassVar[int] = 4
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
         "'UNSUBSCRIBE:\n  id: 16\n  fields:\n    msg_type: MSG_TYPE'"
     )
@@ -235,7 +235,7 @@ class MDF_MODULE_READY(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "MODULE_READY"
     type_hash: ClassVar[int] = 0x0DF81813
     type_size: ClassVar[int] = 4
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = "'MODULE_READY:\n  id: 26\n  fields:\n    pid: int'"
 
     pid: Int32 = Int32()
@@ -247,7 +247,7 @@ class MDF_LM_EXIT(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "LM_EXIT"
     type_hash: ClassVar[int] = 0x35DD547B
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = "'LM_EXIT:\n  id: 55\n  fields: null'"
 
 
@@ -257,7 +257,7 @@ class MDF_SAVE_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "SAVE_MESSAGE_LOG"
     type_hash: ClassVar[int] = 0x515569E9
     type_size: ClassVar[int] = 260
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
         "'SAVE_MESSAGE_LOG:\n  id: 56\n  fields:\n    pathname: char[MAX_LOGGER_FILENAME_LENGTH]\n    pathname_length: int'"
     )
@@ -272,7 +272,7 @@ class MDF_MESSAGE_LOG_SAVED(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "MESSAGE_LOG_SAVED"
     type_hash: ClassVar[int] = 0x66E84AE5
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = "'MESSAGE_LOG_SAVED:\n  id: 57\n  fields: null'"
 
 
@@ -282,7 +282,7 @@ class MDF_PAUSE_MESSAGE_LOGGING(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "PAUSE_MESSAGE_LOGGING"
     type_hash: ClassVar[int] = 0x20C1E922
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = "'PAUSE_MESSAGE_LOGGING:\n  id: 58\n  fields: null'"
 
 
@@ -292,7 +292,7 @@ class MDF_RESUME_MESSAGE_LOGGING(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "RESUME_MESSAGE_LOGGING"
     type_hash: ClassVar[int] = 0x0D1A3E77
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = "'RESUME_MESSAGE_LOGGING:\n  id: 59\n  fields: null'"
 
 
@@ -302,7 +302,7 @@ class MDF_RESET_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "RESET_MESSAGE_LOG"
     type_hash: ClassVar[int] = 0x68EC4AAB
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = "'RESET_MESSAGE_LOG:\n  id: 60\n  fields: null'"
 
 
@@ -312,7 +312,7 @@ class MDF_DUMP_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "DUMP_MESSAGE_LOG"
     type_hash: ClassVar[int] = 0xF9D7E2BF
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = "'DUMP_MESSAGE_LOG:\n  id: 61\n  fields: null'"
 
 
@@ -322,7 +322,7 @@ class MDF_TIMING_MESSAGE(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "TIMING_MESSAGE"
     type_hash: ClassVar[int] = 0x3595C23E
     type_size: ClassVar[int] = 20808
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
         "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: unsigned short[MAX_MESSAGE_TYPES]\n    ModulePID: int[MAX_MODULES]\n    send_time: double'"
     )
@@ -338,7 +338,7 @@ class MDF_FORCE_DISCONNECT(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "FORCE_DISCONNECT"
     type_hash: ClassVar[int] = 0xC37C54E8
     type_size: ClassVar[int] = 4
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
         "'FORCE_DISCONNECT:\n  id: 82\n  fields:\n    mod_id: int'"
     )
@@ -352,7 +352,7 @@ class MDF_PAUSE_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "PAUSE_SUBSCRIPTION"
     type_hash: ClassVar[int] = 0x22338A6D
     type_size: ClassVar[int] = 4
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
         "'PAUSE_SUBSCRIPTION:\n  id: 85\n  fields:\n    msg_type: MSG_TYPE'"
     )
@@ -366,7 +366,7 @@ class MDF_RESUME_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "RESUME_SUBSCRIPTION"
     type_hash: ClassVar[int] = 0xC56A97F2
     type_size: ClassVar[int] = 4
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
         "'RESUME_SUBSCRIPTION:\n  id: 86\n  fields:\n    msg_type: MSG_TYPE'"
     )
@@ -380,7 +380,7 @@ class MDF_LM_READY(MessageData, metaclass=MessageMeta):
     type_name: ClassVar[str] = "LM_READY"
     type_hash: ClassVar[int] = 0x4863B960
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = "'LM_READY:\n  id: 96\n  fields: null'"
 
 

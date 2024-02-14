@@ -1,5 +1,8 @@
 # core_defs.yaml
 
+compiler_options:
+  IMPORT_COREDEFS: false
+
 imports: null
 
 constants:

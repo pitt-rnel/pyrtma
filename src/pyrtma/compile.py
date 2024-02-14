@@ -3,7 +3,7 @@
 import pathlib
 import re
 import sys
-from typing import List, Union
+from typing import List, Union, Dict
 
 from .parser import Parser, ParserError, FileFormatError
 from rich.traceback import install
@@ -31,6 +31,7 @@ def compile(
     debug: bool = False,
     validate_alignment: bool = True,
     auto_pad: bool = True,
+    import_coredefs: bool = True,
 ):
     """compile message defs
 
@@ -46,6 +47,7 @@ def compile(
         debug (bool, optional): Debug mode. Defaults to False.
         validate_alignment(bool, optional): Validate message 64-bit alignment. Defaults to True.
         auto_pad(bool, optional): Automatically pad messages failing 64-bit alignment validation. Defaults to True. Has no effect if validate_alignment is False.
+        import_coredefs(bool, optional): Automatically import pyrtma.core_defs. Defaults to True.
 
 
     Raises:
@@ -79,7 +81,10 @@ def compile(
 
     defs_file = defs_files[0]
     parser = Parser(
-        debug=debug, validate_alignment=validate_alignment, auto_pad=auto_pad
+        debug=debug,
+        validate_alignment=validate_alignment,
+        auto_pad=auto_pad,
+        import_coredefs=import_coredefs,
     )
     parser.parse(pathlib.Path(defs_file))
 
@@ -170,9 +175,11 @@ def compile(
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="pyrtma Message Definition Compiler.")
+    argparser1 = argparse.ArgumentParser(
+        description="pyrtma Message Definition Compiler."
+    )
 
-    parser.add_argument(
+    argparser1.add_argument(
         "-i",
         "-I",
         "--defs",
@@ -181,7 +188,43 @@ def main():
         help="YAML message defintion file to parse. C header file(s) will use v1 python compiler (deprecated)",
     )
 
-    parser.add_argument(
+    argparser = argparse.ArgumentParser(
+        parents=[argparser1], conflict_handler="resolve"
+    )
+    args_temp, _ = argparser1.parse_known_args()  # parse input file first
+
+    # Default compiler options
+    COMPILER_OPTS: Dict[str, Union[int, float, bool, str]] = {
+        "IMPORT_COREDEFS": True,
+        "VALIDATE_ALIGNMENT": True,
+        "AUTO_PAD": True,
+    }
+    # parse yaml compiler_options and replace defaults prior to parsing command line args
+    try:
+        defs_files = args_temp.defs_files
+        if len(defs_files) == 1 and pathlib.Path(defs_files[0]).suffix.lower() in [
+            ".yaml",
+            ".yml",
+        ]:
+            defs_file = defs_files[0]
+            parser = Parser()
+            compiler_options = parser.parse_compiler_options(pathlib.Path(defs_file))
+            for key, value in compiler_options.items():
+                COMPILER_OPTS[key] = value.value
+    except (ParserError, FileNotFoundError) as e:
+        print()
+        msg = " ".join(str(arg) for arg in e.args)
+        print(f"{e.__class__.__name__}: {msg}")
+        print()
+        if e.__cause__:
+            print("Details:")
+            msg = " ".join(str(arg) for arg in e.__cause__.args)
+            print(f"\t{e.__cause__.__class__.__name__}: {msg}")
+        sys.exit(1)
+    except Exception:
+        raise
+
+    argparser.add_argument(
         "--c",
         "--c_lang",
         dest="c_lang",
@@ -189,7 +232,7 @@ def main():
         help="Output C .h file",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "--python",
         "--py",
         dest="python",
@@ -197,7 +240,7 @@ def main():
         help="Output python .py file",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "--javascript",
         "--js",
         dest="javascript",
@@ -205,7 +248,7 @@ def main():
         help="Output javascript .js file",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "--matlab",
         "--mat",
         "--ml",
@@ -214,21 +257,21 @@ def main():
         help="Output matlab .m file",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "--info",
         dest="info",
         action="store_true",
         help="Output info .txt file",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "--combined",
         dest="combined",
         action="store_true",
         help="Output combined yaml file",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "-o",
         "--out",
         default="",
@@ -236,7 +279,7 @@ def main():
         help="Output directory for compiled files. For v1 compiler (deprecated), full output filename.",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "-n",
         "--name",
         default="",
@@ -244,28 +287,38 @@ def main():
         help="Output file(s) base name.",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "--debug",
         dest="debug",
         action="store_true",
         help="Debug compiler",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "--no_val_align",
         dest="validate_alignment",
         action="store_false",
+        default=COMPILER_OPTS["VALIDATE_ALIGNMENT"],
         help="Disable 64-bit alignment validation",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "--no_auto_pad",
         dest="auto_pad",
         action="store_false",
+        default=COMPILER_OPTS["AUTO_PAD"],
         help="Disable 64-bit alignment auto-padding",
     )
 
-    args = parser.parse_args()
+    argparser.add_argument(
+        "--no_core_import",
+        dest="import_coredefs",
+        action="store_false",
+        default=COMPILER_OPTS["IMPORT_COREDEFS"],
+        help="Disable auto-import of pyrtma.core_defs",
+    )
+    args = argparser.parse_args()
+
     try:
         compile(**vars(args))
     except (ParserError, FileNotFoundError) as e:

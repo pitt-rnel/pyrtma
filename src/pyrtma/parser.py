@@ -309,11 +309,14 @@ RTMAObject = Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, MDF, SDF, 
 class Parser:
     """Parser class"""
 
+    _instance_count: int = -1
+
     def __init__(
         self,
         debug: bool = False,
         validate_alignment: bool = True,
         auto_pad: bool = True,
+        import_coredefs: bool = True,
     ):
         """Parser class
 
@@ -324,8 +327,12 @@ class Parser:
         self.current_file = pathlib.Path()
         self.root_path = pathlib.Path()
         self.debug = debug
+        Parser._instance_count += 1
+
+        # compiler options
         self.validate_alignment = validate_alignment
         self.auto_pad = auto_pad
+        self.import_coredefs = import_coredefs
 
         self.yaml_dict: Dict[str, Dict[str, Any]] = dict(
             metadata={},
@@ -352,10 +359,7 @@ class Parser:
         self.message_ids: Dict[str, MT] = {}
         self.message_defs: Dict[str, MDF] = {}
 
-        # compiler options
-        self.IMPORT_COREDEFS = False
-
-        self.logger = logging.getLogger("pyrtma.parser")
+        self.logger = logging.getLogger(f"pyrtma.parser ({self._instance_count})")
         self.logger.propagate = False
         if self.debug:
             self.logger.setLevel(logging.DEBUG)
@@ -625,7 +629,7 @@ class Parser:
             )
 
         if value < 10 or value > 32767:
-            if self.current_file.name != "core_defs.yaml" and self.IMPORT_COREDEFS:
+            if self.current_file.name != "core_defs.yaml" and self.import_coredefs:
                 raise RTMASyntaxError(
                     f"Value outside of valid range [0 - 32767] for host_id: {name}: {value}"
                 )
@@ -652,7 +656,7 @@ class Parser:
             if (
                 self.current_file.name != "core_defs.yaml"
                 and value != 0
-                and self.IMPORT_COREDEFS
+                and self.import_coredefs
             ):
                 raise RTMASyntaxError(
                     f"Value outside of valid range [10 - 99 or > 200] for module_id: {name}: {value} -> {self.current_file}"
@@ -1293,7 +1297,9 @@ class Parser:
                         f"Key-Value pairs must be separated with a ':' followed by a space. Add a space after the colon.\n{self.current_file}: line {n}\n{line}"
                     )
 
-    def parse(self, msgdefs_file: os.PathLike):
+    def parse_compiler_options(
+        self, msgdefs_file: os.PathLike
+    ) -> Dict[str, CompilerOptions]:
         # Get the current pwd
         cwd = pathlib.Path.cwd()
         try:
@@ -1301,19 +1307,25 @@ class Parser:
             defs_path = pathlib.Path(msgdefs_file)
             self.root_path = defs_path.parent.resolve()
             self.parse_options(defs_path)
-            coredefs_option = self.compiler_options.get("IMPORT_COREDEFS")
-            if coredefs_option:
-                self.IMPORT_COREDEFS = bool(coredefs_option.value)
-            else:
-                self.IMPORT_COREDEFS = True
+        except Exception as e:
+            self.clear()
+            raise
+        finally:
+            os.chdir(str(cwd.absolute()))
+        return self.compiler_options
 
-            if self.IMPORT_COREDEFS:
+    def parse(self, msgdefs_file: os.PathLike):
+        # Get the current pwd
+        cwd = pathlib.Path.cwd()
+        try:
+            if self.import_coredefs:
                 # Parse the core_defs.yaml file first
                 pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
                 core_defs = pkg_dir / "core_defs/core_defs.yaml"
                 self.root_path = pkg_dir
                 self.parse_file(core_defs.absolute())
 
+            defs_path = pathlib.Path(msgdefs_file)
             self.root_path = defs_path.parent.resolve()
             self.parse_file(defs_path)
         except Exception as e:
