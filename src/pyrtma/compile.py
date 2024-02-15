@@ -175,8 +175,10 @@ def compile(
 def main():
     import argparse
 
+    # subparser for include file, to parse compiler options first
     argparser1 = argparse.ArgumentParser(
-        description="pyrtma Message Definition Compiler."
+        description="pyrtma Message Definition Compiler.",
+        add_help=False,
     )
 
     argparser1.add_argument(
@@ -188,41 +190,12 @@ def main():
         help="YAML message defintion file to parse. C header file(s) will use v1 python compiler (deprecated)",
     )
 
+    # full arg parser
     argparser = argparse.ArgumentParser(
-        parents=[argparser1], conflict_handler="resolve"
+        parents=[argparser1],
+        conflict_handler="resolve",
+        add_help=True,
     )
-    args_temp, _ = argparser1.parse_known_args()  # parse input file first
-
-    # Default compiler options
-    COMPILER_OPTS: Dict[str, Union[int, float, bool, str]] = {
-        "IMPORT_COREDEFS": True,
-        "VALIDATE_ALIGNMENT": True,
-        "AUTO_PAD": True,
-    }
-    # parse yaml compiler_options and replace defaults prior to parsing command line args
-    try:
-        defs_files = args_temp.defs_files
-        if len(defs_files) == 1 and pathlib.Path(defs_files[0]).suffix.lower() in [
-            ".yaml",
-            ".yml",
-        ]:
-            defs_file = defs_files[0]
-            parser = Parser()
-            compiler_options = parser.parse_compiler_options(pathlib.Path(defs_file))
-            for key, value in compiler_options.items():
-                COMPILER_OPTS[key] = value.value
-    except (ParserError, FileNotFoundError) as e:
-        print()
-        msg = " ".join(str(arg) for arg in e.args)
-        print(f"{e.__class__.__name__}: {msg}")
-        print()
-        if e.__cause__:
-            print("Details:")
-            msg = " ".join(str(arg) for arg in e.__cause__.args)
-            print(f"\t{e.__cause__.__class__.__name__}: {msg}")
-        sys.exit(1)
-    except Exception:
-        raise
 
     argparser.add_argument(
         "--c",
@@ -294,6 +267,46 @@ def main():
         help="Debug compiler",
     )
 
+    # parse input file first to parse compiler opts in yaml file
+    args_temp, _ = argparser1.parse_known_args()
+
+    # Default compiler options
+    COMPILER_OPTS: Dict[str, Union[int, float, bool, str]] = {
+        "IMPORT_COREDEFS": True,
+        "VALIDATE_ALIGNMENT": True,
+        "AUTO_PAD": True,
+    }
+    # parse yaml compiler_options and replace defaults prior to parsing command line args
+    try:
+        defs_files = args_temp.defs_files
+        if (
+            defs_files
+            and len(defs_files) == 1
+            and pathlib.Path(defs_files[0]).suffix.lower()
+            in [
+                ".yaml",
+                ".yml",
+            ]
+        ):
+            defs_file = defs_files[0]
+            parser = Parser()
+            compiler_options = parser.parse_compiler_options(pathlib.Path(defs_file))
+            for key, value in compiler_options.items():
+                COMPILER_OPTS[key] = value.value
+    except (ParserError, FileNotFoundError) as e:
+        print()
+        msg = " ".join(str(arg) for arg in e.args)
+        print(f"{e.__class__.__name__}: {msg}")
+        print()
+        if e.__cause__:
+            print("Details:")
+            msg = " ".join(str(arg) for arg in e.__cause__.args)
+            print(f"\t{e.__cause__.__class__.__name__}: {msg}")
+        sys.exit(1)
+    except Exception:
+        raise
+
+    # defualt compiler opts to values from yaml
     argparser.add_argument(
         "--no_val_align",
         dest="validate_alignment",
@@ -317,9 +330,12 @@ def main():
         default=COMPILER_OPTS["IMPORT_COREDEFS"],
         help="Disable auto-import of pyrtma.core_defs",
     )
+
+    # parse all options
     args = argparser.parse_args()
 
     try:
+        # run compiler
         compile(**vars(args))
     except (ParserError, FileNotFoundError) as e:
         print()
