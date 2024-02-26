@@ -16,6 +16,7 @@ from typing import (
     overload,
     Type,
     Sequence,
+    Iterator,
 )
 from abc import abstractmethod, ABCMeta
 import numbers
@@ -534,6 +535,9 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
 
         return getattr(self._bound_obj, self._private_name)[key]
 
+    def __iter__(self) -> Iterator:
+        return iter(self[:])
+
     def __setitem__(self, key, value):
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
@@ -673,6 +677,9 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
 
         return getattr(self._bound_obj, self._private_name)[key]
 
+    def __iter__(self) -> Iterator[int]:
+        return iter(self[:])
+
     def __repr__(self) -> str:
         return f"IntArray({type(self._validator).__name__}, len={self._len}) at 0x{id(self):016X}"
 
@@ -742,6 +749,10 @@ class ByteArray(ArrayField[Byte]):
             barray = [int_vals.to_bytes(1, "little")]
 
         return bytearray().join(barray)
+
+    def __iter__(self) -> Iterator[bytearray]:  # Generator[_S, None, None]:
+        for i in range(self._len):
+            yield self.__getitem__(i)
 
     def __setitem__(self, key, value):
         if self._bound_obj is None:
@@ -820,6 +831,9 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
         return getattr(self._bound_obj, self._private_name)[key]
+
+    def __iter__(self) -> Iterator[float]:
+        return iter(self[:])
 
     def __repr__(self) -> str:
         return f"FloatArray({type(self._validator).__name__}, len={self._len}) at 0x{id(self):016X}"
@@ -929,6 +943,9 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
         return getattr(self._bound_obj, self._private_name)[key]
+
+    def __iter__(self) -> Iterator[_S]:
+        return iter(self[:])
 
     def __setitem__(self, key, value):
         if self._bound_obj is None:
