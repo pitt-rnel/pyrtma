@@ -9,7 +9,7 @@ import importlib
 import pathlib
 import sys
 
-from pyrtma.client import Client
+from pyrtma import Client, get_msg_cls
 from pyrtma.exceptions import RTMAMessageError
 import pyrtma.core_defs as cd
 
@@ -93,8 +93,11 @@ class RTMAWebSocketHandler(WebSocketHandler):
 
                 if msg is not None:
                     # Pass message thru websocket as json
-                    _, wd, _ = select.select([], [self.rfile], [], 0)
-                    if self.rfile in wd:
+                    _, wd, _ = select.select([], [self.wfile], [], 0)
+                    if self.wfile in wd:
+                        logger.debug(
+                            f"Forwarding message type {get_msg_cls(msg.header.msg_type).type_name} to ws"
+                        )
                         self.send_message(msg.to_json())
                     else:
                         print("X")
@@ -107,6 +110,26 @@ class RTMAWebSocketHandler(WebSocketHandler):
         """
         logger.info("Websocket PONG received.")
 
+    def handle_connect(self, msg: pyrtma.Message):
+        logger.debug("Received CONNECT")
+
+        # self.proxy._module_id = msg.header.src_mod_id
+        # self.proxy._host_id = msg.header.src_host_id
+        msg.data = cast(cd.MDF_CONNECT, msg.data)
+        ack_msg = self.proxy._connect_helper(
+            bool(msg.data.logger_status), bool(msg.data.daemon_status)
+        )
+        # forward ack
+        # Pass message thru websocket as json
+        _, wd, _ = select.select([], [self.wfile], [], 0)
+        if self.wfile in wd:
+            logger.debug(
+                f"Forwarding ACK from connect to ws. Mod ID = {self.proxy.module_id}"
+            )
+            self.send_message(ack_msg.to_json())
+        else:
+            print("X")
+
     def process_json_message(self, message: str):
         """Process incoming json message
 
@@ -115,6 +138,10 @@ class RTMAWebSocketHandler(WebSocketHandler):
         Args:
             message (str): JSON message string
         """
+        if message == "PING":
+            self.send_message("PONG")
+            return
+
         try:
             msg = pyrtma.Message.from_json(message)
         except RTMAMessageError as e:
@@ -123,21 +150,39 @@ class RTMAWebSocketHandler(WebSocketHandler):
 
         if msg.header.msg_type == cd.MT_DISCONNECT:
             self.proxy.disconnect()
-            logger.debug("Received disconnect, disconnected proxy from MM.")
+            logger.info("Received disconnect, disconnected proxy from MM.")
         elif msg.header.msg_type == cd.MT_SUBSCRIBE:
             msg.data = cast(cd.MDF_SUBSCRIBE, msg.data)
             self.proxy.subscribe([msg.data.msg_type])
+            logger.info(
+                f"Received SUBSCRIBE: {get_msg_cls(msg.data.msg_type).type_name}"
+            )
         elif msg.header.msg_type == cd.MT_UNSUBSCRIBE:
             msg.data = cast(cd.MDF_UNSUBSCRIBE, msg.data)
             self.proxy.unsubscribe([msg.data.msg_type])
+            logger.info(
+                f"Received UNSUBSCRIBE: {get_msg_cls(msg.data.msg_type).type_name}"
+            )
         elif msg.header.msg_type == cd.MT_PAUSE_SUBSCRIPTION:
             msg.data = cast(cd.MDF_PAUSE_SUBSCRIPTION, msg.data)
             self.proxy.pause_subscription([msg.data.msg_type])
+            logger.info(
+                f"Received PAUSE_SUBSCRIPTION: {get_msg_cls(msg.data.msg_type).type_name}"
+            )
         elif msg.header.msg_type == cd.MT_RESUME_SUBSCRIPTION:
             msg.data = cast(cd.MDF_RESUME_SUBSCRIPTION, msg.data)
             self.proxy.resume_subscription([msg.data.msg_type])
+            logger.info(
+                f"Received RESUME_SUBSCRIPTION: {get_msg_cls(msg.data.msg_type).type_name}"
+            )
+        elif msg.header.msg_type == cd.MT_CONNECT:
+            self.handle_connect(msg)
+            logger.info(f"Proxy CONNECTED, assigned module ID {self.proxy.module_id}")
         else:
             self.proxy.forward_message(msg.header, msg.data or None)
+            logger.debug(
+                f"Forwarded message type {get_msg_cls(msg.header.msg_type).type_name} from ws"
+            )
 
     def read_ws_message(self) -> Optional[str]:
         """Read websocket message
@@ -323,7 +368,7 @@ def main():
     websocket_server = WebMessageManager(
         host=args.host,
         port=args.port,
-        loglevel=logging.DEBUG,
+        loglevel=logging.INFO,
         mm_ip=args.mm_ip,
     )
 
