@@ -181,6 +181,30 @@ class Client(object):
             self._sock.close()
             raise SocketOptionError from e
 
+    def _connect_helper(self, logger_status: bool, daemon_status: bool) -> Message:
+        """Called internally after _socket_connect"""
+
+        # Reset the module_id to zero for dynamic assignment
+        if self._dynamic_id:
+            self._module_id = 0
+
+        msg = cd.MDF_CONNECT()
+        msg.logger_status = int(logger_status)
+        msg.daemon_status = int(daemon_status)
+
+        self.send_message(msg)
+        ack_msg = self._wait_for_acknowledgement()
+
+        # save own module ID from ACK if asked to be assigned dynamic ID
+        if self._module_id == 0:
+            self._module_id = ack_msg.header.dest_mod_id
+
+        # reset subscribed and paused types
+        self._subscribed_types = set()
+        self._paused_types = set()
+
+        return ack_msg
+
     def connect(
         self,
         server_name: str = "localhost:7111",
@@ -204,24 +228,7 @@ class Client(object):
         # Setup the underlying socket connection
         self._socket_connect(server_name)
 
-        # Reset the module_id to zero for dynamic assignment
-        if self._dynamic_id:
-            self._module_id = 0
-
-        msg = cd.MDF_CONNECT()
-        msg.logger_status = int(logger_status)
-        msg.daemon_status = int(daemon_status)
-
-        self.send_message(msg)
-        ack_msg = self._wait_for_acknowledgement()
-
-        # save own module ID from ACK if asked to be assigned dynamic ID
-        if self._module_id == 0:
-            self._module_id = ack_msg.header.dest_mod_id
-
-        # reset subscribed and paused types
-        self._subscribed_types = set()
-        self._paused_types = set()
+        ack = self._connect_helper(logger_status, daemon_status)
 
     def disconnect(self):
         """Disconnect from message manager server"""
