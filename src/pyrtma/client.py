@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from .message import Message, get_msg_cls
 from .message_data import MessageData
 from .header import MessageHeader, get_header_cls
+from .message_buffer import MessageBuffer
 from .exceptions import InvalidMessageDefinition
 from . import core_defs as cd
 
@@ -138,6 +139,7 @@ class Client(object):
         self._subscribed_types: Set[int] = set()
         self._paused_types: Set[int] = set()
         self._dynamic_id: bool = module_id == 0
+        self._msgbuf: MessageBuffer = MessageBuffer(timecode=timecode)
         self._sock = socket.socket()
 
     def __del__(self):
@@ -648,70 +650,58 @@ class Client(object):
     ) -> Optional[Message]:
         """Read message without filtering for subscribed messages (helper called by read_message)"""
 
-        if timeout is None:
-            # Skip select call
-            pass
-        elif timeout >= 0:
-            # Wait timeout amount
-            readfds, writefds, exceptfds = select.select([self._sock], [], [], timeout)
-            if len(readfds) == 0:
-                return None
-        else:
-            # Blocking
-            readfds, writefds, exceptfds = select.select([self._sock], [], [])
-            if len(readfds) == 0:
-                return None
+        # Check if we have a message in buffer
+        msg = self._msgbuf.get()
 
-        # Read RTMA Header Section
-        header = self._header_cls()
-        try:
-            nbytes = self._sock.recv_into(header, header.size, socket.MSG_WAITALL)
-            """
-            Note:
-            MSG_WAITALL Flag:
-            The receive request will complete only when one of the following events occurs:
-            The buffer supplied by the caller is completely full.
-            The connection has been closed.
-            The request has been canceled or an error occurred.
-            """
+        if msg is None:
+            if timeout is None:
+                # Skip select call
+                pass
+            elif timeout >= 0:
+                # Wait timeout amount
+                readfds, writefds, exceptfds = select.select(
+                    [self._sock], [], [], timeout
+                )
+                if len(readfds) == 0:
+                    return None
+            else:
+                # Blocking
+                readfds, writefds, exceptfds = select.select([self._sock], [], [])
+                if len(readfds) == 0:
+                    return None
 
-            if nbytes != header.size:
-                self._connected = False
-                raise ConnectionLost
-
-            header.recv_time = time.perf_counter()
-        except ConnectionError:
-            raise ConnectionLost
-
-        # Read Data Section
-        data = get_msg_cls(header.msg_type)()
-        type_size = data.type_size
-        if type_size == -1:  # not defined for v1 message defs
-            type_size = data.size
-
-        if type_size != header.num_data_bytes:
-            raise InvalidMessageDefinition(
-                f"Received message header indicating a message data size ({header.num_data_bytes}) that does not match the expected size ({type_size}) of message type {data.type_name}. Message definitions may be out of sync across systems."
-            )
-
-        # Note: Ignore the sync check if header.version is not filled in
-        # This can removed once all clients support this field.
-        if sync_check and header.version != 0 and header.version != data.type_hash:
-            raise InvalidMessageDefinition(
-                f"Received message header indicating a message version that does not match the expected version of message type {data.type_name}. Message definitions may be out of sync across systems."
-            )
-
-        if header.num_data_bytes:
             try:
-                nbytes = self._sock.recv_into(data, type_size, socket.MSG_WAITALL)
-
-                if nbytes != type_size:
-                    self._connected = False
-                    raise ConnectionLost
+                raw = self._sock.recv(4096)
             except ConnectionError:
                 raise ConnectionLost
 
-        return Message(header, data)
+            self._msgbuf.append(raw)
+
+            if self._msgbuf.pending:
+                raw = self._sock.recv(self._msgbuf.bytes_needed, socket.MSG_WAITALL)
+                self._msgbuf.append(raw)
+                msg = self._msgbuf.get()
+                if msg is None:
+                    breakpoint()
+            else:
+                msg = self._msgbuf.get()
+
+        # If we got nothing at this point return
+        if msg is None:
+            return msg
+
+        # Note: Ignore the sync check if header.version is not filled in
+        # This can removed once all clients support this field.
+        if (
+            sync_check
+            and msg.header.version != 0
+            and msg.header.version != msg.data.type_hash
+        ):
+            raise InvalidMessageDefinition(
+                f"Received message header indicating a message version that does not match the expected version of message type {msg.data.type_name}. Message definitions may be out of sync across systems."
+            )
+
+        return msg
 
     def _wait_for_acknowledgement(self, timeout: float = 3) -> Message:
         """Wait for acknowledgement from message manager module
