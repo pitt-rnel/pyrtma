@@ -671,18 +671,18 @@ class Client(object):
                     return None
 
             try:
-                raw = self._sock.recv(4096)
+                raw = self._sock.recv(8192)
             except ConnectionError:
                 raise ConnectionLost
 
             self._msgbuf.append(raw)
 
+            # Always wait for the data if we have a read a header.
             if self._msgbuf.pending:
                 raw = self._sock.recv(self._msgbuf.bytes_needed, socket.MSG_WAITALL)
                 self._msgbuf.append(raw)
                 msg = self._msgbuf.get()
-                if msg is None:
-                    breakpoint()
+                # assert msg is not None
             else:
                 msg = self._msgbuf.get()
 
