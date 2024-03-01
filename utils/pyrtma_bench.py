@@ -1,34 +1,43 @@
 import sys
-import ctypes
 import time
 import multiprocessing
+import pyrtma
 
-sys.path.append("../")
+# Import message defs to add to pyrtma.msg_defs map
+sys.path.append("../tests/")
+import test_msg_defs.test_defs as td
 
-from pyrtma import *
+
+def get_test_msg(size: int) -> pyrtma.MessageData:
+    if size == 128:
+        return td.MDF_TEST_MSG_128
+    elif size == 256:
+        return td.MDF_TEST_MSG_256
+    elif size == 512:
+        return td.MDF_TEST_MSG_512
+    elif size == 1024:
+        return td.MDF_TEST_MSG_1024
+    elif size == 2048:
+        return td.MDF_TEST_MSG_2048
+    elif size == 4096:
+        return td.MDF_TEST_MSG_4096
+    elif size == 8192:
+        return td.MDF_TEST_MSG_8192
+    else:
+        raise RuntimeError(f"Invalid size value of {size} for TEST_MSG.")
 
 
 def publisher_loop(
     pub_id=0, num_msgs=10000, msg_size=128, num_subscribers=1, server="127.0.0.1:7111"
 ):
-    # Register user defined message types
-    if msg_size > 0:
-        AddMessage(msg_name="TEST", msg_type=5000, msg_def=create_test_msg(msg_size))
-    else:
-        AddSignal(msg_name="TEST", msg_type=5000)
-
-    AddSignal(msg_name="PUBLISHER_READY", msg_type=5001)
-    AddSignal(msg_name="PUBLISHER_DONE", msg_type=5002)
-    AddSignal(msg_name="SUBSCRIBER_READY", msg_type=5003)
-
     # Setup Client
-    mod = Client()
+    mod = pyrtma.Client()
     mod.connect(server_name=server)
     mod.send_module_ready()
-    mod.subscribe("SUBSCRIBER_READY")
+    mod.subscribe([td.MT_SUBSCRIBER_READY])
 
     # Signal that publisher is ready
-    mod.send_signal("PUBLISHER_READY")
+    mod.send_signal(td.MT_PUBLISHER_READY)
 
     print(f"Publisher [{pub_id}] waiting for subscribers ")
 
@@ -37,13 +46,12 @@ def publisher_loop(
     while num_subscribers_ready < num_subscribers:
         msg = mod.read_message(timeout=-1)
         if msg is not None:
-            if msg.msg_name == "SUBSCRIBER_READY":
+            if msg.data.type_name == "SUBSCRIBER_READY":
                 num_subscribers_ready += 1
 
     # Create TEST message with dummy data
-    test_msg = create_test_msg(msg_size)()  # msg = pyrtma.Message("TEST")
-    if msg_size > 0:
-        test_msg.data[:] = list(range(msg_size))
+    test_msg_cls = get_test_msg(msg_size)
+    test_msg = test_msg_cls.from_random()
 
     print(f"Publisher [{pub_id}] starting send loop ")
 
@@ -53,14 +61,13 @@ def publisher_loop(
         mod.send_message(test_msg)
     toc = time.perf_counter()
 
-    mod.send_signal("PUBLISHER_DONE")
+    mod.send_signal(td.MT_PUBLISHER_DONE)
 
     # Stats
     dur = toc - tic
     if num_msgs > 0:
         data_rate = (
-            ctypes.sizeof(mod.header_cls)
-            + ctypes.sizeof(test_msg) * num_msgs / 1e6 / dur
+            (mod.header_cls().size + test_msg_cls.type_size) * num_msgs / 1e6 / dur
         )
         print(
             f"Publisher [{pub_id}] -> {num_msgs} messages | {int(num_msgs/dur)} messages/sec | {data_rate:0.1f} MB/sec | {dur:0.6f} sec "
@@ -73,45 +80,38 @@ def publisher_loop(
 
 
 def subscriber_loop(sub_id=0, num_msgs=100000, msg_size=128, server="127.0.0.1:7111"):
-    # Register user defined message types
-    if msg_size > 0:
-        AddMessage(msg_name="TEST", msg_type=5000, msg_def=create_test_msg(msg_size))
-    else:
-        AddSignal(msg_name="TEST", msg_type=5000)
-
-    AddSignal(msg_name="SUBSCRIBER_READY", msg_type=5003)
-    AddSignal(msg_name="SUBSCRIBER_DONE", msg_type=5004)
-
     # Setup Client
-    mod = Client()
+    mod = pyrtma.Client()
     mod.connect(server_name=server)
     mod.send_module_ready()
-    mod.subscribe("TEST")
-    mod.subscribe("Exit")
+
+    test_msg_cls = get_test_msg(msg_size)
+    mod.subscribe([test_msg_cls.type_id, td.MT_EXIT])
+
     print(f"Subscriber [{sub_id:d}] Ready")
-    mod.send_signal("SUBSCRIBER_READY")
+    mod.send_signal(td.MT_SUBSCRIBER_READY)
 
     # Read Loop (Start clock after first TEST msg received)
     msg_count = 0
     tic = 0
     toc = 0.0
-    test_msg_size = msg_size + ctypes.sizeof(mod.header_cls)
+    test_msg_size = test_msg_cls.type_size + mod.header_cls().size
     while msg_count < num_msgs:
         msg = mod.read_message(timeout=0.100)
         if msg is not None:
-            if msg.name == "TEST":
+            if msg.name == test_msg_cls.type_name:
                 if msg_count == 0:
                     # test_msg_size = msg.msg_size
                     tic = time.perf_counter()
                 toc = time.perf_counter()
                 msg_count += 1
-            elif msg.name == "Exit":
+            elif msg.name == "EXIT":
                 break
         if tic and (time.perf_counter() - toc) > 1:
             print(f"Subscriber [{sub_id:d}] breaking early.")
             break
 
-    mod.send_signal("SUBSCRIBER_DONE")
+    mod.send_signal(td.MT_SUBSCRIBER_DONE)
 
     # Stats
     dur = toc - tic
@@ -130,13 +130,6 @@ def subscriber_loop(sub_id=0, num_msgs=100000, msg_size=128, server="127.0.0.1:7
             f"Subscriber [{sub_id:d}] -> {msg_count} messages | 0 messages/sec | 0 MB/sec | {dur:0.6f} sec "
         )
     mod.disconnect()
-
-
-def create_test_msg(msg_size):
-    class TEST(ctypes.Structure):
-        _fields_ = [("data", ctypes.c_byte * msg_size)]
-
-    return TEST
 
 
 if __name__ == "__main__":
@@ -173,19 +166,20 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Main Thread RTMA client
-    mod = Client()
+    mod = pyrtma.Client()
     mod.connect(server_name=args.server)
     mod.send_module_ready()
 
-    AddSignal(msg_name="PUBLISHER_READY", msg_type=5001)
-    AddSignal(msg_name="PUBLISHER_DONE", msg_type=5002)
-    AddSignal(msg_name="SUBSCRIBER_READY", msg_type=5003)
-    AddSignal(msg_name="SUBSCRIBER_DONE", msg_type=5004)
+    test_msg_cls = get_test_msg(args.msg_size)
 
-    mod.subscribe("PUBLISHER_READY")
-    mod.subscribe("PUBLISHER_DONE")
-    mod.subscribe("SUBSCRIBER_READY")
-    mod.subscribe("SUBSCRIBER_DONE")
+    mod.subscribe(
+        [
+            td.MT_PUBLISHER_READY,
+            td.MT_PUBLISHER_DONE,
+            td.MT_SUBSCRIBER_READY,
+            td.MT_SUBSCRIBER_DONE,
+        ]
+    )
 
     sys.stdout.write(f"Packet size: {args.msg_size} bytes\n")
     sys.stdout.write(f"Sending {args.num_msgs} messages...\n")
@@ -213,7 +207,7 @@ if __name__ == "__main__":
     while publishers_ready < args.num_publishers:
         msg = mod.read_message(timeout=-1)
         if msg is not None:
-            if msg.msg_name == "PUBLISHER_READY":
+            if msg.name == "PUBLISHER_READY":
                 publishers_ready += 1
 
     # print('Waiting for subscriber processes...')
@@ -245,13 +239,13 @@ if __name__ == "__main__":
     ):
         msg = mod.read_message(timeout=0.100)
         if msg is not None:
-            if msg.msg_name == "SUBSCRIBER_DONE":
+            if msg.name == "SUBSCRIBER_DONE":
                 subscribers_done += 1
-            elif msg.msg_name == "PUBLISHER_DONE":
+            elif msg.name == "PUBLISHER_DONE":
                 publishers_done += 1
 
         if (time.perf_counter() - abort_start) > abort_timeout:
-            mod.send_signal("Exit")
+            mod.send_signal(td.MT_EXIT)
             sys.stdout.write("Test Timeout! Sending Exit Signal...\n")
             sys.stdout.flush()
 

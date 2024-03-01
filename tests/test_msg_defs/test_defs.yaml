@@ -1751,3 +1751,53 @@ message_defs:
       struct: VALIDATOR_STRUCT 
       struct_arr: VALIDATOR_STRUCT[8]
 
+  TEST_MSG_128:
+    id: 5002
+    fields:
+      blob: uint8[128]
+
+  TEST_MSG_256:
+    id: 5003
+    fields:
+      blob: uint8[256]
+
+  TEST_MSG_512:
+    id: 5004
+    fields:
+      blob: uint8[512]
+
+  TEST_MSG_1024:
+    id: 5005
+    fields:
+      blob: uint8[1024]
+
+  TEST_MSG_2048:
+    id: 5006
+    fields:
+      blob: uint8[2048]
+
+  TEST_MSG_4096:
+    id: 5007
+    fields:
+      blob: uint8[4096]
+
+  TEST_MSG_8192:
+    id: 5008
+    fields:
+      blob: uint8[8192]
+
+  SUBSCRIBER_READY:
+    id: 5009
+    fields: null
+
+  PUBLISHER_READY:
+    id: 5010
+    fields: null
+
+  SUBSCRIBER_DONE:
+    id: 5011
+    fields: null
+
+  PUBLISHER_DONE:
+    id: 5012
+    fields: null
