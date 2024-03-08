@@ -1,4 +1,3 @@
-from ast import Pass
 import pyrtma
 import logging
 import select
@@ -8,6 +7,8 @@ import argparse
 import importlib
 import pathlib
 import sys
+import json
+
 
 from pyrtma import Client, get_msg_cls
 from pyrtma.exceptions import RTMAMessageError
@@ -98,7 +99,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
                         logger.debug(
                             f"Forwarding message type {get_msg_cls(msg.header.msg_type).type_name} to ws"
                         )
-                        self.send_message(msg.to_json())
+                        self.send_message(msg.to_json(minify=True))
                     else:
                         print("X")
 
@@ -126,7 +127,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
             logger.debug(
                 f"Forwarding ACK from connect to ws. Mod ID = {self.proxy.module_id}"
             )
-            self.send_message(ack_msg.to_json())
+            self.send_message(ack_msg.to_json(minify=True))
         else:
             print("X")
 
@@ -145,6 +146,8 @@ class RTMAWebSocketHandler(WebSocketHandler):
         try:
             msg = pyrtma.Message.from_json(message)
         except RTMAMessageError as e:
+            error_json = json.dumps({"rtma_msg_error": str(e)}, separators=(",", ":"))
+            self.send_message(error_json)
             logger.error(e, stack_info=False)
             return
 
