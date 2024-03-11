@@ -1,4 +1,3 @@
-import pyrtma
 import logging
 import select
 import errno
@@ -8,9 +7,9 @@ import importlib
 import pathlib
 import sys
 import json
+from rich.logging import RichHandler
 
-
-from pyrtma import Client, get_msg_cls
+from pyrtma import Client, Message, get_msg_cls
 from pyrtma.exceptions import RTMAMessageError
 import pyrtma.core_defs as cd
 
@@ -33,6 +32,10 @@ from websocket_server import (  # type: ignore
 )
 
 from typing import Optional, List, Callable, Any, Dict, cast
+
+# use rich logging
+logging.getLogger().removeHandler(logging.getLogger().handlers[0])
+logging.getLogger().addHandler(RichHandler())
 
 
 class RTMAWebSocketHandler(WebSocketHandler):
@@ -89,8 +92,12 @@ class RTMAWebSocketHandler(WebSocketHandler):
                 try:
                     msg = self.proxy.read_message(timeout=None, ack=True)
                 except RTMAMessageError as e:
+                    error_json = json.dumps(
+                        {"rtma_msg_error": str(e)}, separators=(",", ":")
+                    )
+                    self.send_message(error_json)
                     logger.error(e, stack_info=False)
-                    break
+                    continue
 
                 if msg is not None:
                     # Pass message thru websocket as json
@@ -111,7 +118,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         """
         logger.info("Websocket PONG received.")
 
-    def handle_connect(self, msg: pyrtma.Message):
+    def handle_connect(self, msg: Message):
         logger.debug("Received CONNECT")
 
         # self.proxy._module_id = msg.header.src_mod_id
@@ -144,48 +151,50 @@ class RTMAWebSocketHandler(WebSocketHandler):
             return
 
         try:
-            msg = pyrtma.Message.from_json(message)
+            msg = Message.from_json(message)
+
+            if msg.header.msg_type == cd.MT_DISCONNECT:
+                self.proxy.disconnect()
+                logger.info("Received disconnect, disconnected proxy from MM.")
+            elif msg.header.msg_type == cd.MT_SUBSCRIBE:
+                msg.data = cast(cd.MDF_SUBSCRIBE, msg.data)
+                self.proxy.subscribe([msg.data.msg_type])
+                logger.info(
+                    f"Received SUBSCRIBE: {get_msg_cls(msg.data.msg_type).type_name}"
+                )
+            elif msg.header.msg_type == cd.MT_UNSUBSCRIBE:
+                msg.data = cast(cd.MDF_UNSUBSCRIBE, msg.data)
+                self.proxy.unsubscribe([msg.data.msg_type])
+                logger.info(
+                    f"Received UNSUBSCRIBE: {get_msg_cls(msg.data.msg_type).type_name}"
+                )
+            elif msg.header.msg_type == cd.MT_PAUSE_SUBSCRIPTION:
+                msg.data = cast(cd.MDF_PAUSE_SUBSCRIPTION, msg.data)
+                self.proxy.pause_subscription([msg.data.msg_type])
+                logger.info(
+                    f"Received PAUSE_SUBSCRIPTION: {get_msg_cls(msg.data.msg_type).type_name}"
+                )
+            elif msg.header.msg_type == cd.MT_RESUME_SUBSCRIPTION:
+                msg.data = cast(cd.MDF_RESUME_SUBSCRIPTION, msg.data)
+                self.proxy.resume_subscription([msg.data.msg_type])
+                logger.info(
+                    f"Received RESUME_SUBSCRIPTION: {get_msg_cls(msg.data.msg_type).type_name}"
+                )
+            elif msg.header.msg_type == cd.MT_CONNECT:
+                self.handle_connect(msg)
+                logger.info(
+                    f"Proxy CONNECTED, assigned module ID {self.proxy.module_id}"
+                )
+            else:
+                self.proxy.forward_message(msg.header, msg.data or None)
+                logger.debug(
+                    f"Forwarded message type {get_msg_cls(msg.header.msg_type).type_name} from ws"
+                )
         except RTMAMessageError as e:
             error_json = json.dumps({"rtma_msg_error": str(e)}, separators=(",", ":"))
             self.send_message(error_json)
             logger.error(e, stack_info=False)
             return
-
-        if msg.header.msg_type == cd.MT_DISCONNECT:
-            self.proxy.disconnect()
-            logger.info("Received disconnect, disconnected proxy from MM.")
-        elif msg.header.msg_type == cd.MT_SUBSCRIBE:
-            msg.data = cast(cd.MDF_SUBSCRIBE, msg.data)
-            self.proxy.subscribe([msg.data.msg_type])
-            logger.info(
-                f"Received SUBSCRIBE: {get_msg_cls(msg.data.msg_type).type_name}"
-            )
-        elif msg.header.msg_type == cd.MT_UNSUBSCRIBE:
-            msg.data = cast(cd.MDF_UNSUBSCRIBE, msg.data)
-            self.proxy.unsubscribe([msg.data.msg_type])
-            logger.info(
-                f"Received UNSUBSCRIBE: {get_msg_cls(msg.data.msg_type).type_name}"
-            )
-        elif msg.header.msg_type == cd.MT_PAUSE_SUBSCRIPTION:
-            msg.data = cast(cd.MDF_PAUSE_SUBSCRIPTION, msg.data)
-            self.proxy.pause_subscription([msg.data.msg_type])
-            logger.info(
-                f"Received PAUSE_SUBSCRIPTION: {get_msg_cls(msg.data.msg_type).type_name}"
-            )
-        elif msg.header.msg_type == cd.MT_RESUME_SUBSCRIPTION:
-            msg.data = cast(cd.MDF_RESUME_SUBSCRIPTION, msg.data)
-            self.proxy.resume_subscription([msg.data.msg_type])
-            logger.info(
-                f"Received RESUME_SUBSCRIPTION: {get_msg_cls(msg.data.msg_type).type_name}"
-            )
-        elif msg.header.msg_type == cd.MT_CONNECT:
-            self.handle_connect(msg)
-            logger.info(f"Proxy CONNECTED, assigned module ID {self.proxy.module_id}")
-        else:
-            self.proxy.forward_message(msg.header, msg.data or None)
-            logger.debug(
-                f"Forwarded message type {get_msg_cls(msg.header.msg_type).type_name} from ws"
-            )
 
     def read_ws_message(self) -> Optional[str]:
         """Read websocket message

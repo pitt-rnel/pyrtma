@@ -72,7 +72,7 @@ def get_msg_cls(id: int) -> Type[MessageData]:
         return _msg_defs[id]
     except KeyError as e:
         raise UnknownMessageType(
-            f"There is no message definition associated with id:{id}"
+            f"There is no message definition associated with id: {id}"
         ) from e
 
 

@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from .message import Message, get_msg_cls
 from .message_data import MessageData
 from .header import MessageHeader, get_header_cls
-from .exceptions import InvalidMessageDefinition
+from .exceptions import InvalidMessageDefinition, UnknownMessageType
 from . import core_defs as cd
 
 from functools import wraps
@@ -684,12 +684,19 @@ class Client(object):
             raise ConnectionLost
 
         # Read Data Section
-        data = get_msg_cls(header.msg_type)()
+
+        try:
+            data = get_msg_cls(header.msg_type)()
+        except UnknownMessageType as e:
+            _ = self._sock.recv(header.num_data_bytes, socket.MSG_WAITALL)
+            raise e
+
         type_size = data.type_size
         if type_size == -1:  # not defined for v1 message defs
             type_size = data.size
 
         if type_size != header.num_data_bytes:
+            _ = self._sock.recv(header.num_data_bytes, socket.MSG_WAITALL)
             raise InvalidMessageDefinition(
                 f"Received message header indicating a message data size ({header.num_data_bytes}) that does not match the expected size ({type_size}) of message type {data.type_name}. Message definitions may be out of sync across systems."
             )
@@ -697,6 +704,7 @@ class Client(object):
         # Note: Ignore the sync check if header.version is not filled in
         # This can removed once all clients support this field.
         if sync_check and header.version != 0 and header.version != data.type_hash:
+            _ = self._sock.recv(header.num_data_bytes, socket.MSG_WAITALL)
             raise InvalidMessageDefinition(
                 f"Received message header indicating a message version that does not match the expected version of message type {data.type_name}. Message definitions may be out of sync across systems."
             )
