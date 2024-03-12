@@ -674,6 +674,7 @@ class Parser:
 
     def check_alignment(self, s: Union[SDF, MDF]):
         """Confirm 64 bit alignment of structures"""
+        PADDING_BYTE_TYPE = "char"
 
         # This value will represent the memory address currently pointed to in the struct layout
         ptr = 0
@@ -712,8 +713,8 @@ class Parser:
             # Create the required padding field
             padding = Field(
                 name=f"padding_{npad}_",
-                type_name="char",
-                type_obj=supported_types["char"],
+                type_name=PADDING_BYTE_TYPE,
+                type_obj=supported_types[PADDING_BYTE_TYPE],
                 length_expression=f'"{pad_len}"',
                 length_expanded=f'"{pad_len}"',
                 length=pad_len,
@@ -772,8 +773,8 @@ class Parser:
             # Create the required padding field
             padding = Field(
                 name=f"padding_{npad}_",
-                type_name="char",
-                type_obj=supported_types["char"],
+                type_name=PADDING_BYTE_TYPE,
+                type_obj=supported_types[PADDING_BYTE_TYPE],
                 length_expression=f'"{pad_len}"',
                 length_expanded=f'"{pad_len}"',
                 length=pad_len or None,
@@ -800,7 +801,7 @@ class Parser:
             if (ptr % a) == 0:
                 s.alignment = min(a, strictest_alignment)
                 break
-        else:
+        else:  # only runs if we don't break
             # Note: This should never happen
             raise RuntimeError(f"Unable to determine alignment required for {s.name}")
 
