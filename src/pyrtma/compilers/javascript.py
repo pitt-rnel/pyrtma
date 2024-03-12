@@ -17,6 +17,7 @@ from pyrtma.__version__ import __version__
 # Native C types that are supported
 type_map = {
     "char": '""',
+    "string": '""',  # not really a C type, used to distinguish char from string (length > 1) in js
     "unsigned char": 0,
     "byte": 0,
     "int": 0,
@@ -119,15 +120,21 @@ class JSDefCompiler:
             else:
                 raise RuntimeError(f"Unknown field name {field.name} in {struct.name}")
 
+            comment = ""  # reserved for possible future use
+
             if field.length is not None:
-                s += f"{field.name}: Array({field.length}).fill({ftype}())"
+                if field.type_name == "char" and field.length > 1:
+                    ftype = "type_map.string"
+                    s += f"{field.name}: {ftype}({field.length})"
+                else:
+                    s += f"{field.name}: Array({field.length}).fill({ftype}())"
             else:
                 s += f"{field.name}: {ftype}()"
 
             if n < num_fields:
-                s += ",\n"
+                s += f",{comment}\n"
             else:
-                s += "\n"
+                s += f"{comment}\n"
 
         s += "\t}\n"
         s += "};"
@@ -149,7 +156,8 @@ class JSDefCompiler:
             f.write("const type_map = {};\n")
             for name, value in type_map.items():
                 name = name.replace(" ", "_")
-                f.write(f"type_map.{name} = () => {value};\n")
+                args = "length" if name == "string" else ""
+                f.write(f"type_map.{name} = ({args}) => {value};\n")
             f.write("\n")
 
             # Top-Level RTMA object
