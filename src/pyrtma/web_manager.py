@@ -7,9 +7,10 @@ import importlib
 import pathlib
 import sys
 import json
+import time
 from rich.logging import RichHandler
 
-from pyrtma import Client, Message, get_msg_cls
+from pyrtma import Client, Message, MessageHeader, get_msg_cls
 from pyrtma.exceptions import RTMAMessageError
 import pyrtma.core_defs as cd
 
@@ -105,6 +106,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
                         )
                         self.send_message(msg.to_json(minify=True))
                     else:
+                        self.send_failed_message(msg.header, time.perf_counter())
                         logger.warning(
                             f"Failed to foward message type {get_msg_cls(msg.header.msg_type).type_name} to ws. Mod ID = {self.proxy.module_id}"
                         )
@@ -135,6 +137,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
             )
             self.send_message(ack_msg.to_json(minify=True))
         else:
+            self.send_failed_message(ack_msg.header, time.perf_counter())
             logger.warning(
                 f"Failed to foward ACK to ws. Mod ID = {self.proxy.module_id}."
             )
@@ -258,6 +261,23 @@ class RTMAWebSocketHandler(WebSocketHandler):
 
         opcode_handler(message_bytes.decode("utf8"))
         return message_bytes.decode("utf8")
+
+    def send_failed_message(self, header: MessageHeader, time_of_failure: float):
+        """Send FAILED_MESSAGE when we cannot forward to websocket"""
+        data = cd.MDF_FAILED_MESSAGE()
+        data.dest_mod_id = self.proxy.module_id
+        data.time_of_failure = time_of_failure
+
+        # Copy the values into the RTMA_MSG_HEADER
+        for fname, ftype in data.msg_header._fields_:
+            setattr(data.msg_header, fname, getattr(header, fname))
+
+        if (
+            data.msg_header.msg_type == cd.MT_FAILED_MESSAGE
+        ):  # avoid unlikely infinite recursion
+            return
+
+        self.proxy.send_message(data)
 
     def finish(self):
         """Close RTMA connection"""
