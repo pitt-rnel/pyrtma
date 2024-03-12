@@ -69,7 +69,7 @@ _V = TypeVar("_V")  # Value
 class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
     """Abstract base class for all message field validator descriptors"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._ctype: Type[ctypes._CData] = ctypes._CData
 
     def __set_name__(self, owner: _P, name: str):
@@ -94,7 +94,7 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
     """Abstract base class for float type validators"""
 
     @abstractmethod
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_float
 
     def __get__(self, obj: _P, objtype=None) -> float:
@@ -149,14 +149,14 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
 class Float(FloatValidatorBase):
     """32-bit Float validator class"""
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_float
 
 
 class Double(FloatValidatorBase):
     """Double (64-bit float) validator class"""
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_double
 
 
@@ -245,7 +245,7 @@ class Int8(IntValidatorBase):
     _min: ClassVar[int] = -(2**7)
     _max: ClassVar[int] = 2**7 - 1
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int8
 
 
@@ -257,7 +257,7 @@ class Int16(IntValidatorBase):
     _min: ClassVar[int] = -(2**15)
     _max: ClassVar[int] = 2**15 - 1
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int16
 
 
@@ -269,7 +269,7 @@ class Int32(IntValidatorBase):
     _min: ClassVar[int] = -(2**31)
     _max: ClassVar[int] = 2**31 - 1
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int32
 
 
@@ -281,7 +281,7 @@ class Int64(IntValidatorBase):
     _min: ClassVar[int] = -(2**63)
     _max: ClassVar[int] = 2**63 - 1
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int64
 
 
@@ -293,7 +293,7 @@ class Uint8(IntValidatorBase):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**8 - 1
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint8
 
 
@@ -305,7 +305,7 @@ class Uint16(IntValidatorBase):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**16 - 1
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint16
 
 
@@ -317,7 +317,7 @@ class Uint32(IntValidatorBase):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**32 - 1
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint32
 
 
@@ -329,7 +329,7 @@ class Uint64(IntValidatorBase):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**64 - 1
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint64
 
 
@@ -341,7 +341,7 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
     _min: ClassVar[int] = 0
     _max: ClassVar[int] = 2**8 - 1
 
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_ubyte
 
     @property
@@ -479,7 +479,7 @@ _FV = TypeVar("_FV", bound=FieldValidator)
 class Char(String):
     """Validator for scalar char values"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._ctype = ctypes.c_char
         self.len = 1
 

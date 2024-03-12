@@ -172,7 +172,7 @@ def compile(
     print("DONE.")
 
 
-def main():
+def main() -> None:
     import argparse
 
     # subparser for include file, to parse compiler options first
