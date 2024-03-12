@@ -71,15 +71,12 @@ class RTMAWebSocketHandler(WebSocketHandler):
         # Establish the underlying socket connection with MessageManger Server
         self.proxy._socket_connect(self.mm_ip)
 
-        print("New Client:")
-        print(
-            f"ws:{self.request.getsockname()[0]}:{self.request.getsockname()[1]} -> {self.request.getpeername()[0]}:{self.request.getpeername()[1]}"
+        log_str = (
+            "New Client:\n"
+            + f"ws: {self.request.getsockname()[0]}:{self.request.getsockname()[1]} -> {self.request.getpeername()[0]}:{self.request.getpeername()[1]}\n"
+            + f"rtma: {self.proxy.sock.getsockname()[0]}:{self.proxy.sock.getsockname()[1]} -> {self.proxy.sock.getpeername()[0]}:{self.proxy.sock.getpeername()[1]}\n"
         )
-
-        print(
-            f"rtma:{self.proxy.sock.getsockname()[0]}:{self.proxy.sock.getsockname()[1]} -> {self.proxy.sock.getpeername()[0]}:{self.proxy.sock.getpeername()[1]}"
-        )
-        print()
+        logger.info(log_str)
 
         # Message Loop
         while self.keep_alive and self.proxy.connected:
@@ -108,7 +105,9 @@ class RTMAWebSocketHandler(WebSocketHandler):
                         )
                         self.send_message(msg.to_json(minify=True))
                     else:
-                        print("X")
+                        logger.warning(
+                            f"Failed to foward message type {get_msg_cls(msg.header.msg_type).type_name} to ws. Mod ID = {self.proxy.module_id}"
+                        )
 
     def pong_received(self, msg: str):
         """Log that pong was received
@@ -136,7 +135,9 @@ class RTMAWebSocketHandler(WebSocketHandler):
             )
             self.send_message(ack_msg.to_json(minify=True))
         else:
-            print("X")
+            logger.warning(
+                f"Failed to foward ACK to ws. Mod ID = {self.proxy.module_id}."
+            )
 
     def process_json_message(self, message: str):
         """Process incoming json message
@@ -319,7 +320,7 @@ def ws_client_connect(client: Dict[str, Any], server: WebMessageManager):
         client (Dict[str, Any]): Client dictionary
         server: WebMessageManager Server object
     """
-    print(f"Client connected -> id:{client['id']}")
+    logger.info(f"Client connected -> id: {client['id']}")
 
 
 def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
@@ -330,7 +331,7 @@ def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
         client (Dict[str, Any]): Client dictionary
         server: WebMessageManager Server object
     """
-    print(f"Client disconnected -> id:{client['id']}\n")
+    logger.info(f"Client disconnected -> id: {client['id']}\n")
 
 
 def main():

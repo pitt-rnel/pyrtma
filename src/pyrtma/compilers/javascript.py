@@ -45,7 +45,9 @@ type_map = {
     "int64": 0,
 }
 
-TAB = "  " # two spaces is preferred indent in js
+TAB = "  "  # two spaces is preferred indent in js
+
+
 def pad(indent: int) -> str:
     return indent * TAB
 
