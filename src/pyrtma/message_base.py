@@ -281,6 +281,12 @@ def _from_dict(obj: MessageBase, data: Dict[str, Any]):
                 for i, elem in enumerate(getattr(obj, name)):
                     _from_dict(elem, data[name][i])
             elif ftype._type_ is ctypes.c_char:
+                # list of characters is equivalent to str
+                if type(data[name]) is list and all(
+                    [(type(x) is str and len(x) <= 1) for x in data[name]]
+                ):
+                    data[name] = "".join(data[name])
+
                 setattr(obj, name, data[name])
             else:
                 getattr(obj, name)[:] = data[name]
