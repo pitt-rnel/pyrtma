@@ -45,9 +45,9 @@ type_map = {
     "int64": 0,
 }
 
-
+TAB = "  " # two spaces is preferred indent in js
 def pad(indent: int) -> str:
-    return indent * "\t"
+    return indent * TAB
 
 
 class JSDefCompiler:
@@ -98,13 +98,13 @@ class JSDefCompiler:
         elif isinstance(struct, SDF):
             top_field = "SDF"
 
-        tabs = "\t" * 2
+        tabs = TAB * 2
         num_fields = len(struct.fields)
 
         if num_fields == 0:
             return f"RTMA.{top_field}.{struct.name} = () => {{ return {{}} }};"
 
-        s = f"RTMA.{top_field}.{struct.name} = () => {{\n\treturn {{\n"
+        s = f"RTMA.{top_field}.{struct.name} = () => {{\n{TAB}return {{\n"
 
         for n, field in enumerate(struct.fields, start=1):
             s += tabs
@@ -136,7 +136,7 @@ class JSDefCompiler:
             else:
                 s += f"{comment}\n"
 
-        s += "\t}\n"
+        s += f"{TAB}}}\n"
         s += "};"
 
         return s
