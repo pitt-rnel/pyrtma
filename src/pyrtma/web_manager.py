@@ -93,11 +93,14 @@ class RTMAWebSocketHandler(WebSocketHandler):
                     error_json = json.dumps(
                         {"rtma_msg_error": str(e)}, separators=(",", ":")
                     )
-                    self.send_message(error_json)
+                    if self.keep_alive:
+                        _, wd, _ = select.select([], [self.wfile], [], 0)
+                        if self.wfile in wd:
+                            self.send_message(error_json)
                     logger.error(e, stack_info=False)
                     continue
 
-                if msg is not None:
+                if msg is not None and self.keep_alive:
                     # Pass message thru websocket as json
                     _, wd, _ = select.select([], [self.wfile], [], 0)
                     if self.wfile in wd:
@@ -106,7 +109,8 @@ class RTMAWebSocketHandler(WebSocketHandler):
                         )
                         self.send_message(msg.to_json(minify=True))
                     else:
-                        self.send_failed_message(msg.header, time.perf_counter())
+                        if self.proxy.connected:
+                            self.send_failed_message(msg.header, time.perf_counter())
                         logger.warning(
                             f"Failed to foward message type {get_msg_cls(msg.header.msg_type).type_name} to ws. Mod ID = {self.proxy.module_id}"
                         )
@@ -340,8 +344,10 @@ def ws_client_connect(client: Dict[str, Any], server: WebMessageManager):
         client (Dict[str, Any]): Client dictionary
         server: WebMessageManager Server object
     """
-    logger.info(f"Client connected -> id: {client['id']}")
-
+    try:
+        logger.info(f"Client connected -> id: {client['id']}")
+    except:
+        pass
 
 def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
     """Websocket client disconnect
@@ -354,7 +360,7 @@ def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
     try:
         logger.info(f"Client disconnected -> id: {client['id']}")
     except:
-        logger.info("Client disconnected")
+        pass
 
 
 def main():
