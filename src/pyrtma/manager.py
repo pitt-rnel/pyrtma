@@ -11,15 +11,16 @@ import time
 import random
 import ctypes
 import os
+import typing
 
 from .message import Message, get_msg_cls
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
+from .core_defs import ALL_MESSAGE_TYPES, MAX_MESSAGE_TYPES
 from . import core_defs as cd
 
 from typing import Dict, List, Tuple, Set, Type, Union, Optional
-import typing
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from collections import defaultdict, Counter
 
 LOG_LEVEL = logging.INFO
@@ -37,6 +38,7 @@ class Module:
     header_cls: Type[MessageHeader]
     id: int = 0
     pid: int = 0
+    subs: Set[int] = field(default_factory=set)
     connected: bool = False
     is_logger: bool = False
 
@@ -248,8 +250,8 @@ class MessageManager:
             module (Module): Module object to remove
         """
         # Drop all subscriptions for this module
-        for msg_type, subscriber_set in self.subscriptions.items():
-            subscriber_set.discard(module)
+        for msg_type in module.subs:
+            self.subscriptions[msg_type].discard(module)
 
         # Discard from logger module set if needed
         self.logger_modules.discard(module)
@@ -275,8 +277,16 @@ class MessageManager:
             msg (Message): incoming SUBSCRIBE message
         """
         sub = cd.MDF_SUBSCRIBE.from_buffer(msg.data)
-        self.subscriptions[sub.msg_type].add(src_module)
-        self.logger.info(f"SUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
+
+        if sub.msg_type == ALL_MESSAGE_TYPES:
+            for msg_type in range(0, MAX_MESSAGE_TYPES + 1):
+                self.subscriptions[msg_type].add(src_module)
+                src_module.subs.add(msg_type)
+            self.logger.info(f"SUBSCRIBE- {src_module!s} to ALL_MESSAGE_TYPES")
+        else:
+            self.subscriptions[sub.msg_type].add(src_module)
+            src_module.subs.add(sub.msg_type)
+            self.logger.info(f"SUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
 
     def remove_subscription(self, src_module: Module, msg: Message):
         """Remove message subscription
@@ -287,8 +297,14 @@ class MessageManager:
         """
         sub = cd.MDF_UNSUBSCRIBE.from_buffer(msg.data)
         # Silently let modules unsubscribe from messages that they are not subscribed to.
-        self.subscriptions[sub.msg_type].discard(src_module)
-        self.logger.info(f"UNSUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
+        if sub.msg_type == ALL_MESSAGE_TYPES:
+            for msg_type in src_module.subs:
+                self.subscriptions[msg_type].discard(src_module)
+            self.logger.info(f"UNSUBSCRIBE- {src_module!s} from ALL_MESSAGE_TYPES")
+        else:
+            src_module.subs.discard(sub.msg_type)
+            self.subscriptions[sub.msg_type].discard(src_module)
+            self.logger.info(f"UNSUBSCRIBE- {src_module!s} from MT:{sub.msg_type}")
 
     def resume_subscription(self, src_module: Module, msg: Message):
         """Resume message subscription
@@ -389,9 +405,6 @@ class MessageManager:
                 f"MessageManager::forward_message: Got invalid dest_host_id [{dest_host_id}]"
             )
 
-        # Always forward to logger modules
-        self.send_to_loggers(header, data, wlist)
-
         # Subscriber set for this message type
         subscribers = self.subscriptions[header.msg_type]
 
@@ -430,6 +443,21 @@ class MessageManager:
                     )
                     print("x", end="", flush=True)
                     self.send_failed_message(module, header, time.perf_counter(), wlist)
+            elif module.is_logger:
+                # Block until logger is ready
+                select.select([], [module.conn], [], None)
+
+                try:
+                    module.send_message(header, data)
+                except ConnectionError as err:
+                    self.logger.error(
+                        f"Connection Error on write to {module!s} - {err!s}"
+                    )
+                    print("x", end="", flush=True)
+                    self.send_failed_message(
+                        module, header, time.perf_counter(), wlist
+                    )  # this could result in inifite recursion, this is prevented by send_failed_message returning if failed message type is failed_message.
+
             else:
                 print("x", end="", flush=True)
                 self.send_failed_message(module, header, time.perf_counter(), wlist)

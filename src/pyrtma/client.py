@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from .message import Message, get_msg_cls
 from .message_data import MessageData
 from .header import MessageHeader, get_header_cls
+from .core_defs import ALL_MESSAGE_TYPES, MAX_MESSAGE_TYPES
 from .exceptions import (
     InvalidMessageDefinition,
     UnknownMessageType,
@@ -81,6 +82,8 @@ class Client(object):
         timecode (optional): Add additional timecode fields to message
             header, used by some projects at RNEL. Defaults to False.
     """
+
+    ALL_MESSAGE_TYPES_SET = set(range(0, MAX_MESSAGE_TYPES + 1))
 
     def __init__(
         self,
@@ -269,7 +272,11 @@ class Client(object):
         self.send_message(msg)
 
     def _subscription_control(self, msg_list: Iterable[int], ctrl_msg: str):
-        msg_set = set(msg_list)
+        if ALL_MESSAGE_TYPES in msg_list:
+            msg_set = Client.ALL_MESSAGE_TYPES_SET
+        else:
+            msg_set = set(msg_list)
+
         msg: MessageData
         if ctrl_msg == "Subscribe":
             msg = cd.MDF_SUBSCRIBE()
@@ -290,8 +297,12 @@ class Client(object):
         else:
             raise TypeError("Unknown control message type.")
 
-        for msg_type in msg_list:
-            msg.msg_type = msg_type
+        if ALL_MESSAGE_TYPES not in msg_list:
+            for msg_type in msg_list:
+                msg.msg_type = msg_type
+                self.send_message(msg)
+        else:
+            msg.msg_type = ALL_MESSAGE_TYPES
             self.send_message(msg)
 
     @requires_connection
@@ -334,19 +345,33 @@ class Client(object):
         self._subscription_control(msg_list, "ResumeSubscription")
 
     @requires_connection
+    def subscribe_to_all(self):
+        """Subscribe all message types"""
+        self.subscribe([ALL_MESSAGE_TYPES])
+
+    @requires_connection
     def unsubscribe_from_all(self):
         """Unsubscribe from all subscribed types"""
-        self.unsubscribe(self.subscribed_types)
+        if self.subscribed_types == Client.ALL_MESSAGE_TYPES_SET:
+            self.unsubscribe([ALL_MESSAGE_TYPES])
+        else:
+            self.unsubscribe(self.subscribed_types)
 
     @requires_connection
     def pause_all_subscriptions(self):
         """Pause all subscribed types"""
-        self.pause_subscription(self.subscribed_types)
+        if self.subscribed_types == Client.ALL_MESSAGE_TYPES_SET:
+            self.pause_subscription([ALL_MESSAGE_TYPES])
+        else:
+            self.pause_subscription(self.subscribed_types)
 
     @requires_connection
     def resume_all_subscriptions(self):
         """Resume all paused subscriptions"""
-        self.resume_subscription(self.paused_subscribed_types)
+        if self.paused_subscribed_types == Client.ALL_MESSAGE_TYPES_SET:
+            self.resume_subscription([ALL_MESSAGE_TYPES])
+        else:
+            self.resume_subscription(self.paused_subscribed_types)
 
     @contextmanager
     def subscription_context(self, msg_list: Iterable[int]):
@@ -589,7 +614,7 @@ class Client(object):
         M = self._read_message(timeout, ack, sync_check)
 
         # filter out unsubscribed messages that may still be in queue
-        while M and M.header.msg_type not in self.subscribed_types:
+        while M and (M.header.msg_type not in self.subscribed_types):
             if (
                 ack and M.header.msg_type == cd.MT_ACKNOWLEDGE
             ):  # ack input allows ACK to be read and not discarded
