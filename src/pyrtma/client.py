@@ -17,6 +17,7 @@ from .exceptions import (
     InvalidMessageDefinition,
     UnknownMessageType,
     ClientError,
+    SocketOptionError,
     MessageManagerNotFound,
     NotConnectedError,
     ConnectionLost,
