@@ -351,7 +351,10 @@ def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
         client (Dict[str, Any]): Client dictionary
         server: WebMessageManager Server object
     """
-    logger.info(f"Client disconnected -> id: {client['id']}\n")
+    try:
+        logger.info(f"Client disconnected -> id: {client['id']}")
+    except:
+        logger.info("Client disconnected")
 
 
 def main():
