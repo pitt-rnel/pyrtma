@@ -10,7 +10,7 @@ import json
 import time
 from rich.logging import RichHandler
 
-from pyrtma import Client, Message, MessageHeader, get_msg_cls
+from pyrtma import Client, Message, MessageHeader, get_msg_cls, ClientError
 from pyrtma.exceptions import RTMAMessageError
 import pyrtma.core_defs as cd
 
@@ -60,6 +60,14 @@ class RTMAWebSocketHandler(WebSocketHandler):
 
         WebSocketHandler.__init__(self, socket, addr, server)
 
+    @property
+    def ws_ready_to_send(self):
+        if self.keep_alive:
+            _, wd, _ = select.select([], [self.wfile], [], 0)
+            return self.wfile in wd
+        else:
+            return False
+
     def handle(self):
         """Handle RTMA proxy connection"""
         if not self.handshake_done:
@@ -93,17 +101,14 @@ class RTMAWebSocketHandler(WebSocketHandler):
                     error_json = json.dumps(
                         {"rtma_msg_error": str(e)}, separators=(",", ":")
                     )
-                    if self.keep_alive:
-                        _, wd, _ = select.select([], [self.wfile], [], 0)
-                        if self.wfile in wd:
-                            self.send_message(error_json)
+                    if self.ws_ready_to_send:
+                        self.send_message(error_json)
                     logger.error(e, stack_info=False)
                     continue
 
                 if msg is not None and self.keep_alive:
                     # Pass message thru websocket as json
-                    _, wd, _ = select.select([], [self.wfile], [], 0)
-                    if self.wfile in wd:
+                    if self.ws_ready_to_send:
                         logger.debug(
                             f"Forwarding message type {get_msg_cls(msg.header.msg_type).type_name} to ws"
                         )
@@ -134,8 +139,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         )
         # forward ack
         # Pass message thru websocket as json
-        _, wd, _ = select.select([], [self.wfile], [], 0)
-        if self.wfile in wd:
+        if self.ws_ready_to_send:
             logger.debug(
                 f"Forwarding ACK from connect to ws. Mod ID = {self.proxy.module_id}"
             )
@@ -154,7 +158,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         Args:
             message (str): JSON message string
         """
-        if message == "PING":
+        if message == "PING" and self.ws_ready_to_send:
             self.send_message("PONG")
             return
 
@@ -198,9 +202,12 @@ class RTMAWebSocketHandler(WebSocketHandler):
                 logger.debug(
                     f"Forwarded message type {get_msg_cls(msg.header.msg_type).type_name} from ws"
                 )
-        except RTMAMessageError as e:
-            error_json = json.dumps({"rtma_msg_error": str(e)}, separators=(",", ":"))
-            self.send_message(error_json)
+        except (RTMAMessageError, ClientError) as e:
+            if self.ws_ready_to_send:
+                error_json = json.dumps(
+                    {"rtma_msg_error": str(e)}, separators=(",", ":")
+                )
+                self.send_message(error_json)
             logger.error(e, stack_info=False)
             return
 
@@ -280,8 +287,8 @@ class RTMAWebSocketHandler(WebSocketHandler):
             data.msg_header.msg_type == cd.MT_FAILED_MESSAGE
         ):  # avoid unlikely infinite recursion
             return
-
-        self.proxy.send_message(data)
+        if self.proxy.connected:
+            self.proxy.send_message(data)
 
     def finish(self):
         """Close RTMA connection"""
@@ -348,6 +355,7 @@ def ws_client_connect(client: Dict[str, Any], server: WebMessageManager):
         logger.info(f"Client connected -> id: {client['id']}")
     except:
         pass
+
 
 def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
     """Websocket client disconnect
