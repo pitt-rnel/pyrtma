@@ -20,6 +20,7 @@ from .core_defs import ALL_MESSAGE_TYPES, MAX_MESSAGE_TYPES
 from . import core_defs as cd
 
 from typing import Dict, List, Tuple, Set, Type, Union, Optional
+from itertools import chain
 from dataclasses import dataclass, field
 from collections import defaultdict, Counter
 
@@ -41,6 +42,10 @@ class Module:
     subs: Set[int] = field(default_factory=set)
     connected: bool = False
     is_logger: bool = False
+
+    @property
+    def sub_all(self) -> bool:
+        return ALL_MESSAGE_TYPES in self.subs
 
     def send_message(self, header: MessageHeader, payload: Union[bytes, MessageData]):
         """Send a message
@@ -279,11 +284,19 @@ class MessageManager:
         sub = cd.MDF_SUBSCRIBE.from_buffer(msg.data)
 
         if sub.msg_type == ALL_MESSAGE_TYPES:
-            for msg_type in range(0, MAX_MESSAGE_TYPES + 1):
-                self.subscriptions[msg_type].add(src_module)
-                src_module.subs.add(msg_type)
+            self.subscriptions[sub.msg_type].add(src_module)
+
+            # Clear out the individual subs
+            for sub_type in src_module.subs:
+                self.subscriptions[sub_type].discard(src_module)
+            src_module.subs.clear()
+
+            src_module.subs.add(sub.msg_type)
             self.logger.info(f"SUBSCRIBE- {src_module!s} to ALL_MESSAGE_TYPES")
         else:
+            # Ignore individual msg_types subs when subscribed to ALL_MESSAGE_TYPES
+            if src_module.sub_all:
+                return
             self.subscriptions[sub.msg_type].add(src_module)
             src_module.subs.add(sub.msg_type)
             self.logger.info(f"SUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
@@ -295,16 +308,24 @@ class MessageManager:
             src_module (Module): Unsubscribing module
             msg (Message): incoming UNSUBSCRIBE message
         """
-        sub = cd.MDF_UNSUBSCRIBE.from_buffer(msg.data)
-        # Silently let modules unsubscribe from messages that they are not subscribed to.
-        if sub.msg_type == ALL_MESSAGE_TYPES:
-            for msg_type in src_module.subs:
-                self.subscriptions[msg_type].discard(src_module)
+        unsub = cd.MDF_UNSUBSCRIBE.from_buffer(msg.data)
+
+        if unsub.msg_type == ALL_MESSAGE_TYPES:
+            self.subscriptions[unsub.msg_type].discard(src_module)
+
+            # Clear out the individual subs
+            for sub_type in src_module.subs:
+                self.subscriptions[sub_type].discard(src_module)
+            src_module.subs.clear()
+
             self.logger.info(f"UNSUBSCRIBE- {src_module!s} from ALL_MESSAGE_TYPES")
         else:
-            src_module.subs.discard(sub.msg_type)
-            self.subscriptions[sub.msg_type].discard(src_module)
-            self.logger.info(f"UNSUBSCRIBE- {src_module!s} from MT:{sub.msg_type}")
+            # Ignore individual msg_types unsubs when subscribed to ALL_MESSAGE_TYPES
+            if src_module.sub_all:
+                return
+            self.subscriptions[unsub.msg_type].discard(src_module)
+            src_module.subs.discard(unsub.msg_type)
+            self.logger.info(f"UNSUBSCRIBE- {src_module!s} from MT:{unsub.msg_type}")
 
     def resume_subscription(self, src_module: Module, msg: Message):
         """Resume message subscription
@@ -381,9 +402,9 @@ class MessageManager:
 
         The given message will be forwarded to:
 
-            - all subscribed logger modules (ALWAYS)
+            - all subscribed logger modules
             - if the message has a destination address, and it is subscribed to by that destination it will be forwarded only there
-            - if the message has no destination address, it will be forwarded to all subscribed modules
+            - if the message has no destination address, it will be forwarded to all subscribed modules or those subscribed to ALL_MESSAGE_TYPES
 
         Args:
             header (MessageHeader): Message Header
@@ -406,37 +427,19 @@ class MessageManager:
             )
 
         # Subscriber set for this message type
-        subscribers = self.subscriptions[header.msg_type]
+        subscribers = chain(
+            self.subscriptions[header.msg_type], self.subscriptions[ALL_MESSAGE_TYPES]
+        )
 
-        # Send to a specific destination if it is subscribed
-        if dest_mod_id > 0:
-            for module in subscribers:
-                if module.id == dest_mod_id:
-                    if module.conn in wlist:
-                        try:
-                            module.send_message(header, data)
-                        except ConnectionError as err:
-                            self.logger.error(
-                                f"Connection Error on write to {module!s} - {err!s}"
-                            )
-                            print("x", end="", flush=True)
-                            self.send_failed_message(
-                                module, header, time.perf_counter(), wlist
-                            )
-                        return
-                    else:
-                        print("x", end="", flush=True)
-                        self.send_failed_message(
-                            module, header, time.perf_counter(), wlist
-                        )
-                        return
-            return  # if specified dest_mod_id is not in subscribers, do not send message (other than to loggers)
-
-        # Send to all subscribed modules
         for module in subscribers:
             if module.conn in wlist:
                 try:
-                    module.send_message(header, data)
+                    if (
+                        dest_mod_id == 0
+                        or (module.id == dest_mod_id)
+                        or module.is_logger
+                    ):
+                        module.send_message(header, data)
                 except ConnectionError as err:
                     self.logger.error(
                         f"Connection Error on write to {module!s} - {err!s}"

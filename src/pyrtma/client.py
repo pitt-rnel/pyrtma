@@ -83,8 +83,6 @@ class Client(object):
             header, used by some projects at RNEL. Defaults to False.
     """
 
-    ALL_MESSAGE_TYPES_SET = set(range(0, MAX_MESSAGE_TYPES + 1))
-
     def __init__(
         self,
         module_id: int = 0,
@@ -101,6 +99,7 @@ class Client(object):
         self._connected = False
         self._header_cls = get_header_cls(timecode)
         self._recv_buffer = bytearray(1024**2)
+        self._sub_all = False
         self._subscribed_types: Set[int] = set()
         self._paused_types: Set[int] = set()
         self._dynamic_id: bool = module_id == 0
@@ -168,6 +167,7 @@ class Client(object):
         # reset subscribed and paused types
         self._subscribed_types = set()
         self._paused_types = set()
+        self._sub_all = False
 
         return ack_msg
 
@@ -210,6 +210,7 @@ class Client(object):
             # reset subscribed and paused types
             self._subscribed_types = set()
             self._paused_types = set()
+            self._sub_all = False
 
     @property
     def server(self) -> Tuple[str, int]:
@@ -272,37 +273,60 @@ class Client(object):
         self.send_message(msg)
 
     def _subscription_control(self, msg_list: Iterable[int], ctrl_msg: str):
-        if ALL_MESSAGE_TYPES in msg_list:
-            msg_set = Client.ALL_MESSAGE_TYPES_SET
-        else:
+        all_msg = ALL_MESSAGE_TYPES in msg_list
+
+        if not all_msg:
             msg_set = set(msg_list)
+        else:
+            msg_set = set([ALL_MESSAGE_TYPES])
+
+        # Note: Ignore any sub control for individual msg_types
+        # when subscribed to ALL_MESSAGE_TYPES
+        if self._sub_all and not all_msg:
+            return
 
         msg: MessageData
         if ctrl_msg == "Subscribe":
             msg = cd.MDF_SUBSCRIBE()
-            self._subscribed_types |= msg_set
-            self._paused_types -= msg_set
+            if all_msg:
+                self._subscribed_types = msg_set
+                self._paused_types.clear()
+                self._sub_all = True
+            else:
+                self._subscribed_types |= msg_set
+                self._paused_types -= msg_set
         elif ctrl_msg == "Unsubscribe":
             msg = cd.MDF_UNSUBSCRIBE()
-            self._subscribed_types -= msg_set
-            self._paused_types -= msg_set
+            if all_msg:
+                self._subscribed_types.clear()
+                self._paused_types.clear()
+                self._sub_all = False
+            else:
+                self._subscribed_types -= msg_set
+                self._paused_types -= msg_set
         elif ctrl_msg == "PauseSubscription":
             msg = cd.MDF_PAUSE_SUBSCRIPTION()
-            self._subscribed_types -= msg_set
-            self._paused_types |= msg_set
+            if all_msg:
+                self._subscribed_types.clear()
+                self._paused_types = msg_set
+                self._sub_all = False
+            else:
+                self._subscribed_types -= msg_set
+                self._paused_types |= msg_set
         elif ctrl_msg == "ResumeSubscription":
             msg = cd.MDF_RESUME_SUBSCRIPTION()
-            self._subscribed_types |= msg_set
-            self._paused_types -= msg_set
+            if all_msg:
+                self._subscribed_types = msg_set
+                self._paused_types.clear()
+                self._sub_all = True
+            else:
+                self._subscribed_types |= msg_set
+                self._paused_types -= msg_set
         else:
             raise TypeError("Unknown control message type.")
 
-        if ALL_MESSAGE_TYPES not in msg_list:
-            for msg_type in msg_list:
-                msg.msg_type = msg_type
-                self.send_message(msg)
-        else:
-            msg.msg_type = ALL_MESSAGE_TYPES
+        for msg_type in msg_set:
+            msg.msg_type = msg_type
             self.send_message(msg)
 
     @requires_connection
@@ -348,30 +372,22 @@ class Client(object):
     def subscribe_to_all(self):
         """Subscribe all message types"""
         self.subscribe([ALL_MESSAGE_TYPES])
+        self._sub_all = True
 
     @requires_connection
     def unsubscribe_from_all(self):
         """Unsubscribe from all subscribed types"""
-        if self.subscribed_types == Client.ALL_MESSAGE_TYPES_SET:
-            self.unsubscribe([ALL_MESSAGE_TYPES])
-        else:
-            self.unsubscribe(self.subscribed_types)
+        self.unsubscribe(self.subscribed_types)
 
     @requires_connection
     def pause_all_subscriptions(self):
         """Pause all subscribed types"""
-        if self.subscribed_types == Client.ALL_MESSAGE_TYPES_SET:
-            self.pause_subscription([ALL_MESSAGE_TYPES])
-        else:
-            self.pause_subscription(self.subscribed_types)
+        self.pause_subscription(self.subscribed_types)
 
     @requires_connection
     def resume_all_subscriptions(self):
         """Resume all paused subscriptions"""
-        if self.paused_subscribed_types == Client.ALL_MESSAGE_TYPES_SET:
-            self.resume_subscription([ALL_MESSAGE_TYPES])
-        else:
-            self.resume_subscription(self.paused_subscribed_types)
+        self.resume_subscription(self.paused_subscribed_types)
 
     @contextmanager
     def subscription_context(self, msg_list: Iterable[int]):
@@ -403,6 +419,7 @@ class Client(object):
         Args:
             msg_list (Iterable[int]): A list of numeric message IDs to temporarily unsubscribe to
         """
+
         msg_list = list(msg_list)  # cast arbitrary iterable to list
         for mt in msg_list:
             if mt not in self.subscribed_types:
@@ -612,6 +629,9 @@ class Client(object):
         """
         t0 = time.perf_counter()
         M = self._read_message(timeout, ack, sync_check)
+
+        if self._sub_all:
+            return M
 
         # filter out unsubscribed messages that may still be in queue
         while M and (M.header.msg_type not in self.subscribed_types):
