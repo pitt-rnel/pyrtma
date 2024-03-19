@@ -308,7 +308,7 @@ class Client(object):
             msg = cd.MDF_PAUSE_SUBSCRIPTION()
             if all_msg:
                 self._subscribed_types.clear()
-                self._paused_types = msg_set
+                self._paused_types.clear()
                 self._sub_all = False
             else:
                 self._subscribed_types -= msg_set
@@ -367,12 +367,6 @@ class Client(object):
             msg_list (Iterable[int]): A list of paused message IDs to resubscribe to
         """
         self._subscription_control(msg_list, "ResumeSubscription")
-
-    @requires_connection
-    def subscribe_to_all(self):
-        """Subscribe all message types"""
-        self.subscribe([ALL_MESSAGE_TYPES])
-        self._sub_all = True
 
     @requires_connection
     def unsubscribe_from_all(self):
@@ -482,6 +476,8 @@ class Client(object):
             header.dest_host_id = dest_host_id
             header.dest_mod_id = dest_mod_id
             header.num_data_bytes = 0
+            header.remaining_bytes = 0
+            header.reserved = 0
 
             self._sendall(header)  # type: ignore
 
@@ -540,6 +536,9 @@ class Client(object):
             header.dest_host_id = dest_host_id
             header.dest_mod_id = dest_mod_id
             header.num_data_bytes = ctypes.sizeof(msg_data)
+            header.remaining_bytes = 0
+            header.reserved = 0
+
             try:
                 header.version = msg_data.type_hash
             except AttributeError as e:
