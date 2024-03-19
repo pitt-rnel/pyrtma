@@ -16,10 +16,10 @@ import typing
 from .message import Message, get_msg_cls
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
-from .core_defs import ALL_MESSAGE_TYPES, MAX_MESSAGE_TYPES
+from .core_defs import ALL_MESSAGE_TYPES
 from . import core_defs as cd
 
-from typing import Dict, List, Tuple, Set, Type, Union, Optional
+from typing import Dict, List, Tuple, Set, Type, Union
 from itertools import chain
 from dataclasses import dataclass, field
 from collections import defaultdict, Counter

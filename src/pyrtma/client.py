@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from .message import Message, get_msg_cls
 from .message_data import MessageData
 from .header import MessageHeader, get_header_cls
-from .core_defs import ALL_MESSAGE_TYPES, MAX_MESSAGE_TYPES
+from .core_defs import ALL_MESSAGE_TYPES
 from .exceptions import (
     InvalidMessageDefinition,
     UnknownMessageType,
