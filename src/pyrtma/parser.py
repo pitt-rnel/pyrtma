@@ -17,6 +17,8 @@ from hashlib import sha256
 from typing import List, Optional, Any, Union, Tuple, Dict, Type, Literal
 from dataclasses import dataclass, field, is_dataclass, asdict
 
+from .core_defs import MAX_MESSAGE_TYPES
+
 
 @dataclass
 class NativeType:
@@ -872,7 +874,7 @@ class Parser:
                 f"Message definition id must evaluate to int type not {type(msg_id).__name__}. {name}: {msg_id}"
             )
 
-        if msg_id < 0 or msg_id > 10000:
+        if msg_id < 0 or msg_id > MAX_MESSAGE_TYPES:
             raise RTMASyntaxError(
                 "Value outside of valid range [0 - 10000] for module_id: {name}: {value}"
             )
