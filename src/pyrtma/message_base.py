@@ -1,6 +1,6 @@
 import ctypes
 import json
-from dataclasses import is_dataclass
+
 from typing import TypeVar, Any, Type, Dict
 from .utils.print import print_ctype_array, hexdump
 from .utils.random_fields import _random_struct
