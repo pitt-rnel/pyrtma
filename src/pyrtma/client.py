@@ -695,8 +695,11 @@ class Client(object):
         try:
             data = get_msg_cls(header.msg_type)()
         except UnknownMessageType as e:
-            _ = self._sock.recv(header.num_data_bytes, socket.MSG_WAITALL)
-            raise e
+            mt = header.msg_type
+            raw = self._sock.recv(header.num_data_bytes, socket.MSG_WAITALL)
+            raise UnknownMessageType(
+                f"No message definition found for MT={mt}", header, raw
+            )
 
         type_size = data.type_size
         if type_size == -1:  # not defined for v1 message defs
