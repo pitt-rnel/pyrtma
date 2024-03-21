@@ -1,0 +1,50 @@
+# Legacy QuickLogger Message Definitions
+constants:
+  MAX_LOGGER_FILENAME_LENGTH: 256
+
+message_defs:
+  LM_READY:
+    id: 96
+    fields: null
+
+  LM_STATUS:
+    id: 54
+    fields:
+      is_logging: uint32
+      max_msgs: uint32
+      hdr_bufsz: uint32
+      data_bufsz: uint32
+      msg_count: uint32
+      hdr_total: uint32
+      data_total: uint32
+      ofs_total: uint32
+
+  LM_EXIT:
+    id: 55
+    fields: null
+
+  SAVE_MESSAGE_LOG:
+    id: 56
+    fields:
+      pathname: char[MAX_LOGGER_FILENAME_LENGTH]
+      pathname_length: int
+
+  MESSAGE_LOG_SAVED:
+    id: 57
+    fields: null
+
+  PAUSE_MESSAGE_LOGGING:
+    id: 58
+    fields: null
+
+  RESUME_MESSAGE_LOGGING:
+    id: 59
+    fields: null
+
+  RESET_MESSAGE_LOG:
+    id: 60
+    fields: null
+
+  DUMP_MESSAGE_LOG:
+    id: 61
+    fields: null

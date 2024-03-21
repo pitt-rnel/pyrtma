@@ -3,7 +3,8 @@
 compiler_options:
   IMPORT_COREDEFS: false
 
-imports: null
+imports:
+  - quick_logger.yaml
 
 constants:
   MAX_MODULES: 200
@@ -15,17 +16,23 @@ constants:
   MAX_INTERNAL_TIMERS: 20
   MAX_RTMA_MSG_TYPE: 99
   MAX_RTMA_MODULE_ID: 9
-  MAX_LOGGER_FILENAME_LENGTH: 256
   MAX_CONTIGUOUS_MESSAGE_DATA: 9000
   ALL_MESSAGE_TYPES: 0x7FFFFFFF
+  MAX_CLIENTS: 256
+  MAX_SUBSCRIBERS: 256
+  MAX_SUBS: 256
+  MAX_NAME_LEN: 32
+  MESSAGE_TRAFFIC_SIZE: 64
+  MAX_MESSAGE_SIZE: 65535
+
 
 string_constants: null
 
 aliases:
-  MODULE_ID: short
-  HOST_ID: short
-  MSG_TYPE: int
-  MSG_COUNT: int
+  MODULE_ID: int16
+  HOST_ID: int16
+  MSG_TYPE: int32
+  MSG_COUNT: int32
 
 host_ids:
   LOCAL_HOST: 0
@@ -33,6 +40,7 @@ host_ids:
 
 module_ids:
   MESSAGE_MANAGER: 0
+  DATA_LOGGER: 4
   QUICK_LOGGER: 5
 
 struct_defs:
@@ -46,10 +54,10 @@ struct_defs:
       src_mod_id: MODULE_ID
       dest_host_id: HOST_ID
       dest_mod_id: MODULE_ID
-      num_data_bytes: int
-      remaining_bytes: int
-      is_dynamic: int
-      reserved: unsigned int
+      num_data_bytes: int32
+      remaining_bytes: int32
+      is_dynamic: int32
+      reserved: uint32
 
 message_defs:
   EXIT:
@@ -68,22 +76,32 @@ message_defs:
     id: 6
     fields:
       mod_id: MODULE_ID
-      reserved: short
+      reserved: int16
       msg_type: MSG_TYPE
 
   FAILED_MESSAGE:
     id: 8
     fields:
       dest_mod_id: MODULE_ID
-      reserved: short[3]
+      reserved: int16[3]
       time_of_failure: double
       msg_header: RTMA_MSG_HEADER
+
+  CONNECT_V1:
+    id: 4
+    fields:
+      logger_status: int16
+      daemon_status: int16
 
   CONNECT:
     id: 13
     fields:
-      logger_status: short
-      daemon_status: short
+      logger_status: int16
+      allow_multiple: int16
+      pad: int16
+      mod_id: MODULE_ID
+      pid: int32
+      name: char[MAX_NAME_LEN]
 
   DISCONNECT:
     id: 14
@@ -102,37 +120,7 @@ message_defs:
   MODULE_READY:
     id: 26
     fields:
-      pid: int
-
-  LM_EXIT:
-    id: 55
-    fields: null
-
-  SAVE_MESSAGE_LOG:
-    id: 56
-    fields:
-      pathname: char[MAX_LOGGER_FILENAME_LENGTH]
-      pathname_length: int
-
-  MESSAGE_LOG_SAVED:
-    id: 57
-    fields: null
-
-  PAUSE_MESSAGE_LOGGING:
-    id: 58
-    fields: null
-
-  RESUME_MESSAGE_LOGGING:
-    id: 59
-    fields: null
-
-  RESET_MESSAGE_LOG:
-    id: 60
-    fields: null
-
-  DUMP_MESSAGE_LOG:
-    id: 61
-    fields: null
+      pid: int32
 
   TIMING_MESSAGE:
     id: 80
@@ -144,7 +132,7 @@ message_defs:
   FORCE_DISCONNECT:
     id: 82
     fields:
-      mod_id: int
+      mod_id: int32
 
   PAUSE_SUBSCRIPTION:
     id: 85
@@ -156,6 +144,59 @@ message_defs:
     fields:
       msg_type: MSG_TYPE
 
-  LM_READY:
-    id: 96
-    fields: null
+  MM_LOG:
+    id: 29
+    fields:
+      level: int32
+      pad: int32
+      message: char[256]
+
+  MESSAGE_TRAFFIC:
+    id: 30
+    fields:
+      seqno: uint32
+      sub_seqno: uint32
+      start_timestamp: double
+      end_timestamp: double
+      msg_type: MSG_TYPE[MESSAGE_TRAFFIC_SIZE]
+      msg_count: uint16[MESSAGE_TRAFFIC_SIZE]
+
+  ACTIVE_CLIENTS:
+    id: 31
+    fields:
+      timestamp: double
+      num_clients: int16
+      padding: int16
+      reserved: int32
+      client_mod_id: MODULE_ID[MAX_CLIENTS]
+      client_pid: int32[MAX_CLIENTS]
+    
+  CLIENT_INFO:
+    id: 32
+    fields:
+      addr: char[32]
+      uid: int32
+      pid: int32
+      mod_id: MODULE_ID
+      is_logger: int16
+      is_unique: int16
+      port: uint16
+      name: char[MAX_NAME_LEN]
+
+  CLIENT_CLOSED:
+    id: 33
+    fields:
+      addr: char[32]
+      uid: int32
+      pid: int32
+      mod_id: MODULE_ID
+      is_logger: int16
+      is_unique: int16
+      port: uint16
+      name: char[MAX_NAME_LEN]
+
+  CLIENT_SET_NAME:
+    id: 34
+    fields:
+      name: char[MAX_NAME_LEN]
+

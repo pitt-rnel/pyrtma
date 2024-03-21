@@ -10,6 +10,7 @@ import os
 import ctypes
 from contextlib import contextmanager
 
+from .context import get_context
 from .message import Message, get_msg_cls
 from .message_data import MessageData
 from .header import MessageHeader, get_header_cls
@@ -88,6 +89,7 @@ class Client(object):
         module_id: int = 0,
         host_id: int = 0,
         timecode: bool = False,
+        name: str = "",
     ):
         if module_id >= cd.DYN_MOD_ID_START or module_id < 0:
             raise ValueError(f"Module ID must be >= 0 and < {cd.DYN_MOD_ID_START}")
@@ -104,6 +106,17 @@ class Client(object):
         self._paused_types: Set[int] = set()
         self._dynamic_id: bool = module_id == 0
         self._sock = socket.socket()
+
+        # Auto-assign a name if module-id is defined
+        ctx = get_context()
+        if name == "" and module_id != 0:
+            for k, v in ctx["mid"].items():
+                if v == module_id:
+                    self._name = k
+            else:
+                self._name = name
+        else:
+            self._name = name
 
     def __del__(self):
         if self._connected:
@@ -146,7 +159,7 @@ class Client(object):
             self._sock.close()
             raise SocketOptionError from e
 
-    def _connect_helper(self, logger_status: bool, daemon_status: bool) -> Message:
+    def _connect_helper(self, logger_status: bool, allow_multiple: bool) -> Message:
         """Called internally after _socket_connect"""
 
         # Reset the module_id to zero for dynamic assignment
@@ -155,7 +168,10 @@ class Client(object):
 
         msg = cd.MDF_CONNECT()
         msg.logger_status = int(logger_status)
-        msg.daemon_status = int(daemon_status)
+        msg.allow_multiple = int(allow_multiple)
+        msg.pid = os.getpid()
+        msg.mod_id = self.module_id
+        msg.name = self.name
 
         self.send_message(msg)
         ack_msg = self._wait_for_acknowledgement()
@@ -171,11 +187,15 @@ class Client(object):
 
         return ack_msg
 
+    @property
+    def name(self) -> str:
+        return self._name
+
     def connect(
         self,
         server_name: str = "localhost:7111",
         logger_status: bool = False,
-        daemon_status: bool = False,
+        allow_multiple: bool = False,
     ):
         """Connect to message manager server
 
@@ -185,7 +205,7 @@ class Client(object):
             logger_status (optional): Flag to declare client as a logger module.
                 Logger modules are automatically subscribed to all message types.
                 Defaults to False.
-            daemon_status (optional): Flag to declare client as a daemon. Defaults to False.
+            allow_multiple (optional): Flag to declare client can have multiple instances. Defaults to False.
 
         Raises:
             MessageManagerNotFound: Unable to connect to message manager
@@ -194,7 +214,7 @@ class Client(object):
         # Setup the underlying socket connection
         self._socket_connect(server_name)
 
-        ack = self._connect_helper(logger_status, daemon_status)
+        ack = self._connect_helper(logger_status, allow_multiple)
 
     def disconnect(self):
         """Disconnect from message manager server"""
@@ -814,7 +834,7 @@ def client_context(
     host_id: int = 0,
     timecode: bool = False,
     logger_status: bool = False,
-    daemon_status: bool = False,
+    allow_multiple: bool = False,
 ):
     """Context manager function to simplify initializing a pyrtma Client
 
@@ -834,13 +854,13 @@ def client_context(
         logger_status (optional): Flag to declare client as a logger module.
             Logger modules are automatically subscribed to all message types.
             Defaults to False.
-        daemon_status (optional): Flag to declare client as a daemon. Defaults to False.
+        allow_multiple (optional): Flag to declare client can have multiple instances. Defaults to False.
 
     Yields:
         Client: initialized pyrtma Client object
     """
     c = Client(module_id, host_id, timecode)
-    c.connect(server_name, logger_status, daemon_status)
+    c.connect(server_name, logger_status, allow_multiple)
     if msg_list:
         c.subscribe(msg_list)
     c.send_module_ready()
