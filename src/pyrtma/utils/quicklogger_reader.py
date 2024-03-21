@@ -5,6 +5,7 @@ import sys
 import importlib
 import pyrtma
 import pyrtma.message
+import pyrtma.context
 import json
 import warnings
 
@@ -130,7 +131,7 @@ class QLReader:
                 mod = importlib.import_module(fname)
 
         # Cache all the user defined objects associated with the data
-        self.context = mod.get_context()
+        self.context = pyrtma.context.get_context()
 
         try:
             messages = []

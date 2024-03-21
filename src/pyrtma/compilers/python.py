@@ -229,7 +229,7 @@ class PyDefCompiler:
 
         from pyrtma.message_base import MessageBase, MessageMeta
         from pyrtma.message_data import MessageData
-        from pyrtma.context import update_context
+        from pyrtma.context import update_context, get_context
         from pyrtma.validators import Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float, Double, Struct, IntArray, FloatArray, StructArray, Char, String, Byte, ByteArray
         
         """
