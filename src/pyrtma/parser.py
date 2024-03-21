@@ -876,7 +876,7 @@ class Parser:
 
         if msg_id < 0 or msg_id > MAX_MESSAGE_TYPES:
             raise RTMASyntaxError(
-                "Value outside of valid range [0 - 10000] for module_id: {name}: {value}"
+                f"Value outside of valid range [0 - 10000] for module_id: {name}: {msg_id}"
             )
 
         for mt in self.message_ids.values():
