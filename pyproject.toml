@@ -46,3 +46,5 @@ pyrtma = ["py.typed", "*.yaml"]
 message_manager = "pyrtma.manager:main"
 web_manager = "pyrtma.web_manager:main"
 rtma_compiler = "pyrtma.compile:main"
+data_logger = "pyrtma.data_logger.__main__:main"
+data_logger_cli = "pyrtma.data_logger.cli:main"

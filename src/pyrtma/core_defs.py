@@ -34,6 +34,7 @@ COMPILED_PYRTMA_VERSION: str = "2.2.2"
 check_compiled_version(COMPILED_PYRTMA_VERSION)
 
 # Constants
+MAX_DATA_SETS: int = 6
 MAX_LOGGER_FILENAME_LENGTH: int = 256
 MAX_MODULES: int = 200
 DYN_MOD_ID_START: int = 100
@@ -71,6 +72,27 @@ MID_DATA_LOGGER: int = 4
 MID_QUICK_LOGGER: int = 5
 
 # Message Type IDs
+MT_DATA_LOGGER_STATUS: int = 62
+MT_DATA_LOGGER_STATUS_REQUEST: int = 63
+MT_ADD_DATA_COLLECTION: int = 64
+MT_REMOVE_DATA_COLLECTION: int = 65
+MT_ADD_DATA_SET: int = 66
+MT_REMOVE_DATA_SET: int = 67
+MT_DATA_COLLECTION_CONFIG_REQUEST: int = 68
+MT_DATA_COLLECTION_CONFIG: int = 69
+MT_DATA_COLLECTION_STARTED: int = 70
+MT_DATA_COLLECTION_STOPPED: int = 71
+MT_DATA_COLLECTION_SAVED: int = 72
+MT_DATA_LOGGER_START: int = 73
+MT_DATA_LOGGER_STOP: int = 74
+MT_DATA_LOGGER_PAUSE: int = 75
+MT_DATA_LOGGER_RESUME: int = 76
+MT_DATA_LOGGER_RESET: int = 77
+MT_DATA_LOGGER_ERROR: int = 78
+MT_DATA_LOGGER_METADATA_UPDATE: int = 79
+MT_DATA_LOGGER_METADATA_REQUEST: int = 87
+MT_DATA_LOGGER_METADATA: int = 88
+MT_DATA_LOG_TEST_2048: int = 89
 MT_LM_READY: int = 96
 MT_LM_STATUS: int = 54
 MT_LM_EXIT: int = 55
@@ -104,6 +126,72 @@ MT_CLIENT_SET_NAME: int = 34
 
 
 # Struct Definitions
+class DATA_SET(MessageBase, metaclass=MessageMeta):
+    type_name: ClassVar[str] = "DATA_SET"
+    type_hash: ClassVar[int] = 0xB267DE7B
+    type_size: ClassVar[int] = 452
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_SET:\n  fields:\n    name: char[32]\n    sub_dir_fmt: char[128]\n    file_name_fmt: char[128]\n    formatter: char[32]\n    subdivide_interval: int32\n    msg_types: int32[32]'"
+
+    name: String = String(32)
+    sub_dir_fmt: String = String(128)
+    file_name_fmt: String = String(128)
+    formatter: String = String(32)
+    subdivide_interval: Int32 = Int32()
+    msg_types: IntArray[Int32] = IntArray(Int32, 32)
+
+
+class DATA_COLLECTION(MessageBase, metaclass=MessageMeta):
+    type_name: ClassVar[str] = "DATA_COLLECTION"
+    type_hash: ClassVar[int] = 0x9FA9C51A
+    type_size: ClassVar[int] = 3132
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_COLLECTION:\n  fields:\n    name: char[32]\n    base_path: char[256]\n    dir_fmt: char[128]\n    num_data_sets: int16\n    unused: int16\n    data_sets: DATA_SET[MAX_DATA_SETS]'"
+
+    name: String = String(32)
+    base_path: String = String(256)
+    dir_fmt: String = String(128)
+    num_data_sets: Int16 = Int16()
+    unused: Int16 = Int16()
+    data_sets: StructArray[DATA_SET] = StructArray(DATA_SET, 6)
+
+
+class DATA_SET_INFO(MessageBase, metaclass=MessageMeta):
+    type_name: ClassVar[str] = "DATA_SET_INFO"
+    type_hash: ClassVar[int] = 0x65972A16
+    type_size: ClassVar[int] = 452
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_SET_INFO:\n  fields:\n    name: char[32]\n    formatter: char[32]\n    save_path: char[256]\n    subdivide_interval: int32\n    msg_types: int32[32]'"
+
+    name: String = String(32)
+    formatter: String = String(32)
+    save_path: String = String(256)
+    subdivide_interval: Int32 = Int32()
+    msg_types: IntArray[Int32] = IntArray(Int32, 32)
+
+
+class DATA_COLLECTION_INFO(MessageBase, metaclass=MessageMeta):
+    type_name: ClassVar[str] = "DATA_COLLECTION_INFO"
+    type_hash: ClassVar[int] = 0x8FAF0CA3
+    type_size: ClassVar[int] = 3004
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_COLLECTION_INFO:\n  fields:\n    name: char[32]\n    save_path: char[256]\n    num_data_sets: int16\n    unused: int16\n    data_sets: DATA_SET_INFO[MAX_DATA_SETS]'"
+
+    name: String = String(32)
+    save_path: String = String(256)
+    num_data_sets: Int16 = Int16()
+    unused: Int16 = Int16()
+    data_sets: StructArray[DATA_SET_INFO] = StructArray(DATA_SET_INFO, 6)
+
+
 class RTMA_MSG_HEADER(MessageBase, metaclass=MessageMeta):
     type_name: ClassVar[str] = "RTMA_MSG_HEADER"
     type_hash: ClassVar[int] = 0x35CC5A39
@@ -128,6 +216,273 @@ class RTMA_MSG_HEADER(MessageBase, metaclass=MessageMeta):
 
 
 # Message Definitions
+@pyrtma.message_def
+class MDF_DATA_LOGGER_STATUS(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 62
+    type_name: ClassVar[str] = "DATA_LOGGER_STATUS"
+    type_hash: ClassVar[int] = 0x9E922E93
+    type_size: ClassVar[int] = 24
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_LOGGER_STATUS:\n  id: 62\n  fields:\n    timestamp: double\n    elapsed_time: double\n    is_recording: int32\n    is_paused: int32'"
+
+    timestamp: Double = Double()
+    elapsed_time: Double = Double()
+    is_recording: Int32 = Int32()
+    is_paused: Int32 = Int32()
+
+
+@pyrtma.message_def
+class MDF_DATA_LOGGER_STATUS_REQUEST(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 63
+    type_name: ClassVar[str] = "DATA_LOGGER_STATUS_REQUEST"
+    type_hash: ClassVar[int] = 0x168B0652
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[str] = "'DATA_LOGGER_STATUS_REQUEST:\n  id: 63\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_ADD_DATA_COLLECTION(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 64
+    type_name: ClassVar[str] = "ADD_DATA_COLLECTION"
+    type_hash: ClassVar[int] = 0xA50C4BC8
+    type_size: ClassVar[int] = 3132
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'ADD_DATA_COLLECTION:\n  id: 64\n  fields:\n    collection: DATA_COLLECTION'"
+
+    collection: Struct[DATA_COLLECTION] = Struct(DATA_COLLECTION)
+
+
+@pyrtma.message_def
+class MDF_REMOVE_DATA_COLLECTION(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 65
+    type_name: ClassVar[str] = "REMOVE_DATA_COLLECTION"
+    type_hash: ClassVar[int] = 0x5430DCF2
+    type_size: ClassVar[int] = 32
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'REMOVE_DATA_COLLECTION:\n  id: 65\n  fields:\n    collection_name: char[32]'"
+
+    collection_name: String = String(32)
+
+
+@pyrtma.message_def
+class MDF_ADD_DATA_SET(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 66
+    type_name: ClassVar[str] = "ADD_DATA_SET"
+    type_hash: ClassVar[int] = 0xB368D74F
+    type_size: ClassVar[int] = 484
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'ADD_DATA_SET:\n  id: 66\n  fields:\n    collection_name: char[32]\n    data_set: DATA_SET'"
+
+    collection_name: String = String(32)
+    data_set: Struct[DATA_SET] = Struct(DATA_SET)
+
+
+@pyrtma.message_def
+class MDF_REMOVE_DATA_SET(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 67
+    type_name: ClassVar[str] = "REMOVE_DATA_SET"
+    type_hash: ClassVar[int] = 0x0BC39C04
+    type_size: ClassVar[int] = 64
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'REMOVE_DATA_SET:\n  id: 67\n  fields:\n    collection_name: char[32]\n    name: char[32]'"
+
+    collection_name: String = String(32)
+    name: String = String(32)
+
+
+@pyrtma.message_def
+class MDF_DATA_COLLECTION_CONFIG_REQUEST(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 68
+    type_name: ClassVar[str] = "DATA_COLLECTION_CONFIG_REQUEST"
+    type_hash: ClassVar[int] = 0x1779D826
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_COLLECTION_CONFIG_REQUEST:\n  id: 68\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_DATA_COLLECTION_CONFIG(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 69
+    type_name: ClassVar[str] = "DATA_COLLECTION_CONFIG"
+    type_hash: ClassVar[int] = 0xC08D3576
+    type_size: ClassVar[int] = 3132
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_COLLECTION_CONFIG:\n  id: 69\n  fields:\n    collection: DATA_COLLECTION'"
+
+    collection: Struct[DATA_COLLECTION] = Struct(DATA_COLLECTION)
+
+
+@pyrtma.message_def
+class MDF_DATA_COLLECTION_STARTED(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 70
+    type_name: ClassVar[str] = "DATA_COLLECTION_STARTED"
+    type_hash: ClassVar[int] = 0x415737CA
+    type_size: ClassVar[int] = 3004
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_COLLECTION_STARTED:\n  id: 70\n  fields:\n    collection: DATA_COLLECTION_INFO'"
+
+    collection: Struct[DATA_COLLECTION_INFO] = Struct(DATA_COLLECTION_INFO)
+
+
+@pyrtma.message_def
+class MDF_DATA_COLLECTION_STOPPED(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 71
+    type_name: ClassVar[str] = "DATA_COLLECTION_STOPPED"
+    type_hash: ClassVar[int] = 0xDA1AF3AE
+    type_size: ClassVar[int] = 3004
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_COLLECTION_STOPPED:\n  id: 71\n  fields:\n    collection: DATA_COLLECTION_INFO'"
+
+    collection: Struct[DATA_COLLECTION_INFO] = Struct(DATA_COLLECTION_INFO)
+
+
+@pyrtma.message_def
+class MDF_DATA_COLLECTION_SAVED(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 72
+    type_name: ClassVar[str] = "DATA_COLLECTION_SAVED"
+    type_hash: ClassVar[int] = 0x74528518
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[str] = "'DATA_COLLECTION_SAVED:\n  id: 72\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_DATA_LOGGER_START(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 73
+    type_name: ClassVar[str] = "DATA_LOGGER_START"
+    type_hash: ClassVar[int] = 0x982D6942
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[str] = "'DATA_LOGGER_START:\n  id: 73\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_DATA_LOGGER_STOP(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 74
+    type_name: ClassVar[str] = "DATA_LOGGER_STOP"
+    type_hash: ClassVar[int] = 0xA5B66B24
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[str] = "'DATA_LOGGER_STOP:\n  id: 74\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_DATA_LOGGER_PAUSE(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 75
+    type_name: ClassVar[str] = "DATA_LOGGER_PAUSE"
+    type_hash: ClassVar[int] = 0x9A556835
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[str] = "'DATA_LOGGER_PAUSE:\n  id: 75\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_DATA_LOGGER_RESUME(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 76
+    type_name: ClassVar[str] = "DATA_LOGGER_RESUME"
+    type_hash: ClassVar[int] = 0x18811751
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[str] = "'DATA_LOGGER_RESUME:\n  id: 76\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_DATA_LOGGER_RESET(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 77
+    type_name: ClassVar[str] = "DATA_LOGGER_RESET"
+    type_hash: ClassVar[int] = 0x1EB32BEB
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[str] = "'DATA_LOGGER_RESET:\n  id: 77\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_DATA_LOGGER_ERROR(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 78
+    type_name: ClassVar[str] = "DATA_LOGGER_ERROR"
+    type_hash: ClassVar[int] = 0xAD3B4A67
+    type_size: ClassVar[int] = 512
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_LOGGER_ERROR:\n  id: 78\n  fields:\n    msg: char[512]'"
+
+    msg: String = String(512)
+
+
+@pyrtma.message_def
+class MDF_DATA_LOGGER_METADATA_UPDATE(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 79
+    type_name: ClassVar[str] = "DATA_LOGGER_METADATA_UPDATE"
+    type_hash: ClassVar[int] = 0x3C673526
+    type_size: ClassVar[int] = 512
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_LOGGER_METADATA_UPDATE:\n  id: 79\n  fields:\n    json: char[512]'"
+
+    json: String = String(512)
+
+
+@pyrtma.message_def
+class MDF_DATA_LOGGER_METADATA_REQUEST(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 87
+    type_name: ClassVar[str] = "DATA_LOGGER_METADATA_REQUEST"
+    type_hash: ClassVar[int] = 0x2D068003
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_LOGGER_METADATA_REQUEST:\n  id: 87\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_DATA_LOGGER_METADATA(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 88
+    type_name: ClassVar[str] = "DATA_LOGGER_METADATA"
+    type_hash: ClassVar[int] = 0x3852789B
+    type_size: ClassVar[int] = 1024
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_LOGGER_METADATA:\n  id: 88\n  fields:\n    json: char[1024]'"
+
+    json: String = String(1024)
+
+
+@pyrtma.message_def
+class MDF_DATA_LOG_TEST_2048(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 89
+    type_name: ClassVar[str] = "DATA_LOG_TEST_2048"
+    type_hash: ClassVar[int] = 0x651D3C98
+    type_size: ClassVar[int] = 2048
+    type_source: ClassVar[str] = "data_logger.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'DATA_LOG_TEST_2048:\n  id: 89\n  fields:\n    raw: char[2048]'"
+
+    raw: String = String(2048)
+
+
 @pyrtma.message_def
 class MDF_LM_READY(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 96

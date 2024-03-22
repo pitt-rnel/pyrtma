@@ -4,6 +4,7 @@ compiler_options:
   IMPORT_COREDEFS: false
 
 imports:
+  - data_logger.yaml
   - quick_logger.yaml
 
 constants:
