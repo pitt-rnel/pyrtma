@@ -1,3 +1,11 @@
+import sys
+
+if sys.version_info.major < 3:
+    raise ImportError("DataLogger requires python 3.10 or greater")
+
+if sys.version_info.minor < 10:
+    raise ImportError("DataLogger requires python 3.10 or greater")
+
 from .data_logger import DataLogger
 
 
