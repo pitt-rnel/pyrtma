@@ -23,6 +23,7 @@ constants:
   MAX_SUBSCRIBERS: 256
   MAX_SUBS: 256
   MAX_NAME_LEN: 32
+  MAX_LOG_LENGTH: 1024
   MESSAGE_TRAFFIC_SIZE: 64
   MAX_MESSAGE_SIZE: 65535
 
@@ -201,3 +202,68 @@ message_defs:
     fields:
       name: char[MAX_NAME_LEN]
 
+  RTMA_LOG:
+    id: 40
+    fields: # based on python LogRecord
+      time: double # time of log, from time.time() (unix time)
+      level: int32 # 0 NOTSET, 10 DEBUG, 20 INFO, 30 WARNING, 40 ERROR, 50 CRITICAL
+      lineno: int32 # source code line number where message was logged
+      name: char[128] # name of the logger or module
+      pathname: char[512] # name of source file
+      funcname: char[256] # name of function making log
+      message: char[MAX_LOG_LENGTH] # formatted message
+
+  RTMA_LOG_CRITICAL:
+    id: 41
+    fields: # based on python LogRecord
+      time: double # time of log, from time.time() (unix time)
+      level: int32 # 0 NOTSET, 10 DEBUG, 20 INFO, 30 WARNING, 40 ERROR, 50 CRITICAL
+      lineno: int32 # source code line number where message was logged
+      name: char[128] # name of the logger or module
+      pathname: char[512] # name of source file
+      funcname: char[256] # name of function making log
+      message: char[MAX_LOG_LENGTH] # formatted message
+
+  RTMA_LOG_ERROR:
+    id: 42
+    fields: # based on python LogRecord
+      time: double # time of log, from time.time() (unix time)
+      level: int32 # 0 NOTSET, 10 DEBUG, 20 INFO, 30 WARNING, 40 ERROR, 50 CRITICAL
+      lineno: int32 # source code line number where message was logged
+      name: char[128] # name of the logger or module
+      pathname: char[512] # name of source file
+      funcname: char[256] # name of function making log
+      message: char[MAX_LOG_LENGTH] # formatted message
+
+  RTMA_LOG_WARNING:
+    id: 43
+    fields: # based on python LogRecord
+      time: double # time of log, from time.time() (unix time)
+      level: int32 # 0 NOTSET, 10 DEBUG, 20 INFO, 30 WARNING, 40 ERROR, 50 CRITICAL
+      lineno: int32 # source code line number where message was logged
+      name: char[128] # name of the logger or module
+      pathname: char[512] # name of source file
+      funcname: char[256] # name of function making log
+      message: char[MAX_LOG_LENGTH] # formatted message
+
+  RTMA_LOG_INFO:
+    id: 44
+    fields: # based on python LogRecord
+      time: double # time of log, from time.time() (unix time)
+      level: int32 # 0 NOTSET, 10 DEBUG, 20 INFO, 30 WARNING, 40 ERROR, 50 CRITICAL
+      lineno: int32 # source code line number where message was logged
+      name: char[128] # name of the logger or module
+      pathname: char[512] # name of source file
+      funcname: char[256] # name of function making log
+      message: char[MAX_LOG_LENGTH] # formatted message
+
+  RTMA_LOG_DEBUG:
+    id: 45
+    fields: # based on python LogRecord
+      time: double # time of log, from time.time() (unix time)
+      level: int32 # 0 NOTSET, 10 DEBUG, 20 INFO, 30 WARNING, 40 ERROR, 50 CRITICAL
+      lineno: int32 # source code line number where message was logged
+      name: char[128] # name of the logger or module
+      pathname: char[512] # name of source file
+      funcname: char[256] # name of function making log
+      message: char[MAX_LOG_LENGTH] # formatted message

@@ -8,6 +8,11 @@ import select
 import time
 import os
 import ctypes
+import logging
+import logging.handlers
+
+from pathlib import Path
+from rich.logging import RichHandler
 from contextlib import contextmanager
 
 from .context import get_context
@@ -31,6 +36,7 @@ from . import core_defs as cd
 
 from functools import wraps
 from typing import (
+    Dict,
     Optional,
     Tuple,
     Type,
@@ -41,6 +47,7 @@ from typing import (
     Any,
     TypeVar,
     cast,
+    Union,
 )
 from warnings import warn
 
@@ -55,6 +62,310 @@ __all__ = [
     "Client",
     "client_context",
 ]
+
+
+RTMA_LOG_MSG = Union[
+    cd.MDF_RTMA_LOG,
+    cd.MDF_RTMA_LOG_DEBUG,
+    cd.MDF_RTMA_LOG_INFO,
+    cd.MDF_RTMA_LOG_WARNING,
+    cd.MDF_RTMA_LOG_ERROR,
+    cd.MDF_RTMA_LOG_CRITICAL,
+]
+
+
+class RTMALogHandler(logging.Handler):
+    """Logging handler class that writes logs as rtma messages"""
+
+    log_map: Dict[int, Type[RTMA_LOG_MSG]] = {
+        10: cd.MDF_RTMA_LOG_DEBUG,
+        20: cd.MDF_RTMA_LOG_INFO,
+        30: cd.MDF_RTMA_LOG_WARNING,
+        40: cd.MDF_RTMA_LOG_ERROR,
+        50: cd.MDF_RTMA_LOG_CRITICAL,
+    }
+
+    def __init__(self, client: "Client"):
+        logging.Handler.__init__(self)
+        self.client = client
+
+    def close(self):
+        logging.Handler.close(self)
+
+    def get_log_msg_cls(self, level) -> Type[RTMA_LOG_MSG]:
+        return RTMALogHandler.log_map.get(level) or cd.MDF_RTMA_LOG
+
+    def gen_log_msg(self, record: logging.LogRecord) -> RTMA_LOG_MSG:
+        # See https://docs.python.org/3/library/logging.html#logrecord-attributes
+        # for LogRecord attributes that could be added
+        msg = self.get_log_msg_cls(record.levelno)()
+        msg.name = record.name
+        msg.time = record.created
+        msg.level = record.levelno
+        msg.lineno = record.lineno
+        msg.pathname = record.pathname
+        msg.funcname = record.funcName
+        msg.message = record.getMessage()
+        return msg
+
+    def emit(self, record: logging.LogRecord):
+        try:
+            if self.client.connected:
+                msg = self.gen_log_msg(record)
+                self.client.send_message(msg)
+        except Exception:
+            self.handleError(record)
+
+
+class ClientLogger(object):
+    def __init__(
+        self,
+        log_name: str,
+        rtma_client: "Client",
+        level: int = logging.NOTSET,
+    ):
+        # default formatter
+        default_formatter = logging.Formatter(
+            "%(levelname)s - %(asctime)s - %(name)s - %(message)s"
+        )
+        self._console_formatter = default_formatter
+        self._file_formatter = default_formatter
+
+        # initialize private attributes
+        self._logger = logging.getLogger(log_name)
+        self._logger.propagate = True
+        self.level = level
+        self._console_level = level
+        self._rtma_level = level
+        self._file_level = level
+        self._rtma_client = rtma_client
+        self._rtma_handler = self.init_rtma_handler()
+        self._file_handler = None
+        self._console_handler = self.init_console_handler()
+
+        # default values for which handlers will be enabled
+        self._enable_rtma = True
+        self._logger.addHandler(self._rtma_handler)
+
+        self._enable_console = True
+        self._logger.addHandler(self._console_handler)
+
+        self._enable_file = False
+        self._log_filename: Union[str, Path] = ""
+
+        # alias logger methods
+        self.debug = self.logger.debug
+        self.info = self.logger.info
+        self.warning = self.logger.warning
+        self.warn = self.logger.warn
+        self.error = self.logger.error
+        self.exception = self.logger.exception
+        self.critical = self.logger.critical
+
+    def __del__(self):
+        if self._console_handler:
+            self._logger.removeHandler(self._console_handler)
+
+        if self._file_handler:
+            self._logger.removeHandler(self._file_handler)
+            self._file_handler = None
+
+        if self._rtma_handler:
+            self._logger.removeHandler(self._rtma_handler)
+
+    @property
+    def logger(self) -> logging.Logger:  # read only
+        return self._logger
+
+    @property
+    def log_name(self) -> str:  # read only
+        return self.logger.name
+
+    @property
+    def console_handler(self) -> Optional[logging.Handler]:  # read only
+        if self._enable_console:
+            for handler in self._logger.handlers:
+                if handler is self._console_handler:
+                    return self._console_handler
+        return None
+
+    @property
+    def rtma_handler(self) -> Optional[RTMALogHandler]:  # read only
+        if self._enable_rtma:
+            for handler in self._logger.handlers:
+                if handler is self._rtma_handler:
+                    return self._rtma_handler
+
+    @property
+    def file_handler(self) -> Optional[logging.FileHandler]:  # read only
+        if self._enable_file and self._file_handler is not None:
+            for handler in self._logger.handlers:
+                if handler is self._file_handler:
+                    return self._file_handler
+        return None
+
+    @property
+    def enable_console(self) -> bool:
+        return self._enable_console
+
+    @enable_console.setter
+    def enable_console(self, value: bool):
+        if self._enable_console != bool(value):  # value changed
+            if self.console_handler:
+                if bool(value):
+                    # add handler
+                    self.logger.addHandler(self.console_handler)
+                else:
+                    # disable handler
+                    self.logger.removeHandler(self.console_handler)
+            self._enable_console = bool(value)
+
+    @property
+    def enable_rtma(self) -> bool:
+        return self._enable_rtma
+
+    @enable_rtma.setter
+    def enable_rtma(self, value: bool):
+        if self._enable_rtma != bool(value):  # value changed
+            if self.rtma_handler:
+                if bool(value):
+                    # add handler
+                    self.logger.addHandler(self._rtma_handler)
+                else:
+                    # disable handler
+                    self.logger.removeHandler(self._rtma_handler)
+            self._enable_rtma = bool(value)
+
+    @property
+    def enable_file(self) -> bool:
+        return self._enable_file
+
+    @enable_file.setter
+    def enable_file(self, value: bool):
+        if self._enable_file != bool(value):  # value changed
+            if bool(value):
+                if self._file_handler:
+                    self.logger.removeHandler(self._file_handler)
+                    self._file_handler = None
+
+                # add handler
+                self._file_handler = self.init_file_handler()
+                self.logger.addHandler(self._file_handler)
+            else:
+                # disable handler
+                if self._file_handler:
+                    self.logger.removeHandler(self._file_handler)
+                    self._file_handler = None
+
+            self._enable_file = bool(value)
+
+    @property
+    def level(self) -> int:
+        return self.logger.level
+
+    @level.setter
+    def level(self, value: int):
+        self._logger.setLevel(value)
+
+    @property
+    def log_filename(self) -> Union[str, Path]:
+        if self.file_handler:
+            return self.file_handler.baseFilename
+        else:
+            return self._log_filename
+
+    @log_filename.setter
+    def log_filename(self, value: Union[str, Path]):
+        self._log_filename = value
+
+    @property
+    def console_level(self) -> int:
+        if self.console_handler:
+            self._console_level = self.console_handler.level
+        return self._console_level
+
+    @console_level.setter
+    def console_level(self, value: int):
+        if self.console_handler:
+            self.console_handler.level = value
+        self._console_level = value
+
+    @property
+    def rtma_level(self) -> int:
+        if self.rtma_handler:
+            self._rtma_level = self.rtma_handler.level
+        return self._rtma_level
+
+    @rtma_level.setter
+    def rtma_level(self, value: int):
+        if self.rtma_handler:
+            self.rtma_handler.level = value
+        self._rtma_level = value
+
+    @property
+    def file_level(self) -> int:
+        if self.file_handler:
+            self._file_level = self.file_handler.level
+        return self._file_level
+
+    @file_level.setter
+    def file_level(self, value: int):
+        if self.file_handler:
+            self.file_handler.level = value
+        self._file_level = value
+
+    @property
+    def console_formatter(self) -> Optional[logging.Formatter]:
+        if self.console_handler:
+            self._console_formatter = self.console_handler.formatter
+        return self._console_formatter
+
+    @console_formatter.setter
+    def console_formatter(self, value: Optional[logging.Formatter]):
+        if self.console_handler:
+            self.console_handler.setFormatter(value)
+        self._console_formatter = value
+
+    @property
+    def file_formatter(self) -> Optional[logging.Formatter]:
+        if self.file_handler:
+            self._file_formatter = self.file_handler.formatter
+        return self._file_formatter
+
+    @file_formatter.setter
+    def file_formatter(self, value: Optional[logging.Formatter]):
+        if self._file_handler:
+            self._file_handler.setFormatter(value)
+        self._file_formatter = value
+
+    def init_console_handler(self) -> logging.Handler:
+        console_handler = RichHandler()
+        console_handler.name = "Console Handler"
+        console_handler.setLevel(self._console_level)
+        console_handler.setFormatter(self._console_formatter)
+
+        return console_handler
+
+    def init_rtma_handler(self):
+        rtma_handler = RTMALogHandler(self._rtma_client)
+        rtma_handler.name = "RTMA Handler"
+        rtma_handler.setLevel(self._rtma_level)
+
+        return rtma_handler
+
+    def init_file_handler(self) -> logging.FileHandler:
+        file_handler = logging.handlers.RotatingFileHandler(
+            self._log_filename, maxBytes=3 * (1024**2), backupCount=3
+        )
+        file_handler.name = "File Handler"
+        file_handler.setLevel(self._file_level)
+        file_handler.setFormatter(self._file_formatter)
+
+        return file_handler
+
+    def __repr__(self):
+        level = logging.getLevelName(self.logger.getEffectiveLevel())
+        return "<%s %s (%s)>" % (self.__class__.__name__, self.log_name, level)
 
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -117,6 +428,29 @@ class Client(object):
                 self._name = name
         else:
             self._name = name
+
+        self._logger = ClientLogger(
+            self._name or f"Module({module_id})", self, logging.INFO
+        )
+
+    @property
+    def logger(self) -> ClientLogger:
+        return self._logger
+
+    def debug(self, msg: str, *args):
+        return self._logger.debug(msg, *args)
+
+    def info(self, msg: str, *args):
+        return self._logger.info(msg, *args)
+
+    def warn(self, msg: str, *args):
+        return self._logger.warn(msg, *args)
+
+    def error(self, msg: str, *args):
+        return self._logger.error(msg, *args)
+
+    def critical(self, msg: str, *args):
+        return self._logger.critical(msg, *args)
 
     def __del__(self):
         if self._connected:
@@ -186,6 +520,14 @@ class Client(object):
         self._sub_all = False
 
         return ack_msg
+
+    @property
+    def log_level(self) -> int:
+        return self._logger.level
+
+    @log_level.setter
+    def log_level(self, level: int):
+        self._logger.level = level
 
     @property
     def name(self) -> str:

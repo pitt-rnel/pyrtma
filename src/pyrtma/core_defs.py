@@ -51,6 +51,7 @@ MAX_CLIENTS: int = 256
 MAX_SUBSCRIBERS: int = 256
 MAX_SUBS: int = 256
 MAX_NAME_LEN: int = 32
+MAX_LOG_LENGTH: int = 1024
 MESSAGE_TRAFFIC_SIZE: int = 64
 MAX_MESSAGE_SIZE: int = 65535
 
@@ -123,6 +124,12 @@ MT_ACTIVE_CLIENTS: int = 31
 MT_CLIENT_INFO: int = 32
 MT_CLIENT_CLOSED: int = 33
 MT_CLIENT_SET_NAME: int = 34
+MT_RTMA_LOG: int = 40
+MT_RTMA_LOG_CRITICAL: int = 41
+MT_RTMA_LOG_ERROR: int = 42
+MT_RTMA_LOG_WARNING: int = 43
+MT_RTMA_LOG_INFO: int = 44
+MT_RTMA_LOG_DEBUG: int = 45
 
 
 # Struct Definitions
@@ -902,6 +909,126 @@ class MDF_CLIENT_SET_NAME(MessageData, metaclass=MessageMeta):
     ] = "'CLIENT_SET_NAME:\n  id: 34\n  fields:\n    name: char[MAX_NAME_LEN]'"
 
     name: String = String(32)
+
+
+@pyrtma.message_def
+class MDF_RTMA_LOG(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 40
+    type_name: ClassVar[str] = "RTMA_LOG"
+    type_hash: ClassVar[int] = 0x975F197F
+    type_size: ClassVar[int] = 1936
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'RTMA_LOG:\n  id: 40\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+
+    time: Double = Double()
+    level: Int32 = Int32()
+    lineno: Int32 = Int32()
+    name: String = String(128)
+    pathname: String = String(512)
+    funcname: String = String(256)
+    message: String = String(1024)
+
+
+@pyrtma.message_def
+class MDF_RTMA_LOG_CRITICAL(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 41
+    type_name: ClassVar[str] = "RTMA_LOG_CRITICAL"
+    type_hash: ClassVar[int] = 0xDEBCA500
+    type_size: ClassVar[int] = 1936
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'RTMA_LOG_CRITICAL:\n  id: 41\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+
+    time: Double = Double()
+    level: Int32 = Int32()
+    lineno: Int32 = Int32()
+    name: String = String(128)
+    pathname: String = String(512)
+    funcname: String = String(256)
+    message: String = String(1024)
+
+
+@pyrtma.message_def
+class MDF_RTMA_LOG_ERROR(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 42
+    type_name: ClassVar[str] = "RTMA_LOG_ERROR"
+    type_hash: ClassVar[int] = 0x45D2E328
+    type_size: ClassVar[int] = 1936
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'RTMA_LOG_ERROR:\n  id: 42\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+
+    time: Double = Double()
+    level: Int32 = Int32()
+    lineno: Int32 = Int32()
+    name: String = String(128)
+    pathname: String = String(512)
+    funcname: String = String(256)
+    message: String = String(1024)
+
+
+@pyrtma.message_def
+class MDF_RTMA_LOG_WARNING(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 43
+    type_name: ClassVar[str] = "RTMA_LOG_WARNING"
+    type_hash: ClassVar[int] = 0xE6399270
+    type_size: ClassVar[int] = 1936
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'RTMA_LOG_WARNING:\n  id: 43\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+
+    time: Double = Double()
+    level: Int32 = Int32()
+    lineno: Int32 = Int32()
+    name: String = String(128)
+    pathname: String = String(512)
+    funcname: String = String(256)
+    message: String = String(1024)
+
+
+@pyrtma.message_def
+class MDF_RTMA_LOG_INFO(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 44
+    type_name: ClassVar[str] = "RTMA_LOG_INFO"
+    type_hash: ClassVar[int] = 0x607B81E9
+    type_size: ClassVar[int] = 1936
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'RTMA_LOG_INFO:\n  id: 44\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+
+    time: Double = Double()
+    level: Int32 = Int32()
+    lineno: Int32 = Int32()
+    name: String = String(128)
+    pathname: String = String(512)
+    funcname: String = String(256)
+    message: String = String(1024)
+
+
+@pyrtma.message_def
+class MDF_RTMA_LOG_DEBUG(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 45
+    type_name: ClassVar[str] = "RTMA_LOG_DEBUG"
+    type_hash: ClassVar[int] = 0x45EDC532
+    type_size: ClassVar[int] = 1936
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[
+        str
+    ] = "'RTMA_LOG_DEBUG:\n  id: 45\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+
+    time: Double = Double()
+    level: Int32 = Int32()
+    lineno: Int32 = Int32()
+    name: String = String(128)
+    pathname: String = String(512)
+    funcname: String = String(256)
+    message: String = String(1024)
 
 
 # User Context
