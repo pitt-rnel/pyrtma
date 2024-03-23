@@ -89,14 +89,14 @@ message_defs:
       time_of_failure: double
       msg_header: RTMA_MSG_HEADER
 
-  CONNECT_V1:
-    id: 4
+  CONNECT:
+    id: 13
     fields:
       logger_status: int16
       daemon_status: int16
 
-  CONNECT:
-    id: 13
+  CONNECT_V2:
+    id: 4
     fields:
       logger_status: int16
       allow_multiple: int16

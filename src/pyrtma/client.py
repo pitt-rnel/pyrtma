@@ -500,7 +500,8 @@ class Client(object):
         if self._dynamic_id:
             self._module_id = 0
 
-        msg = cd.MDF_CONNECT()
+        msg = cd.MDF_CONNECT_V2()
+        msg.type_id = cd.MT_CONNECT  # Override the type_id
         msg.logger_status = int(logger_status)
         msg.allow_multiple = int(allow_multiple)
         msg.pid = os.getpid()

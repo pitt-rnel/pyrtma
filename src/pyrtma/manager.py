@@ -265,9 +265,9 @@ class MessageManager:
         Returns:
             bool: success code
         """
-        if isinstance(msg.data, cd.MDF_CONNECT_V1):
+        if isinstance(msg.data, cd.MDF_CONNECT):
             v1 = 1
-        elif isinstance(msg.data, cd.MDF_CONNECT):
+        elif isinstance(msg.data, cd.MDF_CONNECT_V2):
             v1 = 0
         else:
             raise RuntimeError(
@@ -377,14 +377,14 @@ class MessageManager:
             src_module.subs.clear()
 
             src_module.subs.add(sub.msg_type)
-            self.logger.info(f"SUBSCRIBE- {src_module!s} to ALL_MESSAGE_TYPES")
+            self.logger.debug(f"SUBSCRIBE- {src_module!s} to ALL_MESSAGE_TYPES")
         else:
             # Ignore individual msg_types subs when subscribed to ALL_MESSAGE_TYPES
             if src_module.sub_all:
                 return
             self.subscriptions[sub.msg_type].add(src_module)
             src_module.subs.add(sub.msg_type)
-            self.logger.info(f"SUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
+            self.logger.debug(f"SUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
 
     def remove_subscription(self, src_module: Module, msg: Message):
         """Remove message subscription
@@ -403,14 +403,14 @@ class MessageManager:
                 self.subscriptions[sub_type].discard(src_module)
             src_module.subs.clear()
 
-            self.logger.info(f"UNSUBSCRIBE- {src_module!s} from ALL_MESSAGE_TYPES")
+            self.logger.debug(f"UNSUBSCRIBE- {src_module!s} from ALL_MESSAGE_TYPES")
         else:
             # Ignore individual msg_types unsubs when subscribed to ALL_MESSAGE_TYPES
             if src_module.sub_all:
                 return
             self.subscriptions[unsub.msg_type].discard(src_module)
             src_module.subs.discard(unsub.msg_type)
-            self.logger.info(f"UNSUBSCRIBE- {src_module!s} from MT:{unsub.msg_type}")
+            self.logger.debug(f"UNSUBSCRIBE- {src_module!s} from MT:{unsub.msg_type}")
 
     def resume_subscription(self, src_module: Module, msg: Message):
         """Resume message subscription
@@ -740,8 +740,8 @@ class MessageManager:
         hdr = self.header
         # Check for connect version
         if hdr.msg_type == cd.MT_CONNECT:
-            if hdr.num_data_bytes == cd.MDF_CONNECT_V1.type_size:
-                data = cd.MDF_CONNECT_V1.from_buffer(self.data_buffer)
+            if hdr.num_data_bytes == cd.MDF_CONNECT_V2.type_size:
+                data = cd.MDF_CONNECT_V2.from_buffer(self.data_buffer)
             else:
                 data = cd.MDF_CONNECT.from_buffer(self.data_buffer)
             return Message(hdr, data)

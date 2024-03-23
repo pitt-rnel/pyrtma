@@ -108,8 +108,8 @@ MT_KILL: int = 1
 MT_ACKNOWLEDGE: int = 2
 MT_FAIL_SUBSCRIBE: int = 6
 MT_FAILED_MESSAGE: int = 8
-MT_CONNECT_V1: int = 4
 MT_CONNECT: int = 13
+MT_CONNECT_V2: int = 4
 MT_DISCONNECT: int = 14
 MT_SUBSCRIBE: int = 15
 MT_UNSUBSCRIBE: int = 16
@@ -660,30 +660,30 @@ class MDF_FAILED_MESSAGE(MessageData, metaclass=MessageMeta):
 
 
 @pyrtma.message_def
-class MDF_CONNECT_V1(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4
-    type_name: ClassVar[str] = "CONNECT_V1"
-    type_hash: ClassVar[int] = 0x01994636
+class MDF_CONNECT(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 13
+    type_name: ClassVar[str] = "CONNECT"
+    type_hash: ClassVar[int] = 0xF4FDCFF3
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[
         str
-    ] = "'CONNECT_V1:\n  id: 4\n  fields:\n    logger_status: int16\n    daemon_status: int16'"
+    ] = "'CONNECT:\n  id: 13\n  fields:\n    logger_status: int16\n    daemon_status: int16'"
 
     logger_status: Int16 = Int16()
     daemon_status: Int16 = Int16()
 
 
 @pyrtma.message_def
-class MDF_CONNECT(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 13
-    type_name: ClassVar[str] = "CONNECT"
-    type_hash: ClassVar[int] = 0xB1246771
+class MDF_CONNECT_V2(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 4
+    type_name: ClassVar[str] = "CONNECT_V2"
+    type_hash: ClassVar[int] = 0xE1B49C8A
     type_size: ClassVar[int] = 44
     type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[
         str
-    ] = "'CONNECT:\n  id: 13\n  fields:\n    logger_status: int16\n    allow_multiple: int16\n    pad: int16\n    mod_id: MODULE_ID\n    pid: int32\n    name: char[MAX_NAME_LEN]'"
+    ] = "'CONNECT_V2:\n  id: 4\n  fields:\n    logger_status: int16\n    allow_multiple: int16\n    pad: int16\n    mod_id: MODULE_ID\n    pid: int32\n    name: char[MAX_NAME_LEN]'"
 
     logger_status: Int16 = Int16()
     allow_multiple: Int16 = Int16()
