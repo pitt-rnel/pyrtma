@@ -167,9 +167,9 @@ class MessageManager:
         self.t_last_message_count = time.perf_counter()
         self.min_timing_message_period = 0.9
 
-        self.last_client_info: float = 0.0
+        self.last_client_info: float = time.perf_counter()
         self.traffic_counter: typing.Counter[int] = Counter()
-        self.traffic_start: float = 0.0
+        self.traffic_start: float = time.perf_counter()
         self.traffic_seqno: int = 1
 
         # Disable Nagle Algorithm
@@ -211,14 +211,19 @@ class MessageManager:
     def _configure_logging(self) -> None:
         # Logging Configuration
         self.logger.propagate = False
-        self.logger.setLevel(LOG_LEVEL)
+        if self._debug:
+            level = logging.DEBUG
+        else:
+            level = LOG_LEVEL
+
+        self.logger.setLevel(level)
         formatter = logging.Formatter(
             "%(levelname)s - %(asctime)s - %(name)s - %(message)s"
         )
 
         # Console Log
         console = logging.StreamHandler()
-        console.setLevel(LOG_LEVEL)
+        console.setLevel(level)
         console.setFormatter(formatter)
         self.logger.addHandler(console)
 
@@ -667,8 +672,8 @@ class MessageManager:
         self.send_message(data)
 
     def send_traffic(self):
+        self.logger.debug("MESSAGE_TRAFFIC")
         data = cd.MDF_MESSAGE_TRAFFIC()
-
         now = time.perf_counter()
         sub_seqno = 1
         nsent = 0
@@ -700,6 +705,7 @@ class MessageManager:
         self.traffic_seqno += 1
 
     def send_client_close(self, module: Module):
+        self.logger.debug("CLIENT_CLOSE")
         msg = cd.MDF_CLIENT_CLOSED()
         msg.uid = module.uid
         msg.pid = module.pid
@@ -712,6 +718,7 @@ class MessageManager:
         self.send_message(msg)
 
     def send_client_info(self, module: Module):
+        self.logger.debug("CLIENT_INFO")
         msg = cd.MDF_CLIENT_INFO()
         msg.uid = module.uid
         msg.pid = module.pid
@@ -724,16 +731,20 @@ class MessageManager:
         self.send_message(msg)
 
     def send_active_clients(self):
+        self.logger.debug("ACTIVE_CLIENTS")
         msg = cd.MDF_ACTIVE_CLIENTS()
         msg.timestamp = time.perf_counter()
 
-        for i, module in enumerate(self.modules.values()):
+        for i, (sock, module) in enumerate(self.modules.items()):
+            if sock == self.listen_socket:
+                continue
             msg.client_mod_id[i] = module.mod_id
             msg.client_pid[i] = module.pid
             self.send_client_info(module)
 
-        msg.num_clients = len(self.modules)
+        msg.num_clients = len(self.modules) - 1
         self.send_message(msg)
+        self.last_client_info = msg.timestamp
 
     @property
     def message(self) -> Message:
@@ -840,21 +851,21 @@ class MessageManager:
                         if got_msg:
                             self.process_message(src)
 
-                    now = time.perf_counter()
+                now = time.perf_counter()
 
-                    if (
-                        self.b_send_msg_timing
-                        and (now - self.t_last_message_count)
-                        > self.min_timing_message_period
-                    ):
-                        self.send_timing_message()
-                        self.t_last_message_count = now
+                if (
+                    self.b_send_msg_timing
+                    and (now - self.t_last_message_count)
+                    > self.min_timing_message_period
+                ):
+                    self.send_timing_message()
+                    self.t_last_message_count = now
 
-                    if (now - self.traffic_start) > self.TRAFFIC_INTERVAL:
-                        self.send_traffic()
+                if (now - self.traffic_start) > self.TRAFFIC_INTERVAL:
+                    self.send_traffic()
 
-                    if (now - self.last_client_info) > self.INFO_INTERVAL:
-                        self.send_active_clients()
+                if (now - self.last_client_info) > self.INFO_INTERVAL:
+                    self.send_active_clients()
 
         except KeyboardInterrupt:
             self.logger.info("Stopping Message Manager")
