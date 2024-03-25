@@ -42,7 +42,7 @@ class DataLogger:
             cd.MT_DATA_LOGGER_METADATA_REQUEST,
         ]
 
-        self.mod.subscribe([cd.ALL_MESSAGE_TYPES])
+        self.mod.subscribe(self.ctrl_msg_types)
 
         self.mod.send_module_ready()
 
@@ -152,6 +152,7 @@ class DataLogger:
                     "Cannot start collection while recording in progresss."
                 )
 
+            self.mod.subscribe([cd.ALL_MESSAGE_TYPES])
             self.collection.start()
 
             msg = cd.MDF_DATA_COLLECTION_STARTED()
@@ -169,7 +170,10 @@ class DataLogger:
     def stop_logging(self):
         if self.collection:
             if self._recording:
+                self.mod.unsubscribe([cd.ALL_MESSAGE_TYPES])
                 self.collection.stop()
+                self.mod.subscribe(self.ctrl_msg_types)
+
                 msg = cd.MDF_DATA_COLLECTION_STOPPED()
                 msg.collection = self.collection_info()
                 self.mod.send_message(msg)

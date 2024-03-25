@@ -29,7 +29,11 @@ class DataFormatter(ABC):
     def write(self, wbuf: list[pyrtma.Message]):
         self.fd.writelines(self.format_message(msg) for msg in wbuf)
 
-    def finalize(self):
+    def finalize(self, wbuf: list[pyrtma.Message]):
+        # Write the last bit of data
+        self.write(wbuf)
+
+        # Write an optional footer
         if footer := self.format_footer():
             self.fd.write(footer)
 

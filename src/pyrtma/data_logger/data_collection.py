@@ -144,21 +144,12 @@ class DataCollection:
             while not self.write_finished.wait(0.250):
                 pass
 
-        for ds in self.datasets:
-            ds.collection_stopped = True
-
-        self.trigger_write()
-
-        # Wait for any remaining data
-        if self.write_to_disk.is_set():
-            while not self.write_finished.wait(0.250):
-                pass
-
         self.write_to_disk.clear()
         self.write_finished.clear()
 
         # Close all the Data Set files in the collection
         for ds in self.datasets:
+            ds.collection_stopped = True
             ds.stop()
             ds.close()
 

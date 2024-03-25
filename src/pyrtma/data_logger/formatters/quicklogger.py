@@ -27,6 +27,7 @@ class QLFormatter(DataFormatter):
         self.ofs = 0
         self.offsets: list[int] = []
         self.msgbuf = []
+        self.num_writes = 0
 
         self.data_tmp = tempfile.NamedTemporaryFile()
         # print(f"TempFile: {self.data_tmp.name}")
@@ -57,6 +58,7 @@ class QLFormatter(DataFormatter):
         # Note: This data gets copied and appended at the end
         # to preserve the QL v1 format
         self.data_tmp.writelines(bytes(msg.data) for msg in wbuf)
+        self.num_writes += 1
 
     def write_offsets(self):
         ofs = b"".join(x.to_bytes(4, byteorder=sys.byteorder) for x in self.offsets)
@@ -74,7 +76,17 @@ class QLFormatter(DataFormatter):
         # Append the message data tempfile to the data set file
         shutil.copyfileobj(self.data_tmp, self.fd)
 
-    def finalize(self):
-        self.write_offsets()
-        self.copy_data()
+    def finalize(self, wbuf: list[pyrtma.Message]):
+        if self.num_writes > 0:
+            self.write(wbuf)
+            self.write_offsets()
+            self.copy_data()
+        else:
+            # Skip copying data to tmp file if
+            # our collection only needs one write
+            super().write(wbuf)
+            self.update_file_header()
+            self.write_offsets()
+            self.fd.writelines(bytes(msg.data) for msg in wbuf)
+
         self.data_tmp.close()

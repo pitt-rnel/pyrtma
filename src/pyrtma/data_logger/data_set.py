@@ -102,7 +102,7 @@ class DataSet:
 
     def subdivide(self):
         self.sub_index += 1
-        self.formatter.finalize()
+        self.formatter.finalize(self.wbuf)
 
         if self.fd:
             self.fd.close()
@@ -120,7 +120,8 @@ class DataSet:
         self.formatter = self.formatter_cls(self.fd)
 
     def stop(self):
-        self.formatter.finalize()
+        self.stage_for_write()
+        self.formatter.finalize(self.wbuf)
 
     def close(self):
         if self.fd is not None:
@@ -133,6 +134,7 @@ class DataSet:
 
     def write(self):
         self.formatter.write(self.wbuf)
+        self.wbuf.clear()
 
         if not self.collection_stopped and self.subdivide_flag:
             self.subdivide_flag = False
