@@ -520,6 +520,8 @@ class Client(object):
         self._paused_types = set()
         self._sub_all = False
 
+        self.logger._logger.name = self._name or f"Module({self._module_id})"
+
         return ack_msg
 
     @property
