@@ -13,6 +13,7 @@ import ctypes
 import os
 import typing
 
+from .validators import disable_message_validation
 from .message import Message, get_msg_cls
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
@@ -682,7 +683,6 @@ class MessageManager:
 
         out_header = self.header_cls()
         data = cd.MDF_FAILED_MESSAGE()
-
         out_header.msg_type = cd.MT_FAILED_MESSAGE
         out_header.send_time = time.perf_counter()
         out_header.src_mod_id = cd.MID_MESSAGE_MANAGER
@@ -840,73 +840,74 @@ class MessageManager:
     def run(self):
         """Start the message manager server"""
         try:
-            while self._keep_running:
-                rlist, _, _ = select.select(
-                    self.modules.keys(), [], [], self.read_timeout
-                )
+            with disable_message_validation():
+                while self._keep_running:
+                    rlist, _, _ = select.select(
+                        self.modules.keys(), [], [], self.read_timeout
+                    )
 
-                # Check for an incoming connection request
-                if len(rlist) > 0:
-                    try:
-                        rlist.remove(self.listen_socket)
-                        (conn, address) = self.listen_socket.accept()
-                        self.logger.info(
-                            f"New connection accepted from {address[0]}:{address[1]}"
-                        )
+                    # Check for an incoming connection request
+                    if len(rlist) > 0:
+                        try:
+                            rlist.remove(self.listen_socket)
+                            (conn, address) = self.listen_socket.accept()
+                            self.logger.info(
+                                f"New connection accepted from {address[0]}:{address[1]}"
+                            )
 
-                        # Disable Nagle Algorithm
-                        conn.setsockopt(
-                            socket.getprotobyname("tcp"), socket.TCP_NODELAY, 1
-                        )
+                            # Disable Nagle Algorithm
+                            conn.setsockopt(
+                                socket.getprotobyname("tcp"), socket.TCP_NODELAY, 1
+                            )
 
-                        self.sockets.append(conn)
-                        self.modules[conn] = Module(
-                            self.generate_uid(), conn, address, self.header_cls
-                        )
-                    except ValueError:
-                        pass
+                            self.sockets.append(conn)
+                            self.modules[conn] = Module(
+                                self.generate_uid(), conn, address, self.header_cls
+                            )
+                        except ValueError:
+                            pass
 
-                    # Randomly select the order of sockets with data.
-                    random.shuffle(rlist)
+                        # Randomly select the order of sockets with data.
+                        random.shuffle(rlist)
 
-                    # Check whichs clients are ready to receive data
-                    self.wlist.clear()
-                    if rlist:
-                        _, self.wlist, _ = select.select(
-                            [], self.modules.keys(), [], self.write_timeout
-                        )
+                        # Check whichs clients are ready to receive data
+                        self.wlist.clear()
+                        if rlist:
+                            _, self.wlist, _ = select.select(
+                                [], self.modules.keys(), [], self.write_timeout
+                            )
 
-                    for client_socket in rlist:
-                        # Check that module is still active
-                        src = self.modules.get(client_socket)
-                        if src:
-                            try:
-                                got_msg = self.read_message(client_socket)
-                            except ConnectionError as err:
-                                self.disconnect_module(src)
-                                self.logger.error(
-                                    f"Connection Error on read, disconnecting  {src!s} - {err!s}"
-                                )
-                                continue
+                        for client_socket in rlist:
+                            # Check that module is still active
+                            src = self.modules.get(client_socket)
+                            if src:
+                                try:
+                                    got_msg = self.read_message(client_socket)
+                                except ConnectionError as err:
+                                    self.disconnect_module(src)
+                                    self.logger.error(
+                                        f"Connection Error on read, disconnecting  {src!s} - {err!s}"
+                                    )
+                                    continue
 
-                            if got_msg:
-                                self.process_message(src)
+                                if got_msg:
+                                    self.process_message(src)
 
-                now = time.perf_counter()
+                    now = time.perf_counter()
 
-                if (
-                    self.b_send_msg_timing
-                    and (now - self.t_last_message_count)
-                    > self.min_timing_message_period
-                ):
-                    self.send_timing_message()
-                    self.t_last_message_count = now
+                    if (
+                        self.b_send_msg_timing
+                        and (now - self.t_last_message_count)
+                        > self.min_timing_message_period
+                    ):
+                        self.send_timing_message()
+                        self.t_last_message_count = now
 
-                if (now - self.traffic_start) > self.TRAFFIC_INTERVAL:
-                    self.send_traffic()
+                    if (now - self.traffic_start) > self.TRAFFIC_INTERVAL:
+                        self.send_traffic()
 
-                if (now - self.last_client_info) > self.INFO_INTERVAL:
-                    self.send_active_clients()
+                    if (now - self.last_client_info) > self.INFO_INTERVAL:
+                        self.send_active_clients()
 
         except KeyboardInterrupt:
             self.logger.info("Stopping Message Manager")
@@ -944,15 +945,16 @@ def main():
     else:
         ip_addr = ""  # socket.INADDR_ANY
 
-    msg_mgr = MessageManager(
-        ip_address=ip_addr,
-        port=args.port,
-        timecode=args.timecode,
-        debug=args.debug,
-        send_msg_timing=(not args.disable_timing_msg),
-    )
+    with disable_message_validation():
+        msg_mgr = MessageManager(
+            ip_address=ip_addr,
+            port=args.port,
+            timecode=args.timecode,
+            debug=args.debug,
+            send_msg_timing=(not args.disable_timing_msg),
+        )
 
-    msg_mgr.run()
+        msg_mgr.run()
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ from .message import Message, get_msg_cls
 from .message_data import MessageData
 from .header import MessageHeader, get_header_cls
 from .core_defs import ALL_MESSAGE_TYPES
+from .validators import disable_message_validation
 from .exceptions import (
     InvalidMessageDefinition,
     UnknownMessageType,
@@ -891,29 +892,30 @@ class Client(object):
             )  # blocking
 
         if writefds:
-            header = self._header_cls()
-            header.msg_type = msg_data.type_id
-            header.msg_count = self._msg_count
-            header.send_time = time.perf_counter()
-            header.recv_time = 0.0
-            header.src_host_id = self._host_id
-            header.src_mod_id = self._module_id
-            header.dest_host_id = dest_host_id
-            header.dest_mod_id = dest_mod_id
-            header.num_data_bytes = ctypes.sizeof(msg_data)
-            header.remaining_bytes = 0
-            header.reserved = 0
+            with disable_message_validation():
+                header = self._header_cls()
+                header.msg_type = msg_data.type_id
+                header.msg_count = self._msg_count
+                header.send_time = time.perf_counter()
+                header.recv_time = 0.0
+                header.src_host_id = self._host_id
+                header.src_mod_id = self._module_id
+                header.dest_host_id = dest_host_id
+                header.dest_mod_id = dest_mod_id
+                header.num_data_bytes = ctypes.sizeof(msg_data)
+                header.remaining_bytes = 0
+                header.reserved = 0
 
-            try:
-                header.version = msg_data.type_hash
-            except AttributeError as e:
-                if not hasattr(msg_data, "type_hash"):
-                    warn(
-                        "Message class is missing type_hash. V1 message defs are deprecated.",
-                        FutureWarning,
-                    )
-                else:
-                    raise e
+                try:
+                    header.version = msg_data.type_hash
+                except AttributeError as e:
+                    if not hasattr(msg_data, "type_hash"):
+                        warn(
+                            "Message class is missing type_hash. V1 message defs are deprecated.",
+                            FutureWarning,
+                        )
+                    else:
+                        raise e
 
             self._sendall(header)  # type: ignore
             if header.num_data_bytes > 0:
