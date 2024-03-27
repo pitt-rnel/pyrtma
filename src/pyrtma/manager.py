@@ -103,6 +103,29 @@ class Module:
         return self.conn.__hash__()
 
 
+class MMLogHandler(logging.Handler):
+    """Logging handler class that send MM_LOG messages"""
+
+    def __init__(self, mm: "MessageManager"):
+        logging.Handler.__init__(self)
+        self.mm = mm
+
+    def close(self):
+        logging.Handler.close(self)
+
+    def emit(self, record: logging.LogRecord):
+        try:
+            msg = cd.MDF_MM_LOG()
+            msg.level = record.levelno
+            if self.formatter:
+                msg.message = self.formatter.format(record)
+            else:
+                msg.message = record.getMessage()
+            self.mm.send_message(msg)
+        except Exception:
+            self.handleError(record)
+
+
 class MessageManager:
     """MessageManager class
 
@@ -226,6 +249,12 @@ class MessageManager:
         console.setLevel(level)
         console.setFormatter(formatter)
         self.logger.addHandler(console)
+
+        # RTMA Log
+        mm_log = MMLogHandler(self)
+        mm_log.setLevel(level)
+        mm_log.setFormatter(formatter)
+        self.logger.addHandler(mm_log)
 
     def assign_module_id(self) -> int:
         """Assign module ID dynamically to connecting module
@@ -461,10 +490,10 @@ class MessageManager:
 
         if nbytes != self.header_size:
             mod = self.modules[sock]
+            self.remove_module(mod)
             self.logger.warning(
                 f"DROPPING - {mod!s} - No header returned from sock.recv_into."
             )
-            self.remove_module(mod)
             return False
 
         # Read Data Section
@@ -474,10 +503,10 @@ class MessageManager:
 
             if nbytes != data_size:
                 mod = self.modules[sock]
+                self.remove_module(mod)
                 self.logger.warning(
                     f"DROPPING - {mod!s} - No data returned from sock.recv_into."
                 )
-                self.remove_module(mod)
                 return False
 
         return True
@@ -521,11 +550,15 @@ class MessageManager:
             return
 
         # Subscriber set for this message type
-        subscribers = chain(
-            self.subscriptions[header.msg_type], self.subscriptions[ALL_MESSAGE_TYPES]
+        subscribers = list(
+            chain(
+                self.subscriptions[header.msg_type],
+                self.subscriptions[ALL_MESSAGE_TYPES],
+            )
         )
 
-        for module in subscribers:
+        for n in range(len(subscribers)):
+            module = subscribers[n]
             if module.conn in self.wlist:
                 try:
                     if (
@@ -536,6 +569,7 @@ class MessageManager:
                         module.send_message(header, data)
                         module.drops = 0
                 except ConnectionError as err:
+                    self.remove_module(module)
                     self.logger.error(
                         f"Connection Error on write to {module!s} - {err!s}"
                     )
@@ -549,6 +583,7 @@ class MessageManager:
                     module.send_message(header, data)
                     module.drops = 0
                 except ConnectionError as err:
+                    self.remove_module(module)
                     self.logger.error(
                         f"Connection Error on write to {module!s} - {err!s}"
                     )
@@ -583,6 +618,7 @@ class MessageManager:
                 module.send_message(header, payload)
                 module.drops = 0
             except ConnectionError as err:
+                self.remove_module(module)
                 self.logger.error(f"Connection Error on write to {module!s} - {err!s}")
                 print("x", end="", flush=True)
                 # this could result in infinite recursion,
@@ -616,6 +652,7 @@ class MessageManager:
         try:
             src_module.send_message(header, b"")
         except ConnectionError as err:
+            self.remove_module(src_module)
             self.logger.error(f"Connection Error on write to {src_module!s} - {err!s}")
             print("x", end="", flush=True)
             self.send_failed_message(src_module, header, time.perf_counter())
@@ -636,6 +673,13 @@ class MessageManager:
             header (MessageHeader): Header of failed message
             time_of_failure (float): Time of send failure
         """
+        # Avoid infinite recursion
+        if header.msg_type in (
+            cd.MT_FAILED_MESSAGE,
+            cd.MT_MM_LOG,
+        ):
+            return
+
         out_header = self.header_cls()
         data = cd.MDF_FAILED_MESSAGE()
 
@@ -650,11 +694,6 @@ class MessageManager:
         # Copy the values into the RTMA_MSG_HEADER
         for fname, ftype in data.msg_header._fields_:
             setattr(data.msg_header, fname, getattr(header, fname))
-
-        if (
-            data.msg_header.msg_type == cd.MT_FAILED_MESSAGE
-        ):  # avoid unlikely infinite recursion
-            return
 
         # send to logger modules AND modules subscribed to FAILED_MESSAGE
         self.forward_message(out_header, data)
@@ -838,18 +877,20 @@ class MessageManager:
                         )
 
                     for client_socket in rlist:
-                        src = self.modules[client_socket]
-                        try:
-                            got_msg = self.read_message(client_socket)
-                        except ConnectionError as err:
-                            self.logger.error(
-                                f"Connection Error on read, disconnecting  {src!s} - {err!s}"
-                            )
-                            self.disconnect_module(src)
-                            continue
+                        # Check that module is still active
+                        src = self.modules.get(client_socket)
+                        if src:
+                            try:
+                                got_msg = self.read_message(client_socket)
+                            except ConnectionError as err:
+                                self.disconnect_module(src)
+                                self.logger.error(
+                                    f"Connection Error on read, disconnecting  {src!s} - {err!s}"
+                                )
+                                continue
 
-                        if got_msg:
-                            self.process_message(src)
+                            if got_msg:
+                                self.process_message(src)
 
                 now = time.perf_counter()
 
