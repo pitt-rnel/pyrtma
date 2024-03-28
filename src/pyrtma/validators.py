@@ -78,16 +78,20 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
         self._private_name = "_" + name
 
     @abstractmethod
-    def __get__(self, obj: _P, objtype=None): ...
+    def __get__(self, obj: _P, objtype=None):
+        ...
 
     @abstractmethod
-    def __set__(self, obj: _P, value: _V): ...
+    def __set__(self, obj: _P, value: _V):
+        ...
 
     @abstractmethod
-    def validate_one(self, value: _V): ...
+    def validate_one(self, value: _V):
+        ...
 
     @abstractmethod
-    def validate_many(self, value: Iterable[_V]): ...
+    def validate_many(self, value: Iterable[_V]):
+        ...
 
 
 class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMeta):
@@ -119,10 +123,11 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
         if not isinstance(value, numbers.Number):
             raise TypeError(f"Expected {value} to be a float")
 
-        if math.isinf(self._ctype(value).value):
-            raise ValueError(
-                f"The {value} can not be represented as a {type(self).__name__}"
-            )
+        # Commented this check to help performance
+        # if math.isinf(self._ctype(value).value):
+        #     raise ValueError(
+        #         f"The {value} can not be represented as a {type(self).__name__}"
+        #     )
 
     def validate_many(self, value: Iterable[float]):
         """Validate multiple float values
@@ -134,13 +139,21 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
             TypeError: Wrong type
             ValueError: Value cannot be precisely represented with this datatype
         """
-        if any(not isinstance(v, numbers.Number) for v in value):
+
+        # Check first value only
+        if not isinstance(next(iter(value)), numbers.Number):
             raise TypeError(f"Expected {value!r} to be a float.")
 
-        if any(math.isinf(self._ctype(v).value) for v in value):
-            raise ValueError(
-                f"{value} contains value(s) that can not be represented as a {type(self).__name__}"
-            )
+        # Commented this check to help performance
+        # Check all values
+        # if any(not isinstance(v, numbers.Number) for v in value):
+        #     raise TypeError(f"Expected {value!r} to be a float.")
+
+        # Commented this check to help performance
+        # if any(math.isinf(self._ctype(v).value) for v in value):
+        #     raise ValueError(
+        #         f"{value} contains value(s) that can not be represented as a {type(self).__name__}"
+        #     )
 
     def __repr__(self):
         return f"{type(self).__name__} at 0x{id(self):016X}"
@@ -170,7 +183,8 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
     _max: ClassVar[int] = 2**8 - 1
 
     @abstractmethod
-    def __init__(self, *args): ...
+    def __init__(self, *args):
+        ...
 
     @property
     def size(self) -> int:
@@ -209,10 +223,10 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
         if not isinstance(value, numbers.Integral):
             raise TypeError(f"Expected {value} to be an int")
 
-        if value < self._min:
-            raise ValueError(f"Expected {value} to be at least {self._min}")
-        if value > self._max:
-            raise ValueError(f"Expected {value} to be no more than {self._max}")
+        if not (self._min <= value <= self._max):
+            raise ValueError(
+                f"Expected {value} to be in range of {self._min} to {self._max}"
+            )
 
     def validate_many(self, value: Iterable[int]):
         """Validate multiple integer values
@@ -224,14 +238,20 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
             TypeError: Wrong type
             ValueError: Integer out of range for this datatype
         """
-        if any(not isinstance(v, numbers.Integral) for v in value):
+
+        # Check first value only
+        if not isinstance(next(iter(value)), numbers.Integral):
             raise TypeError(f"Expected {value} to be an int.")
 
-        if any((v < self._min for v in value)):
-            raise ValueError(f"Expected {value} to be {self._min} or greater.")
+        # Commented this check to help performance
+        # Check all values
+        # if any(not isinstance(v, numbers.Integral) for v in value):
+        #     raise TypeError(f"Expected {value} to be an int.")
 
-        if any((v > self._max for v in value)):
-            raise ValueError(f"Expected {value} to be no more than {self._max}")
+        if not all((self._min <= v <= self._max for v in value)):
+            raise ValueError(
+                f"Expected {value} to be in range of {self._min} to {self._max}."
+            )
 
     def __repr__(self):
         return f"{type(self).__name__}(size={self.size}, unsigned={self.unsigned}) at 0x{id(self):016X}"
@@ -414,11 +434,10 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
                 f"Expected {value} to be an int sequence, bytes, or bytearray."
             )
 
-        if any((v < self._min for v in value)):
-            raise ValueError(f"Expected {value} to be {self._min} or greater.")
-
-        if any((v > self._max for v in value)):
-            raise ValueError(f"Expected {value} to be no more than {self._max}")
+        if not all((self._min <= v <= self._max for v in value)):
+            raise ValueError(
+                f"Expected {value} to be in range of {self._min} to {self._max}."
+            )
 
     def __repr__(self):
         return f"Byte(len=1) at 0x{id(self):016X}"
@@ -456,8 +475,8 @@ class String(FieldValidator[_P, str], Generic[_P]):
         if len(value) > self.len:
             raise ValueError(f'Expected "{value}" to be no longer than {self.len}')
 
-        if any(ord(c) > 127 for c in value):
-            raise TypeError(f"Expected {value} to only containt valid ascii points")
+        if not value.isascii():
+            raise TypeError(f"Expected {value} to only contain valid ascii points")
 
     def validate_many(self, value):
         """Validate multiple strings
@@ -666,10 +685,12 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
             self.__get__(obj).__setitem__(slice(None), value)
 
     @overload
-    def __getitem__(self, key: int) -> int: ...
+    def __getitem__(self, key: int) -> int:
+        ...
 
     @overload
-    def __getitem__(self, key: slice) -> List[int]: ...
+    def __getitem__(self, key: slice) -> List[int]:
+        ...
 
     def __getitem__(self, key) -> Union[int, List[int]]:
         if self._bound_obj is None:
@@ -733,10 +754,12 @@ class ByteArray(ArrayField[Byte]):
             self.__get__(obj).__setitem__(slice(None), value)
 
     @overload
-    def __getitem__(self, key: int) -> bytearray: ...
+    def __getitem__(self, key: int) -> bytearray:
+        ...
 
     @overload
-    def __getitem__(self, key: slice) -> bytearray: ...
+    def __getitem__(self, key: slice) -> bytearray:
+        ...
 
     def __getitem__(self, key) -> bytearray:
         if self._bound_obj is None:
@@ -821,10 +844,12 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
             self.__get__(obj).__setitem__(slice(None), value)
 
     @overload
-    def __getitem__(self, key: int) -> float: ...
+    def __getitem__(self, key: int) -> float:
+        ...
 
     @overload
-    def __getitem__(self, key: slice) -> List[float]: ...
+    def __getitem__(self, key: slice) -> List[float]:
+        ...
 
     def __getitem__(self, key) -> Union[float, List[float]]:
         if self._bound_obj is None:
@@ -852,10 +877,12 @@ class Struct(FieldValidator, Generic[_S]):
         return getattr(obj, self._private_name)
 
     @overload
-    def __set__(self, obj: MessageBase, value: _S): ...
+    def __set__(self, obj: MessageBase, value: _S):
+        ...
 
     @overload
-    def __set__(self, obj: StructArray, value: Struct[_S]): ...
+    def __set__(self, obj: StructArray, value: Struct[_S]):
+        ...
 
     def __set__(self, obj, value):
         if _VALIDATION_ENABLED.get():
@@ -934,10 +961,12 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
             self.__get__(obj).__setitem__(slice(None), value)
 
     @overload
-    def __getitem__(self, key: int) -> _S: ...
+    def __getitem__(self, key: int) -> _S:
+        ...
 
     @overload
-    def __getitem__(self, key: slice) -> List[_S]: ...
+    def __getitem__(self, key: slice) -> List[_S]:
+        ...
 
     def __getitem__(self, key) -> Union[_S, List[_S]]:
         if self._bound_obj is None:
