@@ -404,10 +404,10 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
         """
 
         if isinstance(value, int):
-            if value < self._min:
-                raise ValueError(f"Expected {value} to be at least {self._min}")
-            if value > self._max:
-                raise ValueError(f"Expected {value} to be no more than {self._max}")
+            if not self._min <= value <= self._max:
+                raise ValueError(
+                    f"Expected {value} to be in range of {self._min} to {self._max}"
+                )
             return
 
         if not isinstance(value, (bytes, bytearray)):
@@ -429,10 +429,15 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
         if isinstance(value, (bytes, bytearray)):
             return
 
-        if any(not isinstance(v, int) for v in value):
-            raise TypeError(
-                f"Expected {value} to be an int sequence, bytes, or bytearray."
-            )
+        # Check first value only
+        if not isinstance(next(iter(value)), numbers.Integral):
+            raise TypeError(f"Expected {value} to be an int.")
+
+        # Commented this check to help performance
+        # if any(not isinstance(v, int) for v in value):
+        #     raise TypeError(
+        #         f"Expected {value} to be an int sequence, bytes, or bytearray."
+        #     )
 
         if not all((self._min <= v <= self._max for v in value)):
             raise ValueError(
