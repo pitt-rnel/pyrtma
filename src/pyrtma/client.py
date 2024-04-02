@@ -457,7 +457,7 @@ class Client(object):
         if self._connected:
             try:
                 self.disconnect()
-            except ClientError:
+            except Exception:
                 """Silently ignore any errors at this point."""
                 pass
 
