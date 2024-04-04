@@ -810,6 +810,7 @@ class MessageManager:
         if msg_type == cd.MT_CONNECT:
             if self.connect_module(src_module, self.message):
                 self.send_ack(src_module)
+                self.send_client_info(src_module)
                 self.logger.info(f"CONNECT - {src_module!s}")
         elif msg_type == cd.MT_DISCONNECT:
             self.disconnect_module(src_module)
