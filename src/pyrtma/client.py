@@ -12,7 +12,6 @@ import logging
 import logging.handlers
 
 from pathlib import Path
-from rich.logging import RichHandler
 from contextlib import contextmanager
 
 from .context import get_context
@@ -21,6 +20,7 @@ from .message_data import MessageData
 from .header import MessageHeader, get_header_cls
 from .core_defs import ALL_MESSAGE_TYPES
 from .validators import disable_message_validation
+from .color_formatter import ColorFormatter
 from .exceptions import (
     InvalidMessageDefinition,
     UnknownMessageType,
@@ -126,15 +126,14 @@ class ClientLogger(object):
         level: int = logging.NOTSET,
     ):
         # default formatter
-        default_formatter = logging.Formatter(
-            "%(levelname)s - %(asctime)s - %(name)s - %(message)s"
-        )
-        self._console_formatter = default_formatter
-        self._file_formatter = default_formatter
+        self._default_fmt = "%(levelname)s - %(asctime)s - %(name)s - %(message)s"
+        self._default_formatter = logging.Formatter(self._default_fmt)
+        self._console_formatter = ColorFormatter(self._default_fmt)
+        self._file_formatter = self._default_formatter
 
         # initialize private attributes
         self._logger = logging.getLogger(log_name)
-        self._logger.propagate = True
+        self._logger.propagate = False
         self.level = level
         self._console_level = level
         self._rtma_level = level
@@ -340,7 +339,7 @@ class ClientLogger(object):
         self._file_formatter = value
 
     def init_console_handler(self) -> logging.Handler:
-        console_handler = RichHandler()
+        console_handler = logging.StreamHandler()
         console_handler.name = "Console Handler"
         console_handler.setLevel(self._console_level)
         console_handler.setFormatter(self._console_formatter)
