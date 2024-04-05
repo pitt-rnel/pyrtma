@@ -118,7 +118,6 @@ MT_TIMING_MESSAGE: int = 80
 MT_FORCE_DISCONNECT: int = 82
 MT_PAUSE_SUBSCRIPTION: int = 85
 MT_RESUME_SUBSCRIPTION: int = 86
-MT_MM_LOG: int = 29
 MT_MESSAGE_TRAFFIC: int = 30
 MT_ACTIVE_CLIENTS: int = 31
 MT_CLIENT_INFO: int = 32
@@ -799,22 +798,6 @@ class MDF_RESUME_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
     ] = "'RESUME_SUBSCRIPTION:\n  id: 86\n  fields:\n    msg_type: MSG_TYPE'"
 
     msg_type: Int32 = Int32()
-
-
-@pyrtma.message_def
-class MDF_MM_LOG(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 29
-    type_name: ClassVar[str] = "MM_LOG"
-    type_hash: ClassVar[int] = 0xF4225C93
-    type_size: ClassVar[int] = 264
-    type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'MM_LOG:\n  id: 29\n  fields:\n    level: int32\n    pad: int32\n    message: char[256]'"
-
-    level: Int32 = Int32()
-    pad: Int32 = Int32()
-    message: String = String(256)
 
 
 @pyrtma.message_def

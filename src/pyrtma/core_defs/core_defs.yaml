@@ -146,13 +146,6 @@ message_defs:
     fields:
       msg_type: MSG_TYPE
 
-  MM_LOG:
-    id: 29
-    fields:
-      level: int32
-      pad: int32
-      message: char[256]
-
   MESSAGE_TRAFFIC:
     id: 30
     fields:

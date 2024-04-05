@@ -13,6 +13,7 @@ import ctypes
 import os
 import typing
 
+from .client_logging import RTMALogger
 from .validators import disable_message_validation
 from .message import Message, get_msg_cls
 from .header import MessageHeader, get_header_cls
@@ -24,8 +25,6 @@ from typing import Dict, List, Tuple, Set, Type, Union
 from itertools import chain
 from dataclasses import dataclass, field
 from collections import defaultdict, Counter
-
-LOG_LEVEL = logging.INFO
 
 
 @dataclass
@@ -104,29 +103,6 @@ class Module:
         return self.conn.__hash__()
 
 
-class MMLogHandler(logging.Handler):
-    """Logging handler class that send MM_LOG messages"""
-
-    def __init__(self, mm: "MessageManager"):
-        logging.Handler.__init__(self)
-        self.mm = mm
-
-    def close(self):
-        logging.Handler.close(self)
-
-    def emit(self, record: logging.LogRecord):
-        try:
-            msg = cd.MDF_MM_LOG()
-            msg.level = record.levelno
-            if self.formatter:
-                msg.message = self.formatter.format(record)
-            else:
-                msg.message = record.getMessage()
-            self.mm.send_message(msg)
-        except Exception:
-            self.handleError(record)
-
-
 class MessageManager:
     """MessageManager class
 
@@ -142,6 +118,7 @@ class MessageManager:
         ip_address: str = "",  # "" equivalent to socket.INADDR_ANY
         port: int = 7111,
         timecode=False,
+        log_level=logging.INFO,
         debug=False,
         send_msg_timing=True,
     ):
@@ -167,7 +144,9 @@ class MessageManager:
         self.write_timeout = 0  # c++ message manager uses timeout = 0 for all modules except logger modules, which uses -1 (blocking)
         self._debug = debug
         self.b_send_msg_timing = send_msg_timing
-        self.logger = logging.getLogger(f"MessageManager@{ip_address}:{port}")
+
+        self.logger = RTMALogger(f"MessageManager", self, logging.INFO)
+        self.logger.level = log_level
 
         if ip_address == socket.INADDR_ANY:
             ip_address = ""  # bind and Module require a string input, '' is treated as INADDR_ANY by bind
@@ -225,37 +204,15 @@ class MessageManager:
         if debug:
             self.listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-        self._configure_logging()
         self.logger.info("Message Manager Initialized.")
+
+    @property
+    def connected(self) -> bool:
+        return True
 
     def generate_uid(self) -> int:
         self._uid += 1
         return self._uid
-
-    def _configure_logging(self) -> None:
-        # Logging Configuration
-        self.logger.propagate = False
-        if self._debug:
-            level = logging.DEBUG
-        else:
-            level = LOG_LEVEL
-
-        self.logger.setLevel(level)
-        formatter = logging.Formatter(
-            "%(levelname)s - %(asctime)s - %(name)s - %(message)s"
-        )
-
-        # Console Log
-        console = logging.StreamHandler()
-        console.setLevel(level)
-        console.setFormatter(formatter)
-        self.logger.addHandler(console)
-
-        # RTMA Log
-        mm_log = MMLogHandler(self)
-        mm_log.setLevel(level)
-        mm_log.setFormatter(formatter)
-        self.logger.addHandler(mm_log)
 
     def assign_module_id(self) -> int:
         """Assign module ID dynamically to connecting module
@@ -528,8 +485,8 @@ class MessageManager:
             data (Union[bytes, MessageData]): Message Data
         """
 
-        # message counts
-        if count:
+        # message counts (Skip traffic count)
+        if header.msg_type != cd.MT_MESSAGE_TRAFFIC:
             if self.b_send_msg_timing:
                 self.message_counts[header.msg_type] += 1
             self.traffic_counter[header.msg_type] += 1
@@ -627,15 +584,21 @@ class MessageManager:
                 # failed message type is failed_message.
                 self.send_failed_message(module, header, time.perf_counter())
 
-    def send_message(self, data: MessageData, dest_mod_id: int = 0, count=True):
+    def send_message(
+        self,
+        msg_data: MessageData,
+        dest_mod_id: int = 0,
+        dest_host_id: int = 0,
+        timeout: float = 0,
+    ):
         header = self.header_cls()
-        header.msg_type = data.type_id
+        header.msg_type = msg_data.type_id
         header.send_time = time.perf_counter()
         header.src_mod_id = cd.MID_MESSAGE_MANAGER
         header.dest_mod_id = dest_mod_id
-        header.num_data_bytes = data.type_size
+        header.num_data_bytes = msg_data.type_size
 
-        self.forward_message(header, data, count=count)
+        self.forward_message(header, msg_data)
 
     def send_ack(self, src_module: Module):
         """Send ACKNOWLEDGE signal header
@@ -677,7 +640,12 @@ class MessageManager:
         # Avoid infinite recursion
         if header.msg_type in (
             cd.MT_FAILED_MESSAGE,
-            cd.MT_MM_LOG,
+            cd.MT_RTMA_LOG,
+            cd.MT_RTMA_LOG_CRITICAL,
+            cd.MT_RTMA_LOG_ERROR,
+            cd.MT_RTMA_LOG_WARNING,
+            cd.MT_RTMA_LOG_INFO,
+            cd.MT_RTMA_LOG_DEBUG,
         ):
             return
 
@@ -729,7 +697,7 @@ class MessageManager:
 
             if (n % cd.MESSAGE_TRAFFIC_SIZE) == 0:
                 nsent = n
-                self.send_message(data, count=False)
+                self.send_message(data)
                 sub_seqno += 1
 
         # Send any remaining
@@ -737,7 +705,7 @@ class MessageManager:
             i += 1
             if nsent < len(self.traffic_counter):
                 data.msg_type[i:] = [-1 for _ in range(cd.MESSAGE_TRAFFIC_SIZE - i)]
-                self.send_message(data, count=False)
+                self.send_message(data)
 
         self.traffic_counter.clear()
         self.traffic_start = now
@@ -931,6 +899,13 @@ def main():
     )
     parser.add_argument("-d", "--debug", action="store_true", help="Debug mode")
     parser.add_argument(
+        "--log-level",
+        dest="log_level",
+        choices=["DEBUG", "INFO", "WARN", "ERROR"],
+        default="INFO",
+        help="Logging Level",
+    )
+    parser.add_argument(
         "-t", "--timecode", action="store_true", help="Use timecode in message header"
     )
     parser.add_argument(
@@ -946,11 +921,14 @@ def main():
     else:
         ip_addr = ""  # socket.INADDR_ANY
 
+    level = logging.getLevelNamesMapping().get(args.log_level) or logging.INFO
+
     with disable_message_validation():
         msg_mgr = MessageManager(
             ip_address=ip_addr,
             port=args.port,
             timecode=args.timecode,
+            log_level=level,
             debug=args.debug,
             send_msg_timing=(not args.disable_timing_msg),
         )

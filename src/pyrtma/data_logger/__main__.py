@@ -27,18 +27,16 @@ def main():
     )
 
     parser.add_argument(
-        "--debug",
-        dest="debug",
-        action="store_true",
-        help="Set to debug logging mode",
+        "--log-level",
+        dest="log_level",
+        choices=["DEBUG", "INFO", "WARN", "ERROR"],
+        default="INFO",
+        help="Logging Level",
     )
 
     args = parser.parse_args()
 
-    if args.debug:
-        DataLogger.LOG_LEVEL = logging.DEBUG
-    else:
-        DataLogger.LOG_LEVEL = logging.INFO
+    log_level = logging.getLevelNamesMapping().get(args.log_level) or logging.INFO
 
     if args.defs_file:
         base = pathlib.Path(args.defs_file).absolute().parent
@@ -47,7 +45,7 @@ def main():
         sys.path.insert(0, (str(base.absolute())))
         importlib.import_module(fname)
 
-    d = DataLogger(args.mm_ip)
+    d = DataLogger(args.mm_ip, log_level=log_level)
     d.run()
 
 

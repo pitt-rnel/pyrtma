@@ -42,8 +42,7 @@ class CustomFormatter(DataFormatter):
 
 
 def main():
-    DataLogger.LOG_LEVEL = logging.DEBUG
-    d = DataLogger("127.0.0.1:7111")
+    d = DataLogger("127.0.0.1:7111", logging.DEBUG)
     add_formatter(CustomFormatter)
     d.run()
 

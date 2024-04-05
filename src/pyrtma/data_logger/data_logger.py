@@ -18,13 +18,10 @@ from .exceptions import *
 
 
 class DataLogger:
-    LOG_LEVEL = logging.INFO
-
-    def __init__(self, rtma_server_ip: str, enable_file_log: bool = False):
-        self.logger = self.init_logging(enable_file_log)
-
+    def __init__(self, rtma_server_ip: str, log_level: int):
         self.RTMA = cd.get_context()
-        self.mod = pyrtma.Client(module_id=cd.MID_DATA_LOGGER)
+        self.mod = pyrtma.Client(module_id=cd.MID_DATA_LOGGER, name="DataLogger")
+        self.mod.logger.level = log_level
         self.mod.connect(rtma_server_ip, logger_status=True)
         self.ctrl_msg_types = [
             cd.MT_DATA_LOGGER_START,
@@ -46,7 +43,7 @@ class DataLogger:
 
         self.mod.send_module_ready()
 
-        self.logger.info("DataLogger connected and waiting for configuration.")
+        self.mod.info("DataLogger connected and waiting for configuration.")
 
         self.metadata = LoggingMetadata()
         self.collection: Optional[DataCollection] = None
@@ -55,36 +52,6 @@ class DataLogger:
         self._recording = False
         self._paused = False
         self._elapsed_time = 0.0
-
-    def init_logging(self, enable_file_log: bool = True):
-        # Setup a Logger
-        logger = logging.getLogger("data_logger")
-        logger.propagate = False
-        logger.setLevel(DataLogger.LOG_LEVEL)
-        fmt = "{levelname:<8s} - {asctime} - {name:<15} - {message}"
-        formatter = logging.Formatter(fmt, style="{")
-
-        # Console Log
-        console = logging.StreamHandler()
-        console.setLevel(DataLogger.LOG_LEVEL)
-        console.setFormatter(formatter)
-        logger.addHandler(console)
-
-        # File Log
-        if enable_file_log:
-            LOG_PATH = tempfile.gettempdir()
-            LOG_DIR = os.path.join(LOG_PATH, "data_logger")
-            os.makedirs(LOG_DIR, exist_ok=True)
-            timestamp = datetime.datetime.now().strftime("%Y_%m_%d")
-            LOG_FILENAME = f"data_logger_{timestamp}.log"
-            LOG_FILE = os.path.join(LOG_DIR, LOG_FILENAME)
-
-            file_handler = logging.FileHandler(LOG_FILE)
-            file_handler.setLevel(DataLogger.LOG_LEVEL)
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-
-        return logger
 
     def send_status(self):
         msg = cd.MDF_DATA_LOGGER_STATUS()
@@ -159,7 +126,7 @@ class DataLogger:
             msg.collection = self.collection_info()
             self.mod.send_message(msg)
 
-            self.logger.info("Data logging started.")
+            self.mod.info("Data logging started.")
             self._recording = True
             self._paused = False
         else:
@@ -179,9 +146,9 @@ class DataLogger:
                 self.mod.send_message(msg)
                 self.mod.send_signal(cd.MT_DATA_COLLECTION_SAVED)
 
-                self.logger.info("Data logging stopped.")
+                self.mod.info("Data logging stopped.")
             else:
-                self.logger.warn("Logger not recording. Stop ignored.")
+                self.mod.warn("Logger not recording. Stop ignored.")
         else:
             raise DataCollectionNotConfigured("Ignoring stop logging request.")
 
@@ -192,7 +159,7 @@ class DataLogger:
     def pause_logging(self):
         if self.collection:
             self.collection.pause()
-            self.logger.info("Data logging paused.")
+            self.mod.info("Data logging paused.")
             self._paused = True
         else:
             raise DataCollectionNotConfigured("Ignoring pause logging request.")
@@ -200,7 +167,7 @@ class DataLogger:
     def resume_logging(self):
         if self.collection:
             self.collection.resume()
-            self.logger.info("Data logging resumed.")
+            self.mod.info("Data logging resumed.")
             self._paused = False
         else:
             raise DataCollectionNotConfigured("Ignoring resume logging request.")
@@ -212,7 +179,7 @@ class DataLogger:
             )
 
         if self.collection:
-            self.logger.info(f"Closing previous collection: {self.collection.name}")
+            self.mod.info(f"Closing previous collection: {self.collection.name}")
             self.collection.close()
             self.rm_data_collection()
 
@@ -222,7 +189,7 @@ class DataLogger:
             msg.collection.dir_fmt,
             self.metadata,
         )
-        self.logger.info(f"Created data collection: {msg.collection.name}")
+        self.mod.info(f"Created data collection: {msg.collection.name}")
 
         for i in range(msg.collection.num_data_sets):
             ds = msg.collection.data_sets[i]
@@ -241,7 +208,7 @@ class DataLogger:
                     )
                 )
             except (DataFormatterKeyError, InvalidFormatter, DataSetExistsError) as e:
-                self.logger.error(e.args[0])
+                self.mod.error(e.args[0])
                 self.send_error(f"{e.__class__.__name__}:{e.args[0]}")
                 continue
 
@@ -281,7 +248,7 @@ class DataLogger:
             )
 
         if self.collection:
-            self.logger.info(f"Removed data collection: {self.collection.name}")
+            self.mod.info(f"Removed data collection: {self.collection.name}")
             self.collection.close()
             self.collection = None
 
@@ -297,9 +264,7 @@ class DataLogger:
     def reset(self):
         if (c := self.collection) is not None:
             if self._recording:
-                self.logger.warn(
-                    "Reset while recording in progress. Stopping collection!"
-                )
+                self.mod.warn("Reset while recording in progress. Stopping collection!")
                 self.stop_logging()
 
             self.rm_data_collection()
@@ -307,7 +272,7 @@ class DataLogger:
         self.metadata.clear()
         self._recording = False
         self._paused = False
-        self.logger.info(f"Reset DataLogger. All collection/sets are cleared")
+        self.mod.info(f"Reset DataLogger. All collection/sets are cleared")
 
     def update_metadata(self, json_str: str):
         if self._recording:
@@ -329,7 +294,7 @@ class DataLogger:
                 try:
                     msg = self.mod.read_message(0.100)
                 except UnknownMessageType as e:
-                    self.logger.warn(f"UnknownMessageType: {e.args[0]}")
+                    self.mod.warn(f"UnknownMessageType: {e.args[0]}")
                     continue
 
                 if self.collection and self._recording:
@@ -369,7 +334,7 @@ class DataLogger:
                             meta.json = self.metadata.to_json()
                             self.mod.send_message(meta)
                 except DataLoggerError as e:
-                    self.logger.error(e.args[0])
+                    self.mod.error(e.args[0])
                     self.send_error(f"{e.__class__.__name__}:{e.args[0]}")
                     if self._recording:
                         self.stop_logging()
@@ -385,4 +350,4 @@ class DataLogger:
             if self.collection:
                 self.collection.close()
 
-            self.logger.info("DataLogger is exiting...")
+            self.mod.info("DataLogger is exiting...")
