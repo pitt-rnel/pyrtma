@@ -189,6 +189,7 @@ class MessageManager:
             conn=self.listen_socket,
             address=(ip_address, port),
             header_cls=self.header_cls,
+            name="message_manager",
             mod_id=0,
             pid=os.getpid(),
             connected=True,
@@ -743,8 +744,8 @@ class MessageManager:
         msg.timestamp = time.perf_counter()
 
         for i, (sock, module) in enumerate(self.modules.items()):
-            if sock == self.listen_socket:
-                continue
+            # if sock == self.listen_socket:
+            #     continue
             msg.client_mod_id[i] = module.mod_id
             msg.client_pid[i] = module.pid
             self.send_client_info(module)
