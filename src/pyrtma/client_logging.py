@@ -22,6 +22,10 @@ class ClientLike(Protocol):
     def connected(self) -> bool:
         ...
 
+    @property
+    def logger(self) -> "RTMALogger":
+        ...
+
 
 RTMA_LOG_MSG = Union[
     cd.MDF_RTMA_LOG,
@@ -108,7 +112,8 @@ class RTMALogHandler(logging.Handler):
                 msg = self.gen_log_msg(record)
                 self.client.send_message(msg)
         except Exception:
-            self.handleError(record)
+            self.client.logger.enable_rtma = False
+            # self.handleError(record)
 
 
 class RTMALogger(object):
