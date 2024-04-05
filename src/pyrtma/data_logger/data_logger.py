@@ -20,7 +20,7 @@ from .exceptions import *
 class DataLogger:
     def __init__(self, rtma_server_ip: str, log_level: int):
         self.RTMA = cd.get_context()
-        self.mod = pyrtma.Client(module_id=cd.MID_DATA_LOGGER, name="DataLogger")
+        self.mod = pyrtma.Client(module_id=cd.MID_DATA_LOGGER, name="data_logger")
         self.mod.logger.level = log_level
         self.mod.connect(rtma_server_ip, logger_status=True)
         self.ctrl_msg_types = [

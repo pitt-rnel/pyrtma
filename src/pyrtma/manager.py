@@ -145,7 +145,7 @@ class MessageManager:
         self._debug = debug
         self.b_send_msg_timing = send_msg_timing
 
-        self.logger = RTMALogger(f"MessageManager", self, logging.INFO)
+        self.logger = RTMALogger(f"message_manager", self, logging.INFO)
         self.logger.level = log_level
 
         if ip_address == socket.INADDR_ANY:
