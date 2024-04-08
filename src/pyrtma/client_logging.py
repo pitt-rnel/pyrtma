@@ -4,6 +4,7 @@ import pyrtma.core_defs as cd
 import pathlib
 
 from .message import MessageData
+from .exceptions import ClientError
 
 from typing import Union, Type, Dict, Optional, Protocol
 
@@ -111,9 +112,11 @@ class RTMALogHandler(logging.Handler):
             if self.client.connected:
                 msg = self.gen_log_msg(record)
                 self.client.send_message(msg)
+        except ClientError:
+            self.client.logger.enable_rtma = False
         except Exception:
             self.client.logger.enable_rtma = False
-            # self.handleError(record)
+            self.handleError(record)
 
 
 class RTMALogger(object):
