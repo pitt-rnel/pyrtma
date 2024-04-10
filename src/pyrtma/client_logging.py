@@ -134,7 +134,7 @@ class RTMALogger(object):
 
         # initialize private attributes
         self._logger = logging.getLogger(log_name)
-        self._logger.propagate = False
+        self._logger.propagate = True
         self.level = level
         self._console_level = level
         self._rtma_level = level
