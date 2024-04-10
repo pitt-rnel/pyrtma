@@ -433,6 +433,13 @@ class MessageManager:
         mr = cd.MDF_MODULE_READY.from_buffer(msg.data)
         src_module.pid = mr.pid
 
+    def set_module_name(self, src_module: Module, msg: Message):
+        name_msg = cd.MDF_CLIENT_SET_NAME.from_buffer(msg.data)
+        src_module.name = name_msg.name or ""
+        self.logger.info(
+            f"SET_NAME - {src_module.ipaddr} - ID({src_module.mod_id}) - {src_module.name}"
+        )
+
     def read_message(self, sock: socket.socket) -> bool:
         """Read an incoming message
 
@@ -796,8 +803,12 @@ class MessageManager:
         elif msg_type == cd.MT_RESUME_SUBSCRIPTION:
             self.resume_subscription(src_module, self.message)
             self.send_ack(src_module)
+        elif msg_type == cd.MT_CLIENT_SET_NAME:
+            self.set_module_name(src_module, self.message)
+            self.send_client_info(src_module)
         elif msg_type == cd.MT_MODULE_READY:
             self.register_module_ready(src_module, self.message)
+            self.send_client_info(src_module)
         else:
             self.logger.debug(f"FORWARD - msg_type:{hdr.msg_type} from {src_module!s}")
             data = self.data_view[: hdr.num_data_bytes]
