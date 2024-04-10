@@ -5,6 +5,7 @@ def main():
     import sys
     import importlib
     import logging
+    from ..exceptions import ClientError, ConnectionLost, MessageManagerNotFound
     from .data_logger import DataLogger
 
     parser = argparse.ArgumentParser(description="Packet Data Logger")
@@ -46,7 +47,15 @@ def main():
         importlib.import_module(fname)
 
     d = DataLogger(args.mm_ip, log_level=log_level)
-    d.run()
+
+    try:
+        d.run()
+    except MessageManagerNotFound as e:
+        d.mod.error(f"MessageManagerNotFound: {e.args[0]}")
+        sys.exit(1)
+    except ConnectionLost as e:
+        d.mod.error(f"ConnectionLost: Connection to MessageManager is broken.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
