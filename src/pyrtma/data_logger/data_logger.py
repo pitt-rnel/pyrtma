@@ -335,8 +335,9 @@ class DataLogger:
                             meta.json = self.metadata.to_json()
                             self.mod.send_message(meta)
                         case cd.MT_EXIT:
-                            self._running = False
-                            self.mod.info("Received EXIT request. Closing...")
+                            if msg.header.dest_mod_id == self.mod.module_id:
+                                self._running = False
+                                self.mod.info("Received EXIT request. Closing...")
                 except DataLoggerError as e:
                     self.mod.error(e.args[0])
                     self.send_error(f"{e.__class__.__name__}:{e.args[0]}")
