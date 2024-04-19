@@ -46,10 +46,15 @@ def add_color(color: str, text: str) -> str:
 
 
 def main(server: str, log_level: int):
-    level_map = dict(DEBUG=10, INFO=20, WARNING=30, ERROR=40, CRITICAL=50)
+    level_map = dict(TRACE=0, DEBUG=10, INFO=20, WARNING=30, ERROR=40, CRITICAL=50)
     level_name = {v: k for k, v in level_map.items()}
     color_map = dict(
-        DEBUG="GREEN", INFO="WHITE", WARNING="YELLOW", ERROR="RED", CRITICAL="PURPLE"
+        TRACE="WHITE",
+        DEBUG="GREEN",
+        INFO="WHITE",
+        WARNING="YELLOW",
+        ERROR="RED",
+        CRITICAL="PURPLE",
     )
 
     try:
@@ -83,7 +88,7 @@ def main(server: str, log_level: int):
                     while True:
                         msg = c.read_message(timeout=0.100)
                         if msg and msg.type_id in msg_list:
-                            level = level_name[msg.data.level]
+                            level = level_name.get(msg.data.level) or f"LEVEL({level})"
                             level_color = color_map[level]
                             print(
                                 add_color(
