@@ -224,6 +224,7 @@ class PyDefCompiler:
         import ctypes
 
         import pyrtma
+        import pyrtma.core_defs
         from pyrtma.__version__ import check_compiled_version
         from typing import ClassVar, Dict, Any
 
@@ -239,6 +240,10 @@ class PyDefCompiler:
         return f"update_context(__name__)"
 
     def generate(self, out_filepath: pathlib.Path):
+        import pyrtma.core_defs as cd
+
+        core_defs = vars(cd)
+
         with open(out_filepath, mode="w") as f:
             f.write(self.generate_docstr())
             f.write(self.generate_imports())
@@ -281,12 +286,20 @@ class PyDefCompiler:
 
             f.write("# Struct Definitions\n")
             for obj in self.parser.struct_defs.values():
-                f.write(self.generate_struct(obj))
+                if obj.name in core_defs:
+                    # Alias core_defs
+                    f.write(f"{obj.name} = pyrtma.core_defs.{obj.name}")
+                else:
+                    f.write(self.generate_struct(obj))
                 f.write("\n\n")
 
             f.write("# Message Definitions\n")
             for obj in self.parser.message_defs.values():
-                f.write(self.generate_msg_def(obj))
+                if f"MDF_{obj.name}" in core_defs:
+                    # Alias core_defs
+                    f.write(f"MDF_{obj.name} = pyrtma.core_defs.MDF_{obj.name}")
+                else:
+                    f.write(self.generate_msg_def(obj))
                 f.write("\n\n")
 
             f.write("# User Context\n")
