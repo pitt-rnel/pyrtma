@@ -15,6 +15,7 @@ from pyrtma.exceptions import RTMAMessageError
 import pyrtma.core_defs as cd
 
 from socket import error as SocketError
+import socket
 from socketserver import TCPServer
 from websocket_server import (  # type: ignore
     WebsocketServer,
@@ -328,6 +329,17 @@ class WebMessageManager(WebsocketServer):
         self.host = host
         self.port = self.socket.getsockname()[1]
 
+        if self.host not in ("", "0.0.0.0"):
+            logger.info(f"WebMessageManager listening on {self.host}:{self.port}")
+        else:
+            hosts = socket.gethostbyname_ex(socket.gethostname())[-1]
+            if "127.0.0.1" not in hosts:
+                hosts.append("127.0.0.1")
+            logger.info(
+                f"WebMessageManager listening on all interfaces, port {self.port}"
+            )
+            logger.info(f"IP addresses: {hosts}")
+
         self.key = key
         self.cert = cert
 
@@ -386,6 +398,7 @@ def main():
     )
 
     parser.add_argument(
+        "-a",
         "--host",
         default="",
         dest="host",
