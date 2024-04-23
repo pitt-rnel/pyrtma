@@ -127,24 +127,18 @@ class Client(object):
             self._name or f"Module({module_id})", self, logging.INFO
         )
 
+        # alias logger methods
+        self.debug = self._logger.debug
+        self.info = self._logger.info
+        self.warning = self._logger.warning
+        self.warn = self._logger.warn
+        self.error = self._logger.error
+        self.exception = self._logger.exception
+        self.critical = self._logger.critical
+
     @property
     def logger(self) -> RTMALogger:
         return self._logger
-
-    def debug(self, msg: str, *args):
-        return self._logger.debug(msg, *args)
-
-    def info(self, msg: str, *args):
-        return self._logger.info(msg, *args)
-
-    def warn(self, msg: str, *args):
-        return self._logger.warn(msg, *args)
-
-    def error(self, msg: str, *args):
-        return self._logger.error(msg, *args)
-
-    def critical(self, msg: str, *args):
-        return self._logger.critical(msg, *args)
 
     def __del__(self):
         if self._connected:
