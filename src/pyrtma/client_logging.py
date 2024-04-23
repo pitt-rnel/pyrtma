@@ -16,16 +16,13 @@ class ClientLike(Protocol):
         dest_mod_id: int = 0,
         dest_host_id: int = 0,
         timeout: float = -1,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @property
-    def connected(self) -> bool:
-        ...
+    def connected(self) -> bool: ...
 
     @property
-    def logger(self) -> "RTMALogger":
-        ...
+    def logger(self) -> "RTMALogger": ...
 
 
 RTMA_LOG_MSG = Union[
