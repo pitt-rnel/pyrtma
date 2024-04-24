@@ -99,11 +99,11 @@ message_defs:
     id: 4
     fields:
       logger_status: int16
+      daemon_status: int16
       allow_multiple: int16
-      pad: int16
-      mod_id: MODULE_ID
+      mod_id: MODULE_ID # int16
       pid: int32
-      name: char[MAX_NAME_LEN]
+      name: char[MAX_NAME_LEN] # char[32]
 
   DISCONNECT:
     id: 14
