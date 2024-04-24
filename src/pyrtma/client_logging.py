@@ -36,41 +36,6 @@ RTMA_LOG_MSG = Union[
 ]
 
 
-class ColorFormatter(logging.Formatter):
-    def __init__(self, template: str, *args, **kwargs):
-        BLACK = "30"
-        RED = "31"
-        GREEN = "32"
-        YELLOW = "33"
-        BLUE = "34"
-        PURPLE = "35"
-        CYAN = "36"
-        WHITE = "37"
-
-        RESET = "\033[0m"
-
-        def color(COLOR: str):
-            return "\033[0;" + COLOR + "m"
-
-        def bold(COLOR: str):
-            return "\033[1;" + COLOR + "m"
-
-        self.template = template
-        self.FORMATS = {
-            logging.DEBUG: color(GREEN) + template + RESET,
-            logging.INFO: color(WHITE) + template + RESET,
-            logging.WARNING: color(YELLOW) + template + RESET,
-            logging.ERROR: color(RED) + template + RESET,
-            logging.CRITICAL: color(PURPLE) + template + RESET,
-        }
-        super().__init__(*args, **kwargs)
-
-    def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno)
-        formatter = logging.Formatter(log_fmt or self.template, style="{")
-        return formatter.format(record)
-
-
 class RTMALogHandler(logging.Handler):
     """Logging handler class that writes logs as rtma messages"""
 
@@ -126,8 +91,9 @@ class RTMALogger(object):
     ):
         # default formatter
         self._default_fmt = "{levelname:<8} - {asctime} - {name:<16} - {message}"
+        self._rich_fmt = "{name:<16}  |  {message}"
         self._default_formatter = logging.Formatter(self._default_fmt, style="{")
-        self._console_formatter = ColorFormatter(self._default_fmt, style="{")
+        self._console_formatter = logging.Formatter(self._rich_fmt, style="{")
         self._file_formatter = self._default_formatter
 
         # initialize private attributes
@@ -338,10 +304,10 @@ class RTMALogger(object):
         self._file_formatter = value
 
     def init_console_handler(self) -> logging.Handler:
-        console_handler = RichHandler()  # logging.StreamHandler()
+        console_handler = RichHandler(log_time_format="[%X.%f]")
         console_handler.name = "Console Handler"
         console_handler.setLevel(self._console_level)
-        # console_handler.setFormatter(self._console_formatter)
+        console_handler.setFormatter(self._console_formatter)
 
         return console_handler
 
