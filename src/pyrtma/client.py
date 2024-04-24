@@ -181,21 +181,28 @@ class Client(object):
             self._sock.close()
             raise SocketOptionError from e
 
-    def _connect_helper(self, logger_status: bool, allow_multiple: bool) -> Message:
+    def _connect_helper(
+        self, logger_status: bool, daemon_status: bool, allow_multiple: bool
+    ) -> Message:
         """Called internally after _socket_connect"""
 
         # Reset the module_id to zero for dynamic assignment
         if self._dynamic_id:
             self._module_id = 0
 
-        msg = cd.MDF_CONNECT_V2()
-        msg.type_id = cd.MT_CONNECT  # Override the type_id
+        msg = cd.MDF_CONNECT()
         msg.logger_status = int(logger_status)
-        msg.allow_multiple = int(allow_multiple)
-        msg.pid = os.getpid()
-        msg.mod_id = self.module_id
-        msg.name = self.name
+        msg.daemon_status = int(daemon_status)
 
+        msg2 = cd.MDF_CONNECT_V2()
+        msg2.logger_status = int(logger_status)
+        msg2.daemon_status = int(daemon_status)
+        msg2.allow_multiple = int(allow_multiple)
+        msg2.pid = os.getpid()
+        msg2.mod_id = self.module_id
+        msg2.name = self.name
+
+        self.send_message(msg2)
         self.send_message(msg)
         ack_msg = self._wait_for_acknowledgement()
 
@@ -228,6 +235,7 @@ class Client(object):
         self,
         server_name: str = "localhost:7111",
         logger_status: bool = False,
+        daemon_status: bool = False,
         allow_multiple: bool = False,
     ):
         """Connect to message manager server
@@ -243,11 +251,14 @@ class Client(object):
         Raises:
             MessageManagerNotFound: Unable to connect to message manager
         """
+        # Disconnect first
+        if self.connected:
+            self.disconnect()
 
         # Setup the underlying socket connection
         self._socket_connect(server_name)
 
-        ack = self._connect_helper(logger_status, allow_multiple)
+        ack = self._connect_helper(logger_status, daemon_status, allow_multiple)
 
     def disconnect(self):
         """Disconnect from message manager server"""

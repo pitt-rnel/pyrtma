@@ -44,6 +44,7 @@ class Module:
     subs: Set[int] = field(default_factory=set)
     connected: bool = False
     is_logger: bool = False
+    is_daemon: bool = False
     unique: bool = True
     drops: int = 0
     msg_count: int = 0
@@ -258,23 +259,25 @@ class MessageManager:
         Returns:
             bool: success code
         """
-        if isinstance(msg.data, cd.MDF_CONNECT):
-            v1 = 1
-        elif isinstance(msg.data, cd.MDF_CONNECT_V2):
-            v1 = 0
+        # ignore v1 message that follows v2 message
+        if module.connected:
+            return False
+
+        if isinstance(msg.data, cd.MDF_CONNECT_V2):
+            module.mod_id = msg.data.mod_id
+            module.unique = msg.data.allow_multiple == 0
+            module.pid = msg.data.pid
+            module.name = msg.data.name
+        elif isinstance(msg.data, cd.MDF_CONNECT):
+            module.mod_id = msg.header.src_mod_id
         else:
             raise RuntimeError(
                 f"MessageManager::connect_module: Uknown Connect message definition"
             )
 
+        # fields common to v1 and v2
         module.is_logger = msg.data.logger_status == 1
-        if v1:
-            module.mod_id = msg.header.src_mod_id
-        else:
-            module.mod_id = msg.data.mod_id
-            module.unique = msg.data.allow_multiple == 0
-            module.pid = msg.data.pid
-            module.name = msg.data.name
+        module.is_daemon = msg.data.daemon_status == 1
 
         if module.mod_id != 0:
             if module.mod_id < 1 or module.mod_id > cd.DYN_MOD_ID_START:
@@ -765,12 +768,12 @@ class MessageManager:
     def message(self) -> Message:
         hdr = self.header
         # Check for connect version
-        if hdr.msg_type == cd.MT_CONNECT:
-            if hdr.num_data_bytes == cd.MDF_CONNECT_V2.type_size:
-                data = cd.MDF_CONNECT_V2.from_buffer(self.data_buffer)
-            else:
-                data = cd.MDF_CONNECT.from_buffer(self.data_buffer)
-            return Message(hdr, data)
+        # if hdr.msg_type == cd.MT_CONNECT:
+        #     if hdr.num_data_bytes == cd.MDF_CONNECT_V2.type_size:
+        #         data = cd.MDF_CONNECT_V2.from_buffer(self.data_buffer)
+        #     else:
+        #         data = cd.MDF_CONNECT.from_buffer(self.data_buffer)
+        #     return Message(hdr, data)
 
         return Message(hdr, get_msg_cls(hdr.msg_type).from_buffer(self.data_buffer))
 
@@ -783,11 +786,14 @@ class MessageManager:
         hdr = self.header
         msg_type = hdr.msg_type
 
-        if msg_type == cd.MT_CONNECT:
+        if msg_type == cd.MT_CONNECT or msg_type == cd.MT_CONNECT_V2:
             if self.connect_module(src_module, self.message):
                 self.send_ack(src_module)
                 self.send_client_info(src_module)
-                self.logger.info(f"CONNECT - {src_module!s}")
+                if msg_type == cd.MT_CONNECT:
+                    self.logger.info(f"CONNECT - {src_module!s}")
+                else:
+                    self.logger.info(f"CONNECT v2 - {src_module!s}")
         elif msg_type == cd.MT_DISCONNECT:
             self.disconnect_module(src_module)
             self.logger.info(f"DISCONNECT - {src_module!s}")
