@@ -33,7 +33,7 @@ dependencies = [
 where = ["src"]
 
 [tool.setuptools.dynamic]
-version = {attr = "pyrtma.__version__"}
+version = {attr = "pyrtma.__version__.__version__"}
 
 [tool.setuptools.package-data]
 pyrtma = ["py.typed", "*.yaml"]

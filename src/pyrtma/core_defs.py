@@ -138,9 +138,9 @@ class DATA_SET(MessageBase, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xB267DE7B
     type_size: ClassVar[int] = 452
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_SET:\n  fields:\n    name: char[32]\n    sub_dir_fmt: char[128]\n    file_name_fmt: char[128]\n    formatter: char[32]\n    subdivide_interval: int32\n    msg_types: int32[32]'"
+    type_def: ClassVar[str] = (
+        "'DATA_SET:\n  fields:\n    name: char[32]\n    sub_dir_fmt: char[128]\n    file_name_fmt: char[128]\n    formatter: char[32]\n    subdivide_interval: int32\n    msg_types: int32[32]'"
+    )
 
     name: String = String(32)
     sub_dir_fmt: String = String(128)
@@ -155,9 +155,9 @@ class DATA_COLLECTION(MessageBase, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x9FA9C51A
     type_size: ClassVar[int] = 3132
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_COLLECTION:\n  fields:\n    name: char[32]\n    base_path: char[256]\n    dir_fmt: char[128]\n    num_data_sets: int16\n    unused: int16\n    data_sets: DATA_SET[MAX_DATA_SETS]'"
+    type_def: ClassVar[str] = (
+        "'DATA_COLLECTION:\n  fields:\n    name: char[32]\n    base_path: char[256]\n    dir_fmt: char[128]\n    num_data_sets: int16\n    unused: int16\n    data_sets: DATA_SET[MAX_DATA_SETS]'"
+    )
 
     name: String = String(32)
     base_path: String = String(256)
@@ -172,9 +172,9 @@ class DATA_SET_INFO(MessageBase, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x65972A16
     type_size: ClassVar[int] = 452
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_SET_INFO:\n  fields:\n    name: char[32]\n    formatter: char[32]\n    save_path: char[256]\n    subdivide_interval: int32\n    msg_types: int32[32]'"
+    type_def: ClassVar[str] = (
+        "'DATA_SET_INFO:\n  fields:\n    name: char[32]\n    formatter: char[32]\n    save_path: char[256]\n    subdivide_interval: int32\n    msg_types: int32[32]'"
+    )
 
     name: String = String(32)
     formatter: String = String(32)
@@ -188,9 +188,9 @@ class DATA_COLLECTION_INFO(MessageBase, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x8FAF0CA3
     type_size: ClassVar[int] = 3004
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_COLLECTION_INFO:\n  fields:\n    name: char[32]\n    save_path: char[256]\n    num_data_sets: int16\n    unused: int16\n    data_sets: DATA_SET_INFO[MAX_DATA_SETS]'"
+    type_def: ClassVar[str] = (
+        "'DATA_COLLECTION_INFO:\n  fields:\n    name: char[32]\n    save_path: char[256]\n    num_data_sets: int16\n    unused: int16\n    data_sets: DATA_SET_INFO[MAX_DATA_SETS]'"
+    )
 
     name: String = String(32)
     save_path: String = String(256)
@@ -204,9 +204,9 @@ class RTMA_MSG_HEADER(MessageBase, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x35CC5A39
     type_size: ClassVar[int] = 48
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'RTMA_MSG_HEADER:\n  fields:\n    msg_type: MSG_TYPE\n    msg_count: MSG_COUNT\n    send_time: double\n    recv_time: double\n    src_host_id: HOST_ID\n    src_mod_id: MODULE_ID\n    dest_host_id: HOST_ID\n    dest_mod_id: MODULE_ID\n    num_data_bytes: int32\n    remaining_bytes: int32\n    is_dynamic: int32\n    reserved: uint32'"
+    type_def: ClassVar[str] = (
+        "'RTMA_MSG_HEADER:\n  fields:\n    msg_type: MSG_TYPE\n    msg_count: MSG_COUNT\n    send_time: double\n    recv_time: double\n    src_host_id: HOST_ID\n    src_mod_id: MODULE_ID\n    dest_host_id: HOST_ID\n    dest_mod_id: MODULE_ID\n    num_data_bytes: int32\n    remaining_bytes: int32\n    is_dynamic: int32\n    reserved: uint32'"
+    )
 
     msg_type: Int32 = Int32()
     msg_count: Int32 = Int32()
@@ -230,9 +230,9 @@ class MDF_DATA_LOGGER_STATUS(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x9E922E93
     type_size: ClassVar[int] = 24
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_LOGGER_STATUS:\n  id: 62\n  fields:\n    timestamp: double\n    elapsed_time: double\n    is_recording: int32\n    is_paused: int32'"
+    type_def: ClassVar[str] = (
+        "'DATA_LOGGER_STATUS:\n  id: 62\n  fields:\n    timestamp: double\n    elapsed_time: double\n    is_recording: int32\n    is_paused: int32'"
+    )
 
     timestamp: Double = Double()
     elapsed_time: Double = Double()
@@ -257,9 +257,9 @@ class MDF_ADD_DATA_COLLECTION(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xA50C4BC8
     type_size: ClassVar[int] = 3132
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'ADD_DATA_COLLECTION:\n  id: 64\n  fields:\n    collection: DATA_COLLECTION'"
+    type_def: ClassVar[str] = (
+        "'ADD_DATA_COLLECTION:\n  id: 64\n  fields:\n    collection: DATA_COLLECTION'"
+    )
 
     collection: Struct[DATA_COLLECTION] = Struct(DATA_COLLECTION)
 
@@ -271,9 +271,9 @@ class MDF_REMOVE_DATA_COLLECTION(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x5430DCF2
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'REMOVE_DATA_COLLECTION:\n  id: 65\n  fields:\n    collection_name: char[32]'"
+    type_def: ClassVar[str] = (
+        "'REMOVE_DATA_COLLECTION:\n  id: 65\n  fields:\n    collection_name: char[32]'"
+    )
 
     collection_name: String = String(32)
 
@@ -285,9 +285,9 @@ class MDF_ADD_DATA_SET(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xB368D74F
     type_size: ClassVar[int] = 484
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'ADD_DATA_SET:\n  id: 66\n  fields:\n    collection_name: char[32]\n    data_set: DATA_SET'"
+    type_def: ClassVar[str] = (
+        "'ADD_DATA_SET:\n  id: 66\n  fields:\n    collection_name: char[32]\n    data_set: DATA_SET'"
+    )
 
     collection_name: String = String(32)
     data_set: Struct[DATA_SET] = Struct(DATA_SET)
@@ -300,9 +300,9 @@ class MDF_REMOVE_DATA_SET(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x0BC39C04
     type_size: ClassVar[int] = 64
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'REMOVE_DATA_SET:\n  id: 67\n  fields:\n    collection_name: char[32]\n    name: char[32]'"
+    type_def: ClassVar[str] = (
+        "'REMOVE_DATA_SET:\n  id: 67\n  fields:\n    collection_name: char[32]\n    name: char[32]'"
+    )
 
     collection_name: String = String(32)
     name: String = String(32)
@@ -315,9 +315,9 @@ class MDF_DATA_COLLECTION_CONFIG_REQUEST(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x1779D826
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_COLLECTION_CONFIG_REQUEST:\n  id: 68\n  fields: null'"
+    type_def: ClassVar[str] = (
+        "'DATA_COLLECTION_CONFIG_REQUEST:\n  id: 68\n  fields: null'"
+    )
 
 
 @pyrtma.message_def
@@ -327,9 +327,9 @@ class MDF_DATA_COLLECTION_CONFIG(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xC08D3576
     type_size: ClassVar[int] = 3132
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_COLLECTION_CONFIG:\n  id: 69\n  fields:\n    collection: DATA_COLLECTION'"
+    type_def: ClassVar[str] = (
+        "'DATA_COLLECTION_CONFIG:\n  id: 69\n  fields:\n    collection: DATA_COLLECTION'"
+    )
 
     collection: Struct[DATA_COLLECTION] = Struct(DATA_COLLECTION)
 
@@ -341,9 +341,9 @@ class MDF_DATA_COLLECTION_STARTED(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x415737CA
     type_size: ClassVar[int] = 3004
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_COLLECTION_STARTED:\n  id: 70\n  fields:\n    collection: DATA_COLLECTION_INFO'"
+    type_def: ClassVar[str] = (
+        "'DATA_COLLECTION_STARTED:\n  id: 70\n  fields:\n    collection: DATA_COLLECTION_INFO'"
+    )
 
     collection: Struct[DATA_COLLECTION_INFO] = Struct(DATA_COLLECTION_INFO)
 
@@ -355,9 +355,9 @@ class MDF_DATA_COLLECTION_STOPPED(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xDA1AF3AE
     type_size: ClassVar[int] = 3004
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_COLLECTION_STOPPED:\n  id: 71\n  fields:\n    collection: DATA_COLLECTION_INFO'"
+    type_def: ClassVar[str] = (
+        "'DATA_COLLECTION_STOPPED:\n  id: 71\n  fields:\n    collection: DATA_COLLECTION_INFO'"
+    )
 
     collection: Struct[DATA_COLLECTION_INFO] = Struct(DATA_COLLECTION_INFO)
 
@@ -429,9 +429,9 @@ class MDF_DATA_LOGGER_ERROR(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xAD3B4A67
     type_size: ClassVar[int] = 512
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_LOGGER_ERROR:\n  id: 78\n  fields:\n    msg: char[512]'"
+    type_def: ClassVar[str] = (
+        "'DATA_LOGGER_ERROR:\n  id: 78\n  fields:\n    msg: char[512]'"
+    )
 
     msg: String = String(512)
 
@@ -443,9 +443,9 @@ class MDF_DATA_LOGGER_METADATA_UPDATE(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x3C673526
     type_size: ClassVar[int] = 512
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_LOGGER_METADATA_UPDATE:\n  id: 79\n  fields:\n    json: char[512]'"
+    type_def: ClassVar[str] = (
+        "'DATA_LOGGER_METADATA_UPDATE:\n  id: 79\n  fields:\n    json: char[512]'"
+    )
 
     json: String = String(512)
 
@@ -457,9 +457,9 @@ class MDF_DATA_LOGGER_METADATA_REQUEST(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x2D068003
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_LOGGER_METADATA_REQUEST:\n  id: 87\n  fields: null'"
+    type_def: ClassVar[str] = (
+        "'DATA_LOGGER_METADATA_REQUEST:\n  id: 87\n  fields: null'"
+    )
 
 
 @pyrtma.message_def
@@ -469,9 +469,9 @@ class MDF_DATA_LOGGER_METADATA(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x3852789B
     type_size: ClassVar[int] = 1024
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_LOGGER_METADATA:\n  id: 88\n  fields:\n    json: char[1024]'"
+    type_def: ClassVar[str] = (
+        "'DATA_LOGGER_METADATA:\n  id: 88\n  fields:\n    json: char[1024]'"
+    )
 
     json: String = String(1024)
 
@@ -483,9 +483,9 @@ class MDF_DATA_LOG_TEST_2048(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x651D3C98
     type_size: ClassVar[int] = 2048
     type_source: ClassVar[str] = "data_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'DATA_LOG_TEST_2048:\n  id: 89\n  fields:\n    raw: char[2048]'"
+    type_def: ClassVar[str] = (
+        "'DATA_LOG_TEST_2048:\n  id: 89\n  fields:\n    raw: char[2048]'"
+    )
 
     raw: String = String(2048)
 
@@ -507,9 +507,9 @@ class MDF_LM_STATUS(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x2DA5B6A1
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "quick_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'LM_STATUS:\n  id: 54\n  fields:\n    is_logging: uint32\n    max_msgs: uint32\n    hdr_bufsz: uint32\n    data_bufsz: uint32\n    msg_count: uint32\n    hdr_total: uint32\n    data_total: uint32\n    ofs_total: uint32'"
+    type_def: ClassVar[str] = (
+        "'LM_STATUS:\n  id: 54\n  fields:\n    is_logging: uint32\n    max_msgs: uint32\n    hdr_bufsz: uint32\n    data_bufsz: uint32\n    msg_count: uint32\n    hdr_total: uint32\n    data_total: uint32\n    ofs_total: uint32'"
+    )
 
     is_logging: Uint32 = Uint32()
     max_msgs: Uint32 = Uint32()
@@ -538,9 +538,9 @@ class MDF_SAVE_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x515569E9
     type_size: ClassVar[int] = 260
     type_source: ClassVar[str] = "quick_logger.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'SAVE_MESSAGE_LOG:\n  id: 56\n  fields:\n    pathname: char[MAX_LOGGER_FILENAME_LENGTH]\n    pathname_length: int'"
+    type_def: ClassVar[str] = (
+        "'SAVE_MESSAGE_LOG:\n  id: 56\n  fields:\n    pathname: char[MAX_LOGGER_FILENAME_LENGTH]\n    pathname_length: int'"
+    )
 
     pathname: String = String(256)
     pathname_length: Int32 = Int32()
@@ -633,9 +633,9 @@ class MDF_FAIL_SUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x694BF3DB
     type_size: ClassVar[int] = 8
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'FAIL_SUBSCRIBE:\n  id: 6\n  fields:\n    mod_id: MODULE_ID\n    reserved: int16\n    msg_type: MSG_TYPE'"
+    type_def: ClassVar[str] = (
+        "'FAIL_SUBSCRIBE:\n  id: 6\n  fields:\n    mod_id: MODULE_ID\n    reserved: int16\n    msg_type: MSG_TYPE'"
+    )
 
     mod_id: Int16 = Int16()
     reserved: Int16 = Int16()
@@ -649,9 +649,9 @@ class MDF_FAILED_MESSAGE(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x4EAFB837
     type_size: ClassVar[int] = 64
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'FAILED_MESSAGE:\n  id: 8\n  fields:\n    dest_mod_id: MODULE_ID\n    reserved: int16[3]\n    time_of_failure: double\n    msg_header: RTMA_MSG_HEADER'"
+    type_def: ClassVar[str] = (
+        "'FAILED_MESSAGE:\n  id: 8\n  fields:\n    dest_mod_id: MODULE_ID\n    reserved: int16[3]\n    time_of_failure: double\n    msg_header: RTMA_MSG_HEADER'"
+    )
 
     dest_mod_id: Int16 = Int16()
     reserved: IntArray[Int16] = IntArray(Int16, 3)
@@ -666,9 +666,9 @@ class MDF_CONNECT(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xF4FDCFF3
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'CONNECT:\n  id: 13\n  fields:\n    logger_status: int16\n    daemon_status: int16'"
+    type_def: ClassVar[str] = (
+        "'CONNECT:\n  id: 13\n  fields:\n    logger_status: int16\n    daemon_status: int16'"
+    )
 
     logger_status: Int16 = Int16()
     daemon_status: Int16 = Int16()
@@ -681,9 +681,9 @@ class MDF_CONNECT_V2(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xE1B49C8A
     type_size: ClassVar[int] = 44
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'CONNECT_V2:\n  id: 4\n  fields:\n    logger_status: int16\n    allow_multiple: int16\n    pad: int16\n    mod_id: MODULE_ID\n    pid: int32\n    name: char[MAX_NAME_LEN]'"
+    type_def: ClassVar[str] = (
+        "'CONNECT_V2:\n  id: 4\n  fields:\n    logger_status: int16\n    allow_multiple: int16\n    pad: int16\n    mod_id: MODULE_ID\n    pid: int32\n    name: char[MAX_NAME_LEN]'"
+    )
 
     logger_status: Int16 = Int16()
     allow_multiple: Int16 = Int16()
@@ -710,9 +710,9 @@ class MDF_SUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xF5B437C8
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'SUBSCRIBE:\n  id: 15\n  fields:\n    msg_type: MSG_TYPE'"
+    type_def: ClassVar[str] = (
+        "'SUBSCRIBE:\n  id: 15\n  fields:\n    msg_type: MSG_TYPE'"
+    )
 
     msg_type: Int32 = Int32()
 
@@ -724,9 +724,9 @@ class MDF_UNSUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x193FB9E0
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'UNSUBSCRIBE:\n  id: 16\n  fields:\n    msg_type: MSG_TYPE'"
+    type_def: ClassVar[str] = (
+        "'UNSUBSCRIBE:\n  id: 16\n  fields:\n    msg_type: MSG_TYPE'"
+    )
 
     msg_type: Int32 = Int32()
 
@@ -750,9 +750,9 @@ class MDF_TIMING_MESSAGE(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x3595C23E
     type_size: ClassVar[int] = 20808
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: unsigned short[MAX_MESSAGE_TYPES]\n    ModulePID: int[MAX_MODULES]\n    send_time: double'"
+    type_def: ClassVar[str] = (
+        "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: unsigned short[MAX_MESSAGE_TYPES]\n    ModulePID: int[MAX_MODULES]\n    send_time: double'"
+    )
 
     timing: IntArray[Uint16] = IntArray(Uint16, 10000)
     ModulePID: IntArray[Int32] = IntArray(Int32, 200)
@@ -766,9 +766,9 @@ class MDF_FORCE_DISCONNECT(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x335C7BBF
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'FORCE_DISCONNECT:\n  id: 82\n  fields:\n    mod_id: int32'"
+    type_def: ClassVar[str] = (
+        "'FORCE_DISCONNECT:\n  id: 82\n  fields:\n    mod_id: int32'"
+    )
 
     mod_id: Int32 = Int32()
 
@@ -780,9 +780,9 @@ class MDF_PAUSE_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x22338A6D
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'PAUSE_SUBSCRIPTION:\n  id: 85\n  fields:\n    msg_type: MSG_TYPE'"
+    type_def: ClassVar[str] = (
+        "'PAUSE_SUBSCRIPTION:\n  id: 85\n  fields:\n    msg_type: MSG_TYPE'"
+    )
 
     msg_type: Int32 = Int32()
 
@@ -794,9 +794,9 @@ class MDF_RESUME_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xC56A97F2
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'RESUME_SUBSCRIPTION:\n  id: 86\n  fields:\n    msg_type: MSG_TYPE'"
+    type_def: ClassVar[str] = (
+        "'RESUME_SUBSCRIPTION:\n  id: 86\n  fields:\n    msg_type: MSG_TYPE'"
+    )
 
     msg_type: Int32 = Int32()
 
@@ -808,9 +808,9 @@ class MDF_MESSAGE_TRAFFIC(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xA5D05FF5
     type_size: ClassVar[int] = 408
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'MESSAGE_TRAFFIC:\n  id: 30\n  fields:\n    seqno: uint32\n    sub_seqno: uint32\n    start_timestamp: double\n    end_timestamp: double\n    msg_type: MSG_TYPE[MESSAGE_TRAFFIC_SIZE]\n    msg_count: uint16[MESSAGE_TRAFFIC_SIZE]'"
+    type_def: ClassVar[str] = (
+        "'MESSAGE_TRAFFIC:\n  id: 30\n  fields:\n    seqno: uint32\n    sub_seqno: uint32\n    start_timestamp: double\n    end_timestamp: double\n    msg_type: MSG_TYPE[MESSAGE_TRAFFIC_SIZE]\n    msg_count: uint16[MESSAGE_TRAFFIC_SIZE]'"
+    )
 
     seqno: Uint32 = Uint32()
     sub_seqno: Uint32 = Uint32()
@@ -827,9 +827,9 @@ class MDF_ACTIVE_CLIENTS(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xC203F18C
     type_size: ClassVar[int] = 1552
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'ACTIVE_CLIENTS:\n  id: 31\n  fields:\n    timestamp: double\n    num_clients: int16\n    padding: int16\n    reserved: int32\n    client_mod_id: MODULE_ID[MAX_CLIENTS]\n    client_pid: int32[MAX_CLIENTS]'"
+    type_def: ClassVar[str] = (
+        "'ACTIVE_CLIENTS:\n  id: 31\n  fields:\n    timestamp: double\n    num_clients: int16\n    padding: int16\n    reserved: int32\n    client_mod_id: MODULE_ID[MAX_CLIENTS]\n    client_pid: int32[MAX_CLIENTS]'"
+    )
 
     timestamp: Double = Double()
     num_clients: Int16 = Int16()
@@ -846,9 +846,9 @@ class MDF_CLIENT_INFO(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x401076E7
     type_size: ClassVar[int] = 80
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'CLIENT_INFO:\n  id: 32\n  fields:\n    addr: char[32]\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    is_logger: int16\n    is_unique: int16\n    port: uint16\n    name: char[MAX_NAME_LEN]'"
+    type_def: ClassVar[str] = (
+        "'CLIENT_INFO:\n  id: 32\n  fields:\n    addr: char[32]\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    is_logger: int16\n    is_unique: int16\n    port: uint16\n    name: char[MAX_NAME_LEN]'"
+    )
 
     addr: String = String(32)
     uid: Int32 = Int32()
@@ -867,9 +867,9 @@ class MDF_CLIENT_CLOSED(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x087F4249
     type_size: ClassVar[int] = 80
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'CLIENT_CLOSED:\n  id: 33\n  fields:\n    addr: char[32]\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    is_logger: int16\n    is_unique: int16\n    port: uint16\n    name: char[MAX_NAME_LEN]'"
+    type_def: ClassVar[str] = (
+        "'CLIENT_CLOSED:\n  id: 33\n  fields:\n    addr: char[32]\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    is_logger: int16\n    is_unique: int16\n    port: uint16\n    name: char[MAX_NAME_LEN]'"
+    )
 
     addr: String = String(32)
     uid: Int32 = Int32()
@@ -888,9 +888,9 @@ class MDF_CLIENT_SET_NAME(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x34465AE2
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'CLIENT_SET_NAME:\n  id: 34\n  fields:\n    name: char[MAX_NAME_LEN]'"
+    type_def: ClassVar[str] = (
+        "'CLIENT_SET_NAME:\n  id: 34\n  fields:\n    name: char[MAX_NAME_LEN]'"
+    )
 
     name: String = String(32)
 
@@ -902,9 +902,9 @@ class MDF_RTMA_LOG(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x975F197F
     type_size: ClassVar[int] = 1936
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'RTMA_LOG:\n  id: 40\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+    type_def: ClassVar[str] = (
+        "'RTMA_LOG:\n  id: 40\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+    )
 
     time: Double = Double()
     level: Int32 = Int32()
@@ -922,9 +922,9 @@ class MDF_RTMA_LOG_CRITICAL(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xDEBCA500
     type_size: ClassVar[int] = 1936
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'RTMA_LOG_CRITICAL:\n  id: 41\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+    type_def: ClassVar[str] = (
+        "'RTMA_LOG_CRITICAL:\n  id: 41\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+    )
 
     time: Double = Double()
     level: Int32 = Int32()
@@ -942,9 +942,9 @@ class MDF_RTMA_LOG_ERROR(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x45D2E328
     type_size: ClassVar[int] = 1936
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'RTMA_LOG_ERROR:\n  id: 42\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+    type_def: ClassVar[str] = (
+        "'RTMA_LOG_ERROR:\n  id: 42\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+    )
 
     time: Double = Double()
     level: Int32 = Int32()
@@ -962,9 +962,9 @@ class MDF_RTMA_LOG_WARNING(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xE6399270
     type_size: ClassVar[int] = 1936
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'RTMA_LOG_WARNING:\n  id: 43\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+    type_def: ClassVar[str] = (
+        "'RTMA_LOG_WARNING:\n  id: 43\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+    )
 
     time: Double = Double()
     level: Int32 = Int32()
@@ -982,9 +982,9 @@ class MDF_RTMA_LOG_INFO(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x607B81E9
     type_size: ClassVar[int] = 1936
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'RTMA_LOG_INFO:\n  id: 44\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+    type_def: ClassVar[str] = (
+        "'RTMA_LOG_INFO:\n  id: 44\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+    )
 
     time: Double = Double()
     level: Int32 = Int32()
@@ -1002,9 +1002,9 @@ class MDF_RTMA_LOG_DEBUG(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x45EDC532
     type_size: ClassVar[int] = 1936
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[
-        str
-    ] = "'RTMA_LOG_DEBUG:\n  id: 45\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+    type_def: ClassVar[str] = (
+        "'RTMA_LOG_DEBUG:\n  id: 45\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+    )
 
     time: Double = Double()
     level: Int32 = Int32()

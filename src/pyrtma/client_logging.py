@@ -7,6 +7,7 @@ from .message import MessageData
 from .exceptions import ClientError
 
 from typing import Union, Type, Dict, Optional, Protocol
+from rich.logging import RichHandler
 
 
 class ClientLike(Protocol):
@@ -16,16 +17,13 @@ class ClientLike(Protocol):
         dest_mod_id: int = 0,
         dest_host_id: int = 0,
         timeout: float = -1,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @property
-    def connected(self) -> bool:
-        ...
+    def connected(self) -> bool: ...
 
     @property
-    def logger(self) -> "RTMALogger":
-        ...
+    def logger(self) -> "RTMALogger": ...
 
 
 RTMA_LOG_MSG = Union[
@@ -340,10 +338,10 @@ class RTMALogger(object):
         self._file_formatter = value
 
     def init_console_handler(self) -> logging.Handler:
-        console_handler = logging.StreamHandler()
+        console_handler = RichHandler()  # logging.StreamHandler()
         console_handler.name = "Console Handler"
         console_handler.setLevel(self._console_level)
-        console_handler.setFormatter(self._console_formatter)
+        # console_handler.setFormatter(self._console_formatter)
 
         return console_handler
 
