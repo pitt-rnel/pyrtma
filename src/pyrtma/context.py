@@ -1,8 +1,10 @@
 import sys
 import copy
 
+from functools import cache
 from typing import Dict, Any
 from .message_base import MessageBase
+from .message_data import MessageData
 
 
 def _create_context() -> Dict[str, Dict[str, Any]]:
@@ -48,3 +50,17 @@ def update_context(module_name: str) -> Dict[str, Dict[str, Any]]:
 
 def get_context() -> Dict[str, Dict[str, Any]]:
     return _ctx_copy
+
+
+@cache
+def get_core_defs() -> Dict[int, type[MessageData]]:
+    mod = sys.modules["pyrtma.core_defs"]
+
+    core_defs: Dict[int, type[MessageData]] = {}
+    for k, v in mod.__dict__.items():
+        if k.startswith("MDF_"):
+            core_defs[v.type_id] = v
+        else:
+            pass
+
+    return core_defs

@@ -286,20 +286,12 @@ class PyDefCompiler:
 
             f.write("# Struct Definitions\n")
             for obj in self.parser.struct_defs.values():
-                if obj.name in core_defs:
-                    # Alias core_defs
-                    f.write(f"{obj.name} = pyrtma.core_defs.{obj.name}")
-                else:
-                    f.write(self.generate_struct(obj))
+                f.write(self.generate_struct(obj))
                 f.write("\n\n")
 
             f.write("# Message Definitions\n")
             for obj in self.parser.message_defs.values():
-                if f"MDF_{obj.name}" in core_defs:
-                    # Alias core_defs
-                    f.write(f"MDF_{obj.name} = pyrtma.core_defs.MDF_{obj.name}")
-                else:
-                    f.write(self.generate_msg_def(obj))
+                f.write(self.generate_msg_def(obj))
                 f.write("\n\n")
 
             f.write("# User Context\n")

@@ -10,6 +10,7 @@ from typing import Type, Dict, Any, TypeVar
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
 from .message_base import RTMAJSONEncoder
+from .context import get_core_defs
 from .exceptions import InvalidMessageDefinition, UnknownMessageType
 
 __all__ = [
@@ -69,7 +70,10 @@ def get_msg_cls(id: int) -> Type[MessageData]:
         Type[MessageData]: Message class
     """
     try:
-        return _msg_defs[id]
+        if id > 100:
+            return _msg_defs[id]
+        else:
+            return get_core_defs()[id]
     except KeyError as e:
         raise UnknownMessageType(
             f"There is no message definition associated with id: {id}"
