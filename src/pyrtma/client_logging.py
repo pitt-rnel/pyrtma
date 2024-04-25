@@ -7,7 +7,7 @@ import weakref
 from .message import MessageData
 from .exceptions import ClientError
 
-from typing import Union, Type, Dict, Optional, Protocol
+from typing import Union, Type, Dict, Optional, Protocol, List
 from rich.logging import RichHandler
 from rich.markup import escape
 
@@ -63,7 +63,10 @@ class RTMALogHandler(logging.Handler):
         # See https://docs.python.org/3/library/logging.html#logrecord-attributes
         # for LogRecord attributes that could be added
         msg = self.get_log_msg_cls(record.levelno)()
-        msg.name = record.name
+        if hasattr(record, "log_name"):
+            msg.name = record.log_name  # type: ignore
+        else:
+            msg.name = record.name
         msg.time = record.created
         msg.level = record.levelno
         msg.lineno = record.lineno
@@ -98,6 +101,16 @@ class RichLogFormatter(logging.Formatter):
         return super().format(record, *args)
 
 
+class RtmaLogFilter(logging.Filter):
+
+    def __init__(self, log_name: str):
+        self.log_name = log_name
+
+    def filter(self, record: logging.LogRecord):
+        record.log_name = self.log_name
+        return True
+
+
 class RTMALogger(object):
     def __init__(
         self,
@@ -106,20 +119,20 @@ class RTMALogger(object):
         level: int = logging.NOTSET,
     ):
         # default formatter
-        self._default_fmt = "{levelname:<8} - {asctime} - {name:<16} - {message}"
-        self._rich_fmt = "[bold yellow]{name:<16}[/]   {message}"
+        self._default_fmt = "{levelname:<8} - {asctime} - {log_name:<16} - {message}"
+        self._rich_fmt = "[bold yellow]{log_name:<16}[/]   {message}"
         self._default_formatter = logging.Formatter(self._default_fmt, style="{")
         self._console_formatter = RichLogFormatter(self._rich_fmt, style="{")
         self._file_formatter = self._default_formatter
 
         # initialize private attributes
+        self._log_name = log_name
+        self.children: List[logging.Logger] = []
         self._logger = logging.getLogger(hex(id(rtma_client)))
-        self._logger.name = log_name
         self._logger.propagate = True
-        self.level = level
-        self._console_level = level
-        self._rtma_level = level
-        self._file_level = level
+        self.set_all_levels(level)
+        self._filter = RtmaLogFilter(self._log_name)
+        self._logger.addFilter(self._filter)
         self._rtma_client_ref = weakref.ref(rtma_client)
         self._rtma_handler = self.init_rtma_handler()
         self._file_handler = None
@@ -165,7 +178,17 @@ class RTMALogger(object):
 
     @property
     def log_name(self) -> str:  # read only
-        return self.logger.name
+        return self._log_name  # self.logger.name #
+
+    @log_name.setter
+    def log_name(self, log_name: str):
+        old_name = self._log_name
+        self._log_name = log_name
+        self._filter.log_name = log_name
+        for child in self.children:
+            for filter in child.filters:
+                if isinstance(filter, RtmaLogFilter):
+                    filter.log_name = filter.log_name.replace(old_name, log_name, 1)
 
     @property
     def console_handler(self) -> Optional[logging.Handler]:  # read only
@@ -247,7 +270,7 @@ class RTMALogger(object):
 
     @property
     def level(self) -> int:
-        return self.logger.level
+        return self.logger.getEffectiveLevel()
 
     @level.setter
     def level(self, value: int):
@@ -256,6 +279,10 @@ class RTMALogger(object):
     def add_child(self, child_name: str) -> logging.Logger:
         child_logger = self._logger.getChild(child_name)
         child_logger.setLevel(self.level)
+        full_child_name = f"{self.log_name}.{child_name}"
+        filter = RtmaLogFilter(full_child_name)
+        child_logger.addFilter(filter)
+        self.children.append(child_logger)
         return child_logger
 
     def set_all_levels(self, value: int):
@@ -270,6 +297,11 @@ class RTMALogger(object):
         self._console_level = value
         self._rtma_level = value
         self._file_level = value
+
+        # set child levels
+        for child in self.children:
+            if value < child.getEffectiveLevel():
+                child.setLevel(value)
 
     @property
     def log_filename(self) -> Union[str, pathlib.Path]:

@@ -214,7 +214,7 @@ class Client(object):
         self._paused_types = set()
         self._sub_all = False
 
-        self.logger._logger.name = self._name or f"Module {self._module_id}"
+        self.logger.log_name = self._name or f"Module {self._module_id}"
 
         return ack_msg
 
@@ -867,7 +867,7 @@ class Client(object):
 
     def __str__(self) -> str:
         # TODO: Make this better.
-        return f"Client(module_id={self.module_id}, server={self.server}, connected={self.connected}."
+        return f"Client(module_id={self.module_id}, server={self.server}, connected={self.connected})"
 
 
 @contextmanager
