@@ -2,6 +2,7 @@ import logging
 import logging.handlers
 import pyrtma.core_defs as cd
 import pathlib
+import weakref
 
 from .message import MessageData
 from .exceptions import ClientError
@@ -17,13 +18,16 @@ class ClientLike(Protocol):
         dest_mod_id: int = 0,
         dest_host_id: int = 0,
         timeout: float = -1,
-    ) -> None: ...
+    ) -> None:
+        ...
 
     @property
-    def connected(self) -> bool: ...
+    def connected(self) -> bool:
+        ...
 
     @property
-    def logger(self) -> "RTMALogger": ...
+    def logger(self) -> "RTMALogger":
+        ...
 
 
 RTMA_LOG_MSG = Union[
@@ -49,7 +53,7 @@ class RTMALogHandler(logging.Handler):
 
     def __init__(self, client: ClientLike):
         logging.Handler.__init__(self)
-        self.client = client
+        self.client = weakref.ref(client)
 
     def close(self):
         logging.Handler.close(self)
@@ -71,15 +75,17 @@ class RTMALogHandler(logging.Handler):
         return msg
 
     def emit(self, record: logging.LogRecord):
-        try:
-            if self.client.connected:
-                msg = self.gen_log_msg(record)
-                self.client.send_message(msg)
-        except ClientError:
-            self.client.logger.enable_rtma = False
-        except Exception:
-            self.client.logger.enable_rtma = False
-            self.handleError(record)
+        client = self.client()
+        if client:
+            try:
+                if client.connected:
+                    msg = self.gen_log_msg(record)
+                    client.send_message(msg)
+            except ClientError:
+                client.logger.enable_rtma = False
+            except Exception:
+                client.logger.enable_rtma = False
+                self.handleError(record)
 
 
 class RTMALogger(object):
@@ -103,7 +109,7 @@ class RTMALogger(object):
         self._console_level = level
         self._rtma_level = level
         self._file_level = level
-        self._rtma_client = rtma_client
+        self._rtma_client = weakref.ref(rtma_client)
         self._rtma_handler = self.init_rtma_handler()
         self._file_handler = None
         self._console_handler = self.init_console_handler()
@@ -312,9 +318,11 @@ class RTMALogger(object):
         return console_handler
 
     def init_rtma_handler(self):
-        rtma_handler = RTMALogHandler(self._rtma_client)
-        rtma_handler.name = "RTMA Handler"
-        rtma_handler.setLevel(self._rtma_level)
+        c = self._rtma_client()
+        if c:
+            rtma_handler = RTMALogHandler(c)
+            rtma_handler.name = "RTMA Handler"
+            rtma_handler.setLevel(self._rtma_level)
 
         return rtma_handler
 
