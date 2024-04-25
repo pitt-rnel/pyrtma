@@ -124,9 +124,8 @@ class Client(object):
             self._name = name
 
         self._logger = RTMALogger(
-            self._name or f"Module({module_id})", self, logging.INFO
+            self._name or f"Module {module_id}", self, logging.INFO
         )
-
         # alias logger methods
         self.debug = self._logger.debug
         self.info = self._logger.info
@@ -215,7 +214,7 @@ class Client(object):
         self._paused_types = set()
         self._sub_all = False
 
-        self.logger._logger.name = self._name or f"Module({self._module_id})"
+        self.logger._logger.name = self._name or f"Module {self._module_id}"
 
         return ack_msg
 
@@ -225,7 +224,7 @@ class Client(object):
 
     @log_level.setter
     def log_level(self, level: int):
-        self._logger.level = level
+        self._logger.set_all_levels(level)
 
     @property
     def name(self) -> str:

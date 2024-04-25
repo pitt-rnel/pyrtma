@@ -9,6 +9,7 @@ from .exceptions import ClientError
 
 from typing import Union, Type, Dict, Optional, Protocol
 from rich.logging import RichHandler
+from rich.markup import escape
 
 
 class ClientLike(Protocol):
@@ -18,16 +19,13 @@ class ClientLike(Protocol):
         dest_mod_id: int = 0,
         dest_host_id: int = 0,
         timeout: float = -1,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @property
-    def connected(self) -> bool:
-        ...
+    def connected(self) -> bool: ...
 
     @property
-    def logger(self) -> "RTMALogger":
-        ...
+    def logger(self) -> "RTMALogger": ...
 
 
 RTMA_LOG_MSG = Union[
@@ -51,9 +49,9 @@ class RTMALogHandler(logging.Handler):
         50: cd.MDF_RTMA_LOG_CRITICAL,
     }
 
-    def __init__(self, client: ClientLike):
+    def __init__(self, client_ref: weakref.ReferenceType[ClientLike]):
         logging.Handler.__init__(self)
-        self.client = weakref.ref(client)
+        self.client_ref = client_ref
 
     def close(self):
         logging.Handler.close(self)
@@ -75,17 +73,29 @@ class RTMALogHandler(logging.Handler):
         return msg
 
     def emit(self, record: logging.LogRecord):
-        client = self.client()
+        client = self.client_ref()
         if client:
             try:
                 if client.connected:
                     msg = self.gen_log_msg(record)
                     client.send_message(msg)
             except ClientError:
-                client.logger.enable_rtma = False
+                if client:
+                    client.logger.enable_rtma = False
             except Exception:
-                client.logger.enable_rtma = False
+                if client:
+                    client.logger.enable_rtma = False
                 self.handleError(record)
+
+
+class RichLogFormatter(logging.Formatter):
+    """Custom Formatter that calls rich.markup.escape on record.msg so
+    that rich formatting can be applied to formatting ONLY
+    """
+
+    def format(self, record: logging.LogRecord, *args):
+        record.msg = escape(record.msg)
+        return super().format(record, *args)
 
 
 class RTMALogger(object):
@@ -97,9 +107,9 @@ class RTMALogger(object):
     ):
         # default formatter
         self._default_fmt = "{levelname:<8} - {asctime} - {name:<16} - {message}"
-        self._rich_fmt = "{name:<16}  |  {message}"
+        self._rich_fmt = "[bold yellow]{name:<16}[/]   {message}"
         self._default_formatter = logging.Formatter(self._default_fmt, style="{")
-        self._console_formatter = logging.Formatter(self._rich_fmt, style="{")
+        self._console_formatter = RichLogFormatter(self._rich_fmt, style="{")
         self._file_formatter = self._default_formatter
 
         # initialize private attributes
@@ -109,7 +119,7 @@ class RTMALogger(object):
         self._console_level = level
         self._rtma_level = level
         self._file_level = level
-        self._rtma_client = weakref.ref(rtma_client)
+        self._rtma_client_ref = weakref.ref(rtma_client)
         self._rtma_handler = self.init_rtma_handler()
         self._file_handler = None
         self._console_handler = self.init_console_handler()
@@ -143,6 +153,10 @@ class RTMALogger(object):
 
         if self._rtma_handler:
             self._logger.removeHandler(self._rtma_handler)
+
+        # remove any other handlers
+        for handler in self._logger.handlers:
+            self._logger.removeHandler(handler)
 
     @property
     def logger(self) -> logging.Logger:  # read only
@@ -238,6 +252,18 @@ class RTMALogger(object):
     def level(self, value: int):
         self._logger.setLevel(value)
 
+    def set_all_levels(self, value: int):
+        """Set the log level as well as the level for each handler"""
+        # set main level
+        self.level = value
+        # set all handlers
+        for handler in self._logger.handlers:
+            handler.setLevel(value)
+        # set private values
+        self._console_level = value
+        self._rtma_level = value
+        self._file_level = value
+
     @property
     def log_filename(self) -> Union[str, pathlib.Path]:
         if self.file_handler:
@@ -310,7 +336,12 @@ class RTMALogger(object):
         self._file_formatter = value
 
     def init_console_handler(self) -> logging.Handler:
-        console_handler = RichHandler(log_time_format="[%X.%f]")
+        # set markup to True if console formatter is RichLogFormatter
+        # This will allow rich markup in the format string but NOT in each log message text (for compatibility with other handlers)
+        console_handler = RichHandler(
+            log_time_format="[%X.%f]",
+            markup=isinstance(self._console_formatter, RichLogFormatter),
+        )
         console_handler.name = "Console Handler"
         console_handler.setLevel(self._console_level)
         console_handler.setFormatter(self._console_formatter)
@@ -318,11 +349,9 @@ class RTMALogger(object):
         return console_handler
 
     def init_rtma_handler(self):
-        c = self._rtma_client()
-        if c:
-            rtma_handler = RTMALogHandler(c)
-            rtma_handler.name = "RTMA Handler"
-            rtma_handler.setLevel(self._rtma_level)
+        rtma_handler = RTMALogHandler(self._rtma_client_ref)
+        rtma_handler.name = "RTMA Handler"
+        rtma_handler.setLevel(self._rtma_level)
 
         return rtma_handler
 
