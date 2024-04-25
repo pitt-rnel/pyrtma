@@ -19,16 +19,13 @@ class ClientLike(Protocol):
         dest_mod_id: int = 0,
         dest_host_id: int = 0,
         timeout: float = -1,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @property
-    def connected(self) -> bool:
-        ...
+    def connected(self) -> bool: ...
 
     @property
-    def logger(self) -> "RTMALogger":
-        ...
+    def logger(self) -> "RTMALogger": ...
 
 
 RTMA_LOG_MSG = Union[
@@ -52,7 +49,7 @@ class RTMALogHandler(logging.Handler):
         50: cd.MDF_RTMA_LOG_CRITICAL,
     }
 
-    def __init__(self, client_ref: weakref.ReferenceType[ClientLike]):
+    def __init__(self, client_ref: "weakref.ReferenceType[ClientLike]"):
         logging.Handler.__init__(self)
         self.client_ref = client_ref
 
