@@ -2,7 +2,7 @@ import sys
 import copy
 
 from functools import lru_cache
-from typing import Dict, Any
+from typing import Dict, Any, Type
 from .message_base import MessageBase
 from .message_data import MessageData
 
@@ -53,10 +53,10 @@ def get_context() -> Dict[str, Dict[str, Any]]:
 
 
 @lru_cache(maxsize=None)
-def get_core_defs() -> Dict[int, type[MessageData]]:
+def get_core_defs() -> Dict[int, Type[MessageData]]:
     mod = sys.modules["pyrtma.core_defs"]
 
-    core_defs: Dict[int, type[MessageData]] = {}
+    core_defs: Dict[int, Type[MessageData]] = {}
     for k, v in mod.__dict__.items():
         if k.startswith("MDF_"):
             core_defs[v.type_id] = v
