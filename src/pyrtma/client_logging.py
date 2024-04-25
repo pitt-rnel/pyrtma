@@ -113,7 +113,8 @@ class RTMALogger(object):
         self._file_formatter = self._default_formatter
 
         # initialize private attributes
-        self._logger = logging.getLogger(log_name)
+        self._logger = logging.getLogger(hex(id(rtma_client)))
+        self._logger.name = log_name
         self._logger.propagate = True
         self.level = level
         self._console_level = level
