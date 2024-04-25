@@ -767,14 +767,6 @@ class MessageManager:
     @property
     def message(self) -> Message:
         hdr = self.header
-        # Check for connect version
-        # if hdr.msg_type == cd.MT_CONNECT:
-        #     if hdr.num_data_bytes == cd.MDF_CONNECT_V2.type_size:
-        #         data = cd.MDF_CONNECT_V2.from_buffer(self.data_buffer)
-        #     else:
-        #         data = cd.MDF_CONNECT.from_buffer(self.data_buffer)
-        #     return Message(hdr, data)
-
         return Message(hdr, get_msg_cls(hdr.msg_type).from_buffer(self.data_buffer))
 
     def process_message(self, src_module: Module):
