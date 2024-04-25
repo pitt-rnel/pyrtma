@@ -253,6 +253,11 @@ class RTMALogger(object):
     def level(self, value: int):
         self._logger.setLevel(value)
 
+    def add_child(self, child_name: str) -> logging.Logger:
+        child_logger = self._logger.getChild(child_name)
+        child_logger.setLevel(self.level)
+        return child_logger
+
     def set_all_levels(self, value: int):
         """Set the log level as well as the level for each handler"""
         # set main level
@@ -260,6 +265,11 @@ class RTMALogger(object):
         # set all handlers
         for handler in self._logger.handlers:
             handler.setLevel(value)
+
+        for child in self._logger.getChildren():
+            for handler in child.handlers:
+                handler.setLevel(value)
+
         # set private values
         self._console_level = value
         self._rtma_level = value
