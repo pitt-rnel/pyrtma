@@ -1,7 +1,7 @@
 import sys
 import copy
 
-from functools import cache
+from functools import lru_cache
 from typing import Dict, Any
 from .message_base import MessageBase
 from .message_data import MessageData
@@ -52,7 +52,7 @@ def get_context() -> Dict[str, Dict[str, Any]]:
     return _ctx_copy
 
 
-@cache
+@lru_cache(maxsize=None)
 def get_core_defs() -> Dict[int, type[MessageData]]:
     mod = sys.modules["pyrtma.core_defs"]
 
