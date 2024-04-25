@@ -14,6 +14,9 @@ def _random_str(length: int) -> str:
     Returns:
         str: Random string
     """
+    if length > 1:
+        length -= 1
+
     return "".join(random.choice(string.printable) for _ in range(length))
 
 
@@ -109,19 +112,25 @@ def _random_struct(obj: CStruct) -> CStruct:
                     length, min=-(2**15), max=2**15 - 1
                 )
             elif etype in (ctypes.c_ushort, ctypes.c_uint16):
-                getattr(obj, name)[:] = _random_int_array(length, min=0, max=2**16 - 1)
+                getattr(obj, name)[:] = _random_int_array(
+                    length, min=0, max=2**16 - 1
+                )
             elif etype in (ctypes.c_int, ctypes.c_long, ctypes.c_int32):
                 getattr(obj, name)[:] = _random_int_array(
                     length, min=-(2**31), max=2**31 - 1
                 )
             elif etype in (ctypes.c_uint, ctypes.c_ulong, ctypes.c_uint32):
-                getattr(obj, name)[:] = _random_int_array(length, min=0, max=2**32 - 1)
+                getattr(obj, name)[:] = _random_int_array(
+                    length, min=0, max=2**32 - 1
+                )
             elif etype in (ctypes.c_longlong, ctypes.c_int64):
                 getattr(obj, name)[:] = _random_int_array(
                     length, min=-(2**63), max=2**63 - 1
                 )
             elif etype in (ctypes.c_ulonglong, ctypes.c_uint64):
-                getattr(obj, name)[:] = _random_int_array(length, min=0, max=2**64 - 1)
+                getattr(obj, name)[:] = _random_int_array(
+                    length, min=0, max=2**64 - 1
+                )
             elif etype is ctypes.c_float:
                 getattr(obj, name)[:] = _random_float_array(length)
             elif etype is ctypes.c_double:
