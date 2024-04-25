@@ -19,13 +19,16 @@ class ClientLike(Protocol):
         dest_mod_id: int = 0,
         dest_host_id: int = 0,
         timeout: float = -1,
-    ) -> None: ...
+    ) -> None:
+        ...
 
     @property
-    def connected(self) -> bool: ...
+    def connected(self) -> bool:
+        ...
 
     @property
-    def logger(self) -> "RTMALogger": ...
+    def logger(self) -> "RTMALogger":
+        ...
 
 
 RTMA_LOG_MSG = Union[
@@ -265,10 +268,6 @@ class RTMALogger(object):
         # set all handlers
         for handler in self._logger.handlers:
             handler.setLevel(value)
-
-        for child in self._logger.getChildren():
-            for handler in child.handlers:
-                handler.setLevel(value)
 
         # set private values
         self._console_level = value
