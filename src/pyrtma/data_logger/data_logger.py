@@ -1,14 +1,10 @@
-import logging
-import tempfile
-import datetime
-import os
 import time
 
 import pyrtma
 import pyrtma.core_defs as cd
 
 from pyrtma.exceptions import UnknownMessageType
-from typing import Optional
+from typing import Optional, cast
 
 from .metadata import LoggingMetadata
 from .data_collection import DataCollection
@@ -19,7 +15,6 @@ from .exceptions import *
 
 class DataLogger:
     def __init__(self, rtma_server_ip: str, log_level: int):
-        self.RTMA = cd.get_context()
         self.mod = pyrtma.Client(module_id=cd.MID_DATA_LOGGER, name="data_logger")
         self.mod.logger.level = log_level
         self.mod.connect(rtma_server_ip, logger_status=True)
@@ -306,35 +301,39 @@ class DataLogger:
 
                 try:
                     match (msg.data):
-                        case cd.MDF_DATA_LOGGER_START():
+                        case cd.MT_DATA_LOGGER_START:
                             self.start_logging()
-                        case cd.MDF_DATA_LOGGER_STOP():
+                        case cd.MT_DATA_LOGGER_STOP:
                             self.stop_logging()
-                        case cd.MDF_DATA_LOGGER_PAUSE():
+                        case cd.MT_DATA_LOGGER_PAUSE:
                             self.pause_logging()
-                        case cd.MDF_DATA_LOGGER_RESUME():
+                        case cd.MT_DATA_LOGGER_RESUME:
                             self.resume_logging()
-                        case cd.MDF_ADD_DATA_COLLECTION():
-                            self.add_data_collection(msg.data)
-                        case cd.MDF_ADD_DATA_SET():
-                            self.add_data_set(msg.data)
-                        case cd.MDF_REMOVE_DATA_COLLECTION():
+                        case cd.MT_ADD_DATA_COLLECTION:
+                            self.add_data_collection(
+                                cast(cd.MDF_ADD_DATA_COLLECTION, msg.data)
+                            )
+                        case cd.MT_ADD_DATA_SET:
+                            self.add_data_set(cast(cd.MDF_ADD_DATA_SET, msg.data))
+                        case cd.MT_REMOVE_DATA_COLLECTION:
                             self.rm_data_collection()
-                        case cd.MDF_REMOVE_DATA_SET():
-                            self.rm_data_set(msg.data)
-                        case cd.MDF_DATA_LOGGER_RESET():
+                        case cd.MT_REMOVE_DATA_SET:
+                            self.rm_data_set(cast(cd.MDF_REMOVE_DATA_SET, msg.data))
+                        case cd.MT_DATA_LOGGER_RESET:
                             self.reset()
-                        case cd.MDF_DATA_LOGGER_STATUS_REQUEST():
+                        case cd.MT_DATA_LOGGER_STATUS_REQUEST:
                             self.send_status()
-                        case cd.MDF_DATA_COLLECTION_CONFIG_REQUEST():
+                        case cd.MT_DATA_COLLECTION_CONFIG_REQUEST:
                             self.send_config()
-                        case cd.MDF_DATA_LOGGER_METADATA_UPDATE():
-                            self.update_metadata(msg.data.json)
-                        case cd.MDF_DATA_LOGGER_METADATA_REQUEST():
+                        case cd.MT_DATA_LOGGER_METADATA_UPDATE:
+                            self.update_metadata(
+                                cast(cd.MDF_DATA_LOGGER_METADATA_UPDATE, msg.data).json
+                            )
+                        case cd.MT_DATA_LOGGER_METADATA_REQUEST:
                             meta = cd.MDF_DATA_LOGGER_METADATA()
                             meta.json = self.metadata.to_json()
                             self.mod.send_message(meta)
-                        case cd.MDF_EXIT():
+                        case cd.MT_EXIT:
                             if msg.header.dest_mod_id == self.mod.module_id:
                                 self._running = False
                                 self.mod.info("Received EXIT request. Closing...")

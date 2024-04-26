@@ -70,10 +70,7 @@ def get_msg_cls(id: int) -> Type[MessageData]:
         Type[MessageData]: Message class
     """
     try:
-        if id > 100:
-            return _msg_defs[id]
-        else:
-            return get_core_defs()[id]
+        return _msg_defs[id]
     except KeyError as e:
         raise UnknownMessageType(
             f"There is no message definition associated with id: {id}"
