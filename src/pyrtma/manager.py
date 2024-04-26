@@ -13,11 +13,13 @@ import ctypes
 import os
 import typing
 
+
 from .client_logging import RTMALogger
 from .validators import disable_message_validation
 from .message import Message, get_msg_cls
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
+from .context import get_core_defs
 from .core_defs import ALL_MESSAGE_TYPES
 from . import core_defs as cd
 
@@ -767,7 +769,14 @@ class MessageManager:
     @property
     def message(self) -> Message:
         hdr = self.header
-        return Message(hdr, get_msg_cls(hdr.msg_type).from_buffer(self.data_buffer))
+        data_cls = get_core_defs().get(hdr.msg_type)
+        if data_cls:
+            data = data_cls.from_buffer(self.data_buffer)
+            return Message(
+                hdr, get_core_defs()[hdr.msg_type].from_buffer(self.data_buffer)
+            )
+        else:
+            raise RuntimeError(f"Unknown core_def MT={hdr.msg_type}")
 
     def process_message(self, src_module: Module):
         """Process incoming message
