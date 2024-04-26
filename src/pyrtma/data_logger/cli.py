@@ -81,40 +81,39 @@ def main():
         while True:
             cmd = input("(data_log)>> ")
 
-            match (cmd):
-                case "add-collection":
-                    add_collection(mod)
-                case "add-data-set":
-                    add_data_set(mod)
-                case "rm-collection":
-                    rm_collection(mod)
-                case "rm-data-set":
-                    rm_data_set(mod)
-                case "pause":
-                    mod.send_signal(cd.MT_DATA_LOGGER_PAUSE)
-                case "resume":
-                    mod.send_signal(cd.MT_DATA_LOGGER_RESUME)
-                case "reset":
-                    mod.send_signal(cd.MT_DATA_LOGGER_RESET)
-                case "start":
-                    mod.send_signal(cd.MT_DATA_LOGGER_START)
-                case "stop":
-                    mod.send_signal(cd.MT_DATA_LOGGER_STOP)
-                case "get-status":
-                    mod.send_signal(cd.MT_DATA_LOGGER_STATUS_REQUEST)
-                case "get-config":
-                    mod.send_signal(cd.MT_DATA_COLLECTION_CONFIG_REQUEST)
-                case "get-metadata":
-                    mod.send_signal(cd.MT_DATA_LOGGER_METADATA_REQUEST)
-                case "update-metadata":
-                    update_metadata(mod, metadata)
-                case "help":
-                    help()
-                case "exit":
-                    break
-                case _:
-                    print(f"Unknown command: {cmd}")
-                    help()
+            if cmd == "add-collection":
+                add_collection(mod)
+            elif cmd == "add-data-set":
+                add_data_set(mod)
+            elif cmd == "rm-collection":
+                rm_collection(mod)
+            elif cmd == "rm-data-set":
+                rm_data_set(mod)
+            elif cmd == "pause":
+                mod.send_signal(cd.MT_DATA_LOGGER_PAUSE)
+            elif cmd == "resume":
+                mod.send_signal(cd.MT_DATA_LOGGER_RESUME)
+            elif cmd == "reset":
+                mod.send_signal(cd.MT_DATA_LOGGER_RESET)
+            elif cmd == "start":
+                mod.send_signal(cd.MT_DATA_LOGGER_START)
+            elif cmd == "stop":
+                mod.send_signal(cd.MT_DATA_LOGGER_STOP)
+            elif cmd == "get-status":
+                mod.send_signal(cd.MT_DATA_LOGGER_STATUS_REQUEST)
+            elif cmd == "get-config":
+                mod.send_signal(cd.MT_DATA_COLLECTION_CONFIG_REQUEST)
+            elif cmd == "get-metadata":
+                mod.send_signal(cd.MT_DATA_LOGGER_METADATA_REQUEST)
+            elif cmd == "update-metadata":
+                update_metadata(mod, metadata)
+            elif cmd == "help":
+                help()
+            elif cmd == "exit":
+                break
+            else:
+                print(f"Unknown command: {cmd}")
+                help()
 
             msg = mod.read_message(0.200)
             if msg:

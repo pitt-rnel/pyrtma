@@ -5,7 +5,7 @@ import math
 
 from ..message import Message
 from ..core_defs import ALL_MESSAGE_TYPES
-from typing import Type, Optional, IO, Any
+from typing import Type, Optional, IO, Any, List
 
 from .metadata import LoggingMetadata
 from .data_formatter import DataFormatter
@@ -25,7 +25,7 @@ class DataSet:
         file_name_fmt: str,
         formatter_cls: Type[DataFormatter],
         subdivide_interval: int,
-        msg_types: list[int],
+        msg_types: List[int],
         metadata: LoggingMetadata,
     ):
         self.logger = logging.getLogger("data_logger").getChild(
@@ -53,8 +53,8 @@ class DataSet:
         else:
             self.formatter = formatter_cls(io.StringIO())
 
-        self.rbuf: list[Message] = []
-        self.wbuf: list[Message] = []
+        self.rbuf: List[Message] = []
+        self.wbuf: List[Message] = []
 
         self.fd: Optional[IO[Any]] = None
         self.file_path = pathlib.Path()

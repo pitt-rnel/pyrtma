@@ -931,7 +931,17 @@ def main():
     else:
         ip_addr = ""  # socket.INADDR_ANY
 
-    level = logging.getLevelNamesMapping().get(args.log_level) or logging.INFO
+    if args.log_level == "DEBUG":
+        level = logging.DEBUG
+    elif args.log_level == "INFO":
+        level = logging.INFO
+    elif args.log_level == "WARN":
+        level = logging.WARN
+    elif args.log_level == "ERROR":
+        level = logging.ERROR
+    else:
+        print("Unknown log level. Using INFO instead")
+        level = logging.INFO
 
     with disable_message_validation():
         msg_mgr = MessageManager(

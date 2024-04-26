@@ -1,5 +1,5 @@
 import pyrtma
-from typing import Type, Optional, ClassVar, IO, Any
+from typing import Type, Optional, ClassVar, IO, Any, Union, List
 from abc import ABC
 from .exceptions import InvalidFormatter, DataFormatterKeyError
 
@@ -17,19 +17,19 @@ class DataFormatter(ABC):
         if hdr := self.format_header():
             self.fd.write(hdr)
 
-    def format_header(self) -> Optional[bytes | str]:
+    def format_header(self) -> Optional[Union[bytes, str]]:
         return None
 
-    def format_footer(self) -> Optional[bytes | str]:
+    def format_footer(self) -> Optional[Union[bytes, str]]:
         return None
 
-    def format_message(self, msg: pyrtma.Message) -> Optional[str | bytes]:
+    def format_message(self, msg: pyrtma.Message) -> Optional[Union[str, bytes]]:
         return None
 
-    def write(self, wbuf: list[pyrtma.Message]):
+    def write(self, wbuf: List[pyrtma.Message]):
         self.fd.writelines(self.format_message(msg) for msg in wbuf)
 
-    def finalize(self, wbuf: list[pyrtma.Message]):
+    def finalize(self, wbuf: List[pyrtma.Message]):
         # Write the last bit of data
         self.write(wbuf)
 

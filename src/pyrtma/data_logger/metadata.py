@@ -4,11 +4,12 @@ import re
 import os
 
 from .exceptions import MissingMetadata, InvalidMetadata
+from typing import Union
 
 
 class LoggingMetadata:
     def __init__(self):
-        self._metadata: dict[str, str | float | int] = {}
+        self._metadata: dict[str, Union[str, float, int]] = {}
 
     def update(self, json_str: str):
         try:

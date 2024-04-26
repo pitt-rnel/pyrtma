@@ -300,43 +300,42 @@ class DataLogger:
                     continue
 
                 try:
-                    match (msg.data):
-                        case cd.MT_DATA_LOGGER_START:
-                            self.start_logging()
-                        case cd.MT_DATA_LOGGER_STOP:
-                            self.stop_logging()
-                        case cd.MT_DATA_LOGGER_PAUSE:
-                            self.pause_logging()
-                        case cd.MT_DATA_LOGGER_RESUME:
-                            self.resume_logging()
-                        case cd.MT_ADD_DATA_COLLECTION:
-                            self.add_data_collection(
-                                cast(cd.MDF_ADD_DATA_COLLECTION, msg.data)
-                            )
-                        case cd.MT_ADD_DATA_SET:
-                            self.add_data_set(cast(cd.MDF_ADD_DATA_SET, msg.data))
-                        case cd.MT_REMOVE_DATA_COLLECTION:
-                            self.rm_data_collection()
-                        case cd.MT_REMOVE_DATA_SET:
-                            self.rm_data_set(cast(cd.MDF_REMOVE_DATA_SET, msg.data))
-                        case cd.MT_DATA_LOGGER_RESET:
-                            self.reset()
-                        case cd.MT_DATA_LOGGER_STATUS_REQUEST:
-                            self.send_status()
-                        case cd.MT_DATA_COLLECTION_CONFIG_REQUEST:
-                            self.send_config()
-                        case cd.MT_DATA_LOGGER_METADATA_UPDATE:
-                            self.update_metadata(
-                                cast(cd.MDF_DATA_LOGGER_METADATA_UPDATE, msg.data).json
-                            )
-                        case cd.MT_DATA_LOGGER_METADATA_REQUEST:
-                            meta = cd.MDF_DATA_LOGGER_METADATA()
-                            meta.json = self.metadata.to_json()
-                            self.mod.send_message(meta)
-                        case cd.MT_EXIT:
-                            if msg.header.dest_mod_id == self.mod.module_id:
-                                self._running = False
-                                self.mod.info("Received EXIT request. Closing...")
+                    if msg.type_id == cd.MT_DATA_LOGGER_START:
+                        self.start_logging()
+                    elif msg.type_id == cd.MT_DATA_LOGGER_STOP:
+                        self.stop_logging()
+                    elif msg.type_id == cd.MT_DATA_LOGGER_PAUSE:
+                        self.pause_logging()
+                    elif msg.type_id == cd.MT_DATA_LOGGER_RESUME:
+                        self.resume_logging()
+                    elif msg.type_id == cd.MT_ADD_DATA_COLLECTION:
+                        self.add_data_collection(
+                            cast(cd.MDF_ADD_DATA_COLLECTION, msg.data)
+                        )
+                    elif msg.type_id == cd.MT_ADD_DATA_SET:
+                        self.add_data_set(cast(cd.MDF_ADD_DATA_SET, msg.data))
+                    elif msg.type_id == cd.MT_REMOVE_DATA_COLLECTION:
+                        self.rm_data_collection()
+                    elif msg.type_id == cd.MT_REMOVE_DATA_SET:
+                        self.rm_data_set(cast(cd.MDF_REMOVE_DATA_SET, msg.data))
+                    elif msg.type_id == cd.MT_DATA_LOGGER_RESET:
+                        self.reset()
+                    elif msg.type_id == cd.MT_DATA_LOGGER_STATUS_REQUEST:
+                        self.send_status()
+                    elif msg.type_id == cd.MT_DATA_COLLECTION_CONFIG_REQUEST:
+                        self.send_config()
+                    elif msg.type_id == cd.MT_DATA_LOGGER_METADATA_UPDATE:
+                        self.update_metadata(
+                            cast(cd.MDF_DATA_LOGGER_METADATA_UPDATE, msg.data).json
+                        )
+                    elif msg.type_id == cd.MT_DATA_LOGGER_METADATA_REQUEST:
+                        meta = cd.MDF_DATA_LOGGER_METADATA()
+                        meta.json = self.metadata.to_json()
+                        self.mod.send_message(meta)
+                    elif msg.type_id == cd.MT_EXIT:
+                        if msg.header.dest_mod_id == self.mod.module_id:
+                            self._running = False
+                            self.mod.info("Received EXIT request. Closing...")
                 except DataLoggerError as e:
                     self.mod.error(e.args[0])
                     self.send_error(f"{e.__class__.__name__}:{e.args[0]}")

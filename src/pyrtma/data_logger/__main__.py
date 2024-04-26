@@ -37,7 +37,17 @@ def main():
 
     args = parser.parse_args()
 
-    log_level = logging.getLevelNamesMapping().get(args.log_level) or logging.INFO
+    if args.log_level == "DEBUG":
+        level = logging.DEBUG
+    elif args.log_level == "INFO":
+        level = logging.INFO
+    elif args.log_level == "WARN":
+        level = logging.WARN
+    elif args.log_level == "ERROR":
+        level = logging.ERROR
+    else:
+        print("Unknown log level. Using INFO instead")
+        level = logging.INFO
 
     if args.defs_file:
         base = pathlib.Path(args.defs_file).absolute().parent
@@ -46,7 +56,7 @@ def main():
         sys.path.insert(0, (str(base.absolute())))
         importlib.import_module(fname)
 
-    d = DataLogger(args.mm_ip, log_level=log_level)
+    d = DataLogger(args.mm_ip, log_level=level)
 
     try:
         d.run()
