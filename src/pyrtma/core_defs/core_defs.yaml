@@ -4,8 +4,8 @@ compiler_options:
   IMPORT_COREDEFS: false
 
 imports:
-  - data_logger.yaml
-  - quick_logger.yaml
+  - data_logger.yaml # MTs 62-79, 87-89
+  - quick_logger.yaml # MTs 54-61, 96
 
 constants:
   MAX_MODULES: 200
@@ -19,7 +19,7 @@ constants:
   MAX_RTMA_MODULE_ID: 9
   MAX_CONTIGUOUS_MESSAGE_DATA: 9000
   ALL_MESSAGE_TYPES: 0x7FFFFFFF
-  MAX_CLIENTS: 256
+  MAX_ACTIVE_CLIENTS: 256
   MAX_SUBSCRIBERS: 256
   MAX_SUBS: 256
   MAX_NAME_LEN: 32
@@ -127,8 +127,8 @@ message_defs:
   TIMING_MESSAGE:
     id: 80
     fields:
-      timing: unsigned short[MAX_MESSAGE_TYPES]
-      ModulePID: int[MAX_MODULES]
+      timing: uint16[MAX_MESSAGE_TYPES]
+      ModulePID: int32[MAX_MODULES]
       send_time: double
 
   FORCE_DISCONNECT:
@@ -163,8 +163,8 @@ message_defs:
       num_clients: int16
       padding: int16
       reserved: int32
-      client_mod_id: MODULE_ID[MAX_CLIENTS]
-      client_pid: int32[MAX_CLIENTS]
+      client_mod_id: MODULE_ID[MAX_ACTIVE_CLIENTS]
+      client_pid: int32[MAX_ACTIVE_CLIENTS]
     
   CLIENT_INFO:
     id: 32

@@ -99,7 +99,7 @@ message_defs:
 
   DATA_LOGGER_START:
     id: 73
-    fields:
+    fields: null
 
   DATA_LOGGER_STOP:
     id: 74

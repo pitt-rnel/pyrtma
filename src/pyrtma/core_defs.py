@@ -49,7 +49,7 @@ MAX_RTMA_MSG_TYPE: int = 99
 MAX_RTMA_MODULE_ID: int = 9
 MAX_CONTIGUOUS_MESSAGE_DATA: int = 9000
 ALL_MESSAGE_TYPES: int = 2147483647
-MAX_CLIENTS: int = 256
+MAX_ACTIVE_CLIENTS: int = 256
 MAX_SUBSCRIBERS: int = 256
 MAX_SUBS: int = 256
 MAX_NAME_LEN: int = 32
@@ -96,7 +96,6 @@ MT_DATA_LOGGER_METADATA_UPDATE: int = 79
 MT_DATA_LOGGER_METADATA_REQUEST: int = 87
 MT_DATA_LOGGER_METADATA: int = 88
 MT_DATA_LOG_TEST_2048: int = 89
-MT_LM_READY: int = 96
 MT_LM_STATUS: int = 54
 MT_LM_EXIT: int = 55
 MT_SAVE_MESSAGE_LOG: int = 56
@@ -105,6 +104,7 @@ MT_PAUSE_MESSAGE_LOGGING: int = 58
 MT_RESUME_MESSAGE_LOGGING: int = 59
 MT_RESET_MESSAGE_LOG: int = 60
 MT_DUMP_MESSAGE_LOG: int = 61
+MT_LM_READY: int = 96
 MT_EXIT: int = 0
 MT_KILL: int = 1
 MT_ACKNOWLEDGE: int = 2
@@ -492,16 +492,6 @@ class MDF_DATA_LOG_TEST_2048(MessageData, metaclass=MessageMeta):
 
 
 @pyrtma.message_def
-class MDF_LM_READY(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 96
-    type_name: ClassVar[str] = "LM_READY"
-    type_hash: ClassVar[int] = 0x4863B960
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "quick_logger.yaml"
-    type_def: ClassVar[str] = "'LM_READY:\n  id: 96\n  fields: null'"
-
-
-@pyrtma.message_def
 class MDF_LM_STATUS(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 54
     type_name: ClassVar[str] = "LM_STATUS"
@@ -536,11 +526,11 @@ class MDF_LM_EXIT(MessageData, metaclass=MessageMeta):
 class MDF_SAVE_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 56
     type_name: ClassVar[str] = "SAVE_MESSAGE_LOG"
-    type_hash: ClassVar[int] = 0x515569E9
+    type_hash: ClassVar[int] = 0xF0D7A3A9
     type_size: ClassVar[int] = 260
     type_source: ClassVar[str] = "quick_logger.yaml"
     type_def: ClassVar[str] = (
-        "'SAVE_MESSAGE_LOG:\n  id: 56\n  fields:\n    pathname: char[MAX_LOGGER_FILENAME_LENGTH]\n    pathname_length: int'"
+        "'SAVE_MESSAGE_LOG:\n  id: 56\n  fields:\n    pathname: char[MAX_LOGGER_FILENAME_LENGTH]\n    pathname_length: int32'"
     )
 
     pathname: String = String(256)
@@ -595,6 +585,16 @@ class MDF_DUMP_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "quick_logger.yaml"
     type_def: ClassVar[str] = "'DUMP_MESSAGE_LOG:\n  id: 61\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_LM_READY(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 96
+    type_name: ClassVar[str] = "LM_READY"
+    type_hash: ClassVar[int] = 0x4863B960
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "quick_logger.yaml"
+    type_def: ClassVar[str] = "'LM_READY:\n  id: 96\n  fields: null'"
 
 
 @pyrtma.message_def
@@ -748,11 +748,11 @@ class MDF_MODULE_READY(MessageData, metaclass=MessageMeta):
 class MDF_TIMING_MESSAGE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 80
     type_name: ClassVar[str] = "TIMING_MESSAGE"
-    type_hash: ClassVar[int] = 0x3595C23E
+    type_hash: ClassVar[int] = 0xDAA7503D
     type_size: ClassVar[int] = 20808
     type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
-        "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: unsigned short[MAX_MESSAGE_TYPES]\n    ModulePID: int[MAX_MODULES]\n    send_time: double'"
+        "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: uint16[MAX_MESSAGE_TYPES]\n    ModulePID: int32[MAX_MODULES]\n    send_time: double'"
     )
 
     timing: IntArray[Uint16] = IntArray(Uint16, 10000)
@@ -825,11 +825,11 @@ class MDF_MESSAGE_TRAFFIC(MessageData, metaclass=MessageMeta):
 class MDF_ACTIVE_CLIENTS(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 31
     type_name: ClassVar[str] = "ACTIVE_CLIENTS"
-    type_hash: ClassVar[int] = 0xC203F18C
+    type_hash: ClassVar[int] = 0xFC42B3AF
     type_size: ClassVar[int] = 1552
     type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
-        "'ACTIVE_CLIENTS:\n  id: 31\n  fields:\n    timestamp: double\n    num_clients: int16\n    padding: int16\n    reserved: int32\n    client_mod_id: MODULE_ID[MAX_CLIENTS]\n    client_pid: int32[MAX_CLIENTS]'"
+        "'ACTIVE_CLIENTS:\n  id: 31\n  fields:\n    timestamp: double\n    num_clients: int16\n    padding: int16\n    reserved: int32\n    client_mod_id: MODULE_ID[MAX_ACTIVE_CLIENTS]\n    client_pid: int32[MAX_ACTIVE_CLIENTS]'"
     )
 
     timestamp: Double = Double()

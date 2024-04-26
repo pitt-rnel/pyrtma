@@ -3,10 +3,6 @@ constants:
   MAX_LOGGER_FILENAME_LENGTH: 256
 
 message_defs:
-  LM_READY:
-    id: 96
-    fields: null
-
   LM_STATUS:
     id: 54
     fields:
@@ -27,7 +23,7 @@ message_defs:
     id: 56
     fields:
       pathname: char[MAX_LOGGER_FILENAME_LENGTH]
-      pathname_length: int
+      pathname_length: int32
 
   MESSAGE_LOG_SAVED:
     id: 57
@@ -47,4 +43,8 @@ message_defs:
 
   DUMP_MESSAGE_LOG:
     id: 61
+    fields: null
+  
+  LM_READY:
+    id: 96
     fields: null
