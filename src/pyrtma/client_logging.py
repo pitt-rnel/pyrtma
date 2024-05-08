@@ -8,6 +8,8 @@ from .message import MessageData
 from .exceptions import ClientError
 
 from typing import Union, Type, Dict, Optional, Protocol, List
+from contextlib import contextmanager
+import traceback
 from rich.logging import RichHandler
 from rich.markup import escape
 
@@ -403,6 +405,34 @@ class RTMALogger(object):
         file_handler.setFormatter(self._file_formatter)
 
         return file_handler
+
+    @contextmanager
+    def exception_logging_context(self):
+        try:
+            yield
+        except Exception as e:
+            e_str = str(e)
+            e_type = type(e).__name__
+            tb = traceback.extract_tb(e.__traceback__)
+            tb_line = tb[1].lineno
+            tb_fcn_name = tb[1].name
+            tb_pathname = tb[1].filename
+            tb_filename = pathlib.Path(tb_pathname).name
+            if tb_fcn_name != "<module>":
+                tb_fcn_name += "()"
+
+            if e.__traceback__:
+                exc_info = (type(e), e, e.__traceback__.tb_next)
+            else:
+                exc_info = (type(e), e, e.__traceback__)
+
+            # there does not appear to be a (simple) way to point the log record to the line raising the exception
+            # but exc_info prints it
+            self.exception(
+                f"{e_type}: {e_str} -- Unhandled exception in {tb_fcn_name} {tb_filename}:{tb_line}",
+                exc_info=exc_info,
+            )
+            raise
 
     def __repr__(self):
         level = logging.getLevelName(self.logger.getEffectiveLevel())
