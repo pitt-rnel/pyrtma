@@ -115,6 +115,7 @@ class DataLogger:
                     "Cannot start collection while recording in progresss."
                 )
 
+            self.mod.unsubscribe(self.ctrl_msg_types)
             self.mod.subscribe([cd.ALL_MESSAGE_TYPES])
             self.collection.start()
 

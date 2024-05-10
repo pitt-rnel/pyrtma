@@ -5,7 +5,7 @@ def main():
     import sys
     import importlib
     import logging
-    from ..exceptions import ClientError, ConnectionLost, MessageManagerNotFound
+    from ..exceptions import ConnectionLost, MessageManagerNotFound
     from .data_logger import DataLogger
 
     parser = argparse.ArgumentParser(description="Packet Data Logger")
@@ -32,7 +32,7 @@ def main():
         dest="log_level",
         choices=["DEBUG", "INFO", "WARN", "ERROR"],
         default="INFO",
-        help="Logging Level",
+        help="Logging Level (defaults to INFO)",
     )
 
     args = parser.parse_args()
