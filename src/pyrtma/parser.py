@@ -630,10 +630,10 @@ class Parser:
                 f"Values in 'host_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value}"
             )
 
-        if value < 10 or value > 32767:
+        if value < 1 or value > 32767:
             if self.current_file.name != "core_defs.yaml" and self.import_coredefs:
                 raise RTMASyntaxError(
-                    f"Value outside of valid range [0 - 32767] for host_id: {name}: {value}"
+                    f"Value outside of valid range [1 - 32767] for host_id: {name}: {value}"
                 )
 
         for hid in self.host_ids.values():
