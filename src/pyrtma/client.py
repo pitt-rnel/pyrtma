@@ -30,6 +30,7 @@ from .exceptions import (
     AcknowledgementTimeout,
     InvalidDestinationModule,
     InvalidDestinationHost,
+    InvalidSubscription,
 )
 from . import core_defs as cd
 
@@ -348,7 +349,9 @@ class Client(object):
         # Note: Ignore any sub control for individual msg_types
         # when subscribed to ALL_MESSAGE_TYPES
         if self._sub_all and not all_msg:
-            return
+            raise InvalidSubscription(
+                "Cannot modify subscriptions to individual MTs while subscribed to ALL_MESSAGE_TYPES"
+            )
 
         msg: MessageData
         if ctrl_msg == "Subscribe":
