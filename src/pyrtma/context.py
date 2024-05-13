@@ -2,15 +2,29 @@ import sys
 import copy
 
 from functools import lru_cache
-from typing import Dict, Any, Type
+from typing import Dict, Any, Type, TypedDict, Union
 from .message_base import MessageBase
 from .message_data import MessageData
 
 
-def _create_context() -> Dict[str, Dict[str, Any]]:
-    ctx: Dict[str, Dict[str, Any]] = dict(
-        constants={}, typedefs={}, mid={}, sdf={}, mt={}, mdf={}
-    )
+class RTMAContext(TypedDict):
+    constants: Dict[str, Union[int, float, str]]
+    typedefs: Dict[str, Any]
+    mid: Dict[str, int]
+    sdf: Dict[str, Type[MessageBase]]
+    mt: Dict[str, int]
+    mdf: Dict[str, Type[MessageData]]
+
+
+def _create_context() -> RTMAContext:
+    ctx: RTMAContext = {
+        "constants": {},
+        "typedefs": {},
+        "mid": {},
+        "sdf": {},
+        "mt": {},
+        "mdf": {},
+    }
 
     return ctx
 
@@ -19,7 +33,7 @@ _ctx = _create_context()
 _ctx_copy = _ctx.copy()
 
 
-def update_context(module_name: str) -> Dict[str, Dict[str, Any]]:
+def update_context(module_name: str) -> RTMAContext:
     mod = sys.modules[module_name]
 
     for k, v in mod.__dict__.items():
@@ -48,7 +62,7 @@ def update_context(module_name: str) -> Dict[str, Dict[str, Any]]:
     return _ctx_copy
 
 
-def get_context() -> Dict[str, Dict[str, Any]]:
+def get_context() -> RTMAContext:
     return _ctx_copy
 
 
@@ -58,7 +72,7 @@ def get_core_defs() -> Dict[int, Type[MessageData]]:
 
     core_defs: Dict[int, Type[MessageData]] = {}
     for k, v in mod.__dict__.items():
-        if k.startswith("MDF_"):
+        if k.startswith("MDF_") and issubclass(v, MessageData):
             core_defs[v.type_id] = v
         else:
             pass
