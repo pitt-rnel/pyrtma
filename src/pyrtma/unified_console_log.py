@@ -1,11 +1,12 @@
 """Run with `python -m pyrtma.unified_console_logger [OPTIONS]` (use -h for help)"""
 
 import logging
-from .client import Client
+import os
+from .client import Client, client_context
 from . import core_defs as cd
 from .client_logging import RTMALogger
+from .exceptions import MessageManagerNotFound, ConnectionLost
 from typing import Optional, Union, cast
-import os
 
 RTMA_LOG_MSG = Union[
     cd.MDF_RTMA_LOG,
@@ -38,9 +39,13 @@ class RTMA_UnifiedLog(object):
     def init_rtma(self):
         if self.server is None:
             self.server = "127.0.0.1:7111"
-        self.mod.info(f"Connecting to RTMA @ {self.server}")
-        self.mod.connect(self.server)
+        self.mod.info(f"Attempting connection to RTMA @ {self.server}")
+        self.mod.connect(self.server, allow_multiple=True)
 
+        self.mod.info("Successfully connected to RTMA")
+        self.rtma_subscribe()
+
+    def rtma_subscribe(self):
         msg_list = [cd.MT_EXIT, cd.MT_RTMA_LOG]
         if self.log_level <= logging.DEBUG:
             msg_list.append(cd.MT_RTMA_LOG_DEBUG)
@@ -60,11 +65,11 @@ class RTMA_UnifiedLog(object):
         self.mod.subscribe(msg_list)
         self.mod.info(f"Subscribed to: {msg_list}")
         self.mod.send_module_ready()
-        self.mod.info(f"Sucessfully connected to RTMA")
 
     def disconnect(self):
-        self.mod.info("Disconnecting from RTMA")
-        self.mod.disconnect()
+        if self.mod.connected:
+            self.mod.info("Disconnecting from RTMA")
+            self.mod.disconnect()
 
     def make_log_record_dict(self, msg: RTMA_LOG_MSG):
         log_dict = {
@@ -110,20 +115,32 @@ class RTMA_UnifiedLog(object):
             cd.MT_RTMA_LOG_ERROR,
             cd.MT_RTMA_LOG_CRITICAL,
         )
-
-        self.init_rtma()
-        self.mod.info("Starting main loop")
+        if self.server is None:
+            self.server = "127.0.0.1:7111"
         self._running = True
-        while self._running:
-            msg = self.mod.read_message(1)
-            if msg:
-                if msg.type_id == cd.MT_EXIT:
-                    self._running = False
-                elif msg.type_id in log_msg_ids:
-                    msg.data = cast(RTMA_LOG_MSG, msg.data)
-                    self.process_log_msg(msg.data)
-        self.mod.info("Exited main loop")
-        self.disconnect()
+        try:
+            self.mod.info("Starting main loop")
+            while self._running:
+                try:
+                    self.init_rtma()
+                    while self._running:
+                        msg = self.mod.read_message(1)
+                        if msg:
+                            if msg.type_id == cd.MT_EXIT:
+                                self.mod.info("Received EXIT signal")
+                                self._running = False
+                            elif msg.type_id in log_msg_ids:
+                                msg.data = cast(RTMA_LOG_MSG, msg.data)
+                                self.process_log_msg(msg.data)
+                except MessageManagerNotFound:
+                    continue
+                except ConnectionLost:
+                    self.mod.error("RTMA Connection lost, attempting to reconnect")
+        except KeyboardInterrupt:
+            self.mod.info("Keyboard Interrupt")
+        finally:
+            self.mod.disconnect()
+            self.mod.info("Exiting")
 
 
 if __name__ == "__main__":
@@ -146,8 +163,8 @@ if __name__ == "__main__":
         default=7111,
         help="Listener port. Default is 7111.",
     )
-    parser.add_argument("-d", "--debug", action="store_true", help="Debug mode")
     parser.add_argument(
+        "-l",
         "--log-level",
         dest="log_level",
         choices=["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"],
@@ -159,21 +176,7 @@ if __name__ == "__main__":
 
     server_name = f"{args.addr}:{args.port}"
 
-    log_level = logging.INFO  # default
-    if args.log_level:
-        level = args.log_level.upper()
-        if level == "DEBUG":
-            log_level = logging.DEBUG
-        elif level == "INFO":
-            log_level = logging.INFO
-        elif level in ("WARN", "WARNING"):
-            log_level = logging.WARNING
-        elif level == "ERROR":
-            log_level = logging.ERROR
-        elif level == "CRITICAL":
-            log_level = logging.CRITICAL
-        else:
-            raise UserWarning("Unhandled log_level, defaulting to INFO")
+    log_level = logging.getLevelNamesMapping().get(args.log_level) or logging.INFO
 
     RL = RTMA_UnifiedLog(log_level=log_level, server=server_name)
     RL.start()

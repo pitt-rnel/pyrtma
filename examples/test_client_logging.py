@@ -34,8 +34,7 @@ def exception_test(client: pyrtma.Client):
 
 
 if __name__ == "__main__":
-    try:
-        client = pyrtma.Client()
+    with pyrtma.client_context(name="logging_test") as client:
 
         # enable log file (console and RTMA logs enabled by default)
         client.logger.log_filename = "client_log_test.log"
@@ -71,5 +70,3 @@ if __name__ == "__main__":
 
         with client.logger.exception_logging_context():
             raise RuntimeError(f"But this last error will crash it all")
-    finally:
-        client.disconnect()
