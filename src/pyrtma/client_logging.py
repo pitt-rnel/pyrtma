@@ -123,9 +123,13 @@ class RTMALogger(object):
         # default formatter
         self._default_fmt = "{levelname:<8} - {asctime} - {log_name:<16} - {message}"
         self._rich_fmt = "[bold yellow]{log_name:<16}[/]   {message}"
-        self._default_formatter = logging.Formatter(self._default_fmt, style="{")
-        self._console_formatter = RichLogFormatter(self._rich_fmt, style="{")
-        self._file_formatter = self._default_formatter
+        self._default_formatter: Optional[logging.Formatter] = logging.Formatter(
+            self._default_fmt, style="{"
+        )
+        self._console_formatter: Optional[logging.Formatter] = RichLogFormatter(
+            self._rich_fmt, style="{"
+        )
+        self._file_formatter: Optional[logging.Formatter] = self._default_formatter
 
         # initialize private attributes
         self._log_name = log_name
@@ -136,16 +140,18 @@ class RTMALogger(object):
         self._filter = RtmaLogFilter(self._log_name)
         self._logger.addFilter(self._filter)
         self._rtma_client_ref = weakref.ref(rtma_client)
-        self._rtma_handler = self.init_rtma_handler()
-        self._file_handler = None
-        self._console_handler = self.init_console_handler()
+        self._rtma_handler: Optional[RTMALogHandler] = self.init_rtma_handler()
+        self._file_handler: Optional[logging.FileHandler] = None
+        self._console_handler: Optional[logging.Handler] = self.init_console_handler()
 
         # default values for which handlers will be enabled
-        self._enable_rtma = True
-        self._logger.addHandler(self._rtma_handler)
+        if self._rtma_handler:
+            self._logger.addHandler(self._rtma_handler)
+        self._enable_rtma = self._rtma_handler is not None
 
-        self._enable_console = True
-        self._logger.addHandler(self._console_handler)
+        if self._console_handler:
+            self._logger.addHandler(self._console_handler)
+        self._enable_console = self._console_formatter is not None
 
         self._enable_file = False
         self._log_filename: Union[str, pathlib.Path] = ""
@@ -206,6 +212,7 @@ class RTMALogger(object):
             for handler in self._logger.handlers:
                 if handler is self._rtma_handler:
                     return self._rtma_handler
+        return None
 
     @property
     def file_handler(self) -> Optional[logging.FileHandler]:  # read only
@@ -238,7 +245,7 @@ class RTMALogger(object):
     @enable_rtma.setter
     def enable_rtma(self, value: bool):
         if self._enable_rtma != bool(value):  # value changed
-            if self.rtma_handler:
+            if self._rtma_handler:
                 if bool(value):
                     # add handler
                     self.logger.addHandler(self._rtma_handler)

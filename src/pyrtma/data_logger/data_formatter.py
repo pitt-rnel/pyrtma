@@ -1,10 +1,7 @@
 import pyrtma
-from typing import Type, Optional, ClassVar, IO, Any, Union, List
+from typing import Type, Optional, ClassVar, IO, Any, Union, List, Dict
 from abc import ABC
 from .exceptions import InvalidFormatter, DataFormatterKeyError
-
-
-_formatter_map = {}
 
 
 class DataFormatter(ABC):
@@ -36,6 +33,9 @@ class DataFormatter(ABC):
         # Write an optional footer
         if footer := self.format_footer():
             self.fd.write(footer)
+
+
+_formatter_map: Dict[str, Type[DataFormatter]] = {}
 
 
 def add_formatter(fmt_cls: Type[DataFormatter]):

@@ -17,7 +17,7 @@ from typing import Optional
 
 class DataCollection:
     MAX_DATA_SETS = 6
-    WRITE_PERIOD = 15
+    WRITE_PERIOD = 15.0
 
     def __init__(
         self,
@@ -38,7 +38,7 @@ class DataCollection:
         self._elapsed_time = 0.0
         self.ref_time = -1
         self.start_time = -1
-        self.next_write = -1
+        self.next_write = -1.0
 
         self.name = name
 
@@ -157,7 +157,7 @@ class DataCollection:
         self.ref_time = -1
         self._recording = False
         self._paused = False
-        self.next_write = -1
+        self.next_write = -1.0
 
         self.logger.info(f"Stopped collection: {self.name}")
 

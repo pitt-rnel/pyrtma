@@ -27,17 +27,10 @@ def add_data_set(mod: pyrtma.Client):
     msg.data_set.file_name_fmt = input("(add-data-set)->file_name_fmt: ")
     msg.data_set.formatter = input("(add-data-set)->formatter: ")
 
-    ctx = cd.get_context()
-    mt = []
     raw = input("(add-data-set)->msg_type: ")
     msg_types = list(map(int, raw.split()))
 
-    for msg_type in msg_types:
-        msg_type = ctx["mt"].get((raw))
-        if msg_type:
-            mt.append(msg_type)
-
-    msg.data_set.msg_types[: len(mt)] = mt
+    msg.data_set.msg_types[: len(msg_types)] = msg_types
     mod.send_message(msg)
 
 

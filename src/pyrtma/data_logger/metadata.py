@@ -8,7 +8,7 @@ from typing import Union
 
 
 class LoggingMetadata:
-    def __init__(self):
+    def __init__(self) -> None:
         self._metadata: dict[str, Union[str, float, int]] = {}
 
     def update(self, json_str: str):
@@ -22,7 +22,7 @@ class LoggingMetadata:
 
         self._metadata.clear()
         self._metadata.update(**new_data)
-        self._update_buitlins()
+        self._update_builtins()
 
     def to_json(self):
         return json.dumps(self._metadata, separators=(",", ":"))
@@ -30,7 +30,7 @@ class LoggingMetadata:
     def clear(self):
         self._metadata.clear()
 
-    def _update_buitlins(self):
+    def _update_builtins(self):
         now = datetime.datetime.now()
 
         # Builtin Time metadata
@@ -42,7 +42,7 @@ class LoggingMetadata:
         )
 
     def expand_format(self, s: str) -> str:
-        self._update_buitlins()
+        self._update_builtins()
 
         def repl(m: re.Match) -> str:
             d = m.groupdict()
@@ -58,7 +58,7 @@ class LoggingMetadata:
                     )
             else:
                 try:
-                    value = self._metadata[key]
+                    value = str(self._metadata[key])
                 except KeyError:
                     raise MissingMetadata(
                         f"No value found in metadata for {key} in metadata format string: {s}"

@@ -6,7 +6,7 @@ import tempfile
 
 from pyrtma.utils.quicklogger_reader import QLFileHeader
 from ..data_formatter import DataFormatter
-from typing import ClassVar, IO
+from typing import ClassVar, IO, List
 
 
 class QLFormatter(DataFormatter):
@@ -26,7 +26,6 @@ class QLFormatter(DataFormatter):
 
         self.ofs = 0
         self.offsets: list[int] = []
-        self.msgbuf = []
         self.num_writes = 0
 
         self.data_tmp = tempfile.NamedTemporaryFile()

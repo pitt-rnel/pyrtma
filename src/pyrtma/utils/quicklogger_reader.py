@@ -5,19 +5,20 @@ import sys
 import importlib
 import pyrtma
 import pyrtma.message
-import pyrtma.context
-import json
 import warnings
 
-from typing import List, Union, Tuple, Generator, Dict, Any, Optional, Type
+from ..context import RTMAContext, get_context, _create_context
+from typing import List, Union, Generator, Dict, Any, Optional, Type
 from ..validators import ByteArray
-from ..message import RTMAJSONEncoder, Message, MessageHeader, MessageData
+from ..message import Message, MessageHeader, MessageData
 from ..message_base import MessageBase, MessageMeta
 from ..exceptions import VersionMismatchWarning
 from pyrtma.validators import Uint32, String
 
 
 _unknown: Dict[int, Type[MessageData]] = {}
+
+_empty_context = _create_context()
 
 
 def legacy_variable_len_msg(msg_type: int) -> bool:
@@ -91,7 +92,7 @@ class QLReader:
         self.offsets: List[int] = []
         self.data: List[MessageData] = []
         self.messages: List[Message] = []
-        self.context: Dict[str, Any] = {}
+        self.context: RTMAContext = _empty_context.copy()
         self.skipped = 0
 
     def clear(self):
@@ -101,7 +102,7 @@ class QLReader:
         self.headers.clear()
         self.offsets.clear()
         self.data.clear()
-        self.context.clear()
+        self.context = _empty_context.copy()
         self.messages.clear()
         self.skipped = 0
 
@@ -131,7 +132,7 @@ class QLReader:
                 mod = importlib.import_module(fname)
 
         # Cache all the user defined objects associated with the data
-        self.context = pyrtma.context.get_context()
+        self.context = get_context()
 
         try:
             messages = []

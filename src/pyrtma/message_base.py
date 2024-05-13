@@ -59,7 +59,7 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         """
         max_len = 20
         pstr = "\t" * add_tabs + f"{type(self).__name__}:"
-        for field_name, field_type in self._fields_:
+        for field_name, field_type, *_ in self._fields_:
             if field_name[0] == "_":
                 field_name = field_name[1:]
             val = getattr(self, field_name)
@@ -272,7 +272,7 @@ def _from_dict(obj: MessageBase, data: Dict[str, Any]):
         obj (MessageBase): Message object
         data (Dict[str, Any]): Message data dictionary
     """
-    for _name, ftype in obj._fields_:
+    for _name, ftype, *_ in obj._fields_:
         name = _name[1:] if _name[0] == "_" else _name
         if issubclass(ftype, MessageBase):
             _from_dict(getattr(obj, name), data[name])
@@ -304,7 +304,7 @@ def _to_dict(obj: MessageBase) -> Dict[str, Any]:
         Dict[str, Any]: Dictionary
     """
     data: Dict[str, Any] = {}
-    for _name, ftype in obj._fields_:
+    for _name, ftype, *_ in obj._fields_:
         name = _name[1:]
         if issubclass(ftype, MessageBase):
             data[name] = _to_dict(getattr(obj, name))
