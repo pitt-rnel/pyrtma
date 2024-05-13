@@ -266,6 +266,8 @@ class Client(object):
                 self.send_signal(cd.MT_DISCONNECT)
                 # Allow some time for signal to reach MM
                 time.sleep(0.100)
+        except:
+            pass
         finally:
             if hasattr(self, "_sock"):
                 self._sock.close()
