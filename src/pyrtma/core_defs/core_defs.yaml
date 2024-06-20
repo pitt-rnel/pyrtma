@@ -12,9 +12,6 @@ constants:
   DYN_MOD_ID_START: 100
   MAX_HOSTS: 5
   MAX_MESSAGE_TYPES: 10000
-  MIN_STREAM_TYPE: 9000
-  MAX_TIMERS: 100
-  MAX_INTERNAL_TIMERS: 20
   MAX_RTMA_MSG_TYPE: 99
   MAX_RTMA_MODULE_ID: 9
   MAX_CONTIGUOUS_MESSAGE_DATA: 9000
@@ -74,6 +71,16 @@ message_defs:
     id: 2
     fields: null
 
+  CONNECT_V2:
+    id: 4
+    fields:
+      logger_status: int16
+      daemon_status: int16
+      allow_multiple: int16
+      mod_id: MODULE_ID # int16
+      pid: int32
+      name: char[MAX_NAME_LEN] # char[32]
+
   FAIL_SUBSCRIBE:
     id: 6
     fields:
@@ -95,16 +102,6 @@ message_defs:
       logger_status: int16
       daemon_status: int16
 
-  CONNECT_V2:
-    id: 4
-    fields:
-      logger_status: int16
-      daemon_status: int16
-      allow_multiple: int16
-      mod_id: MODULE_ID # int16
-      pid: int32
-      name: char[MAX_NAME_LEN] # char[32]
-
   DISCONNECT:
     id: 14
     fields: null
@@ -123,28 +120,6 @@ message_defs:
     id: 26
     fields:
       pid: int32
-
-  TIMING_MESSAGE:
-    id: 80
-    fields:
-      timing: uint16[MAX_MESSAGE_TYPES]
-      ModulePID: int32[MAX_MODULES]
-      send_time: double
-
-  FORCE_DISCONNECT:
-    id: 82
-    fields:
-      mod_id: int32
-
-  PAUSE_SUBSCRIPTION:
-    id: 85
-    fields:
-      msg_type: MSG_TYPE
-
-  RESUME_SUBSCRIPTION:
-    id: 86
-    fields:
-      msg_type: MSG_TYPE
 
   MESSAGE_TRAFFIC:
     id: 30
@@ -260,3 +235,25 @@ message_defs:
       pathname: char[512] # name of source file
       funcname: char[256] # name of function making log
       message: char[MAX_LOG_LENGTH] # formatted message
+
+  TIMING_MESSAGE:
+    id: 80
+    fields:
+      timing: uint16[MAX_MESSAGE_TYPES]
+      ModulePID: int32[MAX_MODULES]
+      send_time: double
+
+  FORCE_DISCONNECT:
+    id: 82
+    fields:
+      mod_id: int32
+
+  PAUSE_SUBSCRIPTION:
+    id: 85
+    fields:
+      msg_type: MSG_TYPE
+
+  RESUME_SUBSCRIPTION:
+    id: 86
+    fields:
+      msg_type: MSG_TYPE
