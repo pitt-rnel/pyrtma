@@ -21,7 +21,7 @@ try:
     from .core_defs import MAX_MESSAGE_TYPES
 except AttributeError:
     # if we deprecate and remove this constant, we can fall back on inf
-    MAX_MESSAGE_TYPES = float('inf')
+    MAX_MESSAGE_TYPES = float("inf")
 
 
 @dataclass
