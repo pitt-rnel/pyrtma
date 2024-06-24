@@ -1,7 +1,7 @@
 import ctypes
 import json
 
-from typing import TypeVar, Any, Type, Dict
+from typing import TypeVar, Any, Type, Dict, List
 from .utils.print import print_ctype_array, hexdump
 from .utils.random_fields import _random_struct
 from .exceptions import JSONDecodingError
@@ -28,6 +28,8 @@ class MessageMeta(CStructType):
                 fname = "_" + key
                 ftype = namespace[key]._ctype
                 fields.append((fname, ftype))
+            elif key == "_fields_":
+                fields.extend(namespace["_fields_"])
         if fields:
             namespace["_fields_"] = fields
         elif "_fields_" not in namespace:
@@ -294,6 +296,14 @@ def _from_dict(obj: MessageBase, data: Dict[str, Any]):
             setattr(obj, name, data[name])
 
 
+def _expand_carray(array: ctypes.Array) -> List:
+    expanded = array[:]
+    for i, a in enumerate(expanded):
+        if isinstance(a, ctypes.Array):
+            expanded[i] = _expand_carray(expanded[i])
+    return expanded
+
+
 def _to_dict(obj: MessageBase) -> Dict[str, Any]:
     """Helper function to create dictionary from message fields
 
@@ -305,7 +315,7 @@ def _to_dict(obj: MessageBase) -> Dict[str, Any]:
     """
     data: Dict[str, Any] = {}
     for _name, ftype, *_ in obj._fields_:
-        name = _name[1:]
+        name = _name[1:] if _name[0] == "_" else _name
         if issubclass(ftype, MessageBase):
             data[name] = _to_dict(getattr(obj, name))
         elif issubclass(ftype, ctypes.Array):
@@ -334,7 +344,8 @@ def _to_dict(obj: MessageBase) -> Dict[str, Any]:
 
             # Any other Array Type
             else:
-                data[name] = getattr(obj, name)[:]
+                data[name] = _expand_carray(getattr(obj, name))
+
         else:
             data[name] = getattr(obj, name)
 
