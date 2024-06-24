@@ -49,7 +49,7 @@ class QLFormatter(DataFormatter):
 
         return bytes(msg.header)
 
-    def write(self, wbuf: list[pyrtma.Message]):
+    def write(self, wbuf: List[pyrtma.Message]):
         super().write(wbuf)
         self.update_file_header()
 
@@ -75,7 +75,7 @@ class QLFormatter(DataFormatter):
         # Append the message data tempfile to the data set file
         shutil.copyfileobj(self.data_tmp, self.fd)
 
-    def finalize(self, wbuf: list[pyrtma.Message]):
+    def finalize(self, wbuf: List[pyrtma.Message]):
         if self.num_writes > 0:
             self.write(wbuf)
             self.write_offsets()
