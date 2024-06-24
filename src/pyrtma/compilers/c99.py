@@ -150,7 +150,7 @@ class CDefCompiler:
         s += "typedef struct {\n"
         obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
         for obj in self.parser.constants.values():
-            if obj.src.name == "core_defs.yaml":
+            if obj.src.parent.stem == "core_defs":
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
             if type(obj.value) is float:
                 ftype = "double"
@@ -164,7 +164,7 @@ class CDefCompiler:
             s += "\n"
 
         for obj in self.parser.string_constants.values():
-            if obj.src.name == "core_defs.yaml":
+            if obj.src.parent.stem == "core_defs":
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
             s += f'#pragma push_macro("{obj.name}")\n'
             s += f"#undef {obj.name}\n"
@@ -177,7 +177,7 @@ class CDefCompiler:
 
         s += "typedef struct {\n"
         for obj in self.parser.host_ids.values():
-            if obj.src.name == "core_defs.yaml":
+            if obj.src.parent.stem == "core_defs":
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
             s += f"    HOST_ID {obj.name};\n"
         s += "} HostIdInfo;\n"
@@ -186,7 +186,7 @@ class CDefCompiler:
 
         s += "typedef struct {\n"
         for obj in self.parser.module_ids.values():
-            if obj.src.name == "core_defs.yaml":
+            if obj.src.parent.stem == "core_defs":
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
             s += f"    MODULE_ID {obj.name};\n"
         s += "} ModuleIdInfo;\n"
@@ -195,7 +195,7 @@ class CDefCompiler:
 
         s += "typedef struct {\n"
         for obj in self.parser.message_ids.values():
-            if obj.src.name == "core_defs.yaml":
+            if obj.src.parent.stem == "core_defs":
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
             s += f"    MSG_TYPE {obj.name};\n"
         s += "} MsgIdInfo;\n"
@@ -204,7 +204,7 @@ class CDefCompiler:
 
         s += "typedef struct {\n"
         for obj in self.parser.message_defs.values():
-            if obj.src.name == "core_defs.yaml":
+            if obj.src.parent.stem == "core_defs":
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
             s += f"    int {obj.name};\n"
         s += "} MsgHashInfo;\n"
@@ -228,7 +228,7 @@ class CDefCompiler:
         s += "    static RTMAInfo RTMA;\n"
         obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
         for obj in self.parser.constants.values():
-            if obj.src.name == "core_defs.yaml":
+            if obj.src.parent.stem == "core_defs":
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
             s += f'#pragma push_macro("{obj.name}")\n'
             s += f"#undef {obj.name}\n"
@@ -237,7 +237,7 @@ class CDefCompiler:
             s += "\n"
 
         for obj in self.parser.string_constants.values():
-            if obj.src.name == "core_defs.yaml":
+            if obj.src.parent.stem == "core_defs":
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
             s += f'#pragma push_macro("{obj.name}")\n'
             s += f"#undef {obj.name}\n"
@@ -246,28 +246,28 @@ class CDefCompiler:
             s += "\n"
 
         for obj in self.parser.host_ids.values():
-            if obj.src.name == "core_defs.yaml":
+            if obj.src.parent.stem == "core_defs":
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
             s += f"{tab}RTMA.HID.{obj.name} = {obj.value};\n"
 
         s += "\n" * 2
 
         for obj in self.parser.module_ids.values():
-            if obj.src.name == "core_defs.yaml":
+            if obj.src.parent.stem == "core_defs":
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
             s += f"{tab}RTMA.MID.{obj.name} = {obj.value};\n"
 
         s += "\n" * 2
 
         for obj in self.parser.message_ids.values():
-            if obj.src.name == "core_defs.yaml":
+            if obj.src.parent.stem == "core_defs":
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
             s += f"{tab}RTMA.MT.{obj.name} = {obj.value};\n"
 
         s += "\n" * 2
 
         for obj in self.parser.message_defs.values():
-            if obj.src.name == "core_defs.yaml":
+            if obj.src.parent.stem == "core_defs":
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
             s += f"{tab}RTMA.HASH.{obj.name} = 0x{obj.hash[:8]};\n"
 
@@ -299,7 +299,7 @@ class CDefCompiler:
             obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
             for obj in self.parser.constants.values():
                 # exclude core_defs.yaml, C clients will import rtma.h
-                if obj.src.name != "core_defs.yaml":
+                if obj.src.parent.stem != "core_defs":
                     f.write(self.generate_constant(obj))
             f.write("\n")
 
@@ -307,7 +307,7 @@ class CDefCompiler:
             f.write("// String Constants\n")
             for obj in self.parser.string_constants.values():
                 # exclude core_defs.yaml, C clients will import rtma.h
-                if obj.src.name != "core_defs.yaml":
+                if obj.src.parent.stem != "core_defs":
                     f.write(self.generate_string_constant(obj))
             f.write("\n")
 
@@ -315,7 +315,7 @@ class CDefCompiler:
             f.write("// Type Aliases\n")
             for obj in self.parser.aliases.values():
                 # exclude core_defs.yaml, C clients will import rtma.h
-                if obj.src.name != "core_defs.yaml":
+                if obj.src.parent.stem != "core_defs":
                     f.write(self.generate_type_alias(obj))
             f.write("\n")
 
@@ -323,7 +323,7 @@ class CDefCompiler:
             f.write("// Host IDs\n")
             for obj in self.parser.host_ids.values():
                 # exclude core_defs.yaml, C clients will import rtma.h
-                if obj.src.name != "core_defs.yaml":
+                if obj.src.parent.stem != "core_defs":
                     f.write(self.generate_host_id(obj))
             f.write("\n")
 
@@ -331,7 +331,7 @@ class CDefCompiler:
             f.write("// Module IDs\n")
             for obj in self.parser.module_ids.values():
                 # exclude core_defs.yaml, C clients will import rtma.h
-                if obj.src.name != "core_defs.yaml":
+                if obj.src.parent.stem != "core_defs":
                     f.write(self.generate_module_id(obj))
             f.write("\n")
 
@@ -339,7 +339,7 @@ class CDefCompiler:
             f.write("// Message Type IDs\n")
             for obj in self.parser.message_ids.values():
                 # exclude core_defs.yaml, C clients will import rtma.h
-                if obj.src.name != "core_defs.yaml":
+                if obj.src.parent.stem != "core_defs":
                     f.write(self.generate_msg_type_id(obj))
             f.write("\n")
 
@@ -347,7 +347,7 @@ class CDefCompiler:
             f.write("// Struct Definitions\n")
             for obj in self.parser.struct_defs.values():
                 # exclude core_defs.yaml, C clients will import rtma.h
-                if obj.src.name != "core_defs.yaml":
+                if obj.src.parent.stem != "core_defs":
                     f.write(self.generate_struct(obj))
                     f.write("\n\n")
 
@@ -355,7 +355,7 @@ class CDefCompiler:
             f.write("// Message Definitions\n")
             for obj in self.parser.message_defs.values():
                 # exclude core_defs.yaml, C clients will import rtma.h
-                if obj.src.name != "core_defs.yaml":
+                if obj.src.parent.stem != "core_defs":
                     f.write(self.generate_struct(obj))
                     f.write("\n\n")
 
@@ -363,7 +363,7 @@ class CDefCompiler:
             f.write("// Message Definition Hashes\n")
             for obj in self.parser.message_defs.values():
                 # exclude core_defs.yaml, C clients will import rtma.h
-                if obj.src.name != "core_defs.yaml":
+                if obj.src.parent.stem != "core_defs":
                     f.write(self.generate_hash_id(obj))
             f.write("\n")
 

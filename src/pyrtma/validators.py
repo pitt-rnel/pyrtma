@@ -130,10 +130,11 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
         if not isinstance(value, numbers.Number):
             raise TypeError(f"Expected {value} to be a float")
 
-        if math.isinf(self._ctype(value).value):
-            raise ValueError(
-                f"The {value} can not be represented as a {type(self).__name__}"
-            )
+        # Commented this check to help performance
+        # if math.isinf(self._ctype(value).value):
+        #     raise ValueError(
+        #         f"The {value} can not be represented as a {type(self).__name__}"
+        #     )
 
     def validate_many(self, value: Iterable[float]):
         """Validate multiple float values
@@ -145,13 +146,21 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
             TypeError: Wrong type
             ValueError: Value cannot be precisely represented with this datatype
         """
-        if any(not isinstance(v, numbers.Number) for v in value):
+
+        # Check first value only
+        if not isinstance(next(iter(value)), numbers.Number):
             raise TypeError(f"Expected {value!r} to be a float.")
 
-        if any(math.isinf(self._ctype(v).value) for v in value):
-            raise ValueError(
-                f"{value} contains value(s) that can not be represented as a {type(self).__name__}"
-            )
+        # Commented this check to help performance
+        # Check all values
+        # if any(not isinstance(v, numbers.Number) for v in value):
+        #     raise TypeError(f"Expected {value!r} to be a float.")
+
+        # Commented this check to help performance
+        # if any(math.isinf(self._ctype(v).value) for v in value):
+        #     raise ValueError(
+        #         f"{value} contains value(s) that can not be represented as a {type(self).__name__}"
+        #     )
 
     def __repr__(self):
         return f"{type(self).__name__} at 0x{id(self):016X}"
@@ -220,10 +229,10 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
         if not isinstance(value, numbers.Integral):
             raise TypeError(f"Expected {value} to be an int")
 
-        if value < self._min:
-            raise ValueError(f"Expected {value} to be at least {self._min}")
-        if value > self._max:
-            raise ValueError(f"Expected {value} to be no more than {self._max}")
+        if not (self._min <= value <= self._max):
+            raise ValueError(
+                f"Expected {value} to be in range of {self._min} to {self._max}"
+            )
 
     def validate_many(self, value: Iterable[int]):
         """Validate multiple integer values
@@ -235,14 +244,20 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
             TypeError: Wrong type
             ValueError: Integer out of range for this datatype
         """
-        if any(not isinstance(v, numbers.Integral) for v in value):
+
+        # Check first value only
+        if not isinstance(next(iter(value)), numbers.Integral):
             raise TypeError(f"Expected {value} to be an int.")
 
-        if any((v < self._min for v in value)):
-            raise ValueError(f"Expected {value} to be {self._min} or greater.")
+        # Commented this check to help performance
+        # Check all values
+        # if any(not isinstance(v, numbers.Integral) for v in value):
+        #     raise TypeError(f"Expected {value} to be an int.")
 
-        if any((v > self._max for v in value)):
-            raise ValueError(f"Expected {value} to be no more than {self._max}")
+        if not all((self._min <= v <= self._max for v in value)):
+            raise ValueError(
+                f"Expected {value} to be in range of {self._min} to {self._max}."
+            )
 
     def __repr__(self):
         return f"{type(self).__name__}(size={self.size}, unsigned={self.unsigned}) at 0x{id(self):016X}"
@@ -395,10 +410,10 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
         """
 
         if isinstance(value, int):
-            if value < self._min:
-                raise ValueError(f"Expected {value} to be at least {self._min}")
-            if value > self._max:
-                raise ValueError(f"Expected {value} to be no more than {self._max}")
+            if not self._min <= value <= self._max:
+                raise ValueError(
+                    f"Expected {value} to be in range of {self._min} to {self._max}"
+                )
             return
 
         if not isinstance(value, (bytes, bytearray)):
@@ -420,16 +435,20 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
         if isinstance(value, (bytes, bytearray)):
             return
 
-        if any(not isinstance(v, int) for v in value):
-            raise TypeError(
-                f"Expected {value} to be an int sequence, bytes, or bytearray."
+        # Check first value only
+        if not isinstance(next(iter(value)), numbers.Integral):
+            raise TypeError(f"Expected {value} to be an int.")
+
+        # Commented this check to help performance
+        # if any(not isinstance(v, int) for v in value):
+        #     raise TypeError(
+        #         f"Expected {value} to be an int sequence, bytes, or bytearray."
+        #     )
+
+        if not all((self._min <= v <= self._max for v in value)):
+            raise ValueError(
+                f"Expected {value} to be in range of {self._min} to {self._max}."
             )
-
-        if any((v < self._min for v in value)):
-            raise ValueError(f"Expected {value} to be {self._min} or greater.")
-
-        if any((v > self._max for v in value)):
-            raise ValueError(f"Expected {value} to be no more than {self._max}")
 
     def __repr__(self):
         return f"Byte(len=1) at 0x{id(self):016X}"
@@ -464,11 +483,11 @@ class String(FieldValidator[_P, str], Generic[_P]):
         if not isinstance(value, str):
             raise TypeError(f"Expected {value} to be a str")
 
-        if len(value) > self.len:
-            raise ValueError(f'Expected "{value}" to be no longer than {self.len}')
+        if len(value) > (self.len - 1):
+            raise ValueError(f'Expected "{value}" to be no longer than {self.len - 1}')
 
-        if any(ord(c) > 127 for c in value):
-            raise TypeError(f"Expected {value} to only containt valid ascii points")
+        if not value.isascii():
+            raise TypeError(f"Expected {value} to only contain valid ascii points")
 
     def validate_many(self, value):
         """Validate multiple strings
@@ -493,6 +512,25 @@ class Char(String):
     def __init__(self) -> None:
         self._ctype = ctypes.c_char
         self.len = 1
+
+    def validate_one(self, value: str):
+        """Validate a char value
+
+        Args:
+            value (str): String value
+
+        Raises:
+            TypeError: Wrong type
+            ValueError: String exceeds max length
+        """
+        if not isinstance(value, str):
+            raise TypeError(f"Expected {value} to be a str")
+
+        if len(value) > self.len:
+            raise ValueError(f'Expected "{value}" to be no longer than {self.len}')
+
+        if not value.isascii():
+            raise TypeError(f"Expected {value} to only contain valid ascii points")
 
     def __repr__(self):
         return f"Char() at 0x{id(self):016X}"

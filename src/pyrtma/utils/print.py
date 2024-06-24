@@ -15,7 +15,10 @@ def print_ctype_array(arr: ctypes.Array):
     arr_len = len(arr)
     str = "["
     for i in range(0, min(arr_len, max_len)):
-        str += f"{arr[i]}, "
+        val = arr[i]
+        if isinstance(val, ctypes.Array):
+            val = print_ctype_array(val)
+        str += f"{val}, "
     if arr_len > max_len:
         str += "...]"
     else:

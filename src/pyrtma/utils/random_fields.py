@@ -14,6 +14,9 @@ def _random_str(length: int) -> str:
     Returns:
         str: Random string
     """
+    if length > 1:
+        length -= 1
+
     return "".join(random.choice(string.printable) for _ in range(length))
 
 
