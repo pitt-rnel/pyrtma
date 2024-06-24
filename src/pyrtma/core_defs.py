@@ -3,7 +3,6 @@
 import ctypes
 
 import pyrtma
-import pyrtma.core_defs
 from pyrtma.__version__ import check_compiled_version
 from typing import ClassVar, Dict, Any
 
@@ -42,9 +41,6 @@ MAX_MODULES: int = 200
 DYN_MOD_ID_START: int = 100
 MAX_HOSTS: int = 5
 MAX_MESSAGE_TYPES: int = 10000
-MIN_STREAM_TYPE: int = 9000
-MAX_TIMERS: int = 100
-MAX_INTERNAL_TIMERS: int = 20
 MAX_RTMA_MSG_TYPE: int = 99
 MAX_RTMA_MODULE_ID: int = 9
 MAX_CONTIGUOUS_MESSAGE_DATA: int = 9000
@@ -108,18 +104,14 @@ MT_LM_READY: int = 96
 MT_EXIT: int = 0
 MT_KILL: int = 1
 MT_ACKNOWLEDGE: int = 2
+MT_CONNECT_V2: int = 4
 MT_FAIL_SUBSCRIBE: int = 6
 MT_FAILED_MESSAGE: int = 8
 MT_CONNECT: int = 13
-MT_CONNECT_V2: int = 4
 MT_DISCONNECT: int = 14
 MT_SUBSCRIBE: int = 15
 MT_UNSUBSCRIBE: int = 16
 MT_MODULE_READY: int = 26
-MT_TIMING_MESSAGE: int = 80
-MT_FORCE_DISCONNECT: int = 82
-MT_PAUSE_SUBSCRIPTION: int = 85
-MT_RESUME_SUBSCRIPTION: int = 86
 MT_MESSAGE_TRAFFIC: int = 30
 MT_ACTIVE_CLIENTS: int = 31
 MT_CLIENT_INFO: int = 32
@@ -131,6 +123,10 @@ MT_RTMA_LOG_ERROR: int = 42
 MT_RTMA_LOG_WARNING: int = 43
 MT_RTMA_LOG_INFO: int = 44
 MT_RTMA_LOG_DEBUG: int = 45
+MT_TIMING_MESSAGE: int = 80
+MT_FORCE_DISCONNECT: int = 82
+MT_PAUSE_SUBSCRIPTION: int = 85
+MT_RESUME_SUBSCRIPTION: int = 86
 
 
 # Struct Definitions
@@ -628,6 +624,25 @@ class MDF_ACKNOWLEDGE(MessageData, metaclass=MessageMeta):
 
 
 @pyrtma.message_def
+class MDF_CONNECT_V2(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 4
+    type_name: ClassVar[str] = "CONNECT_V2"
+    type_hash: ClassVar[int] = 0x5CF13682
+    type_size: ClassVar[int] = 44
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[str] = (
+        "'CONNECT_V2:\n  id: 4\n  fields:\n    logger_status: int16\n    daemon_status: int16\n    allow_multiple: int16\n    mod_id: MODULE_ID\n    pid: int32\n    name: char[MAX_NAME_LEN]'"
+    )
+
+    logger_status: Int16 = Int16()
+    daemon_status: Int16 = Int16()
+    allow_multiple: Int16 = Int16()
+    mod_id: Int16 = Int16()
+    pid: Int32 = Int32()
+    name: String = String(32)
+
+
+@pyrtma.message_def
 class MDF_FAIL_SUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 6
     type_name: ClassVar[str] = "FAIL_SUBSCRIBE"
@@ -673,25 +688,6 @@ class MDF_CONNECT(MessageData, metaclass=MessageMeta):
 
     logger_status: Int16 = Int16()
     daemon_status: Int16 = Int16()
-
-
-@pyrtma.message_def
-class MDF_CONNECT_V2(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4
-    type_name: ClassVar[str] = "CONNECT_V2"
-    type_hash: ClassVar[int] = 0x5CF13682
-    type_size: ClassVar[int] = 44
-    type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[str] = (
-        "'CONNECT_V2:\n  id: 4\n  fields:\n    logger_status: int16\n    daemon_status: int16\n    allow_multiple: int16\n    mod_id: MODULE_ID\n    pid: int32\n    name: char[MAX_NAME_LEN]'"
-    )
-
-    logger_status: Int16 = Int16()
-    daemon_status: Int16 = Int16()
-    allow_multiple: Int16 = Int16()
-    mod_id: Int16 = Int16()
-    pid: Int32 = Int32()
-    name: String = String(32)
 
 
 @pyrtma.message_def
@@ -742,64 +738,6 @@ class MDF_MODULE_READY(MessageData, metaclass=MessageMeta):
     type_def: ClassVar[str] = "'MODULE_READY:\n  id: 26\n  fields:\n    pid: int32'"
 
     pid: Int32 = Int32()
-
-
-@pyrtma.message_def
-class MDF_TIMING_MESSAGE(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 80
-    type_name: ClassVar[str] = "TIMING_MESSAGE"
-    type_hash: ClassVar[int] = 0xDAA7503D
-    type_size: ClassVar[int] = 20808
-    type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[str] = (
-        "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: uint16[MAX_MESSAGE_TYPES]\n    ModulePID: int32[MAX_MODULES]\n    send_time: double'"
-    )
-
-    timing: IntArray[Uint16] = IntArray(Uint16, 10000)
-    ModulePID: IntArray[Int32] = IntArray(Int32, 200)
-    send_time: Double = Double()
-
-
-@pyrtma.message_def
-class MDF_FORCE_DISCONNECT(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 82
-    type_name: ClassVar[str] = "FORCE_DISCONNECT"
-    type_hash: ClassVar[int] = 0x335C7BBF
-    type_size: ClassVar[int] = 4
-    type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[str] = (
-        "'FORCE_DISCONNECT:\n  id: 82\n  fields:\n    mod_id: int32'"
-    )
-
-    mod_id: Int32 = Int32()
-
-
-@pyrtma.message_def
-class MDF_PAUSE_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 85
-    type_name: ClassVar[str] = "PAUSE_SUBSCRIPTION"
-    type_hash: ClassVar[int] = 0x22338A6D
-    type_size: ClassVar[int] = 4
-    type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[str] = (
-        "'PAUSE_SUBSCRIPTION:\n  id: 85\n  fields:\n    msg_type: MSG_TYPE'"
-    )
-
-    msg_type: Int32 = Int32()
-
-
-@pyrtma.message_def
-class MDF_RESUME_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 86
-    type_name: ClassVar[str] = "RESUME_SUBSCRIPTION"
-    type_hash: ClassVar[int] = 0xC56A97F2
-    type_size: ClassVar[int] = 4
-    type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[str] = (
-        "'RESUME_SUBSCRIPTION:\n  id: 86\n  fields:\n    msg_type: MSG_TYPE'"
-    )
-
-    msg_type: Int32 = Int32()
 
 
 @pyrtma.message_def
@@ -1014,6 +952,64 @@ class MDF_RTMA_LOG_DEBUG(MessageData, metaclass=MessageMeta):
     pathname: String = String(512)
     funcname: String = String(256)
     message: String = String(1024)
+
+
+@pyrtma.message_def
+class MDF_TIMING_MESSAGE(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 80
+    type_name: ClassVar[str] = "TIMING_MESSAGE"
+    type_hash: ClassVar[int] = 0xDAA7503D
+    type_size: ClassVar[int] = 20808
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[str] = (
+        "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: uint16[MAX_MESSAGE_TYPES]\n    ModulePID: int32[MAX_MODULES]\n    send_time: double'"
+    )
+
+    timing: IntArray[Uint16] = IntArray(Uint16, 10000)
+    ModulePID: IntArray[Int32] = IntArray(Int32, 200)
+    send_time: Double = Double()
+
+
+@pyrtma.message_def
+class MDF_FORCE_DISCONNECT(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 82
+    type_name: ClassVar[str] = "FORCE_DISCONNECT"
+    type_hash: ClassVar[int] = 0x335C7BBF
+    type_size: ClassVar[int] = 4
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[str] = (
+        "'FORCE_DISCONNECT:\n  id: 82\n  fields:\n    mod_id: int32'"
+    )
+
+    mod_id: Int32 = Int32()
+
+
+@pyrtma.message_def
+class MDF_PAUSE_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 85
+    type_name: ClassVar[str] = "PAUSE_SUBSCRIPTION"
+    type_hash: ClassVar[int] = 0x22338A6D
+    type_size: ClassVar[int] = 4
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[str] = (
+        "'PAUSE_SUBSCRIPTION:\n  id: 85\n  fields:\n    msg_type: MSG_TYPE'"
+    )
+
+    msg_type: Int32 = Int32()
+
+
+@pyrtma.message_def
+class MDF_RESUME_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 86
+    type_name: ClassVar[str] = "RESUME_SUBSCRIPTION"
+    type_hash: ClassVar[int] = 0xC56A97F2
+    type_size: ClassVar[int] = 4
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[str] = (
+        "'RESUME_SUBSCRIPTION:\n  id: 86\n  fields:\n    msg_type: MSG_TYPE'"
+    )
+
+    msg_type: Int32 = Int32()
 
 
 # User Context

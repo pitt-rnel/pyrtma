@@ -17,7 +17,11 @@ from hashlib import sha256
 from typing import List, Optional, Any, Union, Tuple, Dict, Type, Literal
 from dataclasses import dataclass, field, is_dataclass, asdict
 
-from .core_defs import MAX_MESSAGE_TYPES
+try:
+    from .core_defs import MAX_MESSAGE_TYPES
+except AttributeError:
+    # if we deprecate and remove this constant, we can fall back on inf
+    MAX_MESSAGE_TYPES = float('inf')
 
 
 @dataclass
