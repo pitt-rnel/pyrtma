@@ -8,17 +8,17 @@ struct_defs:
   DATA_SET:
     fields:
         name: char[32]
-        sub_dir_fmt: char[128]    # Relative to collection save_path
-        file_name_fmt: char[128]
-        formatter: char[32] # Builtin Options: quicklogger, json, raw, msg_header
+        sub_dir_fmt: char[128]    # Relative to data collection save directory
+        file_name_fmt: char[128]  # Data set saved file name without the file extension
+        formatter: char[32]       # Builtin Options: quicklogger, json, raw, msg_header
         subdivide_interval: int32 # <=0: Single File, >=30: Subdivide recording files
-        msg_types: int32[32]
+        msg_types: int32[32]      # Message type ids that should be passed to data_set formatter
 
   DATA_COLLECTION:
     fields:
       name: char[32]
-      base_path: char[256]
-      dir_fmt: char[128]
+      base_path: char[256] # Base directory where data_collections will be saved
+      dir_fmt: char[128]   # Data collection save directory
       num_data_sets: int16
       unused: int16
       data_sets: DATA_SET[MAX_DATA_SETS]
