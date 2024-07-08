@@ -3,12 +3,12 @@
 import ctypes
 
 import pyrtma
-from pyrtma.__version__ import check_compiled_version
-from typing import ClassVar, Dict, Any
+from pyrtma.__version__ import check_compiled_version, __version__
+from packaging.version import parse as _ver_parse
+from typing import ClassVar
 
 from pyrtma.message_base import MessageBase, MessageMeta
 from pyrtma.message_data import MessageData
-from pyrtma.context import update_context, get_context
 from pyrtma.validators import (
     Int8,
     Int16,
@@ -29,6 +29,9 @@ from pyrtma.validators import (
     Byte,
     ByteArray,
 )
+
+if _ver_parse(__version__) >= _ver_parse("2.3.0"):
+    from pyrtma.context import update_context
 
 
 COMPILED_PYRTMA_VERSION: str = "2.3.0"
@@ -1013,4 +1016,5 @@ class MDF_RESUME_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
 
 
 # User Context
-update_context(__name__)
+if _ver_parse(__version__) >= _ver_parse("2.3.0"):
+    update_context(__name__)
