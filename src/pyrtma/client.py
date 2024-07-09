@@ -116,7 +116,7 @@ class Client(object):
         # Auto-assign a name if module-id is defined
         ctx = get_context()
         if name == "" and module_id != 0:
-            for k, v in ctx["mid"].items():
+            for k, v in ctx.MID.items():
                 if v == module_id:
                     self._name = k
             else:

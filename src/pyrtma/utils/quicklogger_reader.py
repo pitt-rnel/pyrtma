@@ -7,7 +7,7 @@ import pyrtma
 import pyrtma.message
 import warnings
 
-from ..context import RTMAContext, get_context, _create_context
+from ..context import RTMAContext, get_context
 from typing import List, Union, Generator, Dict, Any, Optional, Type
 from ..validators import ByteArray
 from ..message import Message, MessageHeader, MessageData
@@ -17,8 +17,6 @@ from pyrtma.validators import Uint32, String
 
 
 _unknown: Dict[int, Type[MessageData]] = {}
-
-_empty_context = _create_context()
 
 
 def legacy_variable_len_msg(msg_type: int) -> bool:
@@ -92,7 +90,7 @@ class QLReader:
         self.offsets: List[int] = []
         self.data: List[MessageData] = []
         self.messages: List[Message] = []
-        self.context: RTMAContext = _empty_context.copy()
+        self.context: RTMAContext = RTMAContext()
         self.skipped = 0
 
     def clear(self):
@@ -102,7 +100,7 @@ class QLReader:
         self.headers.clear()
         self.offsets.clear()
         self.data.clear()
-        self.context = _empty_context.copy()
+        self.context = RTMAContext()
         self.messages.clear()
         self.skipped = 0
 
@@ -139,7 +137,7 @@ class QLReader:
             headers = []
             data = []
 
-            mt_to_mdf = {v.type_id: v for v in self.context["mdf"].values()}
+            mt_to_mdf = {v.type_id: v for v in self.context.MDF.values()}
 
             with open(self.file_path, "rb") as f:
                 # Parse binary file header
