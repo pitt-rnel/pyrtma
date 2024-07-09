@@ -8,6 +8,7 @@ import textwrap
 import ctypes
 import logging
 import string
+import sys
 
 # import yaml
 from ruamel.yaml import YAML
@@ -21,7 +22,8 @@ try:
     from .core_defs import MAX_MESSAGE_TYPES
 except AttributeError:
     # if we deprecate and remove this constant, we can fall back on inf
-    MAX_MESSAGE_TYPES = float("inf")
+    # changed from inf to maxsize to maintain int type
+    MAX_MESSAGE_TYPES = sys.maxsize
 
 
 @dataclass
