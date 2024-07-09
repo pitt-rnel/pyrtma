@@ -31,7 +31,7 @@ from pyrtma.validators import (
 )
 
 if _ver_parse(__version__) >= _ver_parse("2.3.0"):
-    from pyrtma.context import update_context
+    from pyrtma.context import update_context, get_context
 
 
 COMPILED_PYRTMA_VERSION: str = "2.3.0"
