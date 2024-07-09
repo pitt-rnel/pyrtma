@@ -127,14 +127,13 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
             ValueError: Value cannot be precisely represented with this datatype
         """
 
-        if not isinstance(value, numbers.Number):
+        if not isinstance(value, (int, float)):
             raise TypeError(f"Expected {value} to be a float")
 
-        # Commented this check to help performance
-        # if math.isinf(self._ctype(value).value):
-        #     raise ValueError(
-        #         f"The {value} can not be represented as a {type(self).__name__}"
-        #     )
+        if math.isinf(self._ctype(value).value):
+            raise ValueError(
+                f"The {value} can not be represented as a {type(self).__name__}"
+            )
 
     def validate_many(self, value: Iterable[float]):
         """Validate multiple float values
@@ -147,20 +146,19 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
             ValueError: Value cannot be precisely represented with this datatype
         """
 
-        # Check first value only
-        if not isinstance(next(iter(value)), numbers.Number):
+        # Check all value types
+        # Note: This check accounts for about 35% of the total time
+        if any(not isinstance(v, (int, float)) for v in value):
             raise TypeError(f"Expected {value!r} to be a float.")
 
-        # Commented this check to help performance
-        # Check all values
-        # if any(not isinstance(v, numbers.Number) for v in value):
-        #     raise TypeError(f"Expected {value!r} to be a float.")
-
-        # Commented this check to help performance
-        # if any(math.isinf(self._ctype(v).value) for v in value):
-        #     raise ValueError(
-        #         f"{value} contains value(s) that can not be represented as a {type(self).__name__}"
-        #     )
+        # Note: This may not be worth it since this is a rare overflow case.
+        # Note: This check accounts for about 20% of the total time
+        if math.isinf(self._ctype(max(value)).value) or math.isinf(
+            self._ctype(min(value)).value
+        ):
+            raise ValueError(
+                f"{value} contains value(s) that can not be represented as a {type(self).__name__}"
+            )
 
     def __repr__(self):
         return f"{type(self).__name__} at 0x{id(self):016X}"
@@ -226,7 +224,7 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
             TypeError: Wrong type
             ValueError: Integer out of range for this datatype
         """
-        if not isinstance(value, numbers.Integral):
+        if not isinstance(value, int):
             raise TypeError(f"Expected {value} to be an int")
 
         if not (self._min <= value <= self._max):
@@ -245,16 +243,11 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
             ValueError: Integer out of range for this datatype
         """
 
-        # Check first value only
-        if not isinstance(next(iter(value)), numbers.Integral):
+        # Check all values
+        if any(not isinstance(v, int) for v in value):
             raise TypeError(f"Expected {value} to be an int.")
 
-        # Commented this check to help performance
-        # Check all values
-        # if any(not isinstance(v, numbers.Integral) for v in value):
-        #     raise TypeError(f"Expected {value} to be an int.")
-
-        if not all((self._min <= v <= self._max for v in value)):
+        if (max(value) > self._max) or (min(value) < self._min):
             raise ValueError(
                 f"Expected {value} to be in range of {self._min} to {self._max}."
             )
@@ -435,17 +428,13 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
         if isinstance(value, (bytes, bytearray)):
             return
 
-        # Check first value only
-        if not isinstance(next(iter(value)), numbers.Integral):
-            raise TypeError(f"Expected {value} to be an int.")
-
         # Commented this check to help performance
-        # if any(not isinstance(v, int) for v in value):
-        #     raise TypeError(
-        #         f"Expected {value} to be an int sequence, bytes, or bytearray."
-        #     )
+        if any(not isinstance(v, int) for v in value):
+            raise TypeError(
+                f"Expected {value} to be an int sequence, bytes, or bytearray."
+            )
 
-        if not all((self._min <= v <= self._max for v in value)):
+        if (max(value) > self._max) or (min(value) < self._min):
             raise ValueError(
                 f"Expected {value} to be in range of {self._min} to {self._max}."
             )
