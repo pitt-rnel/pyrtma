@@ -151,6 +151,9 @@ The msg_defs directory should now have message def files created for each langua
 
 The rtma objects are compiled into objects suitable for each language.
 
+>[!NOTE]
+>The pyrtma message compiler requires python 3.8+. Messages compiled for python in python 3.8+ may continue to work with pyrtma clients in python 3.7, but support for 3.7 is being phased out.
+
 ## Examples
 
 See [`/examples/example.py`](https://github.com/pitt-rnel/pyrtma/blob/master/examples/example.py) for pub/sub demo app

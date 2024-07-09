@@ -1,3 +1,9 @@
+from sys import version_info
+import unittest
+
+if version_info[:2] < (3, 8):
+    raise unittest.SkipTest("parser does not support < 3.8")
+
 import tempfile
 import pyrtma.parser
 import textwrap
