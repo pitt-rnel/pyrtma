@@ -677,7 +677,7 @@ class MessageManager(ClientLike):
         data.time_of_failure = time_of_failure
 
         # Copy the values into the RTMA_MSG_HEADER
-        for fname, ftype in data.msg_header._fields_:  # type: ignore
+        for fname, ftype, *_ in data.msg_header._fields_:
             setattr(data.msg_header, fname, getattr(header, fname))
 
         # send to logger modules AND modules subscribed to FAILED_MESSAGE
