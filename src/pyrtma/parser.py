@@ -15,8 +15,22 @@ from ruamel.yaml import YAML
 
 from copy import copy
 from hashlib import sha256
-from typing import List, Optional, Any, Union, Tuple, Dict, Type, Literal
+from typing import (
+    List,
+    Optional,
+    Any,
+    Union,
+    Tuple,
+    Dict,
+    Type,
+    Literal,
+    cast,
+    TYPE_CHECKING,
+)
 from dataclasses import dataclass, field, is_dataclass, asdict
+
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
 
 try:
     from .core_defs import MAX_MESSAGE_TYPES
@@ -1427,8 +1441,11 @@ class Parser:
 
 class CustomEncoder(json.JSONEncoder):
     def default(self, o: Any) -> Any:
-        if is_dataclass(o):
-            return asdict(o)
+        if is_dataclass(o):  # this is true for instance OR type
+            if TYPE_CHECKING:
+                o = cast(DataclassInstance, o)
+            if not isinstance(o, type):
+                return asdict(o)
         if isinstance(o, pathlib.Path):
             return str(o.absolute())
         return super().default(o)
