@@ -14,7 +14,7 @@ import os
 import typing
 
 
-from .client_logging import RTMALogger
+from .client_logging import RTMALogger, ClientLike
 from .validators import disable_message_validation
 from .message import Message, get_msg_cls
 from .header import MessageHeader, get_header_cls
@@ -106,7 +106,7 @@ class Module:
         return self.conn.__hash__()
 
 
-class MessageManager:
+class MessageManager(ClientLike):
     """MessageManager class
 
     RTMA Message Manager server implemented in python.
@@ -148,7 +148,7 @@ class MessageManager:
         self._debug = debug
         self.b_send_msg_timing = send_msg_timing
 
-        self.logger = RTMALogger(f"message_manager", self, logging.INFO)
+        self._logger = RTMALogger(f"message_manager", self, logging.INFO)
         self.logger.level = log_level
 
         if ip_address == socket.INADDR_ANY:
@@ -213,6 +213,10 @@ class MessageManager:
     @property
     def connected(self) -> bool:
         return True
+
+    @property
+    def logger(self) -> RTMALogger:
+        return self._logger
 
     def generate_uid(self) -> int:
         self._uid += 1
@@ -673,7 +677,7 @@ class MessageManager:
         data.time_of_failure = time_of_failure
 
         # Copy the values into the RTMA_MSG_HEADER
-        for fname, ftype in data.msg_header._fields_:
+        for fname, ftype in data.msg_header._fields_:  # type: ignore
             setattr(data.msg_header, fname, getattr(header, fname))
 
         # send to logger modules AND modules subscribed to FAILED_MESSAGE

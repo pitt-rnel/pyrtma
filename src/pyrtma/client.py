@@ -18,7 +18,7 @@ from .message_data import MessageData
 from .header import MessageHeader, get_header_cls
 from .core_defs import ALL_MESSAGE_TYPES
 from .validators import disable_message_validation
-from .client_logging import RTMALogger
+from .client_logging import RTMALogger, ClientLike
 from .exceptions import (
     InvalidMessageDefinition,
     UnknownMessageType,
@@ -79,7 +79,7 @@ def requires_connection(func: F) -> F:
     return cast(F, wrapper)
 
 
-class Client(object):
+class Client(ClientLike):
     """RTMA Client interface
 
     Args:

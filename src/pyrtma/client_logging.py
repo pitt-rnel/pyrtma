@@ -5,16 +5,30 @@ import pathlib
 import weakref
 
 from .message import MessageData
+from abc import ABC, abstractmethod
 from .exceptions import ClientError
 
-from typing import Union, Type, Dict, Optional, Protocol, List
+from typing import Union, Type, Dict, Optional, List
 from contextlib import contextmanager
 import traceback
 from rich.logging import RichHandler
 from rich.markup import escape
 
 
-class ClientLike(Protocol):
+class ClientLike(ABC):
+    """Abstract base class for ClientLike classes such as Client and MessageManager
+
+    Alternative to typing.Protocol for older python versions"""
+
+    @property
+    @abstractmethod
+    def connected(self) -> bool: ...
+
+    @property
+    @abstractmethod
+    def logger(self) -> "RTMALogger": ...
+
+    @abstractmethod
     def send_message(
         self,
         msg_data: MessageData,
@@ -23,11 +37,22 @@ class ClientLike(Protocol):
         timeout: float = -1,
     ) -> None: ...
 
-    @property
-    def connected(self) -> bool: ...
 
-    @property
-    def logger(self) -> "RTMALogger": ...
+# TODO after dropping support for py3.7, switch to Protocol and remove abstract base class from Client and MessageManager
+# class ClientLike(Protocol):
+#     def send_message(
+#         self,
+#         msg_data: MessageData,
+#         dest_mod_id: int = 0,
+#         dest_host_id: int = 0,
+#         timeout: float = -1,
+#     ) -> None: ...
+
+#     @property
+#     def connected(self) -> bool: ...
+
+#     @property
+#     def logger(self) -> "RTMALogger": ...
 
 
 RTMA_LOG_MSG = Union[
