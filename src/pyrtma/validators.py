@@ -3,7 +3,6 @@ from __future__ import annotations
 import ctypes
 import collections.abc as abc
 import math
-import numbers
 
 from typing import (
     List,
@@ -49,15 +48,6 @@ __all__ = [
 ]
 
 _VALIDATION_ENABLED: ContextVar[bool] = ContextVar("_VALIDATION_ENABLED", default=True)
-
-
-def hello(x: ctypes.Array[ctypes.c_int32]):
-    pass
-
-
-a = (ctypes.c_int32 * 10)()
-
-hello(a)
 
 
 @contextmanager
