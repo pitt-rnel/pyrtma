@@ -586,16 +586,24 @@ class TestEncoding(unittest.TestCase):
 
     def test_valid_set_types(self):
         A = MDF_VALIDATOR_A()
-
         A.char = "a"
+        A.char = ctypes.c_char(98)
         A.int8 = 1
+        A.int8 = ctypes.c_int8(2)
         A.int16 = 1
+        A.int16 = ctypes.c_int16(2)
         A.int32 = 1
+        A.int32 = ctypes.c_int32(2)
         A.int64 = 1
+        A.int64 = ctypes.c_int64(2)
         A.uint8 = 1
+        A.uint8 = ctypes.c_uint8(2)
         A.uint16 = 1
+        A.uint16 = ctypes.c_uint16(2)
         A.uint32 = 1
+        A.uint32 = ctypes.c_uint32(2)
         A.uint64 = 1
+        A.uint64 = ctypes.c_uint64(2)
 
         A.float = 1.0
         A.double = 1.0
@@ -603,10 +611,14 @@ class TestEncoding(unittest.TestCase):
         A.float = 1
         A.double = 1
 
+        A.float = ctypes.c_float(1.1)
+        A.double = ctypes.c_double(1.8)
+
         A.byte = 1
         A.byte = b"A"
         A.byte = bytes(1)
         A.byte = bytearray(1)
+        A.byte = ctypes.c_ubyte(1)
 
         A.string = "abc"
 

@@ -74,6 +74,7 @@ def disable_message_validation(ignore=False):
 
 _P = TypeVar("_P")  # Parent
 _V = TypeVar("_V")  # Value
+_C = TypeVar("_C")  # CType
 
 
 class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
@@ -100,7 +101,7 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
     def validate_many(self, value: Iterable[_V]): ...
 
 
-class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMeta):
+class FloatValidatorBase(FieldValidator[_P, float], Generic[_P, _C], metaclass=ABCMeta):
     """Abstract base class for float type validators"""
 
     @abstractmethod
@@ -110,12 +111,12 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
     def __get__(self, obj: _P, objtype=None) -> float:
         return getattr(obj, self._private_name)
 
-    def __set__(self, obj: _P, value: Union[int, float]):
+    def __set__(self, obj: _P, value: Union[float, int, _C]):
         if _VALIDATION_ENABLED.get():
             self.validate_one(value)
         setattr(obj, self._private_name, value)
 
-    def validate_one(self, value: Union[float, int]):
+    def validate_one(self, value: Union[float, int, _C]):
         """Validate a float value
 
         Args:
@@ -125,6 +126,9 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
             TypeError: Wrong type
             ValueError: Value cannot be precisely represented with this datatype
         """
+
+        if isinstance(value, self._ctype):
+            return
 
         if not isinstance(value, (float, int)):
             raise TypeError(f"Expected {value} to be a float")
@@ -160,14 +164,14 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
         return f"{type(self).__name__} at 0x{id(self):016X}"
 
 
-class Float(FloatValidatorBase):
+class Float(FloatValidatorBase[_P, ctypes.c_float], Generic[_P]):
     """32-bit Float validator class"""
 
     def __init__(self, *args) -> None:
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_float
 
 
-class Double(FloatValidatorBase):
+class Double(FloatValidatorBase[_P, ctypes.c_double], Generic[_P]):
     """Double (64-bit float) validator class"""
 
     def __init__(self, *args) -> None:
@@ -175,7 +179,7 @@ class Double(FloatValidatorBase):
 
 
 # Base Class for int validator fields
-class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
+class IntValidatorBase(FieldValidator[_P, int], Generic[_P, _C], metaclass=ABCMeta):
     """Abstract base class for integer type validators"""
 
     _size: ClassVar[int] = 1
@@ -205,12 +209,12 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
     def __get__(self, obj: _P, objtype=None) -> int:
         return getattr(obj, self._private_name)
 
-    def __set__(self, obj: _P, value: int):
+    def __set__(self, obj: _P, value: Union[int, _C]):
         if _VALIDATION_ENABLED.get():
             self.validate_one(value)
         setattr(obj, self._private_name, value)
 
-    def validate_one(self, value: int):
+    def validate_one(self, value: Union[int, _C]):
         """Validate an integer value
 
         Args:
@@ -220,6 +224,10 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
             TypeError: Wrong type
             ValueError: Integer out of range for this datatype
         """
+
+        if isinstance(value, self._ctype):
+            return
+
         if not isinstance(value, int):
             raise TypeError(f"Expected {value} to be an int")
 
@@ -252,7 +260,7 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
         return f"{type(self).__name__}(size={self.size}, unsigned={self.unsigned}) at 0x{id(self):016X}"
 
 
-class Int8(IntValidatorBase):
+class Int8(IntValidatorBase[_P, ctypes.c_int8], Generic[_P]):
     """Validator for 8-bit integers"""
 
     _size: ClassVar[int] = 1
@@ -264,7 +272,7 @@ class Int8(IntValidatorBase):
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int8
 
 
-class Int16(IntValidatorBase):
+class Int16(IntValidatorBase[_P, ctypes.c_int16], Generic[_P]):
     """Validator for 16-bit integers"""
 
     _size: ClassVar[int] = 2
@@ -276,7 +284,7 @@ class Int16(IntValidatorBase):
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int16
 
 
-class Int32(IntValidatorBase):
+class Int32(IntValidatorBase[_P, ctypes.c_int32], Generic[_P]):
     """Validator for 32-bit integers"""
 
     _size: ClassVar[int] = 4
@@ -288,7 +296,7 @@ class Int32(IntValidatorBase):
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int32
 
 
-class Int64(IntValidatorBase):
+class Int64(IntValidatorBase[_P, ctypes.c_int64], Generic[_P]):
     """Validator for 64-bit integers"""
 
     _size: ClassVar[int] = 8
@@ -300,7 +308,7 @@ class Int64(IntValidatorBase):
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int64
 
 
-class Uint8(IntValidatorBase):
+class Uint8(IntValidatorBase[_P, ctypes.c_uint8], Generic[_P]):
     """Validator for unsigned 8-bit integers"""
 
     _size: ClassVar[int] = 1
@@ -312,7 +320,7 @@ class Uint8(IntValidatorBase):
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint8
 
 
-class Uint16(IntValidatorBase):
+class Uint16(IntValidatorBase[_P, ctypes.c_uint16], Generic[_P]):
     """Validator for unsigned 16-bit integers"""
 
     _size: ClassVar[int] = 2
@@ -324,7 +332,7 @@ class Uint16(IntValidatorBase):
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint16
 
 
-class Uint32(IntValidatorBase):
+class Uint32(IntValidatorBase[_P, ctypes.c_uint32], Generic[_P]):
     """Validator for unsigned 32-bit integers"""
 
     _size: ClassVar[int] = 4
@@ -336,7 +344,7 @@ class Uint32(IntValidatorBase):
         self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint32
 
 
-class Uint64(IntValidatorBase):
+class Uint64(IntValidatorBase[_P, ctypes.c_uint64], Generic[_P]):
     """Validator for unsigned 64-bit integers"""
 
     _size: ClassVar[int] = 8
@@ -378,7 +386,7 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
     def __get__(self, obj: _P, objtype=None) -> int:
         return getattr(obj, self._private_name)
 
-    def __set__(self, obj: _P, value: Union[int, bytes, bytearray]):
+    def __set__(self, obj: _P, value: Union[int, bytes, bytearray, ctypes.c_ubyte]):
         if _VALIDATION_ENABLED.get():
             self.validate_one(value)
             if isinstance(value, (bytes, bytearray)):
@@ -387,7 +395,7 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
                 return
         setattr(obj, self._private_name, value)
 
-    def validate_one(self, value: Union[int, bytes, bytearray]):
+    def validate_one(self, value: Union[int, bytes, bytearray, ctypes.c_ubyte]):
         """validate a single byte value
 
         Args:
@@ -397,6 +405,9 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
             ValueError: Value out of range
             TypeError: Wrong type
         """
+
+        if isinstance(value, self._ctype):
+            return
 
         if isinstance(value, int):
             if not self._min <= value <= self._max:
@@ -451,6 +462,10 @@ class String(FieldValidator[_P, str], Generic[_P]):
         return getattr(obj, self._private_name).decode("ascii")
 
     def __set__(self, obj: _P, value: str):
+        if isinstance(value, self._ctype):
+            setattr(obj, self._private_name, value)
+            return
+
         if _VALIDATION_ENABLED.get():
             self.validate_one(value)
         setattr(obj, self._private_name, value.encode("ascii"))
@@ -491,14 +506,20 @@ class String(FieldValidator[_P, str], Generic[_P]):
 _FV = TypeVar("_FV", bound=FieldValidator)
 
 
-class Char(String):
+class Char(String[_P], Generic[_P]):
     """Validator for scalar char values"""
 
     def __init__(self) -> None:
         self._ctype = ctypes.c_char
         self.len = 1
 
-    def validate_one(self, value: str):
+    def __set__(self, obj: _P, value: Union[str, ctypes.c_char]):
+        if isinstance(value, ctypes.c_char):
+            setattr(obj, self._private_name, value)
+        else:
+            super().__set__(obj, value)
+
+    def validate_one(self, value: Union[str, ctypes.c_char]):
         """Validate a char value
 
         Args:
@@ -508,6 +529,10 @@ class Char(String):
             TypeError: Wrong type
             ValueError: String exceeds max length
         """
+
+        if isinstance(value, self._ctype):
+            return
+
         if not isinstance(value, str):
             raise TypeError(f"Expected {value} to be a str")
 
