@@ -3,6 +3,8 @@ import unittest
 # Import message defs to add to pyrtma.msg_defs map
 from .test_msg_defs.test_defs import *
 
+import numpy as np
+
 
 class TestEncoding(unittest.TestCase):
     """Test sending messages through MessageManager."""
@@ -11,7 +13,7 @@ class TestEncoding(unittest.TestCase):
         m = MDF_VALIDATOR_A()
 
         m.int8 = -128
-        m.int8 = 127
+        m.int8 = int(127)
 
         m.uint8 = 0
         m.uint8 = 255
@@ -632,6 +634,7 @@ class TestEncoding(unittest.TestCase):
         A.struct_arr[0] = VALIDATOR_STRUCT()
 
         A.int8_arr[:] = [1, 2, 3, 4]
+        A.int8_arr[:] = (ctypes.c_int8 * 4)()
         A.int16_arr[:] = [1, 2, 3, 4]
         A.int32_arr[:] = [1, 2, 3, 4]
         A.int64_arr[:] = [1, 2, 3, 4]
@@ -657,8 +660,11 @@ class TestEncoding(unittest.TestCase):
             VALIDATOR_STRUCT(),
         ]
 
+        A.struct_arr[:] = (VALIDATOR_STRUCT * 4)()
+
         # again without [:]
         A.int8_arr = [1, 2, 3, 4]
+        A.int8_arr = (ctypes.c_int8 * 4)()
         A.int16_arr = [1, 2, 3, 4]
         A.int32_arr = [1, 2, 3, 4]
         A.int64_arr = [1, 2, 3, 4]
@@ -667,6 +673,7 @@ class TestEncoding(unittest.TestCase):
         A.uint32_arr = [1, 2, 3, 4]
         A.uint64_arr = [1, 2, 3, 4]
         A.float_arr = [1.0, 2.0, 3.0, 4.0]
+        A.float_arr = (ctypes.c_float * 4)()
         A.double_arr = [1.0, 2.0, 3.0, 4.0]
 
         A.float_arr = [1, 2, 3, 4]
@@ -683,6 +690,8 @@ class TestEncoding(unittest.TestCase):
             VALIDATOR_STRUCT(),
             VALIDATOR_STRUCT(),
         ]
+
+        A.struct_arr = (VALIDATOR_STRUCT * 4)()
 
     def test_refs(self):
         A = MDF_VALIDATOR_A()

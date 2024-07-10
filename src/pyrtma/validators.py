@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import collections.abc as abc
 import math
+import numbers
 
 from typing import (
     List,
@@ -19,7 +20,6 @@ from typing import (
     Iterator,
 )
 from abc import abstractmethod, ABCMeta
-import numbers
 from contextlib import contextmanager
 from contextvars import ContextVar
 
@@ -49,6 +49,15 @@ __all__ = [
 ]
 
 _VALIDATION_ENABLED: ContextVar[bool] = ContextVar("_VALIDATION_ENABLED", default=True)
+
+
+def hello(x: ctypes.Array[ctypes.c_int32]):
+    pass
+
+
+a = (ctypes.c_int32 * 10)()
+
+hello(a)
 
 
 @contextmanager
@@ -111,12 +120,12 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
     def __get__(self, obj: _P, objtype=None) -> float:
         return getattr(obj, self._private_name)
 
-    def __set__(self, obj: _P, value: float):
+    def __set__(self, obj: _P, value: Union[int, float]):
         if _VALIDATION_ENABLED.get():
             self.validate_one(value)
         setattr(obj, self._private_name, value)
 
-    def validate_one(self, value: float):
+    def validate_one(self, value: Union[float, int]):
         """Validate a float value
 
         Args:
@@ -127,7 +136,7 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
             ValueError: Value cannot be precisely represented with this datatype
         """
 
-        if not isinstance(value, (int, float)):
+        if not isinstance(value, (float, int)):
             raise TypeError(f"Expected {value} to be a float")
 
         if math.isinf(self._ctype(value).value):
@@ -135,7 +144,7 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
                 f"The {value} can not be represented as a {type(self).__name__}"
             )
 
-    def validate_many(self, value: Iterable[float]):
+    def validate_many(self, value: Iterable[Union[float, int]]):
         """Validate multiple float values
 
         Args:
@@ -146,19 +155,16 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P], metaclass=ABCMe
             ValueError: Value cannot be precisely represented with this datatype
         """
 
-        # Check all value types
-        # Note: This check accounts for about 35% of the total time
-        if any(not isinstance(v, (int, float)) for v in value):
-            raise TypeError(f"Expected {value!r} to be a float.")
-
         # Note: This may not be worth it since this is a rare overflow case.
-        # Note: This check accounts for about 20% of the total time
-        if math.isinf(self._ctype(max(value)).value) or math.isinf(
-            self._ctype(min(value)).value
-        ):
-            raise ValueError(
-                f"{value} contains value(s) that can not be represented as a {type(self).__name__}"
-            )
+        try:
+            if math.isinf(self._ctype(max(value)).value) or math.isinf(
+                self._ctype(min(value)).value
+            ):
+                raise ValueError(
+                    f"{value} contains value(s) that can not be represented as a {type(self).__name__}"
+                )
+        except TypeError:
+            raise TypeError(f"Expected {value!r} to contain all float types.")
 
     def __repr__(self):
         return f"{type(self).__name__} at 0x{id(self):016X}"
@@ -227,7 +233,7 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
         if not isinstance(value, int):
             raise TypeError(f"Expected {value} to be an int")
 
-        if not (self._min <= value <= self._max):
+        if not (self._min <= int(value) <= self._max):
             raise ValueError(
                 f"Expected {value} to be in range of {self._min} to {self._max}"
             )
@@ -245,9 +251,9 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P], metaclass=ABCMeta):
 
         # Check all values
         if any(not isinstance(v, int) for v in value):
-            raise TypeError(f"Expected {value} to be an int.")
+            raise TypeError(f"Expected {value} to contain all int types.")
 
-        if (max(value) > self._max) or (min(value) < self._min):
+        if (int(max(value)) > self._max) or (min(value) < self._min):
             raise ValueError(
                 f"Expected {value} to be in range of {self._min} to {self._max}."
             )
@@ -581,7 +587,7 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
         if _VALIDATION_ENABLED.get():
-            if isinstance(value, abc.Iterable):
+            if isinstance(value, abc.Iterable) or hasattr(value, "__getitem__"):
                 self.validate_many(value)
             else:
                 self.validate_one(value)
@@ -693,7 +699,11 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
         """Return an Array bound to a message obj instance."""
         return IntArray._bound(self, obj)
 
-    def __set__(self, obj: MessageBase, value: Union[ArrayField[_IV], Sequence[int]]):
+    def __set__(
+        self,
+        obj: MessageBase,
+        value: Union[ArrayField[_IV], Sequence[int], ctypes.Array],
+    ):
         if isinstance(value, ArrayField):
             if _VALIDATION_ENABLED.get():
                 self.validate_array(value)
@@ -759,7 +769,7 @@ class ByteArray(ArrayField[Byte]):
     def __set__(
         self,
         obj: MessageBase,
-        value: Union[ArrayField[Byte], Sequence[int], bytes, bytearray],
+        value: Union[ArrayField[Byte], Sequence[int], bytes, bytearray, ctypes.Array],
     ):
         if isinstance(value, ArrayField):
             if _VALIDATION_ENABLED.get():
@@ -797,7 +807,7 @@ class ByteArray(ArrayField[Byte]):
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
         if _VALIDATION_ENABLED.get():
-            if isinstance(value, abc.Iterable):
+            if isinstance(value, abc.Iterable) or hasattr(value, "__getitem__"):
                 self.validate_many(value)
             else:
                 self.validate_one(value)
@@ -847,7 +857,9 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
         return FloatArray._bound(self, obj)
 
     def __set__(
-        self, obj: MessageBase, value: Union[ArrayField[_FPV], Sequence[float]]
+        self,
+        obj: MessageBase,
+        value: Union[ArrayField[_FPV], Sequence[float], ctypes.Array],
     ):
         if isinstance(value, ArrayField):
             if _VALIDATION_ENABLED.get():
@@ -961,7 +973,7 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         """Return an StructArray bound to a message obj instance."""
         return StructArray._bound(self, obj)
 
-    def __set__(self, obj, value: Union[StructArray, Sequence[_S]]):
+    def __set__(self, obj, value: Union[StructArray, Sequence[_S], ctypes.Array[_S]]):
         if isinstance(value, StructArray):
             if _VALIDATION_ENABLED.get():
                 self.validate_array(value)
@@ -992,7 +1004,7 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
             )
 
         if _VALIDATION_ENABLED.get():
-            if isinstance(value, abc.Iterable):
+            if isinstance(value, abc.Iterable) or hasattr(value, "__getitem__"):
                 self.validate_many(value)
             else:
                 self.validate_one(value)
