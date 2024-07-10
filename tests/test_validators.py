@@ -429,7 +429,25 @@ class TestEncoding(unittest.TestCase):
             A.char = 1
 
         with self.assertRaises(TypeError):
+            A.char = ctypes.c_int8(1)
+
+        with self.assertRaises(TypeError):
+            A.char = ctypes.c_byte(1)
+
+        with self.assertRaises(TypeError):
+            A.char = ctypes.c_ubyte(1)
+
+        with self.assertRaises(TypeError):
             A.int8 = "a"
+
+        with self.assertRaises(TypeError):
+            A.int8 = ctypes.c_int16(1)
+
+        with self.assertRaises(TypeError):
+            A.int8 = ctypes.c_uint8(1)
+
+        with self.assertRaises(TypeError):
+            A.int8 = 1.4
 
         with self.assertRaises(TypeError):
             A.int16 = [1, 2, 3]
@@ -460,6 +478,9 @@ class TestEncoding(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             A.byte = "a"
+
+        with self.assertRaises(TypeError):
+            A.byte = ctypes.c_char(1)
 
         with self.assertRaises(TypeError):
             A.string = 1
