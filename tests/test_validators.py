@@ -221,134 +221,134 @@ class TestEncoding(unittest.TestCase):
             m.int8_arr[:] = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.int8_arr[:] = [1, 2, 3, 4, 5]
+            m.int8_arr[:] = (ctypes.c_int8 * 5)()
 
         with self.assertRaises(ValueError):
             m.uint8_arr[:] = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.uint8_arr[:] = [1, 2, 3, 4, 5]
+            m.uint8_arr[:] = (ctypes.c_uint8 * 5)()
 
         with self.assertRaises(ValueError):
             m.int16_arr[:] = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.int16_arr[:] = [1, 2, 3, 4, 5]
+            m.int16_arr[:] = (ctypes.c_int16 * 5)()
 
         with self.assertRaises(ValueError):
             m.uint16_arr[:] = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.uint16_arr[:] = [1, 2, 3, 4, 5]
+            m.uint16_arr[:] = (ctypes.c_uint16 * 5)()
 
         with self.assertRaises(ValueError):
             m.int32_arr[:] = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.int32_arr[:] = [1, 2, 3, 4, 5]
+            m.int32_arr[:] = (ctypes.c_int32 * 5)()
 
         with self.assertRaises(ValueError):
             m.uint32_arr[:] = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.uint32_arr[:] = [1, 2, 3, 4, 5]
+            m.uint32_arr[:] = (ctypes.c_uint32 * 5)()
 
         with self.assertRaises(ValueError):
             m.int64_arr[:] = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.int64_arr[:] = [1, 2, 3, 4, 5]
+            m.int64_arr[:] = (ctypes.c_int64 * 5)()
 
         with self.assertRaises(ValueError):
             m.uint64_arr[:] = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.uint64_arr[:] = [1, 2, 3, 4, 5]
+            m.uint64_arr[:] = (ctypes.c_uint64 * 5)()
 
         with self.assertRaises(ValueError):
             m.float_arr[:] = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.float_arr[:] = [1, 2, 3, 4, 5]
+            m.float_arr[:] = (ctypes.c_float * 5)()
 
         with self.assertRaises(ValueError):
             m.double_arr[:] = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.double_arr[:] = [1, 2, 3, 4, 5]
+            m.double_arr[:] = (ctypes.c_double * 5)()
 
         with self.assertRaises(ValueError):
             m.byte_arr[:] = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.byte_arr[:] = [1, 2, 3, 4, 5]
+            m.byte_arr[:] = (ctypes.c_ubyte * 5)()
 
         # test again without [:]
         with self.assertRaises(ValueError):
             m.int8_arr = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.int8_arr = [1, 2, 3, 4, 5]
+            m.int8_arr = (ctypes.c_int8 * 5)()
 
         with self.assertRaises(ValueError):
             m.uint8_arr = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.uint8_arr = [1, 2, 3, 4, 5]
+            m.uint8_arr = (ctypes.c_uint8 * 5)()
 
         with self.assertRaises(ValueError):
             m.int16_arr = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.int16_arr = [1, 2, 3, 4, 5]
+            m.int16_arr = (ctypes.c_int16 * 5)()
 
         with self.assertRaises(ValueError):
             m.uint16_arr = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.uint16_arr = [1, 2, 3, 4, 5]
+            m.uint16_arr = (ctypes.c_uint16 * 5)()
 
         with self.assertRaises(ValueError):
             m.int32_arr = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.int32_arr = [1, 2, 3, 4, 5]
+            m.int32_arr = (ctypes.c_int32 * 5)()
 
         with self.assertRaises(ValueError):
             m.uint32_arr = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.uint32_arr = [1, 2, 3, 4, 5]
+            m.uint32_arr = (ctypes.c_uint32 * 5)()
 
         with self.assertRaises(ValueError):
             m.int64_arr = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.int64_arr = [1, 2, 3, 4, 5]
+            m.int64_arr = (ctypes.c_int64 * 5)()
 
         with self.assertRaises(ValueError):
             m.uint64_arr = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.uint64_arr = [1, 2, 3, 4, 5]
+            m.uint64_arr = (ctypes.c_uint64 * 5)()
 
         with self.assertRaises(ValueError):
             m.float_arr = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.float_arr = [1, 2, 3, 4, 5]
+            m.float_arr = (ctypes.c_float * 5)()
 
         with self.assertRaises(ValueError):
             m.double_arr = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.double_arr = [1, 2, 3, 4, 5]
+            m.double_arr = (ctypes.c_double * 5)()
 
         with self.assertRaises(ValueError):
             m.byte_arr = [1, 2, 3, 4, 5]
 
         with self.assertRaises(ValueError):
-            m.byte_arr = [1, 2, 3, 4, 5]
+            m.byte_arr = (ctypes.c_ubyte * 5)()
 
     def test_get_types(self):
         m = MDF_VALIDATOR_A()
