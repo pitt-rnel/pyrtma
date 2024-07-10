@@ -3,8 +3,6 @@ import unittest
 # Import message defs to add to pyrtma.msg_defs map
 from .test_msg_defs.test_defs import *
 
-import numpy as np
-
 
 class TestEncoding(unittest.TestCase):
     """Test sending messages through MessageManager."""
