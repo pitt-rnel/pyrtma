@@ -12,18 +12,20 @@ import random
 import ctypes
 import os
 import typing
+import tempfile
 
+import graphviz
 
 from .client_logging import RTMALogger, ClientLike
 from .validators import disable_message_validation
-from .message import Message, get_msg_cls
+from .message import Message, get_msg_defs
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
-from .context import get_core_defs
+from .context import get_core_defs, get_context
 from .core_defs import ALL_MESSAGE_TYPES
 from . import core_defs as cd
 
-from typing import Dict, List, Tuple, Set, Type, Union
+from typing import Dict, List, Tuple, Set, Type, Union, Optional
 from itertools import chain
 from dataclasses import dataclass, field
 from collections import defaultdict, Counter
@@ -98,6 +100,7 @@ class Module:
     def close(self):
         """Close connection"""
         self.conn.close()
+        self.connected = False
 
     def __str__(self):
         return f"{self.name or 'ID'}({self.mod_id}) @ {self.ipaddr}"
@@ -124,6 +127,7 @@ class MessageManager(ClientLike):
         log_level=logging.INFO,
         debug=False,
         send_msg_timing=True,
+        enable_graph=False,
     ):
         """MessageManager class
 
@@ -149,7 +153,7 @@ class MessageManager(ClientLike):
         self.b_send_msg_timing = send_msg_timing
 
         self._logger = RTMALogger(f"message_manager", self, logging.INFO)
-        self.logger.level = log_level
+        self.logger.set_all_levels(log_level)
 
         if ip_address == socket.INADDR_ANY:
             ip_address = ""  # bind and Module require a string input, '' is treated as INADDR_ANY by bind
@@ -187,7 +191,7 @@ class MessageManager(ClientLike):
         self.wlist: List[socket.socket] = []
 
         # Add message manager to its module list
-        mm_module = Module(
+        self.mm_module = Module(
             uid=0,
             conn=self.listen_socket,
             address=(ip_address, port),
@@ -199,7 +203,7 @@ class MessageManager(ClientLike):
             is_logger=False,
         )
 
-        self.modules[self.listen_socket] = mm_module
+        self.modules[self.listen_socket] = self.mm_module
 
         self.data_buffer = bytearray(1024**2)
         self.data_view = memoryview(self.data_buffer)
@@ -207,6 +211,9 @@ class MessageManager(ClientLike):
         # Address Reuse allowed for testing
         if debug:
             self.listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+        self.graph = RTMAGraph()
+        self.graph.enabled = enable_graph
 
         self.logger.info("Message Manager Initialized.")
 
@@ -487,7 +494,11 @@ class MessageManager(ClientLike):
         return True
 
     def forward_message(
-        self, header: MessageHeader, data: Union[bytes, MessageData], count: bool = True
+        self,
+        src_module: Module,
+        header: MessageHeader,
+        data: Union[bytes, MessageData],
+        count: bool = True,
     ):
         """Forward a message from other modules
 
@@ -503,7 +514,7 @@ class MessageManager(ClientLike):
         """
 
         # message counts (Skip traffic count)
-        if header.msg_type != cd.MT_MESSAGE_TRAFFIC:
+        if header.msg_type not in (cd.MT_MESSAGE_TRAFFIC, cd.MT_FAILED_MESSAGE):
             if self.b_send_msg_timing:
                 self.message_counts[header.msg_type] += 1
             self.traffic_counter[header.msg_type] += 1
@@ -542,6 +553,9 @@ class MessageManager(ClientLike):
                         or module.is_logger
                     ):
                         module.send_message(header, data)
+                        self.graph.update(
+                            src_module, module, header.msg_type, header.send_time
+                        )
                         module.drops = 0
                 except ConnectionError as err:
                     self.remove_module(module)
@@ -556,6 +570,9 @@ class MessageManager(ClientLike):
 
                 try:
                     module.send_message(header, data)
+                    self.graph.update(
+                        src_module, module, header.msg_type, header.send_time
+                    )
                     module.drops = 0
                 except ConnectionError as err:
                     self.remove_module(module)
@@ -615,7 +632,7 @@ class MessageManager(ClientLike):
         header.dest_mod_id = dest_mod_id
         header.num_data_bytes = msg_data.type_size
 
-        self.forward_message(header, msg_data)
+        self.forward_message(self.mm_module, header, msg_data)
 
     def send_ack(self, src_module: Module):
         """Send ACKNOWLEDGE signal header
@@ -681,7 +698,7 @@ class MessageManager(ClientLike):
             setattr(data.msg_header, fname, getattr(header, fname))
 
         # send to logger modules AND modules subscribed to FAILED_MESSAGE
-        self.forward_message(out_header, data)
+        self.forward_message(self.mm_module, out_header, data)
 
     def send_timing_message(self):
         """Send TIMING_MESSAGE"""
@@ -823,7 +840,7 @@ class MessageManager(ClientLike):
         else:
             self.logger.debug(f"FORWARD - msg_type:{hdr.msg_type} from {src_module!s}")
             data = self.data_view[: hdr.num_data_bytes]
-            self.forward_message(hdr, data)
+            self.forward_message(src_module, hdr, data)
 
     def close(self):
         """Close manager server"""
@@ -900,6 +917,7 @@ class MessageManager(ClientLike):
 
                     if (now - self.last_client_info) > self.INFO_INTERVAL:
                         self.send_active_clients()
+                        self.graph.build_graph()
 
         except KeyboardInterrupt:
             self.logger.info("Stopping Message Manager")
@@ -937,6 +955,20 @@ def main():
         action="store_true",
         help="Disable sending of TIMING_MESSAGE",
     )
+
+    parser.add_argument(
+        "--enable-graph",
+        action="store_true",
+        help="Enable building module graph output",
+    )
+
+    parser.add_argument(
+        "--defs",
+        dest="defs_file",
+        type=str,
+        default="",
+        help="Path to python message definitions file",
+    )
     args = parser.parse_args()
 
     if args.addr:  # a non-empty host address was passed in.
@@ -956,6 +988,17 @@ def main():
         print("Unknown log level. Using INFO instead")
         level = logging.INFO
 
+    if args.defs_file:
+        import pathlib
+        import sys
+        import importlib
+
+        base = pathlib.Path(args.defs_file).absolute().parent
+        fname = pathlib.Path(args.defs_file).stem
+
+        sys.path.insert(0, (str(base.absolute())))
+        importlib.import_module(fname)
+
     with disable_message_validation():
         msg_mgr = MessageManager(
             ip_address=ip_addr,
@@ -964,9 +1007,103 @@ def main():
             log_level=level,
             debug=args.debug,
             send_msg_timing=(not args.disable_timing_msg),
+            enable_graph=args.enable_graph,
         )
 
         msg_mgr.run()
+
+
+class RTMAGraph:
+    def __init__(self):
+        self._enabled = False
+        self.nodes: dict[int, Module] = dict()
+        self.edges: dict[tuple[Module, Module], dict[int, list[float]]] = {}
+        self.msg_defs = get_msg_defs()
+        self.rtma = get_context()
+        self.mid2name = {v: k for k, v in self.rtma.MID.items()}
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+
+    @enabled.setter
+    def enabled(self, value: bool):
+        if value:
+            self._enabled = True
+            self.clear()
+        else:
+            self._enabled = False
+
+    def clear(self):
+        self.edges.clear()
+
+    def update(self, src: Module, dest: Module, msg_type: int, send_time: float):
+        if not self._enabled:
+            return
+
+        # Ignore rtma control messages
+        if msg_type < 100:
+            return
+
+        # Ignore anything send from MM
+        if src == 0:
+            return
+
+        if self.nodes.get(src.mod_id) is None:
+            self.nodes[src.mod_id] = src
+
+        if self.nodes.get(dest.mod_id) is None:
+            self.nodes[dest.mod_id] = dest
+
+        dir = (src, dest)
+
+        if self.edges.get(dir) is None:
+            self.edges[dir] = {}
+            self.edges[dir][msg_type] = [send_time]
+        else:
+            if self.edges[dir].get(msg_type) is None:
+                self.edges[dir][msg_type] = [send_time]
+            else:
+                self.edges[dir][msg_type].append(send_time)
+
+    def build_graph(
+        self,
+    ):
+        output_dir = tempfile.gettempdir() + "/rtma_graph"
+
+        dot = graphviz.Digraph(
+            "rtma_graph", comment="RTMA Module Graph", format="svg", engine="dot"
+        )
+
+        for node in self.nodes.values():
+            name = node.name or self.mid2name.get(node.mod_id) or f"MID({node.mod_id})"
+
+            if node.connected:
+                dot.node(f"{node.mod_id}", name)
+            else:
+                dot.node(f"{node.mod_id}", name, color="red")
+
+        for (src, dest), edges in self.edges.items():
+            for msg_type, times in edges.items():
+                avg = sum(b - a for a, b in zip(times[:-1], times[1:])) / (len(times))
+
+                try:
+                    msg_name = self.msg_defs[msg_type].type_name
+                except KeyError:
+                    msg_name = f"{msg_type}"
+
+                dot.edge(
+                    f"{src.mod_id}",
+                    f"{dest.mod_id}",
+                    constraint="false",
+                    labeltooltip=f"avg: {avg:0.3f} s",
+                    label=msg_name,
+                    labelfloat="true",
+                    fontsize="10.0",
+                )
+
+        dot.render(directory=output_dir)
+        self.clear()
 
 
 if __name__ == "__main__":

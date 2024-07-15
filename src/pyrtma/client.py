@@ -119,6 +119,7 @@ class Client(ClientLike):
             for k, v in ctx.MID.items():
                 if v == module_id:
                     self._name = k
+                    break
             else:
                 self._name = name
         else:
