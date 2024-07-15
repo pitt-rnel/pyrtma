@@ -543,6 +543,11 @@ class MessageManager(ClientLike):
             )
         )
 
+        if len(subscribers) == 0:
+            self.graph.update(
+                src_module, self.mm_module, header.msg_type, header.send_time
+            )
+
         for n in range(len(subscribers)):
             module = subscribers[n]
             if module.conn in self.wlist:
@@ -812,6 +817,7 @@ class MessageManager(ClientLike):
             if self.connect_module(src_module, self.message):
                 self.send_ack(src_module)
                 self.send_client_info(src_module)
+                self.graph.add_node(src_module)
                 if msg_type == cd.MT_CONNECT:
                     self.logger.info(f"CONNECT - {src_module!s}")
                 else:
@@ -1021,6 +1027,7 @@ class RTMAGraph:
         self.msg_defs = get_msg_defs()
         self.rtma = get_context()
         self.mid2name = {v: k for k, v in self.rtma.MID.items()}
+        self.last_build = time.time()
 
     @property
     def enabled(self) -> bool:
@@ -1035,7 +1042,29 @@ class RTMAGraph:
             self._enabled = False
 
     def clear(self):
+        self.nodes.clear()
         self.edges.clear()
+
+    def prune(self):
+        rm = []
+        for mod in self.nodes.values():
+            if not mod.connected:
+                rm.append(mod)
+                for mods in self.edges.keys():
+                    if mod in mods:
+                        self.edges[mods].clear()
+
+        for mod in rm:
+            self.nodes.pop(mod.mod_id)
+
+    def add_node(self, mod: Module):
+        self.nodes[mod.mod_id] = mod
+
+    def rm_node(self, mod: Module):
+        self.nodes.pop(mod.mod_id)
+        for mods in self.edges.keys():
+            if mod in mods:
+                self.edges[mods].clear()
 
     def update(self, src: Module, dest: Module, msg_type: int, send_time: float):
         if not self._enabled:
@@ -1072,18 +1101,30 @@ class RTMAGraph:
         output_dir = tempfile.gettempdir() + "/rtma_graph"
 
         dot = graphviz.Digraph(
-            "rtma_graph", comment="RTMA Module Graph", format="svg", engine="dot"
+            "rtma_graph",
+            comment="RTMA Module Graph",
+            format="svg",
+            engine="circo",
         )
 
         for node in self.nodes.values():
             name = node.name or self.mid2name.get(node.mod_id) or f"MID({node.mod_id})"
 
             if node.connected:
-                dot.node(f"{node.mod_id}", name)
+                dot.node(f"{node.mod_id}", name.lower(), fontsize="10.0")
             else:
-                dot.node(f"{node.mod_id}", name, color="red")
+                dot.node(f"{node.mod_id}", name.lower(), fontsize="10.0", color="red")
 
         for (src, dest), edges in self.edges.items():
+            src_name = src.name or self.mid2name.get(src.mod_id) or f"MID({src.mod_id})"
+            dest_name = (
+                dest.name or self.mid2name.get(dest.mod_id) or f"MID({dest.mod_id})"
+            )
+            if not src.connected or not dest.connected:
+                edgecolor = "red"
+            else:
+                edgecolor = "black"
+
             for msg_type, times in edges.items():
                 avg = sum(b - a for a, b in zip(times[:-1], times[1:])) / (len(times))
 
@@ -1096,14 +1137,20 @@ class RTMAGraph:
                     f"{src.mod_id}",
                     f"{dest.mod_id}",
                     constraint="false",
-                    labeltooltip=f"avg: {avg:0.3f} s",
-                    label=msg_name,
+                    labeltooltip=f"{src_name} -> {dest_name}: {msg_name}",  # f"avg: {avg:0.3f} s",
+                    tooltip=f"{src_name} -> {dest_name}: {msg_name}",  # f"avg: {avg:0.3f} s",
+                    label=str(msg_type),
                     labelfloat="true",
-                    fontsize="10.0",
+                    fontsize="8.0",
+                    color=edgecolor,
                 )
 
-        dot.render(directory=output_dir)
-        self.clear()
+        with open(f"{output_dir}/rtma_graph.gv", "wt") as f:
+            f.write(dot.source)
+
+        if (time.time() - self.last_build) > 60.0:
+            self.prune()
+            self.last_build = time.time()
 
 
 if __name__ == "__main__":
