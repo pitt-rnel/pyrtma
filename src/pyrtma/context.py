@@ -23,6 +23,7 @@ _ctx_copy = copy.deepcopy(_ctx)
 
 
 def update_context(module_name: str) -> RTMAContext:
+    global _ctx_copy
     mod = sys.modules[module_name]
 
     for k, v in mod.__dict__.items():
