@@ -98,6 +98,7 @@ class Module:
     def close(self):
         """Close connection"""
         self.conn.close()
+        self.connected = False
 
     def __str__(self):
         return f"{self.name or 'ID'}({self.mod_id}) @ {self.ipaddr}"
@@ -149,7 +150,7 @@ class MessageManager(ClientLike):
         self.b_send_msg_timing = send_msg_timing
 
         self._logger = RTMALogger(f"message_manager", self, logging.INFO)
-        self.logger.level = log_level
+        self.logger.set_all_levels(log_level)
 
         if ip_address == socket.INADDR_ANY:
             ip_address = ""  # bind and Module require a string input, '' is treated as INADDR_ANY by bind
@@ -187,7 +188,7 @@ class MessageManager(ClientLike):
         self.wlist: List[socket.socket] = []
 
         # Add message manager to its module list
-        mm_module = Module(
+        self.mm_module = Module(
             uid=0,
             conn=self.listen_socket,
             address=(ip_address, port),
@@ -199,7 +200,7 @@ class MessageManager(ClientLike):
             is_logger=False,
         )
 
-        self.modules[self.listen_socket] = mm_module
+        self.modules[self.listen_socket] = self.mm_module
 
         self.data_buffer = bytearray(1024**2)
         self.data_view = memoryview(self.data_buffer)
@@ -487,7 +488,11 @@ class MessageManager(ClientLike):
         return True
 
     def forward_message(
-        self, header: MessageHeader, data: Union[bytes, MessageData], count: bool = True
+        self,
+        src_module: Module,
+        header: MessageHeader,
+        data: Union[bytes, MessageData],
+        count: bool = True,
     ):
         """Forward a message from other modules
 
@@ -503,7 +508,7 @@ class MessageManager(ClientLike):
         """
 
         # message counts (Skip traffic count)
-        if header.msg_type != cd.MT_MESSAGE_TRAFFIC:
+        if header.msg_type not in (cd.MT_MESSAGE_TRAFFIC, cd.MT_FAILED_MESSAGE):
             if self.b_send_msg_timing:
                 self.message_counts[header.msg_type] += 1
             self.traffic_counter[header.msg_type] += 1
@@ -615,7 +620,7 @@ class MessageManager(ClientLike):
         header.dest_mod_id = dest_mod_id
         header.num_data_bytes = msg_data.type_size
 
-        self.forward_message(header, msg_data)
+        self.forward_message(self.mm_module, header, msg_data)
 
     def send_ack(self, src_module: Module):
         """Send ACKNOWLEDGE signal header
@@ -681,7 +686,7 @@ class MessageManager(ClientLike):
             setattr(data.msg_header, fname, getattr(header, fname))
 
         # send to logger modules AND modules subscribed to FAILED_MESSAGE
-        self.forward_message(out_header, data)
+        self.forward_message(self.mm_module, out_header, data)
 
     def send_timing_message(self):
         """Send TIMING_MESSAGE"""
@@ -823,7 +828,7 @@ class MessageManager(ClientLike):
         else:
             self.logger.debug(f"FORWARD - msg_type:{hdr.msg_type} from {src_module!s}")
             data = self.data_view[: hdr.num_data_bytes]
-            self.forward_message(hdr, data)
+            self.forward_message(src_module, hdr, data)
 
     def close(self):
         """Close manager server"""
