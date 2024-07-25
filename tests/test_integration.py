@@ -2,6 +2,7 @@ import random
 import threading
 import time
 import unittest
+import logging
 
 import pyrtma
 from pyrtma import message_def
@@ -58,14 +59,15 @@ class TestSingleClient(unittest.TestCase):
 
     def setUp(self):
         self.port = random.randint(1000, 10000)  # random port
+        self.addr = f"127.0.0.1:{self.port}"
         self.module_id = 11
-        self.context_module_id = 12
         self.client = Client(module_id=self.module_id, host_id=0, timecode=False)
 
         self.manager = MessageManager(
             ip_address="127.0.0.1",
             port=self.port,
             timecode=False,
+            log_level=logging.ERROR,
             debug=False,
             send_msg_timing=True,
         )
@@ -76,10 +78,9 @@ class TestSingleClient(unittest.TestCase):
         wait_for_message()
 
     def tearDown(self):
+        self.client.disconnect()
         self.manager.close()
         self.manager_thread.join()
-        for mod in self.manager.modules:
-            mod.close()
 
     def test_whenClientConnects_clientConnectsToMessageManager(self):
         """
@@ -88,43 +89,23 @@ class TestSingleClient(unittest.TestCase):
         # Arrange
 
         # Act
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
+        self.client.connect(server_name=self.addr)
         wait_for_message()
 
         # Assert
         self.assertTrue(self.client.connected, msg="Client not connected.")
         self.assertIn(
             self.module_id,
-            [mod.id for mod in self.manager.modules.values()],
+            [mod.mod_id for mod in self.manager.modules.values()],
             msg="Module id not found in Messager Manager modules.",
         )
-
-    def test_whenContextClientConnects_clientConnectsToMessageManager(self):
-        """
-        Test if client module is connected when connect is called.
-        """
-        # Arrange
-
-        # Act
-        with client_context(
-            module_id=self.context_module_id, server_name=f"127.0.0.1:{self.port}"
-        ) as client:
-            wait_for_message()
-
-            # Assert
-            self.assertTrue(client.connected, msg="Client not connected.")
-            self.assertIn(
-                self.context_module_id,
-                [mod.id for mod in self.manager.modules.values()],
-                msg="Module id not found in Messager Manager modules.",
-            )
 
     def test_whenClientSubscribes_clientIsSubscribedToMessageType(self):
         """
         Test if client is subscribed to message type when subscribe is called.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
+        self.client.connect(server_name=self.addr)
         wait_for_message()
 
         # Act
@@ -134,7 +115,7 @@ class TestSingleClient(unittest.TestCase):
         # Assert
         self.assertIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
             msg="Module id not found in TEST_MESSAGE subscriptions.",
         )
 
@@ -144,7 +125,7 @@ class TestSingleClient(unittest.TestCase):
             types are sent to subscribe.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
+        self.client.connect(server_name=self.addr)
         wait_for_message()
 
         # Act
@@ -154,12 +135,12 @@ class TestSingleClient(unittest.TestCase):
         # Assert
         self.assertIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
             msg="Module id not found in TEST_MESSAGE subscriptions",
         )
         self.assertIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
             msg="Module id not found in TEST_MESSAGE2 subscriptions",
         )
 
@@ -168,7 +149,7 @@ class TestSingleClient(unittest.TestCase):
         Test if client is unsubscribed from message type when unsubscribe is called.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
+        self.client.connect(server_name=self.addr)
         wait_for_message()
         self.client.subscribe([MT_TEST_MESSAGE])
         wait_for_message()
@@ -180,7 +161,7 @@ class TestSingleClient(unittest.TestCase):
         # Assert
         self.assertNotIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
             msg="Module id found in TEST_MESSAGE subscriptions.",
         )
 
@@ -190,7 +171,7 @@ class TestSingleClient(unittest.TestCase):
             types are sent to unsubscribe.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
+        self.client.connect(server_name=self.addr)
         wait_for_message()
         self.client.subscribe([MT_TEST_MESSAGE, MT_TEST_MESSAGE2])
         wait_for_message()
@@ -202,12 +183,12 @@ class TestSingleClient(unittest.TestCase):
         # Assert
         self.assertNotIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
             msg="Module id found in TEST_MESSAGE subscriptions.",
         )
         self.assertNotIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
             msg="Module id found in MT_TEST_MESSAGE2 subscriptions.",
         )
 
@@ -216,7 +197,7 @@ class TestSingleClient(unittest.TestCase):
         Test if client is unsubscribed from message type when pause is called.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
+        self.client.connect(server_name=self.addr)
         wait_for_message()
         self.client.subscribe([MT_TEST_MESSAGE])
         wait_for_message()
@@ -228,7 +209,7 @@ class TestSingleClient(unittest.TestCase):
         # Assert
         self.assertNotIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
             msg="Module id found in TEST_MESSAGE subscriptions.",
         )
 
@@ -238,7 +219,7 @@ class TestSingleClient(unittest.TestCase):
             types are sent to pause.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
+        self.client.connect(server_name=self.addr)
         wait_for_message()
         self.client.subscribe([MT_TEST_MESSAGE, MT_TEST_MESSAGE2])
         wait_for_message()
@@ -250,12 +231,12 @@ class TestSingleClient(unittest.TestCase):
         # Assert
         self.assertNotIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
             msg="Module id found in TEST_MESSAGE subscriptions.",
         )
         self.assertNotIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
             msg="Module id found in MT_TEST_MESSAGE2 subscriptions.",
         )
 
@@ -264,7 +245,7 @@ class TestSingleClient(unittest.TestCase):
         Test if client is subscribed to message type when resume is called.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
+        self.client.connect(server_name=self.addr)
         wait_for_message()
         self.client.subscribe([MT_TEST_MESSAGE])
         wait_for_message()
@@ -278,7 +259,7 @@ class TestSingleClient(unittest.TestCase):
         # Assert
         self.assertIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
             msg="Module id not found in TEST_MESSAGE subscriptions",
         )
 
@@ -288,7 +269,7 @@ class TestSingleClient(unittest.TestCase):
             types are sent to resume.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
+        self.client.connect(server_name=self.addr)
         wait_for_message()
         self.client.subscribe([MT_TEST_MESSAGE, MT_TEST_MESSAGE2])
         wait_for_message()
@@ -302,12 +283,12 @@ class TestSingleClient(unittest.TestCase):
         # Assert
         self.assertIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
             msg="Module id not found in TEST_MESSAGE subscriptions",
         )
         self.assertIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
             msg="Module id not found in TEST_MESSAGE2 subscriptions",
         )
 
@@ -316,7 +297,7 @@ class TestSingleClient(unittest.TestCase):
         Test if client is subscribed to message type when subscribe is called.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
+        self.client.connect(server_name=self.addr)
         wait_for_message()
 
         # Act
@@ -326,28 +307,7 @@ class TestSingleClient(unittest.TestCase):
             # Assert
             self.assertIn(
                 self.module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
-                msg="Module id not found in TEST_MESSAGE subscriptions.",
-            )
-
-    def test_whenContextClientContextSubscribes_clientIsSubscribedToMessageType(self):
-        """
-        Test if client is subscribed to message type when subscribe is called.
-        """
-        # Arrange
-
-        # Act
-        with client_context(
-            module_id=self.context_module_id,
-            server_name=f"127.0.0.1:{self.port}",
-            msg_list=[MT_TEST_MESSAGE],
-        ) as client:
-            wait_for_message()
-
-            # Assert
-            self.assertIn(
-                self.context_module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
                 msg="Module id not found in TEST_MESSAGE subscriptions.",
             )
 
@@ -357,7 +317,7 @@ class TestSingleClient(unittest.TestCase):
             types are sent to subscribe.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
+        self.client.connect(server_name=self.addr)
         wait_for_message()
 
         # Act
@@ -367,41 +327,12 @@ class TestSingleClient(unittest.TestCase):
             # Assert
             self.assertIn(
                 self.module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
                 msg="Module id not found in TEST_MESSAGE subscriptions",
             )
             self.assertIn(
                 self.module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
-                msg="Module id not found in TEST_MESSAGE2 subscriptions",
-            )
-
-    def test_whenContextClientContextSubscribesMulti_clientIsSubscribedToMessageTypes(
-        self,
-    ):
-        """
-        Test if client is subscribed to message types when multiple message
-            types are sent to subscribe.
-        """
-        # Arrange
-
-        # Act
-        with client_context(
-            module_id=self.context_module_id,
-            server_name=f"127.0.0.1:{self.port}",
-            msg_list=[MT_TEST_MESSAGE, MT_TEST_MESSAGE2],
-        ) as client:
-            wait_for_message()
-
-            # Assert
-            self.assertIn(
-                self.context_module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
-                msg="Module id not found in TEST_MESSAGE subscriptions",
-            )
-            self.assertIn(
-                self.context_module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
                 msg="Module id not found in TEST_MESSAGE2 subscriptions",
             )
 
@@ -410,7 +341,7 @@ class TestSingleClient(unittest.TestCase):
         Test if client is unsubscribed from message type when unsubscribe is called.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
+        self.client.connect(server_name=self.addr)
         wait_for_message()
         with self.client.subscription_context([MT_TEST_MESSAGE]):
             wait_for_message()
@@ -422,11 +353,261 @@ class TestSingleClient(unittest.TestCase):
         # Assert
         self.assertNotIn(
             self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
             msg="Module id found in TEST_MESSAGE subscriptions.",
         )
 
-    def test_whenContextClientContextUnsubscribes_clientIsUnsubscribedFromMessageType(
+    def test_whenClientContextUnsubscribesMulti_clientIsUnsubscribedFromMessageTypes(
+        self,
+    ):
+        """
+        Test if client is unsubscribed from message types when multiple message
+            types are sent to unsubscribe.
+        """
+        # Arrange
+        self.client.connect(server_name=self.addr)
+        wait_for_message()
+        with self.client.subscription_context([MT_TEST_MESSAGE, MT_TEST_MESSAGE2]):
+            wait_for_message()
+
+        # Act
+        # unsubscribes by exiting context above
+        wait_for_message()
+
+        # Assert
+        self.assertNotIn(
+            self.module_id,
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+            msg="Module id found in TEST_MESSAGE subscriptions.",
+        )
+        self.assertNotIn(
+            self.module_id,
+            [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
+            msg="Module id found in MT_TEST_MESSAGE2 subscriptions.",
+        )
+
+    def test_whenClientContextPauses_clientIsRemovedFromMessageType(self):
+        """
+        Test if client is unsubscribed from message type when pause is called.
+        """
+        # Arrange
+        self.client.connect(server_name=self.addr)
+        wait_for_message()
+        with self.client.subscription_context([MT_TEST_MESSAGE]):
+            wait_for_message()
+
+            # Act
+            with self.client.paused_subscription_context([MT_TEST_MESSAGE]):
+                wait_for_message()
+
+                # Assert
+                self.assertNotIn(
+                    self.module_id,
+                    [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                    msg="Module id found in TEST_MESSAGE subscriptions.",
+                )
+
+    def test_whenClientContextPausesMulti_clientIsRemovedFromMessageTypes(self):
+        """
+        Test if client is unsubscribed from message types when multiple message
+            types are sent to pause.
+        """
+        # Arrange
+        self.client.connect(server_name=self.addr)
+        wait_for_message()
+        with self.client.subscription_context([MT_TEST_MESSAGE, MT_TEST_MESSAGE2]):
+            wait_for_message()
+
+            # Act
+            with self.client.paused_subscription_context(
+                [MT_TEST_MESSAGE, MT_TEST_MESSAGE2]
+            ):
+                wait_for_message()
+
+                # Assert
+                self.assertNotIn(
+                    self.module_id,
+                    [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                    msg="Module id found in TEST_MESSAGE subscriptions.",
+                )
+                self.assertNotIn(
+                    self.module_id,
+                    [
+                        mod.mod_id
+                        for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]
+                    ],
+                    msg="Module id found in MT_TEST_MESSAGE2 subscriptions.",
+                )
+
+    def test_whenClientContextResumes_clientIsAddedToMessageType(self):
+        """
+        Test if client is subscribed to message type when resume is called.
+        """
+        # Arrange
+        self.client.connect(server_name=self.addr)
+        wait_for_message()
+        with self.client.subscription_context([MT_TEST_MESSAGE]):
+            wait_for_message()
+            with self.client.paused_subscription_context([MT_TEST_MESSAGE]):
+                wait_for_message()
+
+            # Act
+            # resumes subscription by exiting context above
+            wait_for_message()
+
+            # Assert
+            self.assertIn(
+                self.module_id,
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                msg="Module id not found in TEST_MESSAGE subscriptions",
+            )
+
+    def test_whenClientContextResumesMulti_clientIsAddedToMessageType(self):
+        """
+        Test if client is subscribed to message types when multiple message
+            types are sent to resume.
+        """
+        # Arrange
+        self.client.connect(server_name=self.addr)
+        wait_for_message()
+        with self.client.subscription_context([MT_TEST_MESSAGE, MT_TEST_MESSAGE2]):
+            wait_for_message()
+            with self.client.paused_subscription_context(
+                [MT_TEST_MESSAGE, MT_TEST_MESSAGE2]
+            ):
+                wait_for_message()
+
+            # Act
+            # resumes subscription by exiting context above
+            wait_for_message()
+
+            # Assert
+            self.assertIn(
+                self.module_id,
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                msg="Module id not found in TEST_MESSAGE subscriptions",
+            )
+            self.assertIn(
+                self.module_id,
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
+                msg="Module id not found in TEST_MESSAGE2 subscriptions",
+            )
+
+
+class TestSingleContextClient(unittest.TestCase):
+    """
+    Test interactions between a single client using client_context manager and message manager.
+    """
+
+    def setUp(self):
+        self.port = random.randint(1000, 10000)  # random port
+        self.addr = f"127.0.0.1:{self.port}"
+        self.module_id = 11
+        self.context_module_id = 12
+
+        self.manager = MessageManager(
+            ip_address="127.0.0.1",
+            port=self.port,
+            timecode=False,
+            log_level=logging.ERROR,
+            debug=False,
+            send_msg_timing=True,
+        )
+        self.manager_thread = threading.Thread(
+            target=self.manager.run,
+        )
+        self.manager_thread.start()
+        wait_for_message()
+
+    def tearDown(self):
+        self.manager.close()
+        self.manager_thread.join()
+
+    def test_whenClientConnects_clientConnectsToMessageManager(self):
+        """
+        Test if client module is connected when connect is called.
+        """
+        # Arrange
+
+        # Act
+        with client_context(
+            module_id=self.context_module_id, server_name=self.addr
+        ) as client:
+            wait_for_message()
+
+            # Assert
+            self.assertTrue(client.connected, msg="Client not connected.")
+            self.assertIn(
+                client.module_id,
+                [mod.mod_id for mod in self.manager.modules.values()],
+                msg="Module id not found in Messager Manager modules.",
+            )
+
+    def test_whenClientConnects_mod_id_is_correct(self):
+        # Arrange
+
+        # Act
+        with client_context(
+            module_id=self.context_module_id, server_name=self.addr
+        ) as client:
+
+            # Assert
+            self.assertTrue(
+                client.module_id == self.context_module_id,
+                msg="Context client's module ID set incorrectly",
+            )
+
+    def test_whenClientContextSubscribes_clientIsSubscribedToMessageType(self):
+        """
+        Test if client is subscribed to message type when subscribe is called.
+        """
+        # Arrange
+
+        # Act
+        with client_context(
+            module_id=self.context_module_id,
+            server_name=self.addr,
+            msg_list=[MT_TEST_MESSAGE],
+        ) as client:
+            wait_for_message()
+
+            # Assert
+            self.assertIn(
+                client.module_id,
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                msg="Module id not found in TEST_MESSAGE subscriptions.",
+            )
+
+    def test_whenClientContextSubscribesMulti_clientIsSubscribedToMessageTypes(
+        self,
+    ):
+        """
+        Test if client is subscribed to message types when multiple message
+            types are sent to subscribe.
+        """
+        # Arrange
+
+        # Act
+        with client_context(
+            module_id=self.context_module_id,
+            server_name=self.addr,
+            msg_list=[MT_TEST_MESSAGE, MT_TEST_MESSAGE2],
+        ) as client:
+            wait_for_message()
+
+            # Assert
+            self.assertIn(
+                client.module_id,
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                msg="Module id not found in TEST_MESSAGE subscriptions",
+            )
+            self.assertIn(
+                client.module_id,
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
+                msg="Module id not found in TEST_MESSAGE2 subscriptions",
+            )
+
+    def test_whenClientContextUnsubscribes_clientIsUnsubscribedFromMessageType(
         self,
     ):
         """
@@ -434,7 +615,7 @@ class TestSingleClient(unittest.TestCase):
         """
         # Arrange
         with client_context(
-            module_id=self.context_module_id, server_name=f"127.0.0.1:{self.port}"
+            module_id=self.context_module_id, server_name=self.addr
         ) as client:
             wait_for_message()
             with client.subscription_context([MT_TEST_MESSAGE]):
@@ -446,8 +627,8 @@ class TestSingleClient(unittest.TestCase):
 
             # Assert
             self.assertNotIn(
-                self.context_module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                client.module_id,
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
                 msg="Module id found in TEST_MESSAGE subscriptions.",
             )
 
@@ -459,37 +640,8 @@ class TestSingleClient(unittest.TestCase):
             types are sent to unsubscribe.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
-        wait_for_message()
-        with self.client.subscription_context([MT_TEST_MESSAGE, MT_TEST_MESSAGE2]):
-            wait_for_message()
-
-        # Act
-        # unsubscribes by exiting context above
-        wait_for_message()
-
-        # Assert
-        self.assertNotIn(
-            self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
-            msg="Module id found in TEST_MESSAGE subscriptions.",
-        )
-        self.assertNotIn(
-            self.module_id,
-            [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
-            msg="Module id found in MT_TEST_MESSAGE2 subscriptions.",
-        )
-
-    def test_whenContextClientContextUnsubscribesMulti_clientIsUnsubscribedFromMessageTypes(
-        self,
-    ):
-        """
-        Test if client is unsubscribed from message types when multiple message
-            types are sent to unsubscribe.
-        """
-        # Arrange
         with client_context(
-            module_id=self.context_module_id, server_name=f"127.0.0.1:{self.port}"
+            module_id=self.context_module_id, server_name=self.addr
         ) as client:
             wait_for_message()
             with client.subscription_context([MT_TEST_MESSAGE, MT_TEST_MESSAGE2]):
@@ -501,13 +653,13 @@ class TestSingleClient(unittest.TestCase):
 
             # Assert
             self.assertNotIn(
-                self.context_module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                client.module_id,
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
                 msg="Module id found in TEST_MESSAGE subscriptions.",
             )
             self.assertNotIn(
-                self.context_module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
+                client.module_id,
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
                 msg="Module id found in MT_TEST_MESSAGE2 subscriptions.",
             )
 
@@ -516,30 +668,9 @@ class TestSingleClient(unittest.TestCase):
         Test if client is unsubscribed from message type when pause is called.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
-        wait_for_message()
-        with self.client.subscription_context([MT_TEST_MESSAGE]):
-            wait_for_message()
-
-            # Act
-            with self.client.paused_subscription_context([MT_TEST_MESSAGE]):
-                wait_for_message()
-
-                # Assert
-                self.assertNotIn(
-                    self.module_id,
-                    [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
-                    msg="Module id found in TEST_MESSAGE subscriptions.",
-                )
-
-    def test_whenContextClientContextPauses_clientIsRemovedFromMessageType(self):
-        """
-        Test if client is unsubscribed from message type when pause is called.
-        """
-        # Arrange
         with client_context(
             module_id=self.context_module_id,
-            server_name=f"127.0.0.1:{self.port}",
+            server_name=self.addr,
             msg_list=[MT_TEST_MESSAGE],
         ) as client:
             wait_for_message()
@@ -550,41 +681,12 @@ class TestSingleClient(unittest.TestCase):
 
                 # Assert
                 self.assertNotIn(
-                    self.context_module_id,
-                    [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                    client.module_id,
+                    [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
                     msg="Module id found in TEST_MESSAGE subscriptions.",
                 )
 
-    def test_whenClientContextPausesMulti_clientIsRemovedFromMessageTypes(self):
-        """
-        Test if client is unsubscribed from message types when multiple message
-            types are sent to pause.
-        """
-        # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
-        wait_for_message()
-        with self.client.subscription_context([MT_TEST_MESSAGE, MT_TEST_MESSAGE2]):
-            wait_for_message()
-
-            # Act
-            with self.client.paused_subscription_context(
-                [MT_TEST_MESSAGE, MT_TEST_MESSAGE2]
-            ):
-                wait_for_message()
-
-                # Assert
-                self.assertNotIn(
-                    self.module_id,
-                    [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
-                    msg="Module id found in TEST_MESSAGE subscriptions.",
-                )
-                self.assertNotIn(
-                    self.module_id,
-                    [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
-                    msg="Module id found in MT_TEST_MESSAGE2 subscriptions.",
-                )
-
-    def test_whenContextClientContextPausesMulti_clientIsRemovedFromMessageType(self):
+    def test_whenClientContextPausesMulti_clientIsRemovedFromMessageType(self):
         """
         Test if client is unsubscribed from message types when multiple message
             types are sent to pause.
@@ -592,7 +694,7 @@ class TestSingleClient(unittest.TestCase):
         # Arrange
         with client_context(
             module_id=self.context_module_id,
-            server_name=f"127.0.0.1:{self.port}",
+            server_name=self.addr,
             msg_list=[MT_TEST_MESSAGE, MT_TEST_MESSAGE2],
         ) as client:
             wait_for_message()
@@ -605,13 +707,16 @@ class TestSingleClient(unittest.TestCase):
 
                 # Assert
                 self.assertNotIn(
-                    self.context_module_id,
-                    [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                    client.module_id,
+                    [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
                     msg="Module id found in TEST_MESSAGE subscriptions.",
                 )
                 self.assertNotIn(
-                    self.context_module_id,
-                    [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
+                    client.module_id,
+                    [
+                        mod.mod_id
+                        for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]
+                    ],
                     msg="Module id found in TEST_MESSAGE2 subscriptions.",
                 )
 
@@ -620,32 +725,9 @@ class TestSingleClient(unittest.TestCase):
         Test if client is subscribed to message type when resume is called.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
-        wait_for_message()
-        with self.client.subscription_context([MT_TEST_MESSAGE]):
-            wait_for_message()
-            with self.client.paused_subscription_context([MT_TEST_MESSAGE]):
-                wait_for_message()
-
-            # Act
-            # resumes subscription by exiting context above
-            wait_for_message()
-
-            # Assert
-            self.assertIn(
-                self.module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
-                msg="Module id not found in TEST_MESSAGE subscriptions",
-            )
-
-    def test_whenContextClientContextResumes_clientIsAddedToMessageType(self):
-        """
-        Test if client is subscribed to message type when resume is called.
-        """
-        # Arrange
         with client_context(
             module_id=self.context_module_id,
-            server_name=f"127.0.0.1:{self.port}",
+            server_name=self.addr,
             msg_list=[MT_TEST_MESSAGE],
         ) as client:
             wait_for_message()
@@ -658,8 +740,8 @@ class TestSingleClient(unittest.TestCase):
 
             # Assert
             self.assertIn(
-                self.context_module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                client.module_id,
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
                 msg="Module id not found in TEST_MESSAGE subscriptions",
             )
 
@@ -669,40 +751,9 @@ class TestSingleClient(unittest.TestCase):
             types are sent to resume.
         """
         # Arrange
-        self.client.connect(server_name=f"127.0.0.1:{self.port}")
-        wait_for_message()
-        with self.client.subscription_context([MT_TEST_MESSAGE, MT_TEST_MESSAGE2]):
-            wait_for_message()
-            with self.client.paused_subscription_context(
-                [MT_TEST_MESSAGE, MT_TEST_MESSAGE2]
-            ):
-                wait_for_message()
-
-            # Act
-            # resumes subscription by exiting context above
-            wait_for_message()
-
-            # Assert
-            self.assertIn(
-                self.module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
-                msg="Module id not found in TEST_MESSAGE subscriptions",
-            )
-            self.assertIn(
-                self.module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
-                msg="Module id not found in TEST_MESSAGE2 subscriptions",
-            )
-
-    def test_whenContextClientContextResumesMulti_clientIsAddedToMessageType(self):
-        """
-        Test if client is subscribed to message types when multiple message
-            types are sent to resume.
-        """
-        # Arrange
         with client_context(
             module_id=self.context_module_id,
-            server_name=f"127.0.0.1:{self.port}",
+            server_name=self.addr,
             msg_list=[MT_TEST_MESSAGE, MT_TEST_MESSAGE2],
         ) as client:
             wait_for_message()
@@ -717,12 +768,12 @@ class TestSingleClient(unittest.TestCase):
 
             # Assert
             self.assertIn(
-                self.context_module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
+                client.module_id,
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE]],
                 msg="Module id not found in TEST_MESSAGE subscriptions",
             )
             self.assertIn(
-                self.context_module_id,
-                [mod.id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
+                client.module_id,
+                [mod.mod_id for mod in self.manager.subscriptions[MT_TEST_MESSAGE2]],
                 msg="Module id not found in TEST_MESSAGE2 subscriptions",
             )
