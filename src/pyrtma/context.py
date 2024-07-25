@@ -17,12 +17,20 @@ class RTMAContext:
     MT: Dict[str, int] = field(default_factory=dict)
     MDF: Dict[str, Type[MessageData]] = field(default_factory=dict)
 
+    def _clear(self):
+        self.constants.clear()
+        self.typedefs.clear()
+        self.MID.clear()
+        self.SDF.clear()
+        self.MT.clear()
+        self.MDF.clear()
+
 
 _ctx = RTMAContext()
 _ctx_copy = copy.deepcopy(_ctx)
 
 
-def update_context(module_name: str) -> RTMAContext:
+def _update_context(module_name: str) -> RTMAContext:
     global _ctx_copy
     mod = sys.modules[module_name]
 
@@ -52,12 +60,21 @@ def update_context(module_name: str) -> RTMAContext:
     return _ctx_copy
 
 
+def _set_context(ctx: RTMAContext):
+    global _ctx
+    global _ctx_copy
+
+    _ctx._clear()
+    _ctx = ctx
+    _ctx_copy = copy.deepcopy(_ctx)
+
+
 def get_context() -> RTMAContext:
     return _ctx_copy
 
 
 @lru_cache(maxsize=None)
-def get_core_defs() -> Dict[int, Type[MessageData]]:
+def _get_core_defs() -> Dict[int, Type[MessageData]]:
     mod = sys.modules["pyrtma.core_defs"]
 
     core_defs: Dict[int, Type[MessageData]] = {}

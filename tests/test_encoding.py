@@ -6,9 +6,10 @@ import logging
 
 import pyrtma
 import pyrtma.message
+import pyrtma.manager
+import pyrtma.context
 
 from pyrtma.client import client_context
-import pyrtma.manager
 from pyrtma.manager import MessageManager
 
 # Import message defs to add to pyrtma.msg_defs map
@@ -22,12 +23,12 @@ class TestEncoding(unittest.TestCase):
         self.port = random.randint(1000, 10000)  # random port
         self.addr = f"127.0.0.1:{self.port}"
 
-        pyrtma.manager.LOG_LEVEL = logging.ERROR
         self.manager = MessageManager(
             ip_address="127.0.0.1",
             port=self.port,
             timecode=False,
             debug=False,
+            log_level=logging.ERROR,
             send_msg_timing=True,
         )
         self.manager_thread = threading.Thread(
@@ -45,7 +46,8 @@ class TestEncoding(unittest.TestCase):
             with client_context(server_name=self.addr) as subscriber:
                 time.sleep(0.250)
 
-                for mdf in pyrtma.message.get_msg_defs().values():
+                ctx = pyrtma.context.get_context()
+                for mdf in ctx.MDF.values():
                     if mdf.type_id > 1000:
                         # Subscribe from message type
                         with subscriber.subscription_context([mdf.type_id]):
