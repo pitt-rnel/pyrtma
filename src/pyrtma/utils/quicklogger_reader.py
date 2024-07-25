@@ -5,6 +5,7 @@ import sys
 import importlib
 import pyrtma
 import pyrtma.message
+import pyrtma.context
 import warnings
 
 from ..context import RTMAContext, get_context
@@ -119,7 +120,8 @@ class QLReader:
         fname = self.defs_path.stem
 
         # Copy the current message def context before importing
-        ctx = pyrtma.message.get_msg_defs()
+        defs = pyrtma.message._get_msg_defs()
+        ctx = pyrtma.context.get_context()
 
         sys.path.insert(0, (str(base.absolute())))
         with warnings.catch_warnings():
@@ -187,7 +189,8 @@ class QLReader:
 
         finally:
             # Restore the orignal message def context
-            pyrtma.message.set_msg_defs(ctx)
+            pyrtma.message._set_msg_defs(defs)
+            pyrtma.context._set_context(ctx)
 
         # Store the results in the object
         self.file_header = file_header
