@@ -10,7 +10,6 @@ from typing import Type, Dict, Any, TypeVar
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
 from .message_base import RTMAJSONEncoder
-from .context import _get_core_defs
 from .exceptions import InvalidMessageDefinition, UnknownMessageType
 
 __all__ = [
