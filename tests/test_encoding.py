@@ -7,7 +7,7 @@ import logging
 import pyrtma
 import pyrtma.message
 
-from pyrtma.client import Client, client_context
+from pyrtma.client import client_context
 import pyrtma.manager
 from pyrtma.manager import MessageManager
 

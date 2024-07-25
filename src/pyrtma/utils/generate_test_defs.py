@@ -1,7 +1,7 @@
 import pathlib
 import random
 from ruamel.yaml import YAML
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Union
 
 # Field type name to ctypes
 type_map = [

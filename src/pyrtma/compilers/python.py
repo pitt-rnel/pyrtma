@@ -11,7 +11,6 @@ from pyrtma.parser import (
     HID,
     MDF,
     SDF,
-    Field,
 )
 from typing import Union
 import subprocess
