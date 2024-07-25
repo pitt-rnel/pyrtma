@@ -817,9 +817,7 @@ class MessageManager(ClientLike):
         data_cls = get_core_defs().get(hdr.msg_type)
         if data_cls:
             data = data_cls.from_buffer(self.data_buffer)
-            return Message(
-                hdr, get_core_defs()[hdr.msg_type].from_buffer(self.data_buffer)
-            )
+            return Message(hdr, data)
         else:
             raise RuntimeError(f"Unknown core_def MT={hdr.msg_type}")
 
