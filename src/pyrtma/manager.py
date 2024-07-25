@@ -177,6 +177,7 @@ class MessageManager(ClientLike):
         self.min_timing_message_period = 0.9
 
         self.last_client_info: float = time.perf_counter()
+        self.sending_traffic = False
         self.traffic_counter: typing.Counter[int] = Counter()
         self.traffic_start: float = time.perf_counter()
         self.traffic_seqno: int = 1
@@ -500,7 +501,6 @@ class MessageManager(ClientLike):
         src_module: Module,
         header: MessageHeader,
         data: Union[bytes, MessageData],
-        count: bool = True,
     ):
         """Forward a message from other modules
 
@@ -514,11 +514,13 @@ class MessageManager(ClientLike):
             src_module (Module): Module where message originated from
             header (MessageHeader): Message Header
             data (Union[bytes, MessageData]): Message Data
-            count (bool, optional): Reserved. Defaults to True
         """
 
-        # message counts (Skip traffic count)
-        if header.msg_type not in (cd.MT_MESSAGE_TRAFFIC, cd.MT_FAILED_MESSAGE):
+        src_name = src_module.name or f"Module({src_module.mod_id})"
+
+        # Increment message counts
+        # Note: skip traffic count if we are currently forwarding out traffic messages)
+        if not self.sending_traffic:
             if self.b_send_msg_timing:
                 self.message_counts[header.msg_type] += 1
             self.traffic_counter[header.msg_type] += 1
@@ -529,13 +531,13 @@ class MessageManager(ClientLike):
         # Verify that the module & host ids are valid
         if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULES:
             self.logger.error(
-                f"MessageManager::forward_message: Got invalid dest_mod_id [{dest_mod_id}]"
+                f"MessageManager::forward_message: Got invalid dest_mod_id [{dest_mod_id}] from {src_name}"
             )
             return
 
         if dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS:
             self.logger.error(
-                f"MessageManager::forward_message: Got invalid dest_host_id [{dest_host_id}]"
+                f"MessageManager::forward_message: Got invalid dest_host_id [{dest_host_id}] from {src_name}"
             )
             return
 
@@ -716,10 +718,13 @@ class MessageManager(ClientLike):
         for mod in self.modules.values():
             data.ModulePID[mod.mod_id] = mod.pid
 
+        self.sending_traffic = True
         self.send_message(data)
+        self.sending_traffic = False
 
     def send_traffic(self):
         """Send MESSAGE_TRAFFIC"""
+        self.sending_traffic = True
         self.logger.debug("MESSAGE_TRAFFIC")
         data = cd.MDF_MESSAGE_TRAFFIC()
         now = time.perf_counter()
@@ -748,6 +753,7 @@ class MessageManager(ClientLike):
                 data.msg_type[i:] = [-1 for _ in range(cd.MESSAGE_TRAFFIC_SIZE - i)]
                 self.send_message(data)
 
+        self.sending_traffic = False
         self.traffic_counter.clear()
         self.traffic_start = now
         self.traffic_seqno += 1
