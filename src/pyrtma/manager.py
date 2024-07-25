@@ -132,7 +132,9 @@ class MessageManager(ClientLike):
 
         Args:
             ip_address (str, optional): server IP address. Defaults to "".
+            port (int, optional): server port. Defaults to 7111.
             timecode (bool, optional): Flag to use message header with timecode values. Defaults to False.
+            log_level (int, optional): logging level, defaults to logging.INFO.
             debug (bool, optional): Flag for debug mode. Defaults to False.
             send_msg_timing (bool, optional): Flag to send TIMING_MSG. Defaults to True.
         """
@@ -444,6 +446,12 @@ class MessageManager(ClientLike):
         src_module.pid = mr.pid
 
     def set_module_name(self, src_module: Module, msg: Message):
+        """Set a module name
+
+        Args:
+            src_module (Module): Module that sent CLIENT_SET_NAME
+            msg (Message): Incoming CLIENT_SET_NAME message
+        """
         name_msg = cd.MDF_CLIENT_SET_NAME.from_buffer(msg.data)
         src_module.name = name_msg.name or ""
         self.logger.info(
@@ -503,8 +511,10 @@ class MessageManager(ClientLike):
             - if the message has no destination address, it will be forwarded to all subscribed modules or those subscribed to ALL_MESSAGE_TYPES
 
         Args:
+            src_module (Module): Module where message originated from
             header (MessageHeader): Message Header
             data (Union[bytes, MessageData]): Message Data
+            count (bool, optional): Reserved. Defaults to True
         """
 
         # message counts (Skip traffic count)
@@ -588,7 +598,6 @@ class MessageManager(ClientLike):
         Args:
             header (MessageHeader): Message header to send
             payload (Union[bytes, MessageData]): Message data to send
-            wlist (List[socket.socket]): Sockets ready for writing
         """
         for module in self.logger_modules:
             if module.conn not in self.wlist:
@@ -613,11 +622,20 @@ class MessageManager(ClientLike):
         dest_host_id: int = 0,
         timeout: float = 0,
     ):
+        """Send a message originating from MessageManager module
+
+        Args:
+            msg_data (MessageData): Object containing the message to send
+            dest_mod_id (int, optional): Specific module ID to send to. Defaults to 0 (broadcast).
+            dest_host_id (int, optional): Specific host ID to send to. Defaults to 0 (broadcast).
+            timeout (float, optional): Reserved. Defaults to 0.
+        """
         header = self.header_cls()
         header.msg_type = msg_data.type_id
         header.send_time = time.perf_counter()
         header.src_mod_id = cd.MID_MESSAGE_MANAGER
         header.dest_mod_id = dest_mod_id
+        header.dest_host_id = dest_host_id
         header.num_data_bytes = msg_data.type_size
 
         self.forward_message(self.mm_module, header, msg_data)
@@ -701,6 +719,7 @@ class MessageManager(ClientLike):
         self.send_message(data)
 
     def send_traffic(self):
+        """Send MESSAGE_TRAFFIC"""
         self.logger.debug("MESSAGE_TRAFFIC")
         data = cd.MDF_MESSAGE_TRAFFIC()
         now = time.perf_counter()
@@ -734,6 +753,11 @@ class MessageManager(ClientLike):
         self.traffic_seqno += 1
 
     def send_client_close(self, module: Module):
+        """Send CLIENT_CLOSED
+
+        Args:
+            module (Module): Closed module object
+        """
         self.logger.debug("CLIENT_CLOSE")
         msg = cd.MDF_CLIENT_CLOSED()
         msg.uid = module.uid
@@ -747,6 +771,11 @@ class MessageManager(ClientLike):
         self.send_message(msg)
 
     def send_client_info(self, module: Module):
+        """Send CLIENT_INFO
+
+        Args:
+            module (Module): Module object to send info for
+        """
         self.logger.debug("CLIENT_INFO")
         msg = cd.MDF_CLIENT_INFO()
         msg.uid = module.uid
@@ -760,6 +789,7 @@ class MessageManager(ClientLike):
         self.send_message(msg)
 
     def send_active_clients(self):
+        """Send ACTIVE_CLIENTS"""
         self.logger.debug("ACTIVE_CLIENTS")
         msg = cd.MDF_ACTIVE_CLIENTS()
         msg.timestamp = time.perf_counter()
