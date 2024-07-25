@@ -16,7 +16,7 @@ import typing
 
 from .client_logging import RTMALogger, ClientLike
 from .validators import disable_message_validation
-from .message import Message, get_msg_cls
+from .message import Message
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
 from .context import get_core_defs
