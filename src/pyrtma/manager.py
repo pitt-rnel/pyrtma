@@ -117,7 +117,6 @@ class MessageManager(ClientLike):
 
     TRAFFIC_INTERVAL = 1.0
     INFO_INTERVAL = 5.0
-    _keep_running = True
 
     def __init__(
         self,
@@ -140,6 +139,7 @@ class MessageManager(ClientLike):
             debug (bool, optional): Flag for debug mode. Defaults to False.
             send_msg_timing (bool, optional): Flag to send TIMING_MSG. Defaults to True.
         """
+        self._keep_running = False
         self.ip_address = ip_address
         self.port = port
 
@@ -879,6 +879,7 @@ class MessageManager(ClientLike):
 
     def run(self):
         """Start the message manager server"""
+        self._keep_running = True
         try:
             with disable_message_validation():
                 while self._keep_running:
