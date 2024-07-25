@@ -2,13 +2,14 @@ import sys
 import time
 import multiprocessing
 import pyrtma
+from typing import Type
 
 # Import message defs to add to pyrtma.msg_defs map
 sys.path.append("../tests/")
 import test_msg_defs.test_defs as td
 
 
-def get_test_msg(size: int) -> pyrtma.MessageData:
+def get_test_msg(size: int) -> Type[pyrtma.MessageData]:
     if size == 128:
         return td.MDF_TEST_MSG_128
     elif size == 256:
