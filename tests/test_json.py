@@ -12,7 +12,7 @@ def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
     if type(obj) != type(other):
         raise TypeError("Can not compare two different struct types.")
 
-    for name, ftype in obj._fields_:
+    for name, ftype, *_ in obj._fields_:
         if issubclass(ftype, ctypes.Structure):
             if not is_equal(getattr(obj, name), getattr(other, name)):
                 return False
