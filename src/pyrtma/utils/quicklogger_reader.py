@@ -3,18 +3,18 @@ import ctypes
 import os
 import sys
 import importlib
+import warnings
 import pyrtma
 import pyrtma.message
 import pyrtma.context
-import warnings
 
-from ..context import RTMAContext, get_context
 from typing import List, Union, Generator, Dict, Any, Optional, Type
-from ..validators import ByteArray
+
+from ..context import RTMAContext
+from ..validators import ByteArray, Uint32, String
 from ..message import Message, MessageHeader, MessageData
 from ..message_base import MessageBase, MessageMeta
 from ..exceptions import VersionMismatchWarning
-from pyrtma.validators import Uint32, String
 
 
 _unknown: Dict[int, Type[MessageData]] = {}
@@ -132,7 +132,7 @@ class QLReader:
                 mod = importlib.import_module(fname)
 
         # Cache all the user defined objects associated with the data
-        self.context = get_context()
+        self.context = pyrtma.context.get_context()
 
         try:
             messages = []
