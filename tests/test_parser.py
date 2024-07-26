@@ -134,7 +134,7 @@ class TestParser(unittest.TestCase):
         dup_msg = textwrap.dedent(
             """
             module_ids:
-                A: 80
+                A: 1000
             """
         )
 
@@ -218,7 +218,7 @@ class TestParser(unittest.TestCase):
                 A: 80
             struct_defs:
                 A:
-                    id: 88
+                    id: 1000
                     fields: null
             """
         )
@@ -232,7 +232,7 @@ class TestParser(unittest.TestCase):
                 A: 80
             message_defs:
                 A:
-                    id: 88
+                    id: 1000
                     fields: null
             """
         )
@@ -271,7 +271,7 @@ class TestParser(unittest.TestCase):
                 A: "abc"
             struct_defs:
                 A:
-                    id: 88
+                    id: 1000
                     fields: null
             """
         )
@@ -285,7 +285,7 @@ class TestParser(unittest.TestCase):
                 A: "abc"
             message_defs:
                 A:
-                    id: 88
+                    id: 1000
                     fields: null
             """
         )
@@ -338,7 +338,7 @@ class TestParser(unittest.TestCase):
                 A: int
             message_defs:
                 A:
-                    id: 88
+                    id: 1000
                     fields: null
             """
         )
@@ -397,7 +397,7 @@ class TestParser(unittest.TestCase):
                         i: int
             message_defs:
                 A:
-                    id: 88
+                    id: 1000
                     fields: null
             """
         )
@@ -413,7 +413,7 @@ class TestParser(unittest.TestCase):
                 A: 80
             message_defs:
                 A:
-                    id: 88
+                    id: 1000
                     fields:
                         i: int
             """
@@ -428,7 +428,7 @@ class TestParser(unittest.TestCase):
                 A: "abc"
             message_defs:
                 A:
-                    id: 88
+                    id: 1000
                     fields:
                         i: int
             """
@@ -443,7 +443,7 @@ class TestParser(unittest.TestCase):
                 A: int
             message_defs:
                 A:
-                    id: 88
+                    id: 1000
                     fields:
                         i: int
             """
@@ -460,7 +460,7 @@ class TestParser(unittest.TestCase):
                         i: int
             message_defs:
                 A:
-                    id: 88
+                    id: 1000
                     fields: null
             """
         )
@@ -540,7 +540,7 @@ class TestParser(unittest.TestCase):
             """
             message_defs:
                 A:
-                    id: 88
+                    id:  1000
                     fields:
                         type_name: int
             """

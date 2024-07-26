@@ -8,14 +8,36 @@ import textwrap
 import ctypes
 import logging
 import string
+import sys
 
 # import yaml
 from ruamel.yaml import YAML
 
 from copy import copy
 from hashlib import sha256
-from typing import List, Optional, Any, Union, Tuple, Dict, Type, Literal
+from typing import (
+    List,
+    Optional,
+    Any,
+    Union,
+    Tuple,
+    Dict,
+    Type,
+    Literal,
+    cast,
+    TYPE_CHECKING,
+)
 from dataclasses import dataclass, field, is_dataclass, asdict
+
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
+try:
+    from .core_defs import MAX_MESSAGE_TYPES
+except AttributeError:
+    # if we deprecate and remove this constant, we can fall back on inf
+    # changed from inf to maxsize to maintain int type
+    MAX_MESSAGE_TYPES = sys.maxsize
 
 
 @dataclass
@@ -628,10 +650,10 @@ class Parser:
                 f"Values in 'host_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value}"
             )
 
-        if value < 10 or value > 32767:
+        if value < 1 or value > 32767:
             if self.current_file.name != "core_defs.yaml" and self.import_coredefs:
                 raise RTMASyntaxError(
-                    f"Value outside of valid range [0 - 32767] for host_id: {name}: {value}"
+                    f"Value outside of valid range [1 - 32767] for host_id: {name}: {value}"
                 )
 
         for hid in self.host_ids.values():
@@ -872,9 +894,9 @@ class Parser:
                 f"Message definition id must evaluate to int type not {type(msg_id).__name__}. {name}: {msg_id}"
             )
 
-        if msg_id < 0 or msg_id > 10000:
+        if msg_id < 0 or msg_id > MAX_MESSAGE_TYPES:
             raise RTMASyntaxError(
-                "Value outside of valid range [0 - 10000] for module_id: {name}: {value}"
+                f"Value outside of valid range [0 - {MAX_MESSAGE_TYPES}] for module_id: {name}: {msg_id}"
             )
 
         for mt in self.message_ids.values():
@@ -1419,8 +1441,11 @@ class Parser:
 
 class CustomEncoder(json.JSONEncoder):
     def default(self, o: Any) -> Any:
-        if is_dataclass(o):
-            return asdict(o)
+        if is_dataclass(o):  # this is true for instance OR type
+            if TYPE_CHECKING:
+                o = cast(DataclassInstance, o)
+            if not isinstance(o, type):
+                return asdict(o)
         if isinstance(o, pathlib.Path):
             return str(o.absolute())
         return super().default(o)

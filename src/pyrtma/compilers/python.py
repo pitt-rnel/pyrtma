@@ -11,7 +11,6 @@ from pyrtma.parser import (
     HID,
     MDF,
     SDF,
-    Field,
 )
 from typing import Union
 import subprocess
@@ -224,55 +223,24 @@ class PyDefCompiler:
         import ctypes
 
         import pyrtma
-        from pyrtma.__version__ import check_compiled_version
-        from typing import ClassVar, Dict, Any
+        from pyrtma.__version__ import check_compiled_version, __version__
+        from packaging.version import parse as _ver_parse
+        from typing import ClassVar
 
         from pyrtma.message_base import MessageBase, MessageMeta
         from pyrtma.message_data import MessageData
         from pyrtma.validators import Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float, Double, Struct, IntArray, FloatArray, StructArray, Char, String, Byte, ByteArray
         
+        if _ver_parse(__version__) >= _ver_parse("2.3.0"):
+            from pyrtma.context import _update_context, get_context
+
         """
         return dedent(s)
 
     def generate_context(self):
         s = """\
-        def _create_context() -> Dict[str, Dict[str, Any]]:
-            import sys
-
-            ctx: Dict[str, Dict[str, Any]] = dict(constants={}, typedefs={}, mid={}, sdf={}, mt={}, mdf={})
-            mod = sys.modules[__name__]
-            for k, v in mod.__dict__.items():
-                if k.startswith("_"):
-                    continue
-
-                if k.startswith("MT_"):
-                    ctx["mt"][k[3:]] = v
-                elif k.startswith("MID_"):
-                    ctx["mid"][k[4:]] = v
-                elif k.startswith("MDF_"):
-                    ctx["mdf"][k[4:]] = v
-                elif k.isupper():
-                    if isinstance(v, (int, float, str)):
-                        ctx["constants"][k] = v
-                    elif v.__name__ is not k:
-                        ctx["typedefs"][k] = v
-                    elif issubclass(v, MessageBase):
-                        ctx["sdf"][k] = v
-                    else:
-                        raise ValueError(f"Unknown object in {__name__}: {k}:{v}")
-                else:
-                    pass
-
-            return ctx
-
-
-        _ctx = _create_context()
-
-
-        def get_context() -> Dict[str, Dict[str, Any]]:
-            import copy
-
-            return copy.deepcopy(_ctx)
+        if _ver_parse(__version__) >= _ver_parse("2.3.0"):
+            _update_context(__name__)
         """
         return dedent(s)
 

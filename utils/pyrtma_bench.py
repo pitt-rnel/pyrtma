@@ -2,13 +2,14 @@ import sys
 import time
 import multiprocessing
 import pyrtma
+from typing import Type
 
 # Import message defs to add to pyrtma.msg_defs map
 sys.path.append("../tests/")
 import test_msg_defs.test_defs as td
 
 
-def get_test_msg(size: int) -> pyrtma.MessageData:
+def get_test_msg(size: int) -> Type[pyrtma.MessageData]:
     if size == 128:
         return td.MDF_TEST_MSG_128
     elif size == 256:
@@ -57,7 +58,7 @@ def publisher_loop(
 
     # Send loop
     tic = time.perf_counter()
-    for n in range(num_msgs):
+    for _ in range(num_msgs):
         mod.send_message(test_msg)
     toc = time.perf_counter()
 
@@ -138,7 +139,12 @@ if __name__ == "__main__":
     # Configuration flags for bench utility
     parser = argparse.ArgumentParser(description="RtmaClient bench test utility")
     parser.add_argument(
-        "-ms", default=128, type=int, dest="msg_size", help="Messge size in bytes."
+        "-ms",
+        default=128,
+        choices=[128, 256, 512, 1024, 2048, 4096, 8192],
+        type=int,
+        dest="msg_size",
+        help="Message size in bytes.",
     )
     parser.add_argument(
         "-n", default=100000, type=int, dest="num_msgs", help="Number of messages."

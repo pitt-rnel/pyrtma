@@ -196,3 +196,24 @@ web_manager -m <MM_IP> -p <WEBSOCKET_PORT> -d <DEFS_FILE>
 to launch the web_manager which will listen to websocket connects on port <WEBSOCKET_PORT> and forward to message manager at <MM_IP>, using pyrtma message definitions defined in <DEFS_FILE>.
 
 See [rtma-js](https://github.com/pitt-rnel/rtma-js) for developing rtma clients in javascript.
+
+# DataLogger
+
+See `examples/data_logger_example.py` for an example on how to configure data collection for a DataLogger.
+
+To start up the logging module:
+```shell
+python -m pyrtma.data_logger --help
+```
+
+or
+
+```shell
+data_logger --help
+```
+
+There is also an interactive command line tool to control and configure the DataLogger manually:
+
+```shell
+python -m pyrtma.data_logger.cli
+```

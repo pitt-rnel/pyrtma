@@ -1,8 +1,8 @@
-import pyrtma
-import pyrtma.message
 import ctypes
 import unittest
 from typing import cast
+
+from pyrtma.context import get_context
 
 # Import message defs to add to pyrtma.msg_defs map
 from .test_msg_defs.test_defs import *
@@ -12,7 +12,7 @@ def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
     if type(obj) != type(other):
         raise TypeError("Can not compare two different struct types.")
 
-    for name, ftype in obj._fields_:
+    for name, ftype, *_ in obj._fields_:
         if issubclass(ftype, ctypes.Structure):
             if not is_equal(getattr(obj, name), getattr(other, name)):
                 return False
@@ -38,7 +38,8 @@ def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
 
 class TestJSONConversion(unittest.TestCase):
     def test_dict(self):
-        for mdf in pyrtma.message.get_msg_defs().values():
+        ctx = get_context()
+        for mdf in ctx.MDF.values():
             # Fill the message with random data
             in_msg = mdf.from_random()
 
@@ -57,7 +58,8 @@ class TestJSONConversion(unittest.TestCase):
             self.assertEqual(in_dict, out_dict)
 
     def test_json(self):
-        for mdf in pyrtma.message.get_msg_defs().values():
+        ctx = get_context()
+        for mdf in ctx.MDF.values():
             # Fill the message with random data
             in_msg = mdf.from_random()
 

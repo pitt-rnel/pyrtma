@@ -8,11 +8,17 @@ import select
 import time
 import os
 import ctypes
+import logging
+
 from contextlib import contextmanager
 
+from .context import get_context
 from .message import Message, get_msg_cls
 from .message_data import MessageData
 from .header import MessageHeader, get_header_cls
+from .core_defs import ALL_MESSAGE_TYPES
+from .validators import disable_message_validation
+from .client_logging import RTMALogger, ClientLike
 from .exceptions import (
     InvalidMessageDefinition,
     UnknownMessageType,
@@ -24,11 +30,13 @@ from .exceptions import (
     AcknowledgementTimeout,
     InvalidDestinationModule,
     InvalidDestinationHost,
+    InvalidSubscription,
 )
 from . import core_defs as cd
 
 from functools import wraps
 from typing import (
+    Dict,
     Optional,
     Tuple,
     Type,
@@ -39,6 +47,7 @@ from typing import (
     Any,
     TypeVar,
     cast,
+    Union,
 )
 from warnings import warn
 
@@ -53,7 +62,6 @@ __all__ = [
     "Client",
     "client_context",
 ]
-
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -71,7 +79,7 @@ def requires_connection(func: F) -> F:
     return cast(F, wrapper)
 
 
-class Client(object):
+class Client(ClientLike):
     """RTMA Client interface
 
     Args:
@@ -87,6 +95,7 @@ class Client(object):
         module_id: int = 0,
         host_id: int = 0,
         timecode: bool = False,
+        name: str = "",
     ):
         if module_id >= cd.DYN_MOD_ID_START or module_id < 0:
             raise ValueError(f"Module ID must be >= 0 and < {cd.DYN_MOD_ID_START}")
@@ -98,16 +107,45 @@ class Client(object):
         self._connected = False
         self._header_cls = get_header_cls(timecode)
         self._recv_buffer = bytearray(1024**2)
+        self._sub_all = False
         self._subscribed_types: Set[int] = set()
         self._paused_types: Set[int] = set()
         self._dynamic_id: bool = module_id == 0
         self._sock = socket.socket()
 
+        # Auto-assign a name if module-id is defined
+        ctx = get_context()
+        if name == "" and module_id != 0:
+            for k, v in ctx.MID.items():
+                if v == module_id:
+                    self._name = k
+                    break
+            else:
+                self._name = name
+        else:
+            self._name = name
+
+        self._logger = RTMALogger(
+            self._name or f"Module {module_id}", self, logging.INFO
+        )
+        # alias logger methods
+        self.debug = self._logger.debug
+        self.info = self._logger.info
+        self.warning = self._logger.warning
+        self.warn = self._logger.warn
+        self.error = self._logger.error
+        self.exception = self._logger.exception
+        self.critical = self._logger.critical
+
+    @property
+    def logger(self) -> RTMALogger:
+        return self._logger
+
     def __del__(self):
         if self._connected:
             try:
                 self.disconnect()
-            except ClientError:
+            except Exception:
                 """Silently ignore any errors at this point."""
                 pass
 
@@ -144,7 +182,9 @@ class Client(object):
             self._sock.close()
             raise SocketOptionError from e
 
-    def _connect_helper(self, logger_status: bool, daemon_status: bool) -> Message:
+    def _connect_helper(
+        self, logger_status: bool, daemon_status: bool, allow_multiple: bool
+    ) -> Message:
         """Called internally after _socket_connect"""
 
         # Reset the module_id to zero for dynamic assignment
@@ -155,6 +195,15 @@ class Client(object):
         msg.logger_status = int(logger_status)
         msg.daemon_status = int(daemon_status)
 
+        msg2 = cd.MDF_CONNECT_V2()
+        msg2.logger_status = int(logger_status)
+        msg2.daemon_status = int(daemon_status)
+        msg2.allow_multiple = int(allow_multiple)
+        msg2.pid = os.getpid()
+        msg2.mod_id = self.module_id
+        msg2.name = self.name
+
+        self.send_message(msg2)
         self.send_message(msg)
         ack_msg = self._wait_for_acknowledgement()
 
@@ -165,14 +214,30 @@ class Client(object):
         # reset subscribed and paused types
         self._subscribed_types = set()
         self._paused_types = set()
+        self._sub_all = False
+
+        self.logger.log_name = self._name or f"Module {self._module_id}"
 
         return ack_msg
+
+    @property
+    def log_level(self) -> int:
+        return self._logger.level
+
+    @log_level.setter
+    def log_level(self, level: int):
+        self._logger.set_all_levels(level)
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     def connect(
         self,
         server_name: str = "localhost:7111",
         logger_status: bool = False,
         daemon_status: bool = False,
+        allow_multiple: bool = False,
     ):
         """Connect to message manager server
 
@@ -182,16 +247,19 @@ class Client(object):
             logger_status (optional): Flag to declare client as a logger module.
                 Logger modules are automatically subscribed to all message types.
                 Defaults to False.
-            daemon_status (optional): Flag to declare client as a daemon. Defaults to False.
+            allow_multiple (optional): Flag to declare client can have multiple instances. Defaults to False.
 
         Raises:
             MessageManagerNotFound: Unable to connect to message manager
         """
+        # Disconnect first
+        if self.connected:
+            self.disconnect()
 
         # Setup the underlying socket connection
         self._socket_connect(server_name)
 
-        ack = self._connect_helper(logger_status, daemon_status)
+        ack = self._connect_helper(logger_status, daemon_status, allow_multiple)
 
     def disconnect(self):
         """Disconnect from message manager server"""
@@ -200,6 +268,8 @@ class Client(object):
                 self.send_signal(cd.MT_DISCONNECT)
                 # Allow some time for signal to reach MM
                 time.sleep(0.100)
+        except:
+            pass
         finally:
             if hasattr(self, "_sock"):
                 self._sock.close()
@@ -207,6 +277,7 @@ class Client(object):
             # reset subscribed and paused types
             self._subscribed_types = set()
             self._paused_types = set()
+            self._sub_all = False
 
     @property
     def server(self) -> Tuple[str, int]:
@@ -269,28 +340,61 @@ class Client(object):
         self.send_message(msg)
 
     def _subscription_control(self, msg_list: Iterable[int], ctrl_msg: str):
-        msg_set = set(msg_list)
+        all_msg = ALL_MESSAGE_TYPES in msg_list
+
+        if not all_msg:
+            msg_set = set(msg_list)
+        else:
+            msg_set = set([ALL_MESSAGE_TYPES])
+
+        # Note: Ignore any sub control for individual msg_types
+        # when subscribed to ALL_MESSAGE_TYPES
+        if self._sub_all and not all_msg:
+            raise InvalidSubscription(
+                "Cannot modify subscriptions to individual MTs while subscribed to ALL_MESSAGE_TYPES"
+            )
+
         msg: MessageData
         if ctrl_msg == "Subscribe":
             msg = cd.MDF_SUBSCRIBE()
-            self._subscribed_types |= msg_set
-            self._paused_types -= msg_set
+            if all_msg:
+                self._subscribed_types = msg_set
+                self._paused_types.clear()
+                self._sub_all = True
+            else:
+                self._subscribed_types |= msg_set
+                self._paused_types -= msg_set
         elif ctrl_msg == "Unsubscribe":
             msg = cd.MDF_UNSUBSCRIBE()
-            self._subscribed_types -= msg_set
-            self._paused_types -= msg_set
+            if all_msg:
+                self._subscribed_types.clear()
+                self._paused_types.clear()
+                self._sub_all = False
+            else:
+                self._subscribed_types -= msg_set
+                self._paused_types -= msg_set
         elif ctrl_msg == "PauseSubscription":
             msg = cd.MDF_PAUSE_SUBSCRIPTION()
-            self._subscribed_types -= msg_set
-            self._paused_types |= msg_set
+            if all_msg:
+                self._subscribed_types.clear()
+                self._paused_types.clear()
+                self._sub_all = False
+            else:
+                self._subscribed_types -= msg_set
+                self._paused_types |= msg_set
         elif ctrl_msg == "ResumeSubscription":
             msg = cd.MDF_RESUME_SUBSCRIPTION()
-            self._subscribed_types |= msg_set
-            self._paused_types -= msg_set
+            if all_msg:
+                self._subscribed_types = msg_set
+                self._paused_types.clear()
+                self._sub_all = True
+            else:
+                self._subscribed_types |= msg_set
+                self._paused_types -= msg_set
         else:
             raise TypeError("Unknown control message type.")
 
-        for msg_type in msg_list:
+        for msg_type in msg_set:
             msg.msg_type = msg_type
             self.send_message(msg)
 
@@ -378,6 +482,7 @@ class Client(object):
         Args:
             msg_list (Iterable[int]): A list of numeric message IDs to temporarily unsubscribe to
         """
+
         msg_list = list(msg_list)  # cast arbitrary iterable to list
         for mt in msg_list:
             if mt not in self.subscribed_types:
@@ -440,6 +545,8 @@ class Client(object):
             header.dest_host_id = dest_host_id
             header.dest_mod_id = dest_mod_id
             header.num_data_bytes = 0
+            header.remaining_bytes = 0
+            header.reserved = 0
 
             self._sendall(header)  # type: ignore
 
@@ -488,26 +595,30 @@ class Client(object):
             )  # blocking
 
         if writefds:
-            header = self._header_cls()
-            header.msg_type = msg_data.type_id
-            header.msg_count = self._msg_count
-            header.send_time = time.perf_counter()
-            header.recv_time = 0.0
-            header.src_host_id = self._host_id
-            header.src_mod_id = self._module_id
-            header.dest_host_id = dest_host_id
-            header.dest_mod_id = dest_mod_id
-            header.num_data_bytes = ctypes.sizeof(msg_data)
-            try:
-                header.version = msg_data.type_hash
-            except AttributeError as e:
-                if not hasattr(msg_data, "type_hash"):
-                    warn(
-                        "Message class is missing type_hash. V1 message defs are deprecated.",
-                        FutureWarning,
-                    )
-                else:
-                    raise e
+            with disable_message_validation():
+                header = self._header_cls()
+                header.msg_type = msg_data.type_id
+                header.msg_count = self._msg_count
+                header.send_time = time.perf_counter()
+                header.recv_time = 0.0
+                header.src_host_id = self._host_id
+                header.src_mod_id = self._module_id
+                header.dest_host_id = dest_host_id
+                header.dest_mod_id = dest_mod_id
+                header.num_data_bytes = ctypes.sizeof(msg_data)
+                header.remaining_bytes = 0
+                header.reserved = 0
+
+                try:
+                    header.version = msg_data.type_hash
+                except AttributeError as e:
+                    if not hasattr(msg_data, "type_hash"):
+                        warn(
+                            "Message class is missing type_hash. V1 message defs are deprecated.",
+                            FutureWarning,
+                        )
+                    else:
+                        raise e
 
             self._sendall(header)  # type: ignore
             if header.num_data_bytes > 0:
@@ -588,8 +699,11 @@ class Client(object):
         t0 = time.perf_counter()
         M = self._read_message(timeout, ack, sync_check)
 
+        if self._sub_all:
+            return M
+
         # filter out unsubscribed messages that may still be in queue
-        while M and M.header.msg_type not in self.subscribed_types:
+        while M and (M.header.msg_type not in self.subscribed_types):
             if (
                 ack and M.header.msg_type == cd.MT_ACKNOWLEDGE
             ):  # ack input allows ACK to be read and not discarded
@@ -651,8 +765,11 @@ class Client(object):
         try:
             data = get_msg_cls(header.msg_type)()
         except UnknownMessageType as e:
-            _ = self._sock.recv(header.num_data_bytes, socket.MSG_WAITALL)
-            raise e
+            mt = header.msg_type
+            raw = self._sock.recv(header.num_data_bytes, socket.MSG_WAITALL)
+            raise UnknownMessageType(
+                f"No message definition found for MT={mt}", header, raw
+            )
 
         type_size = data.type_size
         if type_size == -1:  # not defined for v1 message defs
@@ -756,7 +873,7 @@ class Client(object):
 
     def __str__(self) -> str:
         # TODO: Make this better.
-        return f"Client(module_id={self.module_id}, server={self.server}, connected={self.connected}."
+        return f"Client(module_id={self.module_id}, server={self.server}, connected={self.connected})"
 
 
 @contextmanager
@@ -767,7 +884,8 @@ def client_context(
     host_id: int = 0,
     timecode: bool = False,
     logger_status: bool = False,
-    daemon_status: bool = False,
+    allow_multiple: bool = False,
+    name: str = "",
 ):
     """Context manager function to simplify initializing a pyrtma Client
 
@@ -787,13 +905,14 @@ def client_context(
         logger_status (optional): Flag to declare client as a logger module.
             Logger modules are automatically subscribed to all message types.
             Defaults to False.
-        daemon_status (optional): Flag to declare client as a daemon. Defaults to False.
+        allow_multiple (optional): Flag to declare client can have multiple instances. Defaults to False.
+        name (optional): Name of module
 
     Yields:
         Client: initialized pyrtma Client object
     """
-    c = Client(module_id, host_id, timecode)
-    c.connect(server_name, logger_status, daemon_status)
+    c = Client(module_id, host_id, timecode, name=name)
+    c.connect(server_name, logger_status, allow_multiple)
     if msg_list:
         c.subscribe(msg_list)
     c.send_module_ready()

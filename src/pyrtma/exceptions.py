@@ -74,3 +74,9 @@ class InvalidDestinationHost(ClientError):
     """Raised when client tries to send to an invalid host."""
 
     pass
+
+
+class InvalidSubscription(ClientError):
+    """Raised when a subscription command is invalid"""
+
+    pass

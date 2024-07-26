@@ -14,6 +14,9 @@ def _random_str(length: int) -> str:
     Returns:
         str: Random string
     """
+    if length > 1:
+        length -= 1
+
     return "".join(random.choice(string.printable) for _ in range(length))
 
 
@@ -84,7 +87,7 @@ def _random_struct(obj: CStruct) -> CStruct:
     Returns:
         CStruct: CStructure with random values
     """
-    for _name, ftype in obj._fields_:
+    for _name, ftype, *_ in obj._fields_:
         name = _name[1:] if _name[0] == "_" else _name
         if issubclass(ftype, ctypes.Structure):
             setattr(obj, name, _random_struct(getattr(obj, name)))

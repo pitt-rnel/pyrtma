@@ -3,17 +3,18 @@ import ctypes
 import os
 import sys
 import importlib
+import warnings
 import pyrtma
 import pyrtma.message
-import json
-import warnings
+import pyrtma.context
 
-from typing import List, Union, Tuple, Generator, Dict, Any, Optional, Type
-from ..validators import ByteArray
-from ..message import RTMAJSONEncoder, Message, MessageHeader, MessageData
+from typing import List, Union, Generator, Dict, Any, Optional, Type
+
+from ..context import RTMAContext
+from ..validators import ByteArray, Uint32, String
+from ..message import Message, MessageHeader, MessageData
 from ..message_base import MessageBase, MessageMeta
 from ..exceptions import VersionMismatchWarning
-from pyrtma.validators import Uint32, String
 
 
 _unknown: Dict[int, Type[MessageData]] = {}
@@ -90,7 +91,7 @@ class QLReader:
         self.offsets: List[int] = []
         self.data: List[MessageData] = []
         self.messages: List[Message] = []
-        self.context: Dict[str, Any] = {}
+        self.context: RTMAContext = RTMAContext()
         self.skipped = 0
 
     def clear(self):
@@ -100,7 +101,7 @@ class QLReader:
         self.headers.clear()
         self.offsets.clear()
         self.data.clear()
-        self.context.clear()
+        self.context = RTMAContext()
         self.messages.clear()
         self.skipped = 0
 
@@ -119,7 +120,8 @@ class QLReader:
         fname = self.defs_path.stem
 
         # Copy the current message def context before importing
-        ctx = pyrtma.message.get_msg_defs()
+        defs = pyrtma.message._get_msg_defs()
+        ctx = pyrtma.context.get_context()
 
         sys.path.insert(0, (str(base.absolute())))
         with warnings.catch_warnings():
@@ -130,14 +132,14 @@ class QLReader:
                 mod = importlib.import_module(fname)
 
         # Cache all the user defined objects associated with the data
-        self.context = mod.get_context()
+        self.context = pyrtma.context.get_context()
 
         try:
             messages = []
             headers = []
             data = []
 
-            mt_to_mdf = {v.type_id: v for v in self.context["mdf"].values()}
+            mt_to_mdf = {v.type_id: v for v in self.context.MDF.values()}
 
             with open(self.file_path, "rb") as f:
                 # Parse binary file header
@@ -187,7 +189,8 @@ class QLReader:
 
         finally:
             # Restore the orignal message def context
-            pyrtma.message.set_msg_defs(ctx)
+            pyrtma.message._set_msg_defs(defs)
+            pyrtma.context._set_context(ctx)
 
         # Store the results in the object
         self.file_header = file_header

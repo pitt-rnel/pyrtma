@@ -1,0 +1,149 @@
+# DataLogger Message Definitions
+# Unused legacy RTMA_types were repurposed here
+
+constants:
+  MAX_DATA_SETS: 6
+
+struct_defs:
+  DATA_SET:
+    fields:
+        name: char[32]
+        sub_dir_fmt: char[128]    # Relative to data collection save directory
+        file_name_fmt: char[128]  # Data set saved file name without the file extension
+        formatter: char[32]       # Builtin Options: quicklogger, json, raw, msg_header
+        subdivide_interval: int32 # <=0: Single File, >=30: Subdivide recording files
+        msg_types: int32[32]      # Message type ids that should be passed to data_set formatter
+
+  DATA_COLLECTION:
+    fields:
+      name: char[32]
+      base_path: char[256] # Base directory where data_collections will be saved
+      dir_fmt: char[128]   # Data collection save directory
+      num_data_sets: int16
+      unused: int16
+      data_sets: DATA_SET[MAX_DATA_SETS]
+
+  DATA_SET_INFO:
+    fields:
+      name: char[32]
+      formatter: char[32]
+      save_path: char[256]
+      subdivide_interval: int32 # <=0: Single File, >=30: Subdivide recording files
+      msg_types: int32[32]
+
+  DATA_COLLECTION_INFO:
+      fields:
+        name: char[32]
+        save_path: char[256]
+        num_data_sets: int16
+        unused: int16
+        data_sets: DATA_SET_INFO[MAX_DATA_SETS]
+
+message_defs:
+  DATA_LOGGER_STATUS:
+    id: 62
+    fields:
+      timestamp: double
+      elapsed_time: double
+      is_recording: int32
+      is_paused: int32
+
+  DATA_LOGGER_STATUS_REQUEST:
+    id: 63
+    fields: null
+
+  ADD_DATA_COLLECTION:
+    id: 64
+    fields:
+      collection: DATA_COLLECTION
+
+  REMOVE_DATA_COLLECTION:
+    id: 65
+    fields:
+      collection_name: char[32]
+
+  ADD_DATA_SET:
+    id: 66
+    fields:
+        collection_name: char[32]  # Collection to store the data set in
+        data_set: DATA_SET
+
+  REMOVE_DATA_SET:
+    id: 67
+    fields:
+      collection_name: char[32]  # Collection to store the data set in
+      name: char[32]
+
+  DATA_COLLECTION_CONFIG_REQUEST:
+    id: 68
+    fields: null
+
+  DATA_COLLECTION_CONFIG:
+    id: 69
+    fields:
+        collection: DATA_COLLECTION
+
+  DATA_COLLECTION_STARTED:
+    id: 70
+    fields:
+      collection: DATA_COLLECTION_INFO
+
+  DATA_COLLECTION_STOPPED:
+    id: 71
+    fields:
+      collection: DATA_COLLECTION_INFO
+
+  DATA_COLLECTION_SAVED:
+    id: 72
+    fields: null
+
+  DATA_LOGGER_START:
+    id: 73
+    fields: null
+
+  DATA_LOGGER_STOP:
+    id: 74
+    fields: null
+
+  DATA_LOGGER_PAUSE:
+    id: 75
+    fields: null
+
+  DATA_LOGGER_RESUME:
+    id: 76
+    fields: null
+
+  DATA_LOGGER_RESET:
+    id: 77
+    fields: null
+
+  DATA_LOGGER_ERROR:
+    id: 78
+    fields:
+      msg: char[512]
+
+  DATA_LOGGER_METADATA_UPDATE:
+    id: 79
+    fields:
+      json: char[512]
+
+  # TIMING_MESSAGE: 81
+  # FORCE_DISCONNECT: 82
+  # MM_ERROR: 83
+  # MM_INFO: 84
+  # PAUSE_SUBSCRIPTION: 85
+  # RESUME_SUBSCRIPTION: 86
+
+  DATA_LOGGER_METADATA_REQUEST:
+    id: 87
+    fields: null
+
+  DATA_LOGGER_METADATA:
+    id: 88
+    fields:
+      json: char[1024]
+
+  DATA_LOG_TEST_2048:
+    id: 89
+    fields:
+      raw: char[2048]

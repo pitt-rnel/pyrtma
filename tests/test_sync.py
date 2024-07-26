@@ -20,11 +20,11 @@ class TestSync(unittest.TestCase):
         self.port = random.randint(1000, 10000)  # random port
         self.addr = f"127.0.0.1:{self.port}"
 
-        pyrtma.manager.LOG_LEVEL = logging.ERROR
         self.manager = MessageManager(
             ip_address="127.0.0.1",
             port=self.port,
             timecode=False,
+            log_level=logging.ERROR,
             debug=False,
             send_msg_timing=True,
         )

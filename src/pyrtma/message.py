@@ -39,20 +39,20 @@ def message_def(msg_cls: Type[_MD], *args, **kwargs) -> Type[_MD]:
 msg_def = message_def
 
 
-def set_msg_defs(defs: Dict[int, Type[MessageData]]):
+def _set_msg_defs(defs: Dict[int, Type[MessageData]]):
     _msg_defs.clear()
     _msg_defs.update(defs)
 
 
-def get_msg_defs() -> Dict[int, Type[MessageData]]:
+def _get_msg_defs() -> Dict[int, Type[MessageData]]:
     return copy.deepcopy(_msg_defs)
 
 
-def update_msg_defs(defs: Dict[int, Type[MessageData]]):
+def _update_msg_defs(defs: Dict[int, Type[MessageData]]):
     _msg_defs.update(defs)
 
 
-def clear_msg_defs():
+def _clear_msg_defs():
     _msg_defs.clear()
 
 
