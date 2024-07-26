@@ -3,17 +3,18 @@ import ctypes
 import os
 import sys
 import importlib
+import warnings
 import pyrtma
 import pyrtma.message
-import warnings
+import pyrtma.context
 
-from ..context import RTMAContext, get_context
 from typing import List, Union, Generator, Dict, Any, Optional, Type
-from ..validators import ByteArray
+
+from ..context import RTMAContext
+from ..validators import ByteArray, Uint32, String
 from ..message import Message, MessageHeader, MessageData
 from ..message_base import MessageBase, MessageMeta
 from ..exceptions import VersionMismatchWarning
-from pyrtma.validators import Uint32, String
 
 
 _unknown: Dict[int, Type[MessageData]] = {}
@@ -119,7 +120,8 @@ class QLReader:
         fname = self.defs_path.stem
 
         # Copy the current message def context before importing
-        ctx = pyrtma.message.get_msg_defs()
+        defs = pyrtma.message._get_msg_defs()
+        ctx = pyrtma.context.get_context()
 
         sys.path.insert(0, (str(base.absolute())))
         with warnings.catch_warnings():
@@ -130,7 +132,7 @@ class QLReader:
                 mod = importlib.import_module(fname)
 
         # Cache all the user defined objects associated with the data
-        self.context = get_context()
+        self.context = pyrtma.context.get_context()
 
         try:
             messages = []
@@ -187,7 +189,8 @@ class QLReader:
 
         finally:
             # Restore the orignal message def context
-            pyrtma.message.set_msg_defs(ctx)
+            pyrtma.message._set_msg_defs(defs)
+            pyrtma.context._set_context(ctx)
 
         # Store the results in the object
         self.file_header = file_header

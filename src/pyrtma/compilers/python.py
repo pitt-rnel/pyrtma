@@ -11,7 +11,6 @@ from pyrtma.parser import (
     HID,
     MDF,
     SDF,
-    Field,
 )
 from typing import Union
 import subprocess
@@ -233,7 +232,7 @@ class PyDefCompiler:
         from pyrtma.validators import Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float, Double, Struct, IntArray, FloatArray, StructArray, Char, String, Byte, ByteArray
         
         if _ver_parse(__version__) >= _ver_parse("2.3.0"):
-            from pyrtma.context import update_context, get_context
+            from pyrtma.context import _update_context, get_context
 
         """
         return dedent(s)
@@ -241,7 +240,7 @@ class PyDefCompiler:
     def generate_context(self):
         s = """\
         if _ver_parse(__version__) >= _ver_parse("2.3.0"):
-            update_context(__name__)
+            _update_context(__name__)
         """
         return dedent(s)
 

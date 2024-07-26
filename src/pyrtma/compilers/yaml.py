@@ -1,8 +1,7 @@
 import pathlib
-import sys
 from pyrtma.parser import Parser
 from ruamel.yaml import YAML
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional
 from pyrtma.__version__ import __version__
 
 

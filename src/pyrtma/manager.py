@@ -18,10 +18,10 @@ import graphviz
 
 from .client_logging import RTMALogger, ClientLike
 from .validators import disable_message_validation
-from .message import Message, get_msg_defs
+from .message import Message, _get_msg_defs
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
-from .context import get_core_defs, get_context
+from .context import _get_core_defs, get_context
 from .core_defs import ALL_MESSAGE_TYPES
 from . import core_defs as cd
 
@@ -29,6 +29,8 @@ from typing import Dict, List, Tuple, Set, Type, Union, Optional
 from itertools import chain
 from dataclasses import dataclass, field
 from collections import defaultdict, Counter
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 
 @dataclass
@@ -117,7 +119,6 @@ class MessageManager(ClientLike):
 
     TRAFFIC_INTERVAL = 1.0
     INFO_INTERVAL = 5.0
-    _keep_running = True
 
     def __init__(
         self,
@@ -141,6 +142,7 @@ class MessageManager(ClientLike):
             debug (bool, optional): Flag for debug mode. Defaults to False.
             send_msg_timing (bool, optional): Flag to send TIMING_MSG. Defaults to True.
         """
+        self._keep_running = False
         self.ip_address = ip_address
         self.port = port
 
@@ -180,7 +182,9 @@ class MessageManager(ClientLike):
         self.min_timing_message_period = 0.9
 
         self.last_client_info: float = time.perf_counter()
-        self.sending_traffic = False
+        self.sending_traffic: ContextVar[bool] = ContextVar(
+            "sending_traffic", default=False
+        )
         self.traffic_counter: typing.Counter[int] = Counter()
         self.traffic_start: float = time.perf_counter()
         self.traffic_seqno: int = 1
@@ -227,6 +231,12 @@ class MessageManager(ClientLike):
     @property
     def logger(self) -> RTMALogger:
         return self._logger
+
+    @contextmanager
+    def sending_traffic_ctx(self):
+        token = self.sending_traffic.set(True)
+        yield
+        self.sending_traffic.reset(token)
 
     def generate_uid(self) -> int:
         self._uid += 1
@@ -526,7 +536,7 @@ class MessageManager(ClientLike):
 
         # Increment message counts
         # Note: skip traffic count if we are currently forwarding out traffic messages)
-        if not self.sending_traffic:
+        if not self.sending_traffic.get():
             if self.b_send_msg_timing:
                 self.message_counts[header.msg_type] += 1
             self.traffic_counter[header.msg_type] += 1
@@ -735,42 +745,41 @@ class MessageManager(ClientLike):
         for mod in self.modules.values():
             data.ModulePID[mod.mod_id] = mod.pid
 
-        self.sending_traffic = True
-        self.send_message(data)
-        self.sending_traffic = False
+        data.send_time = time.perf_counter()
+        with self.sending_traffic_ctx():
+            self.send_message(data)
 
     def send_traffic(self):
         """Send MESSAGE_TRAFFIC"""
-        self.sending_traffic = True
-        self.logger.debug("MESSAGE_TRAFFIC")
-        data = cd.MDF_MESSAGE_TRAFFIC()
-        now = time.perf_counter()
-        sub_seqno = 1
-        nsent = 0
-        i = -1
-        for n, (mt, count) in enumerate(self.traffic_counter.items()):
-            data.seqno = self.traffic_seqno
-            data.sub_seqno = sub_seqno
-            data.start_timestamp = self.traffic_start
-            data.end_timestamp = now
+        with self.sending_traffic_ctx():
+            self.logger.debug("MESSAGE_TRAFFIC")
+            data = cd.MDF_MESSAGE_TRAFFIC()
+            now = time.perf_counter()
+            sub_seqno = 1
+            nsent = 0
+            i = -1
+            for n, (mt, count) in enumerate(self.traffic_counter.items()):
+                data.seqno = self.traffic_seqno
+                data.sub_seqno = sub_seqno
+                data.start_timestamp = self.traffic_start
+                data.end_timestamp = now
 
-            i = n % cd.MESSAGE_TRAFFIC_SIZE
-            data.msg_type[i] = mt
-            data.msg_count[i] = count
+                i = n % cd.MESSAGE_TRAFFIC_SIZE
+                data.msg_type[i] = mt
+                data.msg_count[i] = count
 
-            if (n % cd.MESSAGE_TRAFFIC_SIZE) == 0:
-                nsent = n
-                self.send_message(data)
-                sub_seqno += 1
+                if (n % cd.MESSAGE_TRAFFIC_SIZE) == 0:
+                    nsent = n
+                    self.send_message(data)
+                    sub_seqno += 1
 
-        # Send any remaining
-        if i >= 0:
-            i += 1
-            if nsent < len(self.traffic_counter):
-                data.msg_type[i:] = [-1 for _ in range(cd.MESSAGE_TRAFFIC_SIZE - i)]
-                self.send_message(data)
+            # Send any remaining
+            if i >= 0:
+                i += 1
+                if nsent < len(self.traffic_counter):
+                    data.msg_type[i:] = [-1 for _ in range(cd.MESSAGE_TRAFFIC_SIZE - i)]
+                    self.send_message(data)
 
-        self.sending_traffic = False
         self.traffic_counter.clear()
         self.traffic_start = now
         self.traffic_seqno += 1
@@ -831,12 +840,10 @@ class MessageManager(ClientLike):
     @property
     def message(self) -> Message:
         hdr = self.header
-        data_cls = get_core_defs().get(hdr.msg_type)
+        data_cls = _get_core_defs().get(hdr.msg_type)
         if data_cls:
             data = data_cls.from_buffer(self.data_buffer)
-            return Message(
-                hdr, get_core_defs()[hdr.msg_type].from_buffer(self.data_buffer)
-            )
+            return Message(hdr, data)
         else:
             raise RuntimeError(f"Unknown core_def MT={hdr.msg_type}")
 
@@ -890,6 +897,7 @@ class MessageManager(ClientLike):
 
     def run(self):
         """Start the message manager server"""
+        self._keep_running = True
         try:
             with disable_message_validation():
                 while self._keep_running:
@@ -1060,7 +1068,7 @@ class RTMAGraph:
         self._enabled = False
         self.nodes: dict[int, Module] = dict()
         self.edges: dict[tuple[Module, Module], dict[int, list[float]]] = {}
-        self.msg_defs = get_msg_defs()
+        self.msg_defs = _get_msg_defs()
         self.rtma = get_context()
         self.mid2name = {v: k for k, v in self.rtma.MID.items()}
         self.last_build = time.time()

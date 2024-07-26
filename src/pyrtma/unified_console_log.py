@@ -2,7 +2,7 @@
 
 import logging
 import os
-from .client import Client, client_context
+from .client import Client
 from . import core_defs as cd
 from .client_logging import RTMALogger
 from .exceptions import MessageManagerNotFound, ConnectionLost
