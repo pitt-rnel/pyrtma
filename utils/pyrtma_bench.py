@@ -58,7 +58,7 @@ def publisher_loop(
 
     # Send loop
     tic = time.perf_counter()
-    for n in range(num_msgs):
+    for _ in range(num_msgs):
         mod.send_message(test_msg)
     toc = time.perf_counter()
 
@@ -139,7 +139,12 @@ if __name__ == "__main__":
     # Configuration flags for bench utility
     parser = argparse.ArgumentParser(description="RtmaClient bench test utility")
     parser.add_argument(
-        "-ms", default=128, type=int, dest="msg_size", help="Messge size in bytes."
+        "-ms",
+        default=128,
+        choices=[128, 256, 512, 1024, 2048, 4096, 8192],
+        type=int,
+        dest="msg_size",
+        help="Message size in bytes.",
     )
     parser.add_argument(
         "-n", default=100000, type=int, dest="num_msgs", help="Number of messages."
