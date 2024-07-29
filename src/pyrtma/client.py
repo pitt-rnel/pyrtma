@@ -185,7 +185,10 @@ class Client(ClientLike):
     def _connect_helper(
         self, logger_status: bool, daemon_status: bool, allow_multiple: bool
     ) -> Message:
-        """Called internally after _socket_connect"""
+        """Called internally after _socket_connect
+        
+        Note that this is also used by web_manager
+        """
 
         # Reset the module_id to zero for dynamic assignment
         if self._dynamic_id:
