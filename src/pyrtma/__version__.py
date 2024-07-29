@@ -1,7 +1,7 @@
 __title__ = "pyrtma"
 __description__ = "A Python compiler and client for RTMA/Dragonfly messaging system"
 __url__ = "https://github.com/pitt-rnel/pyrtma"
-__version__ = "2.3.2"
+__version__ = "2.3.3"
 __author__ = "RNEL"
 __author_email__ = ""
 __license__ = "MIT"

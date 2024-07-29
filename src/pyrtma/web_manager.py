@@ -136,7 +136,34 @@ class RTMAWebSocketHandler(WebSocketHandler):
         # self.proxy._host_id = msg.header.src_host_id
         msg.data = cast(cd.MDF_CONNECT, msg.data)
         ack_msg = self.proxy._connect_helper(
-            bool(msg.data.logger_status), bool(msg.data.daemon_status)
+            bool(msg.data.logger_status),
+            bool(msg.data.daemon_status),
+            allow_multiple=False,
+        )
+        # forward ack
+        # Pass message thru websocket as json
+        if self.ws_ready_to_send:
+            logger.debug(
+                f"Forwarding ACK from connect to ws. Mod ID = {self.proxy.module_id}"
+            )
+            self.send_message(ack_msg.to_json(minify=True))
+        else:
+            self.send_failed_message(ack_msg.header, time.perf_counter())
+            logger.warning(
+                f"Failed to foward ACK to ws. Mod ID = {self.proxy.module_id}."
+            )
+
+    def handle_connect_v2(self, msg: Message):
+        logger.debug("Received CONNECT_V2")
+
+        # self.proxy._module_id = msg.header.src_mod_id
+        # self.proxy._host_id = msg.header.src_host_id
+        msg.data = cast(cd.MDF_CONNECT_V2, msg.data)
+        self.proxy._name = msg.data.name
+        ack_msg = self.proxy._connect_helper(
+            bool(msg.data.logger_status),
+            bool(msg.data.daemon_status),
+            bool(msg.data.allow_multiple),  # TODO add CONNECT_V2 support to rtma-js
         )
         # forward ack
         # Pass message thru websocket as json
@@ -195,6 +222,11 @@ class RTMAWebSocketHandler(WebSocketHandler):
                 )
             elif msg.header.msg_type == cd.MT_CONNECT:
                 self.handle_connect(msg)
+                logger.info(
+                    f"Proxy CONNECTED, assigned module ID {self.proxy.module_id}"
+                )
+            elif msg.header.msg_type == cd.MT_CONNECT_V2:
+                self.handle_connect_v2(msg)
                 logger.info(
                     f"Proxy CONNECTED, assigned module ID {self.proxy.module_id}"
                 )
@@ -281,7 +313,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         data.time_of_failure = time_of_failure
 
         # Copy the values into the RTMA_MSG_HEADER
-        for fname, ftype in data.msg_header._fields_:
+        for fname, ftype, *_ in data.msg_header._fields_:
             setattr(data.msg_header, fname, getattr(header, fname))
 
         if (
