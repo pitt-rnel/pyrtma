@@ -186,7 +186,7 @@ class Client(ClientLike):
         self, logger_status: bool, daemon_status: bool, allow_multiple: bool
     ) -> Message:
         """Called internally after _socket_connect
-        
+
         Note that this is also used by web_manager
         """
 
