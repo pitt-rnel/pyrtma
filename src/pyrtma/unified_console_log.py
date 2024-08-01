@@ -1,4 +1,4 @@
-"""Run with `python -m pyrtma.unified_console_logger [OPTIONS]` (use -h for help)"""
+"""Run with `python -m pyrtma.unified_console_log [OPTIONS]` (use -h for help)"""
 
 import logging
 import os
