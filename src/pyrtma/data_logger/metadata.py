@@ -58,7 +58,7 @@ class LoggingMetadata:
                     )
             else:
                 try:
-                    value = str(self._metadata[key])
+                    value = self._metadata[key]
                 except KeyError:
                     raise MissingMetadata(
                         f"No value found in metadata for {key} in metadata format string: {s}"

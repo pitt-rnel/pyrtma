@@ -127,6 +127,8 @@ class DataLogger:
             self._recording = True
             self._paused = False
         else:
+            self.mod.unsubscribe([cd.ALL_MESSAGE_TYPES])
+            self.mod.subscribe(self.ctrl_msg_types)
             raise DataCollectionNotConfigured("Ignoring start logging request.")
 
         self.send_status()
