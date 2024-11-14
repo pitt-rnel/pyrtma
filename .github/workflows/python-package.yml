@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.7", "3.8", "3.11", "3.12"]
+        python-version: ["3.7", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +32,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .
       - name: Lint with black
-        if: ${{ matrix.python-version == '3.12' }}
+        if: ${{ matrix.python-version == '3.13' }}
         uses: psf/black@stable
       - name: Test compiler
         if: ${{ matrix.python-version != '3.7' }}
