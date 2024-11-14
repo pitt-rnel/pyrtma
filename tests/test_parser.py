@@ -628,7 +628,11 @@ class TestParser(unittest.TestCase):
             """
         )
         self.tmp.write(text)
-        with self.assertRaises(pyrtma.parser.YAMLSyntaxError):
+        with self.assertRaises(
+            (pyrtma.parser.YAMLSyntaxError, pyrtma.parser.InvalidTypeError)
+        ):
+            # YAMLSyntaxError does not happen on 3.13 (expression is read as string instead)
+            # InvalidTypeError will happen if not caught by yaml loader
             self.parser.parse(self.tmp.path)
 
         text = textwrap.dedent(
