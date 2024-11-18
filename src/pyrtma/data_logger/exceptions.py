@@ -2,23 +2,15 @@ class DataLoggerError(Exception):
     pass
 
 
-class BasePathNotFound(DataLoggerError):
+class DataSetNotConfigured(DataLoggerError):
     pass
 
 
-class MissingMetadata(DataLoggerError):
+class DataSetNotFound(DataLoggerError):
     pass
 
 
-class DataCollectionNotConfigured(DataLoggerError):
-    pass
-
-
-class DataCollectionNotFound(DataLoggerError):
-    pass
-
-
-class DataCollectionInProgress(DataLoggerError):
+class DataSetInProgress(DataLoggerError):
     pass
 
 
@@ -30,7 +22,7 @@ class DataSetExistsError(DataLoggerError):
     pass
 
 
-class DataCollectionThreadError(DataLoggerError):
+class DataSetThreadError(DataLoggerError):
     pass
 
 
@@ -38,9 +30,5 @@ class DataFormatterKeyError(DataLoggerError):
     pass
 
 
-class DataCollectionFullError(DataLoggerError):
-    pass
-
-
-class InvalidMetadata(DataLoggerError):
+class DataLoggerFullError(DataLoggerError):
     pass
