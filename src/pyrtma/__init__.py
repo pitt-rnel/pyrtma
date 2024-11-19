@@ -1,5 +1,6 @@
 from .message import *
 from .client import *
+from .client_logging import RTMALogger
 
 from .__version__ import (
     __author__,
