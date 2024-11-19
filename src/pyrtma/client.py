@@ -264,6 +264,9 @@ class Client(ClientLike):
 
         ack = self._connect_helper(logger_status, daemon_status, allow_multiple)
 
+        # Send client pid
+        self.send_module_ready()
+
     def disconnect(self):
         """Disconnect from message manager server"""
         try:
