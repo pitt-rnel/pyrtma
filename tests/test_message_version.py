@@ -16,6 +16,9 @@ class TestMessageVersion(unittest.TestCase):
     """
 
     def test_version(self):
-        self.assertEqual(pyrtma.__version__, cd.COMPILED_PYRTMA_VERSION)
-        self.assertEqual(pyrtma.__version__, td.COMPILED_PYRTMA_VERSION)
-        self.assertEqual(pyrtma.__version__, em.COMPILED_PYRTMA_VERSION)
+        with self.subTest("core def version"):
+            self.assertEqual(pyrtma.__version__, cd.COMPILED_PYRTMA_VERSION)
+        with self.subTest("test def version"):
+            self.assertEqual(pyrtma.__version__, td.COMPILED_PYRTMA_VERSION)
+        with self.subTest("example def version"):
+            self.assertEqual(pyrtma.__version__, em.COMPILED_PYRTMA_VERSION)
