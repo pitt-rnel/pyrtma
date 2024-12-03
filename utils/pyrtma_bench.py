@@ -120,11 +120,11 @@ def subscriber_loop(sub_id=0, num_msgs=100000, msg_size=128, server="127.0.0.1:7
         data_rate = (test_msg_size * num_msgs) / 1e6 / dur
         if msg_count == num_msgs:
             print(
-                f"Subscriber [{sub_id:d}] -> {msg_count} messages | {int((msg_count-1)/dur)} messages/sec | {data_rate:0.1f} MB/sec | {dur:0.6f} sec "
+                f"Subscriber [{sub_id:d}] -> {msg_count} messages | {int((msg_count)/dur)} messages/sec | {data_rate:0.1f} MB/sec | {dur:0.6f} sec "
             )
         else:
             print(
-                f"Subscriber [{sub_id:d}] -> {msg_count} ({int(msg_count/num_msgs *100):0d}%) messages | {int((msg_count-1)/dur)} messages/sec | {data_rate:0.1f} MB/sec | {dur:0.6f} sec "
+                f"Subscriber [{sub_id:d}] -> {msg_count} ({int(msg_count/num_msgs *100):0d}%) messages | {int((msg_count)/dur)} messages/sec | {data_rate:0.1f} MB/sec | {dur:0.6f} sec "
             )
     else:
         print(
@@ -254,6 +254,7 @@ if __name__ == "__main__":
             mod.send_signal(td.MT_EXIT)
             sys.stdout.write("Test Timeout! Sending Exit Signal...\n")
             sys.stdout.flush()
+            break
 
     for publisher in publishers:
         publisher.join()
