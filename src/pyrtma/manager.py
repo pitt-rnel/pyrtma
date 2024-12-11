@@ -868,10 +868,11 @@ class MessageManager(ClientLike):
         elif msg_type == cd.MT_MODULE_READY:
             self.register_module_ready(src_module, self.message)
             self.send_client_info(src_module)
-        else:
-            self.logger.debug(f"FORWARD - msg_type:{hdr.msg_type} from {src_module!s}")
-            data = self.data_view[: hdr.num_data_bytes]
-            self.forward_message(src_module, hdr, data)
+
+        # Forward all messages that come through to MM
+        self.logger.debug(f"FORWARD - msg_type:{hdr.msg_type} from {src_module!s}")
+        data = self.data_view[: hdr.num_data_bytes]
+        self.forward_message(src_module, hdr, data)
 
     def close(self):
         """Close manager server"""
