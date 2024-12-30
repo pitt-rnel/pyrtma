@@ -184,16 +184,16 @@ class QLReader:
                         msg_data = create_unknown(header, raw_bytes)
                         unknown.append(n)
                     else:
-                        msg_data = msg_cls.from_buffer_copy(raw_bytes)
-
                         # Apply filter if requested
                         if filter_type is None:
-                            pass
+                            msg_data = msg_cls.from_buffer_copy(raw_bytes)
                         elif filter_type.lower() == 'inclusive':
                             if not header.msg_type in filter_key:
+                                msg_data = None
                                 unknown.append(n)
                         elif filter_type.lower() == 'exclusive':
                             if header.msg_type in filter_key:
+                                msg_data = None
                                 unknown.append(n)
                         else:
                             raise ValueError('Filter type must be None, "inclusive", or "exclusive"')
