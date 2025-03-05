@@ -454,7 +454,9 @@ class String(FieldValidator[_P, str], Generic[_P]):
     """Validator for strings (char arrays)"""
 
     def __init__(self, len: int):
-        assert len > 1
+        assert (
+            len > 1
+        ), "Char Arrays must have a length > 1, the last being a null terminator"
         self.len = len
         self._ctype = ctypes.c_char * len
 
@@ -484,7 +486,9 @@ class String(FieldValidator[_P, str], Generic[_P]):
             raise TypeError(f"Expected {value} to be a str")
 
         if len(value) > (self.len - 1):
-            raise ValueError(f'Expected "{value}" to be no longer than {self.len - 1}')
+            raise ValueError(
+                f'Expected "{value}" to be no longer than {self.len - 1}. Note: Last index is reserved for null terminator.'
+            )
 
         if not value.isascii():
             raise TypeError(f"Expected {value} to only contain valid ascii points")
@@ -759,7 +763,7 @@ class ByteArray(ArrayField[Byte]):
         Args:
             len (int): Byte array length
         """
-        assert len > 1
+        assert len >= 1
         self._validator = Byte()
         self._len = len
         self._bound_obj: Optional[MessageBase] = None
@@ -805,13 +809,11 @@ class ByteArray(ArrayField[Byte]):
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
-        int_vals = getattr(self._bound_obj, self._private_name)[key]
-        try:
-            barray = [x.to_bytes(1, "little") for x in int_vals]
-        except TypeError:
-            barray = [int_vals.to_bytes(1, "little")]
-
-        return bytearray().join(barray)
+        value = getattr(self._bound_obj, self._private_name)[key]
+        if isinstance(value, int):
+            return bytearray([value])
+        else:
+            return bytearray(value)
 
     def __iter__(self) -> Iterator[bytearray]:  # Generator[_S, None, None]:
         for i in range(self._len):
@@ -827,11 +829,9 @@ class ByteArray(ArrayField[Byte]):
             else:
                 self.validate_one(value)
 
-            if isinstance(value, (bytes, bytearray)):
-                if len(value) == 1:
-                    value = int.from_bytes(value, "little")
-                else:
-                    value = [v for v in value]
+        if isinstance(value, (bytes, bytearray)):
+            if len(value) == 1 and isinstance(key, int):
+                value = int.from_bytes(value, "little")
 
         getattr(self._bound_obj, self._private_name)[key] = value
 
