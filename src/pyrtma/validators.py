@@ -81,7 +81,7 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
     """Abstract base class for all message field validator descriptors"""
 
     def __init__(self) -> None:
-        self._ctype: Type[ctypes._CData] = ctypes._CData
+        self._ctype: Type[ctypes._CDataType]
 
     def __set_name__(self, owner: _P, name: str):
         self._owner = owner
