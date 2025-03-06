@@ -800,22 +800,22 @@ class ByteArray(ArrayField[Byte]):
             self.__get__(obj).__setitem__(slice(None), value)
 
     @overload
-    def __getitem__(self, key: int) -> bytearray: ...
+    def __getitem__(self, key: int) -> int: ...
 
     @overload
     def __getitem__(self, key: slice) -> bytearray: ...
 
-    def __getitem__(self, key) -> bytearray:
+    def __getitem__(self, key) -> bytearray | int:
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
         value = getattr(self._bound_obj, self._private_name)[key]
         if isinstance(value, int):
-            return bytearray([value])
+            return value
         else:
             return bytearray(value)
 
-    def __iter__(self) -> Iterator[bytearray]:  # Generator[_S, None, None]:
+    def __iter__(self) -> Iterator[int]:  # Generator[_S, None, None]:
         for i in range(self._len):
             yield self.__getitem__(i)
 
