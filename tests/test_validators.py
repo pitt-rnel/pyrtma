@@ -41,7 +41,7 @@ class TestEncoding(unittest.TestCase):
         m.double = -1.79769313486231570814527423731704356798070e308
 
         m.byte = b"\x00"
-        m.byte = b"\xFF"
+        m.byte = b"\xff"
 
         m.char = chr(0)
         m.char = chr(127)
@@ -77,7 +77,7 @@ class TestEncoding(unittest.TestCase):
         m.double_arr[0] = 1.79769313486231570814527423731704356798070e308
 
         m.byte_arr[0] = b"\x00"
-        m.byte_arr[0] = b"\xFF"
+        m.byte_arr[0] = b"\xff"
 
     def test_validator_out_of_range(self):
         m = MDF_VALIDATOR_A()
