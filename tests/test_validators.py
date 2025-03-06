@@ -421,6 +421,33 @@ class TestEncoding(unittest.TestCase):
         self.assertIsInstance(m.struct_arr[0:2], list)
         self.assertIsInstance(m.struct_arr[0:2][0], VALIDATOR_STRUCT)
 
+        A = MDF_ARRAY_OF_ONE()
+        self.assertIsInstance(A.u8[0], int)
+        self.assertIsInstance(A.u16[0], int)
+        self.assertIsInstance(A.u32[0], int)
+        self.assertIsInstance(A.u64[0], int)
+        self.assertIsInstance(A.i8[0], int)
+        self.assertIsInstance(A.i16[0], int)
+        self.assertIsInstance(A.i32[0], int)
+        self.assertIsInstance(A.i64[0], int)
+        self.assertIsInstance(A.f32[0], float)
+        self.assertIsInstance(A.f64[0], float)
+        self.assertIsInstance(A.ba[0], int)
+        self.assertIsInstance(A.sa[0], VALIDATOR_STRUCT)
+
+        self.assertIsInstance(A.u8[:], list)
+        self.assertIsInstance(A.u16[:], list)
+        self.assertIsInstance(A.u32[:], list)
+        self.assertIsInstance(A.u64[:], list)
+        self.assertIsInstance(A.i8[:], list)
+        self.assertIsInstance(A.i16[:], list)
+        self.assertIsInstance(A.i32[:], list)
+        self.assertIsInstance(A.i64[:], list)
+        self.assertIsInstance(A.f32[:], list)
+        self.assertIsInstance(A.f64[:], list)
+        self.assertIsInstance(A.ba[:], bytearray)
+        self.assertIsInstance(A.sa[:], list)
+
     def test_invalid_set_types(self):
         A = MDF_VALIDATOR_A()
         B = MDF_VALIDATOR_B()
@@ -723,6 +750,70 @@ class TestEncoding(unittest.TestCase):
         ]
 
         A.struct_arr = (VALIDATOR_STRUCT * 4)()
+
+        B = MDF_ARRAY_OF_ONE()
+        B.u8[0] = 1
+        B.u16[0] = 1
+        B.u32[0] = 1
+        B.u64[0] = 1
+
+        B.u8[:] = [1]
+        B.u16[:] = [1]
+        B.u32[:] = [1]
+        B.u64[:] = [1]
+
+        B.u8 = [1]
+        B.u16 = [1]
+        B.u32 = [1]
+        B.u64 = [1]
+
+        B.i8[0] = 1
+        B.i16[0] = 1
+        B.i32[0] = 1
+        B.i64[0] = 1
+
+        B.i8[:] = [1]
+        B.i16[:] = [1]
+        B.i32[:] = [1]
+        B.i64[:] = [1]
+
+        B.i8 = [1]
+        B.i16 = [1]
+        B.i32 = [1]
+        B.i64 = [1]
+
+        B.f32[0] = 1
+        B.f64[0] = 1
+
+        B.f32[:] = [1]
+        B.f64[:] = [1]
+
+        B.f32 = [1]
+        B.f64 = [1]
+
+        B.c = "a"
+        B.c1 = "a"
+        B.s2 = "a"
+
+        B.b = 1
+        B.b = b"\x02"
+        B.b = bytes([2])
+        B.b = bytearray([2])
+
+        B.ba[0] = 1
+        B.ba[0] = b"\x02"
+        B.ba[0] = bytes([2])
+        B.ba[0] = bytearray([2])
+
+        B.ba[:] = [1]
+        B.ba[:] = b"\x02"
+        B.ba[:] = bytes([2])
+        B.ba[:] = bytearray([2])
+
+        B.ba = [1]
+        B.ba = b"\x02"
+        B.ba = bytes([2])
+        B.ba = bytearray([2])
 
     def test_refs(self):
         A = MDF_VALIDATOR_A()
