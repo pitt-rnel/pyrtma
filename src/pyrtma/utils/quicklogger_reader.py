@@ -135,13 +135,15 @@ class QLReader:
                 mod = importlib.import_module(fname)
 
         # Load local message defs
-        ctx2 = mod.get_context() ####_create_context() (older version)
+        ctx2 = mod.get_context()  ####_create_context() (older version)
         if isinstance(ctx2, dict):
-            mt_to_mdf_session = {ctx2['mt'][mtn]: ctx2['mdf'][mtn] for mtn in ctx2['mdf']}
-        elif hasattr(ctx2, 'MT'):
+            mt_to_mdf_session = {
+                ctx2["mt"][mtn]: ctx2["mdf"][mtn] for mtn in ctx2["mdf"]
+            }
+        elif hasattr(ctx2, "MT"):
             mt_to_mdf_session = {ctx2.MT[mtn]: ctx2.MDF[mtn] for mtn in ctx2.MDF.keys()}
         else:
-            print('Warning no local message defs loaded.')
+            print("Warning no local message defs loaded.")
 
         try:
             messages = []
@@ -185,7 +187,7 @@ class QLReader:
                     raw_bytes = d_bytes[offset : offset + header.num_data_bytes]
 
                     if msg_cls is None:
-                        #print(f"Unknown message definition: MT={header.msg_type}")
+                        # print(f"Unknown message definition: MT={header.msg_type}")
                         msg_data = create_unknown(header, raw_bytes)
                         unknown.append(n)
 
