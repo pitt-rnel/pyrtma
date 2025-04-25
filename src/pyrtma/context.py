@@ -13,18 +13,45 @@ class RTMAContext:
     constants: Dict[str, Union[int, float, str]] = field(default_factory=dict)
     typedefs: Dict[str, Any] = field(default_factory=dict)
     MID: Dict[str, int] = field(default_factory=dict)
+    MON: Dict[int, str] = field(default_factory=dict)
     SDF: Dict[str, Type[MessageBase]] = field(default_factory=dict)
     MT: Dict[str, int] = field(default_factory=dict)
+    MN: Dict[int, str] = field(default_factory=dict)
     MDF: Dict[str, Type[MessageData]] = field(default_factory=dict)
 
     def _clear(self):
         self.constants.clear()
         self.typedefs.clear()
         self.MID.clear()
+        self.MON.clear()
         self.SDF.clear()
         self.MT.clear()
+        self.MN.clear()
         self.MDF.clear()
 
+    def message_name_from_id(self, message_id: int) -> str:
+        if message_id in self.MN.keys():
+            return self.MN[message_id]
+        else:
+            return None
+        
+    def message_id_from_name(self, message_name: str) -> int:
+        if message_name in self.MT.keys():
+            return self.MT[message_name]
+        else:
+            return None
+        
+    def module_name_from_id(self, module_id: int) -> str:
+        if module_id in self.MON.keys():
+            return self.MON[module_id]
+        else:
+            return None
+        
+    def module_id_from_name(self, module_name: str) -> int:
+        if module_name in self.MID.keys():
+            return self.MID[module_name]
+        else:
+            return None
 
 _ctx = RTMAContext()
 _ctx_copy = copy.deepcopy(_ctx)
@@ -40,8 +67,10 @@ def _update_context(module_name: str) -> RTMAContext:
 
         if k.startswith("MT_"):
             _ctx.MT[k[3:]] = v
+            _ctx.MN[v] = k[3:]
         elif k.startswith("MID_"):
             _ctx.MID[k[4:]] = v
+            _ctx.MON[v] = k[4:]
         elif k.startswith("MDF_"):
             _ctx.MDF[k[4:]] = v
         elif k.isupper():
