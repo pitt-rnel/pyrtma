@@ -29,23 +29,14 @@ class RTMAContext:
         self.MTN.clear()
         self.MDF.clear()
 
-    def message_name_from_id(self, message_id: int) -> Union[str, None]:
-        return self.MTN.get(message_id)
-
-    def message_id_from_name(self, message_name: str) -> Union[int, None]:
-        return self.MT.get(message_name)
-
-    def module_name_from_id(self, module_id: int) -> Union[str, None]:
-        return self.MON.get(module_id)
-
-    def module_id_from_name(self, module_name: str) -> Union[int, None]:
-        return self.MID.get(module_name)
-
 
 _ctx = RTMAContext()
 _ctx_copy = copy.deepcopy(_ctx)
 
 
+# Note: This private function is called from within the
+# compiled message_defs.py file to populate the global
+# RTMAContext object stored in the module
 def _update_context(module_name: str) -> RTMAContext:
     global _ctx_copy
     mod = sys.modules[module_name]
@@ -103,3 +94,20 @@ def _get_core_defs() -> Dict[int, Type[MessageData]]:
             pass
 
     return core_defs
+
+
+# Helper functions to access context info indirectly
+def message_name_from_id(message_id: int) -> Union[str, None]:
+    return _ctx.MTN.get(message_id)
+
+
+def message_id_from_name(message_name: str) -> Union[int, None]:
+    return _ctx.MT.get(message_name)
+
+
+def module_name_from_id(module_id: int) -> Union[str, None]:
+    return _ctx.MON.get(module_id)
+
+
+def module_id_from_name(module_name: str) -> Union[int, None]:
+    return _ctx.MID.get(module_name)
