@@ -30,28 +30,16 @@ class RTMAContext:
         self.MDF.clear()
 
     def message_name_from_id(self, message_id: int) -> Union[str, None]:
-        if message_id in self.MTN.keys():
-            return self.MTN[message_id]
-        else:
-            return None
+        return self.MTN.get(message_id)
 
     def message_id_from_name(self, message_name: str) -> Union[int, None]:
-        if message_name in self.MT.keys():
-            return self.MT[message_name]
-        else:
-            return None
+        return self.MT.get(message_name)
 
     def module_name_from_id(self, module_id: int) -> Union[str, None]:
-        if module_id in self.MON.keys():
-            return self.MON[module_id]
-        else:
-            return None
+        return self.MON.get(module_id)
 
     def module_id_from_name(self, module_name: str) -> Union[int, None]:
-        if module_name in self.MID.keys():
-            return self.MID[module_name]
-        else:
-            return None
+        return self.MID.get(module_name)
 
 
 _ctx = RTMAContext()
