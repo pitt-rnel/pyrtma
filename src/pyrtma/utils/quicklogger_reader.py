@@ -8,7 +8,7 @@ import pyrtma
 import pyrtma.message
 import pyrtma.context
 
-from typing import List, Union, Generator, Dict, Any, Optional, Type
+from typing import List, Union, Generator, Dict, Any, Optional, Type, cast
 
 from ..context import RTMAContext
 from ..validators import ByteArray, Uint32, String
@@ -110,6 +110,8 @@ class QLReader:
         binfile: Union[str, os.PathLike],
         msgdefs: Union[str, os.PathLike],
         skip_unknown: bool = True,
+        filter_type: Union[None, str] = None,
+        filter_key: list[int] = []
     ):
         self.clear()
         self.defs_path = pathlib.Path(msgdefs)
@@ -166,7 +168,7 @@ class QLReader:
                 unknown: List[int] = []
                 # Extract the message data for each message
                 for n, offset in enumerate(offsets):
-                    header = headers[n]
+                    header = cast(MessageHeader, headers[n])
                     msg_cls = mt_to_mdf.get(header.msg_type)
                     raw_bytes = d_bytes[offset : offset + header.num_data_bytes]
 
@@ -176,16 +178,28 @@ class QLReader:
                         unknown.append(n)
 
                     elif msg_cls.type_size != header.num_data_bytes:
-                        print(
-                            f"Warning: Message header indicates a message data size ({header.num_data_bytes}) that does not match the expected size of message type {msg_cls.type_name} ({msg_cls.type_size}). Message definitions may be out of sync."
-                        )
+                        print(f"Warning: Message header indicates a message data size ({header.num_data_bytes}) "
+                              f"that does not match the expected size of message type {msg_cls.type_name} ({msg_cls.type_size}). "
+                              f"Message definitions may be out of sync.")
                         msg_data = create_unknown(header, raw_bytes)
                         unknown.append(n)
                     else:
-                        msg_data = msg_cls.from_buffer_copy(raw_bytes)
+                        # Apply filter if requested
+                        if filter_type is None:
+                            msg_data = msg_cls.from_buffer_copy(raw_bytes)
+                        elif filter_type.lower() == 'inclusive':
+                            if not header.msg_type in filter_key:
+                                msg_data = None
+                                unknown.append(n)
+                        elif filter_type.lower() == 'exclusive':
+                            if header.msg_type in filter_key:
+                                msg_data = None
+                                unknown.append(n)
+                        else:
+                            raise ValueError('Filter type must be None, "inclusive", or "exclusive"')
 
                     data.append(msg_data)
-                    messages.append(Message(header, msg_data))
+                    messages.append(Message(header, msg_data))      
 
         finally:
             # Restore the orignal message def context
