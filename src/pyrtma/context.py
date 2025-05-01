@@ -98,16 +98,48 @@ def _get_core_defs() -> Dict[int, Type[MessageData]]:
 
 # Helper functions to access context info indirectly
 def message_name_from_id(message_id: int) -> Union[str, None]:
+    """Get message name string from numeric ID
+
+    Args:
+        message_id (int): Message type ID number
+
+    Returns:
+        Union[str, None]: Message name, or None if ID does not exist
+    """
     return _ctx.MTN.get(message_id)
 
 
 def message_id_from_name(message_name: str) -> Union[int, None]:
+    """Get message ID number from name
+
+    Args:
+        message_name (str): Message type name
+
+    Returns:
+        Union[int, None]: Message ID number, or None if name does not exist
+    """
     return _ctx.MT.get(message_name)
 
 
 def module_name_from_id(module_id: int) -> Union[str, None]:
+    """Get module name string from numeric ID
+
+    Args:
+        module_id (int): Module ID number
+
+    Returns:
+        Union[str, None]: Module name, or None if ID does not exist
+    """
     return _ctx.MON.get(module_id)
 
 
 def module_id_from_name(module_name: str) -> Union[int, None]:
+    """Get module ID number from name
+
+    Args:
+        module_name (str): Module ID name
+
+    Returns:
+        Union[int, None]: Module ID number, or None if name does not exist
+    """
     return _ctx.MID.get(module_name)
