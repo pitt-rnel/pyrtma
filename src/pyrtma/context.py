@@ -13,17 +13,33 @@ class RTMAContext:
     constants: Dict[str, Union[int, float, str]] = field(default_factory=dict)
     typedefs: Dict[str, Any] = field(default_factory=dict)
     MID: Dict[str, int] = field(default_factory=dict)
+    MON: Dict[int, str] = field(default_factory=dict)
     SDF: Dict[str, Type[MessageBase]] = field(default_factory=dict)
     MT: Dict[str, int] = field(default_factory=dict)
+    MTN: Dict[int, str] = field(default_factory=dict)
     MDF: Dict[str, Type[MessageData]] = field(default_factory=dict)
 
     def _clear(self):
         self.constants.clear()
         self.typedefs.clear()
         self.MID.clear()
+        self.MON.clear()
         self.SDF.clear()
         self.MT.clear()
+        self.MTN.clear()
         self.MDF.clear()
+
+    def message_name_from_id(self, message_id: int) -> Union[str, None]:
+        return self.MTN.get(message_id)
+
+    def message_id_from_name(self, message_name: str) -> Union[int, None]:
+        return self.MT.get(message_name)
+
+    def module_name_from_id(self, module_id: int) -> Union[str, None]:
+        return self.MON.get(module_id)
+
+    def module_id_from_name(self, module_name: str) -> Union[int, None]:
+        return self.MID.get(module_name)
 
 
 _ctx = RTMAContext()
@@ -40,8 +56,10 @@ def _update_context(module_name: str) -> RTMAContext:
 
         if k.startswith("MT_"):
             _ctx.MT[k[3:]] = v
+            _ctx.MTN[v] = k[3:]
         elif k.startswith("MID_"):
             _ctx.MID[k[4:]] = v
+            _ctx.MON[v] = k[4:]
         elif k.startswith("MDF_"):
             _ctx.MDF[k[4:]] = v
         elif k.isupper():
