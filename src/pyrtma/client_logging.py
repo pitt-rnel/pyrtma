@@ -99,7 +99,13 @@ class RTMALogHandler(logging.Handler):
         msg.lineno = record.lineno
         msg.pathname = record.pathname
         msg.funcname = record.funcName
-        msg.message = record.getMessage()
+        msg_str = record.getMessage()
+        if len(msg_str) > (cd.MAX_LOG_LENGTH - 1):
+            # truncate
+            truncate_str = "[TRUNCATED]"
+            trunc_len = cd.MAX_LOG_LENGTH - len(truncate_str) - 1
+            msg_str = msg_str[:trunc_len] + truncate_str
+        msg.message = msg_str
         return msg
 
     def emit(self, record: logging.LogRecord):
