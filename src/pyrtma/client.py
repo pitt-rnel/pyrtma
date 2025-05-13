@@ -889,7 +889,6 @@ class Client(ClientLike):
         if subscribe_list:
             self.subscribe(subscribe_list)
 
-
     def __str__(self) -> str:
         # TODO: Make this better.
         return f"Client(module_id={self.module_id}, server={self.server}, connected={self.connected})"
