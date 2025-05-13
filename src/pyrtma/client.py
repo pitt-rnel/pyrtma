@@ -877,6 +877,19 @@ class Client(ClientLike):
             msg, time_remaining = read_and_time()
         return not msg
 
+    def reset_subscriptions(self, subscribe_list: Optional[list[int]] = None):
+        """Unsubscribe from all messages and empty the message buffer.
+        If optional 'subscribe_list' argument given, then will subscribe to new messages after reset.
+
+        Args:
+            subscribe_list (Optional[list[int]], optional): _description_. Defaults to None.
+        """
+        self.unsubscribe_from_all()
+        self.discard_messages()
+        if subscribe_list:
+            self.subscribe(subscribe_list)
+
+
     def __str__(self) -> str:
         # TODO: Make this better.
         return f"Client(module_id={self.module_id}, server={self.server}, connected={self.connected})"
