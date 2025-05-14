@@ -883,7 +883,7 @@ class Client(ClientLike):
         If optional 'subscribe_list' argument given, then will subscribe to new messages after reset.
 
         Args:
-            subscribe_list (Optional[list[int]], optional): _description_. Defaults to None.
+            subscribe_list (Optional[list[int]], optional): List of message IDs to subscribe to. Defaults to None.
         """
         self.unsubscribe_from_all()
         self.discard_messages()
