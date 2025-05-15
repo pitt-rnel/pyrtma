@@ -494,17 +494,25 @@ class MessageManager(ClientLike):
         # Read Data Section
         data_size = self.header.num_data_bytes
         if data_size:
+            if data_size > len(self.data_buffer):
+                self.logger.warning("Data size exceeded buffer")
+                self.drop_module(sock)
+                return False
+                
             nbytes = sock.recv_into(self.data_buffer, data_size, socket.MSG_WAITALL)
 
             if nbytes != data_size:
-                mod = self.modules[sock]
-                self.remove_module(mod)
-                self.logger.warning(
-                    f"DROPPING - {mod!s} - No data returned from sock.recv_into."
-                )
+                self.drop_module(sock)
                 return False
 
         return True
+    
+    def drop_module(self, sock: socket.socket):
+        mod = self.modules[sock]
+        self.remove_module(mod)
+        self.logger.warning(
+            f"DROPPING - {mod!s} - No data returned from sock.recv_into."
+        )
 
     def forward_message(
         self,
