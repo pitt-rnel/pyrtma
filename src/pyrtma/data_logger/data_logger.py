@@ -9,6 +9,8 @@ from .data_set import DataSet
 from .data_formatter import get_formatter
 from .exceptions import *
 
+from typing import cast
+
 
 class DataLogger:
     MAX_DATA_SETS = 6
@@ -219,26 +221,26 @@ class DataLogger:
                     continue
 
                 try:
-                    match (msg.data):
-                        case cd.MDF_DATA_SET_START():
-                            self.start_logging(msg.data.name)
-                        case cd.MDF_DATA_SET_STOP():
-                            self.stop_logging(msg.data.name)
-                        case cd.MDF_DATA_SET_PAUSE():
-                            self.pause_logging(msg.data.name)
-                        case cd.MDF_DATA_SET_RESUME():
-                            self.resume_logging(msg.data.name)
-                        case cd.MDF_DATA_SET_ADD():
-                            self.add_data_set(msg.data)
-                        case cd.MDF_DATA_SET_REMOVE():
-                            self.rm_data_set(msg.data.name)
-                        case cd.MDF_DATA_LOGGER_RESET():
+                    match (msg.data.type_id):
+                        case cd.MT_DATA_SET_START:
+                            self.start_logging(cast(str, msg.data.name))
+                        case cd.MT_DATA_SET_STOP:
+                            self.stop_logging(cast(str, msg.data.name))
+                        case cd.MT_DATA_SET_PAUSE:
+                            self.pause_logging(cast(str, msg.data.name))
+                        case cd.MT_DATA_SET_RESUME:
+                            self.resume_logging(cast(str, msg.data.name))
+                        case cd.MT_DATA_SET_ADD:
+                            self.add_data_set(cast(cd.MDF_DATA_SET_ADD, msg.data))
+                        case cd.MT_DATA_SET_REMOVE:
+                            self.rm_data_set(cast(str, msg.data.name))
+                        case cd.MT_DATA_LOGGER_RESET:
                             self.reset()
-                        case cd.MDF_DATA_SET_STATUS_REQUEST():
-                            self.send_status(msg.data.name)
-                        case cd.MDF_DATA_LOGGER_CONFIG_REQUEST():
+                        case cd.MT_DATA_SET_STATUS_REQUEST:
+                            self.send_status(cast(str, msg.data.name))
+                        case cd.MT_DATA_LOGGER_CONFIG_REQUEST:
                             self.send_config()
-                        case cd.MDF_EXIT():
+                        case cd.MT_EXIT:
                             if msg.header.dest_mod_id == self.client.module_id:
                                 self._running = False
                                 self.client.info("Received EXIT request. Closing...")
