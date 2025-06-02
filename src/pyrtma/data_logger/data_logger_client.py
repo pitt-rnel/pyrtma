@@ -15,13 +15,14 @@ if TYPE_CHECKING:
 @dataclass
 class DataSetConfig:
     name: str
-    save_path: Path
+    save_path: StrPath
     filename: str
     formatter: str
     subdivide_interval: int = 0
     msg_types: List[int] = field(default_factory=lambda: [cd.ALL_MESSAGE_TYPES])
 
     def __post_init__(self):
+        self.save_path = Path(self.save_path)
         self._client: Optional[pyrtma.Client] = None
 
     def register_client(self, client: pyrtma.Client):
