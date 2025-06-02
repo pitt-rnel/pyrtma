@@ -3,6 +3,7 @@ import pyrtma.core_defs as cd
 import json
 
 from pyrtma.core_defs import ALL_MESSAGE_TYPES
+from pyrtma.data_logger.data_logger_client import DataLoggerClient, DataSetConfig
 
 
 def add_data_set(mod: pyrtma.Client):
@@ -33,17 +34,8 @@ def main():
     else:
         server = "127.0.0.1:7111"
 
-    mod = pyrtma.Client()
+    mod = DataLoggerClient()
     mod.connect(server)
-    mod.subscribe(
-        [
-            cd.MT_DATA_SET_STATUS,
-            cd.MT_DATA_LOGGER_CONFIG,
-            cd.MT_DATA_LOGGER_ERROR,
-        ]
-    )
-
-    metadata = {}
 
     try:
         while True:
@@ -55,32 +47,32 @@ def main():
             elif cmd == "remove":
                 rm_data_set(mod)
             elif cmd == "pause":
-                msg = cd.MDF_DATA_SET_PAUSE()
-                msg.name = args[1]
-                mod.send_message(msg)
+                mod.pause_data_set(args[1])
+            elif cmd == "pause-all":
+                mod.pause_all_data_sets()
             elif cmd == "resume":
-                msg = cd.MDF_DATA_SET_RESUME()
-                msg.name = args[1]
-                mod.send_message(msg)
+                mod.resume_data_set(args[1])
+            elif cmd == "resume-all":
+                mod.resume_all_data_sets()
             elif cmd == "start":
-                msg = cd.MDF_DATA_SET_START()
-                msg.name = args[1]
-                mod.send_message(msg)
+                mod.start_data_set(args[1])
+            elif cmd == "start-all":
+                mod.start_all_data_sets()
             elif cmd == "stop":
-                msg = cd.MDF_DATA_SET_STOP()
-                msg.name = args[1]
-                mod.send_message(msg)
+                mod.stop_data_set(args[1])
+            elif cmd == "stop-all":
+                mod.stop_all_data_sets()
             elif cmd == "status":
-                msg = cd.MDF_DATA_SET_STATUS_REQUEST()
-                msg.name = args[1]
-                mod.send_message(msg)
+                mod.request_data_set_status(args[1])
+            elif cmd == "status-all":
+                mod.request_all_data_set_status()
             elif cmd == "config":
-                mod.send_signal(cd.MT_DATA_LOGGER_CONFIG_REQUEST)
+                mod.request_data_logger_config()
             elif cmd == "reset":
-                mod.send_signal(cd.MT_DATA_LOGGER_RESET)
-            elif cmd == "help":
+                mod.reset_data_logger()
+            elif cmd in ("help", "?", "h"):
                 help()
-            elif cmd == "exit":
+            elif cmd in ("exit", "quit", "q"):
                 break
             else:
                 print(f"Unknown command: {cmd}")
@@ -94,18 +86,19 @@ def main():
                     elif isinstance(msg.data, cd.MDF_DATA_SET_STATUS):
                         print(msg.data.to_json())
                     elif isinstance(msg.data, cd.MDF_DATA_LOGGER_CONFIG):
-                        d = msg.data.to_dict()
-                        for ds in d["data_sets"]:
-                            names = []
-                            for msg_type in ds["msg_types"]:
-                                if msg_type < 1:
-                                    continue
-                                if msg_type == ALL_MESSAGE_TYPES:
-                                    names.append("ALL_MESSAGE_TYPES")
-                                else:
-                                    names.append(pyrtma.get_msg_cls(msg_type).type_name)
-                            ds["msg_types"] = names
-                        d["data_sets"] = d["data_sets"][: d["num_data_sets"]]
+                        d = mod.process_data_logger_config_msg(msg.data)
+                        # d = msg.data.to_dict()
+                        # for ds in d["data_sets"]:
+                        #     names = []
+                        #     for msg_type in ds["msg_types"]:
+                        #         if msg_type < 1:
+                        #             continue
+                        #         if msg_type == ALL_MESSAGE_TYPES:
+                        #             names.append("ALL_MESSAGE_TYPES")
+                        #         else:
+                        #             names.append(pyrtma.get_msg_cls(msg_type).type_name)
+                        #     ds["msg_types"] = names
+                        # d["data_sets"] = d["data_sets"][: d["num_data_sets"]]
                         print(json.dumps(d, indent=2))
                 else:
                     break
@@ -127,7 +120,8 @@ def help():
     print("  * reset")
     print("  * status")
     print("  * config")
-    print("  * exit - close application.")
+    print("  * help/h/? - print this help")
+    print("  * exit/quit/q - close application.")
     print()
 
 
