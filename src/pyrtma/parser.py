@@ -395,6 +395,11 @@ class Parser:
         console.setFormatter(formatter)
         self.logger.addHandler(console)
 
+        # Reserved field names
+        reserved_file = pathlib.Path(__file__).parent / "reserved_field_names.json"
+        with open(reserved_file, "r") as f:
+            self.reserved_field_names = json.load(f)
+
     def warning(self, msg: str):
         self.logger.warning(msg)
 
@@ -938,21 +943,12 @@ class Parser:
                 mdf.fields.append(copy(field))
         elif isinstance(fields, dict):
             # Parse field specs into Field objects
-            reserved_field_names = (
-                "type_id",
-                "type_name",
-                "type_hash",
-                "type_source",
-                "type_def",
-                "type_size",
-                "hexdump",
-            )
-
             for fname, fstr in fields.items():
-                if fname in reserved_field_names:
-                    raise RTMASyntaxError(
-                        f"{fname} is a reserved field name for internal use."
-                    )
+                for language, reserved_fields in self.reserved_field_names.items():
+                    if fname in reserved_fields:
+                        raise RTMASyntaxError(
+                            f"{fname} is a reserved field name for {language} use."
+                        )
 
                 if not isinstance(fstr, str):
                     raise InvalidTypeError(
