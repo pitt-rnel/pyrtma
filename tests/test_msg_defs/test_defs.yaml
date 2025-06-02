@@ -196,7 +196,7 @@ aliases:
 struct_defs:
   VALIDATOR_STRUCT:
     fields:
-      char: char
+      char_: char
       int8: int8
       int16: int16
       int32: int32
@@ -213,11 +213,11 @@ struct_defs:
       uint16_arr: uint16[4]
       uint32_arr: uint32[4]
       uint64_arr: uint64[4]
-      byte: byte
+      byte_: byte
       byte_arr: byte[4]
       string: char[4]
-      float: float
-      double: double
+      float_: float
+      double_: double
       float_arr: float[4]
       double_arr: double[4]
 
@@ -1694,7 +1694,7 @@ message_defs:
   VALIDATOR_A:
     id: 5000
     fields:
-      char: char
+      char_: char
       int8: int8
       int16: int16
       int32: int32
@@ -1711,20 +1711,20 @@ message_defs:
       uint16_arr: uint16[4]
       uint32_arr: uint32[4]
       uint64_arr: uint64[4]
-      byte: byte
+      byte_: byte
       byte_arr: byte[4]
       string: char[4]
-      float: float
-      double: double
+      float_: float
+      double_: double
       float_arr: float[4]
       double_arr: double[4]
-      struct: VALIDATOR_STRUCT 
+      struct_: VALIDATOR_STRUCT 
       struct_arr: VALIDATOR_STRUCT[4]
 
   VALIDATOR_B:
     id: 5001
     fields:
-      char: char
+      char_: char
       int8: int8
       int16: int16
       int32: int32
@@ -1741,14 +1741,14 @@ message_defs:
       uint16_arr: uint16[8]
       uint32_arr: uint32[8]
       uint64_arr: uint64[8]
-      byte: byte
+      byte_: byte
       byte_arr: byte[8]
       string: char[8]
-      float: float
-      double: double
+      float_: float
+      double_: double
       float_arr: float[8]
       double_arr: double[8]
-      struct: VALIDATOR_STRUCT 
+      struct_: VALIDATOR_STRUCT 
       struct_arr: VALIDATOR_STRUCT[8]
 
   TEST_MSG_128:

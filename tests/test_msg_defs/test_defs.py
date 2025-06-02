@@ -606,14 +606,14 @@ class MJVR_MSG_HEADER(MessageBase, metaclass=MessageMeta):
 
 class VALIDATOR_STRUCT(MessageBase, metaclass=MessageMeta):
     type_name: ClassVar[str] = "VALIDATOR_STRUCT"
-    type_hash: ClassVar[int] = 0x532D211B
+    type_hash: ClassVar[int] = 0xEDECB7D1
     type_size: ClassVar[int] = 232
     type_source: ClassVar[str] = "test_defs.yaml"
     type_def: ClassVar[str] = (
-        "'VALIDATOR_STRUCT:\n  fields:\n    char: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[4]\n    int16_arr: int16[4]\n    int32_arr: int32[4]\n    int64_arr: int64[4]\n    uint8_arr: uint8[4]\n    uint16_arr: uint16[4]\n    uint32_arr: uint32[4]\n    uint64_arr: uint64[4]\n    byte: byte\n    byte_arr: byte[4]\n    string: char[4]\n    float: float\n    double: double\n    float_arr: float[4]\n    double_arr: double[4]'"
+        "'VALIDATOR_STRUCT:\n  fields:\n    char_: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[4]\n    int16_arr: int16[4]\n    int32_arr: int32[4]\n    int64_arr: int64[4]\n    uint8_arr: uint8[4]\n    uint16_arr: uint16[4]\n    uint32_arr: uint32[4]\n    uint64_arr: uint64[4]\n    byte_: byte\n    byte_arr: byte[4]\n    string: char[4]\n    float_: float\n    double_: double\n    float_arr: float[4]\n    double_arr: double[4]'"
     )
 
-    char: Char = Char()
+    char_: Char = Char()
     int8: Int8 = Int8()
     int16: Int16 = Int16()
     int32: Int32 = Int32()
@@ -633,12 +633,12 @@ class VALIDATOR_STRUCT(MessageBase, metaclass=MessageMeta):
     uint32_arr: IntArray[Uint32] = IntArray(Uint32, 4)
     padding_2_: String = String(4)
     uint64_arr: IntArray[Uint64] = IntArray(Uint64, 4)
-    byte: Byte = Byte()
+    byte_: Byte = Byte()
     byte_arr: ByteArray = ByteArray(4)
     string: String = String(4)
     padding_3_: String = String(3)
-    float: Float = Float()
-    double: Double = Double()
+    float_: Float = Float()
+    double_: Double = Double()
     float_arr: FloatArray[Float] = FloatArray(Float, 4)
     double_arr: FloatArray[Double] = FloatArray(Double, 4)
 
@@ -4972,14 +4972,14 @@ class MDF__RESERVED_004378(MessageData, metaclass=MessageMeta):
 class MDF_VALIDATOR_A(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 5000
     type_name: ClassVar[str] = "VALIDATOR_A"
-    type_hash: ClassVar[int] = 0x1BB7E985
+    type_hash: ClassVar[int] = 0x09CD1AB9
     type_size: ClassVar[int] = 1392
     type_source: ClassVar[str] = "test_defs.yaml"
     type_def: ClassVar[str] = (
-        "'VALIDATOR_A:\n  id: 5000\n  fields:\n    char: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[4]\n    int16_arr: int16[4]\n    int32_arr: int32[4]\n    int64_arr: int64[4]\n    uint8_arr: uint8[4]\n    uint16_arr: uint16[4]\n    uint32_arr: uint32[4]\n    uint64_arr: uint64[4]\n    byte: byte\n    byte_arr: byte[4]\n    string: char[4]\n    float: float\n    double: double\n    float_arr: float[4]\n    double_arr: double[4]\n    struct: VALIDATOR_STRUCT\n    struct_arr: VALIDATOR_STRUCT[4]'"
+        "'VALIDATOR_A:\n  id: 5000\n  fields:\n    char_: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[4]\n    int16_arr: int16[4]\n    int32_arr: int32[4]\n    int64_arr: int64[4]\n    uint8_arr: uint8[4]\n    uint16_arr: uint16[4]\n    uint32_arr: uint32[4]\n    uint64_arr: uint64[4]\n    byte_: byte\n    byte_arr: byte[4]\n    string: char[4]\n    float_: float\n    double_: double\n    float_arr: float[4]\n    double_arr: double[4]\n    struct_: VALIDATOR_STRUCT\n    struct_arr: VALIDATOR_STRUCT[4]'"
     )
 
-    char: Char = Char()
+    char_: Char = Char()
     int8: Int8 = Int8()
     int16: Int16 = Int16()
     int32: Int32 = Int32()
@@ -4999,15 +4999,15 @@ class MDF_VALIDATOR_A(MessageData, metaclass=MessageMeta):
     uint32_arr: IntArray[Uint32] = IntArray(Uint32, 4)
     padding_2_: String = String(4)
     uint64_arr: IntArray[Uint64] = IntArray(Uint64, 4)
-    byte: Byte = Byte()
+    byte_: Byte = Byte()
     byte_arr: ByteArray = ByteArray(4)
     string: String = String(4)
     padding_3_: String = String(3)
-    float: Float = Float()
-    double: Double = Double()
+    float_: Float = Float()
+    double_: Double = Double()
     float_arr: FloatArray[Float] = FloatArray(Float, 4)
     double_arr: FloatArray[Double] = FloatArray(Double, 4)
-    struct: Struct[VALIDATOR_STRUCT] = Struct(VALIDATOR_STRUCT)
+    struct_: Struct[VALIDATOR_STRUCT] = Struct(VALIDATOR_STRUCT)
     struct_arr: StructArray[VALIDATOR_STRUCT] = StructArray(VALIDATOR_STRUCT, 4)
 
 
@@ -5015,14 +5015,14 @@ class MDF_VALIDATOR_A(MessageData, metaclass=MessageMeta):
 class MDF_VALIDATOR_B(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 5001
     type_name: ClassVar[str] = "VALIDATOR_B"
-    type_hash: ClassVar[int] = 0x83FD7C4C
+    type_hash: ClassVar[int] = 0xA4D52E5C
     type_size: ClassVar[int] = 2488
     type_source: ClassVar[str] = "test_defs.yaml"
     type_def: ClassVar[str] = (
-        "'VALIDATOR_B:\n  id: 5001\n  fields:\n    char: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[8]\n    int16_arr: int16[8]\n    int32_arr: int32[8]\n    int64_arr: int64[8]\n    uint8_arr: uint8[8]\n    uint16_arr: uint16[8]\n    uint32_arr: uint32[8]\n    uint64_arr: uint64[8]\n    byte: byte\n    byte_arr: byte[8]\n    string: char[8]\n    float: float\n    double: double\n    float_arr: float[8]\n    double_arr: double[8]\n    struct: VALIDATOR_STRUCT\n    struct_arr: VALIDATOR_STRUCT[8]'"
+        "'VALIDATOR_B:\n  id: 5001\n  fields:\n    char_: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[8]\n    int16_arr: int16[8]\n    int32_arr: int32[8]\n    int64_arr: int64[8]\n    uint8_arr: uint8[8]\n    uint16_arr: uint16[8]\n    uint32_arr: uint32[8]\n    uint64_arr: uint64[8]\n    byte_: byte\n    byte_arr: byte[8]\n    string: char[8]\n    float_: float\n    double_: double\n    float_arr: float[8]\n    double_arr: double[8]\n    struct_: VALIDATOR_STRUCT\n    struct_arr: VALIDATOR_STRUCT[8]'"
     )
 
-    char: Char = Char()
+    char_: Char = Char()
     int8: Int8 = Int8()
     int16: Int16 = Int16()
     int32: Int32 = Int32()
@@ -5040,15 +5040,15 @@ class MDF_VALIDATOR_B(MessageData, metaclass=MessageMeta):
     uint16_arr: IntArray[Uint16] = IntArray(Uint16, 8)
     uint32_arr: IntArray[Uint32] = IntArray(Uint32, 8)
     uint64_arr: IntArray[Uint64] = IntArray(Uint64, 8)
-    byte: Byte = Byte()
+    byte_: Byte = Byte()
     byte_arr: ByteArray = ByteArray(8)
     string: String = String(8)
     padding_1_: String = String(3)
-    float: Float = Float()
-    double: Double = Double()
+    float_: Float = Float()
+    double_: Double = Double()
     float_arr: FloatArray[Float] = FloatArray(Float, 8)
     double_arr: FloatArray[Double] = FloatArray(Double, 8)
-    struct: Struct[VALIDATOR_STRUCT] = Struct(VALIDATOR_STRUCT)
+    struct_: Struct[VALIDATOR_STRUCT] = Struct(VALIDATOR_STRUCT)
     struct_arr: StructArray[VALIDATOR_STRUCT] = StructArray(VALIDATOR_STRUCT, 8)
 
 

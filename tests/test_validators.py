@@ -34,17 +34,17 @@ class TestEncoding(unittest.TestCase):
         m.uint64 = 0
         m.uint64 = 18_446_744_073_709_551_615
 
-        m.float = 3.40282346638528859811704183484516925440e38
-        m.float = -3.40282346638528859811704183484516925440e38
+        m.float_ = 3.40282346638528859811704183484516925440e38
+        m.float_ = -3.40282346638528859811704183484516925440e38
 
-        m.double = 1.79769313486231570814527423731704356798070e308
-        m.double = -1.79769313486231570814527423731704356798070e308
+        m.double_ = 1.79769313486231570814527423731704356798070e308
+        m.double_ = -1.79769313486231570814527423731704356798070e308
 
-        m.byte = b"\x00"
-        m.byte = b"\xff"
+        m.byte_ = b"\x00"
+        m.byte_ = b"\xff"
 
-        m.char = chr(0)
-        m.char = chr(127)
+        m.char_ = chr(0)
+        m.char_ = chr(127)
 
         m.int8_arr[0] = -128
         m.int8_arr[0] = 127
@@ -130,22 +130,22 @@ class TestEncoding(unittest.TestCase):
             m.uint64 = 18_446_744_073_709_551_616
 
         with self.assertRaises(ValueError):
-            m.float = -4.40282346638528859811704183484516925441e38
+            m.float_ = -4.40282346638528859811704183484516925441e38
 
         with self.assertRaises(ValueError):
-            m.float = 4.40282346638528859811704183484516925441e38
+            m.float_ = 4.40282346638528859811704183484516925441e38
 
         with self.assertRaises(ValueError):
-            m.double = 2.79769313486231570814527423731704356798071e308
+            m.double_ = 2.79769313486231570814527423731704356798071e308
 
         with self.assertRaises(ValueError):
-            m.double = -2.79769313486231570814527423731704356798071e308
+            m.double_ = -2.79769313486231570814527423731704356798071e308
 
         with self.assertRaises(ValueError):
-            m.byte = -1
+            m.byte_ = -1
 
         with self.assertRaises(ValueError):
-            m.byte = 256
+            m.byte_ = 256
 
         # Arrays
         with self.assertRaises(ValueError):
@@ -360,12 +360,12 @@ class TestEncoding(unittest.TestCase):
         self.assertIsInstance(m.uint16, int)
         self.assertIsInstance(m.uint32, int)
         self.assertIsInstance(m.uint64, int)
-        self.assertIsInstance(m.float, float)
-        self.assertIsInstance(m.double, float)
-        self.assertIsInstance(m.byte, int)
-        self.assertIsInstance(m.char, str)
+        self.assertIsInstance(m.float_, float)
+        self.assertIsInstance(m.double_, float)
+        self.assertIsInstance(m.byte_, int)
+        self.assertIsInstance(m.char_, str)
         self.assertIsInstance(m.string, str)
-        self.assertIsInstance(m.struct, VALIDATOR_STRUCT)
+        self.assertIsInstance(m.struct_, VALIDATOR_STRUCT)
 
         self.assertIsInstance(m.int8_arr, IntArray)
         self.assertIsInstance(m.int16_arr, IntArray)
@@ -426,16 +426,16 @@ class TestEncoding(unittest.TestCase):
         B = MDF_VALIDATOR_B()
 
         with self.assertRaises(TypeError):
-            A.char = 1
+            A.char_ = 1
 
         with self.assertRaises(TypeError):
-            A.char = ctypes.c_int8(1)
+            A.char_ = ctypes.c_int8(1)
 
         with self.assertRaises(TypeError):
-            A.char = ctypes.c_byte(1)
+            A.char_ = ctypes.c_byte(1)
 
         with self.assertRaises(TypeError):
-            A.char = ctypes.c_ubyte(1)
+            A.char_ = ctypes.c_ubyte(1)
 
         with self.assertRaises(TypeError):
             A.int8 = "a"
@@ -471,16 +471,16 @@ class TestEncoding(unittest.TestCase):
             A.uint64 = "a"
 
         with self.assertRaises(TypeError):
-            A.float = "a"
+            A.float_ = "a"
 
         with self.assertRaises(TypeError):
-            A.double = b"1"
+            A.double_ = b"1"
 
         with self.assertRaises(TypeError):
-            A.byte = "a"
+            A.byte_ = "a"
 
         with self.assertRaises(TypeError):
-            A.byte = ctypes.c_char(1)
+            A.byte_ = ctypes.c_char(1)
 
         with self.assertRaises(TypeError):
             A.string = 1
@@ -607,8 +607,8 @@ class TestEncoding(unittest.TestCase):
 
     def test_valid_set_types(self):
         A = MDF_VALIDATOR_A()
-        A.char = "a"
-        A.char = ctypes.c_char(98)
+        A.char_ = "a"
+        A.char_ = ctypes.c_char(98)
         A.int8 = 1
         A.int8 = ctypes.c_int8(2)
         A.int16 = 1
@@ -626,20 +626,20 @@ class TestEncoding(unittest.TestCase):
         A.uint64 = 1
         A.uint64 = ctypes.c_uint64(2)
 
-        A.float = 1.0
-        A.double = 1.0
+        A.float_ = 1.0
+        A.double_ = 1.0
 
-        A.float = 1
-        A.double = 1
+        A.float_ = 1
+        A.double_ = 1
 
-        A.float = ctypes.c_float(1.1)
-        A.double = ctypes.c_double(1.8)
+        A.float_ = ctypes.c_float(1.1)
+        A.double_ = ctypes.c_double(1.8)
 
-        A.byte = 1
-        A.byte = b"A"
-        A.byte = bytes(1)
-        A.byte = bytearray(1)
-        A.byte = ctypes.c_ubyte(1)
+        A.byte_ = 1
+        A.byte_ = b"A"
+        A.byte_ = bytes(1)
+        A.byte_ = bytearray(1)
+        A.byte_ = ctypes.c_ubyte(1)
 
         A.string = "abc"
 
@@ -728,7 +728,7 @@ class TestEncoding(unittest.TestCase):
         A = MDF_VALIDATOR_A()
         B = MDF_VALIDATOR_A()
 
-        A.char = "a"
+        A.char_ = "a"
         A.int8 = 1
         A.int16 = 1
         A.int32 = 1
@@ -737,9 +737,9 @@ class TestEncoding(unittest.TestCase):
         A.uint16 = 1
         A.uint32 = 1
         A.uint64 = 1
-        A.float = 1.0
-        A.double = 1.0
-        A.byte = 1
+        A.float_ = 1.0
+        A.double_ = 1.0
+        A.byte_ = 1
         A.string = "abc"
 
         A.int8_arr[0] = 1
@@ -753,9 +753,9 @@ class TestEncoding(unittest.TestCase):
         A.float_arr[0] = 1
         A.double_arr[0] = 1
         A.byte_arr[0] = 1
-        A.struct_arr[0].char = "a"
+        A.struct_arr[0].char_ = "a"
 
-        self.assertFalse(A.char == B.char)
+        self.assertFalse(A.char_ == B.char_)
         self.assertFalse(A.int8 == B.int8)
         self.assertFalse(A.int16 == B.int16)
         self.assertFalse(A.int32 == B.int32)
@@ -764,9 +764,9 @@ class TestEncoding(unittest.TestCase):
         self.assertFalse(A.uint16 == B.uint16)
         self.assertFalse(A.uint32 == B.uint32)
         self.assertFalse(A.uint64 == B.uint64)
-        self.assertFalse(A.float == B.float)
-        self.assertFalse(A.double == B.double)
-        self.assertFalse(A.byte == B.byte)
+        self.assertFalse(A.float_ == B.float_)
+        self.assertFalse(A.double_ == B.double_)
+        self.assertFalse(A.byte_ == B.byte_)
         self.assertFalse(A.string == B.string)
         self.assertFalse(A.int8_arr == B.int8_arr)
         self.assertFalse(A.int16_arr == B.int16_arr)

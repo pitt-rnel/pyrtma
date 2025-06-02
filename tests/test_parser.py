@@ -697,3 +697,16 @@ class TestParser(unittest.TestCase):
 
         self.tmp.write(text)
         self.parser.parse(self.tmp.path)
+
+    def test_reserved_fields(self):
+        text = textwrap.dedent(
+            """
+            message_defs:
+                _RESERVED_:
+                    fields:
+                        auto: int
+            """
+        )
+        self.tmp.write(text)
+        with self.assertRaises(pyrtma.parser.RTMASyntaxError):
+            self.parser.parse(self.tmp.path)
