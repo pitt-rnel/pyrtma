@@ -499,6 +499,7 @@ MT_SUBSCRIBER_READY: int = 5009
 MT_PUBLISHER_READY: int = 5010
 MT_SUBSCRIBER_DONE: int = 5011
 MT_PUBLISHER_DONE: int = 5012
+MT_ARRAY_OF_ONE: int = 5013
 
 
 # Struct Definitions
@@ -619,24 +620,24 @@ class VALIDATOR_STRUCT(MessageBase, metaclass=MessageMeta):
     int32: Int32 = Int32()
     int64: Int64 = Int64()
     uint8: Uint8 = Uint8()
-    padding_0_: Char = Char()
+    padding_0_: ByteArray = ByteArray(1)
     uint16: Uint16 = Uint16()
     uint32: Uint32 = Uint32()
     uint64: Uint64 = Uint64()
     int8_arr: IntArray[Int8] = IntArray(Int8, 4)
     int16_arr: IntArray[Int16] = IntArray(Int16, 4)
     int32_arr: IntArray[Int32] = IntArray(Int32, 4)
-    padding_1_: String = String(4)
+    padding_1_: ByteArray = ByteArray(4)
     int64_arr: IntArray[Int64] = IntArray(Int64, 4)
     uint8_arr: IntArray[Uint8] = IntArray(Uint8, 4)
     uint16_arr: IntArray[Uint16] = IntArray(Uint16, 4)
     uint32_arr: IntArray[Uint32] = IntArray(Uint32, 4)
-    padding_2_: String = String(4)
+    padding_2_: ByteArray = ByteArray(4)
     uint64_arr: IntArray[Uint64] = IntArray(Uint64, 4)
     byte: Byte = Byte()
     byte_arr: ByteArray = ByteArray(4)
     string: String = String(4)
-    padding_3_: String = String(3)
+    padding_3_: ByteArray = ByteArray(3)
     float: Float = Float()
     double: Double = Double()
     float_arr: FloatArray[Float] = FloatArray(Float, 4)
@@ -2206,10 +2207,10 @@ class MDF_GRIP_COMMAND(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    grip_pos: Double = Double()
-    velocity: Double = Double()
-    force: Double = Double()
-    impedance: Double = Double()
+    grip_pos: FloatArray[Double] = FloatArray(Double, 1)
+    velocity: FloatArray[Double] = FloatArray(Double, 1)
+    force: FloatArray[Double] = FloatArray(Double, 1)
+    impedance: FloatArray[Double] = FloatArray(Double, 1)
     controlMask: IntArray[Int16] = IntArray(Int16, 4)
     src: Int32 = Int32()
     reserved: Int32 = Int32()
@@ -2227,10 +2228,10 @@ class MDF_GRIP_FINISHED_COMMAND(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    grip_pos: Double = Double()
-    velocity: Double = Double()
-    force: Double = Double()
-    impedance: Double = Double()
+    grip_pos: FloatArray[Double] = FloatArray(Double, 1)
+    velocity: FloatArray[Double] = FloatArray(Double, 1)
+    force: FloatArray[Double] = FloatArray(Double, 1)
+    impedance: FloatArray[Double] = FloatArray(Double, 1)
     controlMask: IntArray[Int16] = IntArray(Int16, 4)
     effector: String = String(64)
 
@@ -2247,8 +2248,8 @@ class MDF_GRIPPER_FEEDBACK(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    grip_pos: Double = Double()
-    velocity: Double = Double()
+    grip_pos: FloatArray[Double] = FloatArray(Double, 1)
+    velocity: FloatArray[Double] = FloatArray(Double, 1)
     force: FloatArray[Double] = FloatArray(Double, 5)
     effector: String = String(64)
 
@@ -2285,10 +2286,10 @@ class MDF_MUJOCO_CMD(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    ref_pos: Double = Double()
-    ref_vel: Double = Double()
-    gain_pos: Double = Double()
-    gain_vel: Double = Double()
+    ref_pos: FloatArray[Double] = FloatArray(Double, 1)
+    ref_vel: FloatArray[Double] = FloatArray(Double, 1)
+    gain_pos: FloatArray[Double] = FloatArray(Double, 1)
+    gain_vel: FloatArray[Double] = FloatArray(Double, 1)
     ref_pos_enabled: Int16 = Int16()
     ref_vel_enabled: Int16 = Int16()
     gain_pos_enabled: Int16 = Int16()
@@ -4985,24 +4986,24 @@ class MDF_VALIDATOR_A(MessageData, metaclass=MessageMeta):
     int32: Int32 = Int32()
     int64: Int64 = Int64()
     uint8: Uint8 = Uint8()
-    padding_0_: Char = Char()
+    padding_0_: ByteArray = ByteArray(1)
     uint16: Uint16 = Uint16()
     uint32: Uint32 = Uint32()
     uint64: Uint64 = Uint64()
     int8_arr: IntArray[Int8] = IntArray(Int8, 4)
     int16_arr: IntArray[Int16] = IntArray(Int16, 4)
     int32_arr: IntArray[Int32] = IntArray(Int32, 4)
-    padding_1_: String = String(4)
+    padding_1_: ByteArray = ByteArray(4)
     int64_arr: IntArray[Int64] = IntArray(Int64, 4)
     uint8_arr: IntArray[Uint8] = IntArray(Uint8, 4)
     uint16_arr: IntArray[Uint16] = IntArray(Uint16, 4)
     uint32_arr: IntArray[Uint32] = IntArray(Uint32, 4)
-    padding_2_: String = String(4)
+    padding_2_: ByteArray = ByteArray(4)
     uint64_arr: IntArray[Uint64] = IntArray(Uint64, 4)
     byte: Byte = Byte()
     byte_arr: ByteArray = ByteArray(4)
     string: String = String(4)
-    padding_3_: String = String(3)
+    padding_3_: ByteArray = ByteArray(3)
     float: Float = Float()
     double: Double = Double()
     float_arr: FloatArray[Float] = FloatArray(Float, 4)
@@ -5028,7 +5029,7 @@ class MDF_VALIDATOR_B(MessageData, metaclass=MessageMeta):
     int32: Int32 = Int32()
     int64: Int64 = Int64()
     uint8: Uint8 = Uint8()
-    padding_0_: Char = Char()
+    padding_0_: ByteArray = ByteArray(1)
     uint16: Uint16 = Uint16()
     uint32: Uint32 = Uint32()
     uint64: Uint64 = Uint64()
@@ -5043,7 +5044,7 @@ class MDF_VALIDATOR_B(MessageData, metaclass=MessageMeta):
     byte: Byte = Byte()
     byte_arr: ByteArray = ByteArray(8)
     string: String = String(8)
-    padding_1_: String = String(3)
+    padding_1_: ByteArray = ByteArray(3)
     float: Float = Float()
     double: Double = Double()
     float_arr: FloatArray[Float] = FloatArray(Float, 8)
@@ -5188,6 +5189,39 @@ class MDF_PUBLISHER_DONE(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
     type_def: ClassVar[str] = "'PUBLISHER_DONE:\n  id: 5012\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_ARRAY_OF_ONE(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 5013
+    type_name: ClassVar[str] = "ARRAY_OF_ONE"
+    type_hash: ClassVar[int] = 0x1BE0A085
+    type_size: ClassVar[int] = 288
+    type_source: ClassVar[str] = "test_defs.yaml"
+    type_def: ClassVar[str] = (
+        "'ARRAY_OF_ONE:\n  id: 5013\n  fields:\n    u8: uint8[1]\n    u16: uint16[1]\n    u32: uint32[1]\n    u64: uint64[1]\n    i8: int8[1]\n    i16: int16[1]\n    i32: int32[1]\n    i64: int64[1]\n    f32: float[1]\n    f64: double[1]\n    c: char\n    c1: char[1]\n    s2: char[2]\n    b: byte\n    ba: byte[1]\n    sa: VALIDATOR_STRUCT[1]'"
+    )
+
+    u8: IntArray[Uint8] = IntArray(Uint8, 1)
+    padding_0_: ByteArray = ByteArray(1)
+    u16: IntArray[Uint16] = IntArray(Uint16, 1)
+    u32: IntArray[Uint32] = IntArray(Uint32, 1)
+    u64: IntArray[Uint64] = IntArray(Uint64, 1)
+    i8: IntArray[Int8] = IntArray(Int8, 1)
+    padding_1_: ByteArray = ByteArray(1)
+    i16: IntArray[Int16] = IntArray(Int16, 1)
+    i32: IntArray[Int32] = IntArray(Int32, 1)
+    i64: IntArray[Int64] = IntArray(Int64, 1)
+    f32: FloatArray[Float] = FloatArray(Float, 1)
+    padding_2_: ByteArray = ByteArray(4)
+    f64: FloatArray[Double] = FloatArray(Double, 1)
+    c: Char = Char()
+    c1: Char = Char()
+    s2: String = String(2)
+    b: Byte = Byte()
+    ba: ByteArray = ByteArray(1)
+    padding_3_: ByteArray = ByteArray(2)
+    sa: StructArray[VALIDATOR_STRUCT] = StructArray(VALIDATOR_STRUCT, 1)
 
 
 # User Context
