@@ -98,6 +98,7 @@ MT_PAUSE_MESSAGE_LOGGING: int = 58
 MT_RESUME_MESSAGE_LOGGING: int = 59
 MT_RESET_MESSAGE_LOG: int = 60
 MT_DUMP_MESSAGE_LOG: int = 61
+MT_DEBUG_TEXT: int = 91
 MT_LM_READY: int = 96
 MT_EXIT: int = 0
 MT_KILL: int = 1
@@ -484,6 +485,16 @@ class MDF_DUMP_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "quick_logger.yaml"
     type_def: ClassVar[str] = "'DUMP_MESSAGE_LOG:\n  id: 61\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_DEBUG_TEXT(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 91
+    type_name: ClassVar[str] = "DEBUG_TEXT"
+    type_hash: ClassVar[int] = 0xEC89E79E
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "quick_logger.yaml"
+    type_def: ClassVar[str] = "'DEBUG_TEXT:\n  id: 91\n  fields: null'"
 
 
 @pyrtma.message_def
