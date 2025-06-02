@@ -23,7 +23,7 @@ from .context import _get_core_defs
 from .core_defs import ALL_MESSAGE_TYPES
 from . import core_defs as cd
 
-from typing import Dict, List, Tuple, Set, Type, Union
+from typing import Dict, List, Tuple, Set, Type, Union, Optional
 from itertools import chain
 from dataclasses import dataclass, field
 from collections import defaultdict, Counter
@@ -265,8 +265,7 @@ class MessageManager(ClientLike):
 
         raise RuntimeError("Exceeded maximum limit of allowed modules.")
 
-    @property
-    def header(self) -> MessageHeader:
+    def decode_header(self) -> MessageHeader:
         return self.header_cls.from_buffer(self.header_view)
 
     def connect_module(self, module: Module, msg: Message) -> bool:
@@ -469,42 +468,52 @@ class MessageManager(ClientLike):
             f"SET_NAME - {src_module.ipaddr} - ID({src_module.mod_id}) - {src_module.name}"
         )
 
-    def read_message(self, sock: socket.socket) -> bool:
+    def read_message(self, sock: socket.socket) -> Optional[MessageHeader]:
         """Read an incoming message
 
         Args:
             sock (socket.socket): socket to read from
 
         Returns:
-            bool: Success code
+            MessageHeader: message header of incoming message
         """
         # Read RTMA Header Section
         nbytes = sock.recv_into(
             self.header_buffer, self.header_size, socket.MSG_WAITALL
         )
 
+        # Module that sent the message
+        mod = self.modules[sock]
+
         if nbytes != self.header_size:
-            mod = self.modules[sock]
             self.remove_module(mod)
             self.logger.warning(
-                f"DROPPING - {mod!s} - No header returned from sock.recv_into."
+                f"DROPPING - {mod!s} - Wrong number of header bytes returned from sock.recv_into. Got ({nbytes})."
             )
-            return False
+            return
 
-        # Read Data Section
-        data_size = self.header.num_data_bytes
+        header = self.decode_header()
+
+        # Read Data Section into Internal Buffer
+        data_size = header.num_data_bytes
         if data_size:
+            if data_size > len(self.data_buffer):
+                self.logger.warning(
+                    "Message Data size (data_size) exceeds buffer size. Header may be corrupted."
+                )
+                self.remove_module(mod)
+                return
+
             nbytes = sock.recv_into(self.data_buffer, data_size, socket.MSG_WAITALL)
 
             if nbytes != data_size:
-                mod = self.modules[sock]
-                self.remove_module(mod)
                 self.logger.warning(
-                    f"DROPPING - {mod!s} - No data returned from sock.recv_into."
+                    f"DROPPING - {mod!s} - Wrong number of data bytes returned from sock.recv_into. Got ({nbytes})"
                 )
-                return False
+                self.remove_module(mod)
+                return
 
-        return True
+        return header
 
     def forward_message(
         self,
@@ -820,9 +829,7 @@ class MessageManager(ClientLike):
         self.send_message(msg)
         self.last_client_info = msg.timestamp
 
-    @property
-    def message(self) -> Message:
-        hdr = self.header
+    def decode_core_message(self, hdr: MessageHeader) -> Message:
         data_cls = _get_core_defs().get(hdr.msg_type)
         if data_cls:
             data = data_cls.from_buffer(self.data_buffer)
@@ -830,17 +837,21 @@ class MessageManager(ClientLike):
         else:
             raise RuntimeError(f"Unknown core_def MT={hdr.msg_type}")
 
-    def process_message(self, src_module: Module):
-        """Process incoming message
+    def process_core_message(self, src_module: Module, header: MessageHeader):
+        """Process incoming core message
 
         Args:
             src_module (Module): Message source module
+            header (MessageHeader): Message header of the incoming message
         """
-        hdr = self.header
-        msg_type = hdr.msg_type
+        msg_type = header.msg_type
+        if msg_type >= 100:
+            return
+
+        core_msg = self.decode_core_message(header)
 
         if msg_type == cd.MT_CONNECT or msg_type == cd.MT_CONNECT_V2:
-            if self.connect_module(src_module, self.message):
+            if self.connect_module(src_module, core_msg):
                 self.send_ack(src_module)
                 self.send_client_info(src_module)
                 if msg_type == cd.MT_CONNECT:
@@ -851,27 +862,39 @@ class MessageManager(ClientLike):
             self.disconnect_module(src_module)
             self.logger.info(f"DISCONNECT - {src_module!s}")
         elif msg_type == cd.MT_SUBSCRIBE:
-            self.add_subscription(src_module, self.message)
+            self.add_subscription(src_module, core_msg)
             self.send_ack(src_module)
         elif msg_type == cd.MT_UNSUBSCRIBE:
-            self.remove_subscription(src_module, self.message)
+            self.remove_subscription(src_module, core_msg)
             self.send_ack(src_module)
         elif msg_type == cd.MT_PAUSE_SUBSCRIPTION:
-            self.pause_subscription(src_module, self.message)
+            self.pause_subscription(src_module, core_msg)
             self.send_ack(src_module)
         elif msg_type == cd.MT_RESUME_SUBSCRIPTION:
-            self.resume_subscription(src_module, self.message)
+            self.resume_subscription(src_module, core_msg)
             self.send_ack(src_module)
         elif msg_type == cd.MT_CLIENT_SET_NAME:
-            self.set_module_name(src_module, self.message)
+            self.set_module_name(src_module, core_msg)
             self.send_client_info(src_module)
         elif msg_type == cd.MT_MODULE_READY:
-            self.register_module_ready(src_module, self.message)
+            self.register_module_ready(src_module, core_msg)
             self.send_client_info(src_module)
-        else:
-            self.logger.debug(f"FORWARD - msg_type:{hdr.msg_type} from {src_module!s}")
-            data = self.data_view[: hdr.num_data_bytes]
-            self.forward_message(src_module, hdr, data)
+
+    def process_message(self, src_module: Module, header: MessageHeader):
+        """Process incoming message
+
+        Args:
+            src_module (Module): Message source module
+            header (MessageHeader): Message header of the incoming message
+        """
+
+        # Handle any internal core messages that come through
+        self.process_core_message(src_module, header)
+
+        # Forward all messages that come through to MM
+        self.logger.debug(f"FORWARD - msg_type:{header.msg_type} from {src_module!s}")
+        data = self.data_view[: header.num_data_bytes]
+        self.forward_message(src_module, header, data)
 
     def close(self):
         """Close manager server"""
@@ -923,7 +946,7 @@ class MessageManager(ClientLike):
                             src = self.modules.get(client_socket)
                             if src:
                                 try:
-                                    got_msg = self.read_message(client_socket)
+                                    msg_hdr = self.read_message(client_socket)
                                 except ConnectionError as err:
                                     self.disconnect_module(src)
                                     self.logger.error(
@@ -931,8 +954,8 @@ class MessageManager(ClientLike):
                                     )
                                     continue
 
-                                if got_msg:
-                                    self.process_message(src)
+                                if msg_hdr:
+                                    self.process_message(src, msg_hdr)
 
                     now = time.perf_counter()
 
