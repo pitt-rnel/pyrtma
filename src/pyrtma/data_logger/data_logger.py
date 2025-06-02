@@ -198,9 +198,13 @@ class DataLogger:
 
     def reset(self):
         self.client.info(f"Reset DataLogger. All Data Sets will be cleared")
+        rm = []
         for ds in self.datasets.values():
             ds.stop()
-            self.rm_data_set(ds.name)
+            rm.append(ds.name)
+
+        for name in rm:
+            self.rm_data_set(name)
 
     def send_error(self, msg: str):
         err = cd.MDF_DATA_LOGGER_ERROR()
