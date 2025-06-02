@@ -105,10 +105,12 @@ class DataSet:
         elapsed = self.elapsed_time
         self._elapsed_time = elapsed
         self._paused = True
+        self.logger.info(f"Pausing data set: {self.name}")
 
     def resume(self):
         self._paused = False
         self.ref_time = time.time()
+        self.logger.info(f"Resuming data set: {self.name}")
 
     @property
     def elapsed_time(self) -> float:
