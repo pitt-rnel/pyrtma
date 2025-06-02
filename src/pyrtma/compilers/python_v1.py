@@ -1,5 +1,4 @@
-"""v1 Message Type Compiler: .h to .py
-"""
+"""v1 Message Type Compiler: .h to .py"""
 
 import re
 from typing import List, Dict, Optional, Tuple, IO

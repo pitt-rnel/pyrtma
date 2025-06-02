@@ -123,6 +123,9 @@ class QLReader:
         defs = pyrtma.message._get_msg_defs()
         ctx = pyrtma.context.get_context()
 
+        # Load global message defs
+        mt_to_mdf_global = {v.type_id: v for v in self.context.MDF.values()}
+
         sys.path.insert(0, (str(base.absolute())))
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", VersionMismatchWarning)
@@ -131,15 +134,21 @@ class QLReader:
             else:
                 mod = importlib.import_module(fname)
 
-        # Cache all the user defined objects associated with the data
-        self.context = pyrtma.context.get_context()
+        # Load local message defs
+        ctx2 = mod.get_context()  ####_create_context() (older version)
+        if isinstance(ctx2, dict):
+            mt_to_mdf_session = {
+                ctx2["mt"][mtn]: ctx2["mdf"][mtn] for mtn in ctx2["mdf"]
+            }
+        elif hasattr(ctx2, "MT"):
+            mt_to_mdf_session = {ctx2.MT[mtn]: ctx2.MDF[mtn] for mtn in ctx2.MDF.keys()}
+        else:
+            print("Warning no local message defs loaded.")
 
         try:
             messages = []
             headers = []
             data = []
-
-            mt_to_mdf = {v.type_id: v for v in self.context.MDF.values()}
 
             with open(self.file_path, "rb") as f:
                 # Parse binary file header
@@ -167,17 +176,25 @@ class QLReader:
                 # Extract the message data for each message
                 for n, offset in enumerate(offsets):
                     header = headers[n]
-                    msg_cls = mt_to_mdf.get(header.msg_type)
+
+                    # Look for message def by searching mt in local first, then global
+                    msg_cls = None
+                    if header.msg_type in mt_to_mdf_session:
+                        msg_cls = mt_to_mdf_session[header.msg_type]
+                    elif header.msg_type in mt_to_mdf_global:
+                        msg_cls = mt_to_mdf_global[header.msg_type]
+
                     raw_bytes = d_bytes[offset : offset + header.num_data_bytes]
 
                     if msg_cls is None:
-                        print(f"Unknown message definition: MT={header.msg_type}")
+                        # print(f"Unknown message definition: MT={header.msg_type}")
                         msg_data = create_unknown(header, raw_bytes)
                         unknown.append(n)
 
                     elif msg_cls.type_size != header.num_data_bytes:
                         print(
-                            f"Warning: Message header indicates a message data size ({header.num_data_bytes}) that does not match the expected size of message type {msg_cls.type_name} ({msg_cls.type_size}). Message definitions may be out of sync."
+                            f"Warning: Message header indicates a message data size ({header.num_data_bytes}) that does not match the expected size of message type {msg_cls.type_name} "
+                            f"({msg_cls.type_size}). Message definitions may be out of sync."
                         )
                         msg_data = create_unknown(header, raw_bytes)
                         unknown.append(n)

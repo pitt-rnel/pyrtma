@@ -40,6 +40,7 @@ from typing import (
     Optional,
     Tuple,
     Type,
+    List,
     Union,
     Iterable,
     Set,
@@ -263,6 +264,9 @@ class Client(ClientLike):
         self._socket_connect(server_name)
 
         ack = self._connect_helper(logger_status, daemon_status, allow_multiple)
+
+        # Send client pid
+        self.send_module_ready()
 
     def disconnect(self):
         """Disconnect from message manager server"""
@@ -873,6 +877,18 @@ class Client(ClientLike):
         while msg is not None and time_remaining > 0:
             msg, time_remaining = read_and_time()
         return not msg
+
+    def reset_subscriptions(self, subscribe_list: Optional[List[int]] = None):
+        """Unsubscribe from all messages and empty the message buffer.
+        If optional 'subscribe_list' argument given, then will subscribe to new messages after reset.
+
+        Args:
+            subscribe_list (Optional[list[int]], optional): List of message IDs to subscribe to. Defaults to None.
+        """
+        self.unsubscribe_from_all()
+        self.discard_messages()
+        if subscribe_list:
+            self.subscribe(subscribe_list)
 
     def __str__(self) -> str:
         # TODO: Make this better.

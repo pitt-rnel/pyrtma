@@ -1,4 +1,4 @@
-"""pyrtma.compile Message Type Compiler """
+"""pyrtma.compile Message Type Compiler"""
 
 import pathlib
 import re
