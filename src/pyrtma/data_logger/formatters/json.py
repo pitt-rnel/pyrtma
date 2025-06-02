@@ -7,7 +7,7 @@ from typing import ClassVar
 class JsonFormatter(DataFormatter):
     name: ClassVar[str] = "json"
     mode: ClassVar[str] = "wt"
-    ext: ClassVar[str] = ".json"
+    ext: ClassVar[str] = ".jsonl"
 
     def format_message(self, msg: pyrtma.Message) -> str:
         return msg.to_json(minify=True) + "\n"
