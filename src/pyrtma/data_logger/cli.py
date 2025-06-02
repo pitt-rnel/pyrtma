@@ -6,24 +6,27 @@ from pyrtma.core_defs import ALL_MESSAGE_TYPES
 from pyrtma.data_logger.data_logger_client import DataLoggerClient, DataSetConfig
 
 
-def add_data_set(mod: pyrtma.Client):
-    msg = cd.MDF_DATA_SET_ADD()
-    msg.data_set.name = input("(data-set)->name: ")
-    msg.data_set.save_path = input("(data-set)->save_path: ")
-    msg.data_set.filename = input("(data-set)->filename: ")
-    msg.data_set.formatter = input("(data-set)->formatter: ")
+def add_data_set(mod: DataLoggerClient):
+    name = input("(data-set)->name: ")
+    save_path = input("(data-set)->save_path: ")
+    filename = input("(data-set)->filename: ")
+    formatter = input("(data-set)->formatter: ")
 
     raw = input("(data-set)->msg_type: ")
     msg_types = list(map(int, raw.split()))
 
-    msg.data_set.msg_types[: len(msg_types)] = msg_types
-    mod.send_message(msg)
+    config = DataSetConfig(
+        name=name,
+        save_path=save_path,
+        filename=filename,
+        formatter=formatter,
+        msg_types=msg_types,
+    )
+    config.add(mod)
 
 
-def rm_data_set(mod: pyrtma.Client):
-    msg = cd.MDF_DATA_SET_REMOVE()
-    msg.name = input("(remove)->name: ")
-    mod.send_message(msg)
+def rm_data_set(mod: DataLoggerClient):
+    mod.rm_data_set(input("(remove)->name: "))
 
 
 def main():
