@@ -40,6 +40,9 @@ def main():
     try:
         while True:
             cmd_str = input("(data_log)>> ")
+            if not cmd_str:
+                help()
+                continue
             args = cmd_str.split()
             nargs = len(args)
             cmd = args[0].lower()
