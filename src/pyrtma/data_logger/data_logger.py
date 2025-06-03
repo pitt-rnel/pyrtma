@@ -18,7 +18,7 @@ class DataLogger:
 
     def __init__(self, rtma_server_ip: str, log_level: int):
         self.client = pyrtma.Client(module_id=cd.MID_DATA_LOGGER, name="data_logger")
-        self.client.logger.level = log_level
+        self.client.logger.set_all_levels(log_level)
         self.client.connect(rtma_server_ip, logger_status=True)
         self.logger = self.client.logger
         self.ctrl_msg_types = [

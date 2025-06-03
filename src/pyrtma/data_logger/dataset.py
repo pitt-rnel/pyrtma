@@ -271,7 +271,7 @@ class DataSet:
         except KeyboardInterrupt:
             pass
         finally:
-            print("Collection write thread exited.")
+            self.logger.debug("Collection write thread exited.")
 
     def blocking_write(self):
         """Blocking write without bg thread"""
