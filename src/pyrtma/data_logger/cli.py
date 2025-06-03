@@ -71,6 +71,8 @@ def main():
                 mod.request_data_logger_config()
             elif cmd in ("reset", "<") and nargs == 1:
                 mod.reset_data_logger()
+            elif cmd in ("kill", "k") and nargs == 1:
+                mod.send_signal(cd.MT_LM_EXIT)
             elif cmd in ("exit", "quit", "q"):
                 break
             elif cmd in ("help", "?", "h"):
@@ -114,6 +116,7 @@ def help():
     print("  * status-all/=a - Get status of all datasets")
     print("  * config/c - Get data_logger config")
     print("  * reset/< - Reset data_logger")
+    print("  * kill/k - Close data_logger")
     print("  * help/h/? - print this help")
     print("  * exit/quit/q - close application.")
     print()

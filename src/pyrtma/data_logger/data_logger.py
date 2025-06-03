@@ -32,6 +32,7 @@ class DataLogger:
             cd.MT_DATA_LOGGER_CONFIG_REQUEST,
             cd.MT_DATA_LOGGER_RESET,
             cd.MT_EXIT,
+            cd.MT_LM_EXIT,
         ]
 
         # self.client.subscribe(self.ctrl_msg_types)
@@ -246,6 +247,9 @@ class DataLogger:
                             if msg.header.dest_mod_id == self.client.module_id:
                                 self._running = False
                                 self.client.info("Received EXIT request. Closing...")
+                        case cd.MT_LM_EXIT:
+                            self._running = False
+                            self.client.info("Received LM_EXIT request. Closing...")
 
                     self.update(msg)
                 except DataLoggerError as e:
