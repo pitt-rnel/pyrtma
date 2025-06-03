@@ -1,3 +1,5 @@
+"""data_logger Raw Formatter"""
+
 import pyrtma
 
 from ..data_formatter import DataFormatter

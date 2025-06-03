@@ -1,3 +1,5 @@
+"""DataFormatter abstract base class and formatter registration functions"""
+
 import pyrtma
 from typing import Type, Optional, ClassVar, IO, Any, Union, List, Dict
 from abc import ABC

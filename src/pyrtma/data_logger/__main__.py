@@ -1,3 +1,6 @@
+"""data_logger CLI main entry point"""
+
+
 def main():
     """Main function for starting base Data Logger"""
     import argparse

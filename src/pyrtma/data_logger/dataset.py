@@ -1,3 +1,5 @@
+"""DataSet class used internally by data_logger"""
+
 import pathlib
 import io
 import math

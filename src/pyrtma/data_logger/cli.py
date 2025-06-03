@@ -1,3 +1,8 @@
+"""pyrtma.data_logger.cli - Command Line Interface for pyrtma data logger control
+
+Run with python -m pyrtma.data_logger.cli [MM_SERVER_ADDRESS]
+"""
+
 import json
 import rich
 from rich.prompt import Prompt
@@ -8,6 +13,7 @@ from pyrtma.data_logger.data_logger_client import DataLoggerClient, DataSetConfi
 
 
 def add_dataset(mod: DataLoggerClient):
+    """Prompts for dataset configuration and adds it to the data logger"""
     name = save_path = filename = formatter = raw = None
     Prompt.prompt_suffix = ": "
     while not name:
@@ -39,6 +45,7 @@ def add_dataset(mod: DataLoggerClient):
 
 
 def main():
+    """Main function for the data_logger control CLI."""
     import sys
 
     if len(sys.argv) > 1:
@@ -117,11 +124,12 @@ def main():
 
 
 def help():
+    """Prints the help message for the data_logger control CLI."""
     name = escape("[NAME]")
     g = "[green]"
     b = "[blue]"
 
-    rich.print(f"\n[u]data_logger_control:")
+    rich.print(f"\n[u]data_logger control:")
     rich.print(f"  * {g}add[/]/{g}a[/] - Add a dataset.")
     rich.print(f"  * {g}remove[/]/{g}d[/] {b}{name}[/] - Remove dataset NAME")
     rich.print(f"  * {g}start[/]/{g}s[/] {b}{name}[/] - Start dataset NAME")

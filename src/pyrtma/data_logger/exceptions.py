@@ -1,3 +1,6 @@
+"""data_logger exceptions"""
+
+
 class DataLoggerError(Exception):
     pass
 

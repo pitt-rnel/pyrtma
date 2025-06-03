@@ -1,3 +1,8 @@
+"""pyrtma.data_logger.data_logger_client
+
+Subclass of :py:class:`pyrtma.Client` that provides additional functions for managing the pyrtma data_logger
+"""
+
 from __future__ import annotations
 
 import pyrtma
@@ -12,9 +17,13 @@ from typing import TYPE_CHECKING, List, Dict, Any, Union, Optional
 if TYPE_CHECKING:
     from _typeshed import StrPath
 
+__all__ = ["DataSetConfig", "DataLoggerClient"]
+
 
 @dataclass
 class DataSetConfig:
+    """Configuration for a data_logger dataset"""
+
     name: str
     save_path: StrPath
     filename: str

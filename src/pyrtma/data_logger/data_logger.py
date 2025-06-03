@@ -1,3 +1,8 @@
+"""DataLogger class
+
+Run with python -m pyrtma.data_logger
+"""
+
 import time
 
 import pyrtma
