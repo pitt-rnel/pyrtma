@@ -3,10 +3,11 @@ from __future__ import annotations
 import pyrtma
 import pyrtma.core_defs as cd
 from pyrtma.data_logger.exceptions import NoClientError
+from pyrtma.exceptions import UnknownMessageType
 from dataclasses import dataclass, field
 from pathlib import Path
-
 from typing import TYPE_CHECKING, List, Dict, Any, Union, Optional
+
 
 if TYPE_CHECKING:
     from _typeshed import StrPath
@@ -324,7 +325,10 @@ class DataLoggerClient(pyrtma.Client):
                 if msg_type == cd.ALL_MESSAGE_TYPES:
                     names.append("ALL_MESSAGE_TYPES")
                 else:
-                    names.append(pyrtma.get_msg_cls(msg_type).type_name)
+                    try:
+                        names.append(pyrtma.get_msg_cls(msg_type).type_name)
+                    except UnknownMessageType:
+                        names.append(msg_type)
             ds["msg_types"] = names
         d["data_sets"] = d["data_sets"][: d["num_data_sets"]]
         return d
