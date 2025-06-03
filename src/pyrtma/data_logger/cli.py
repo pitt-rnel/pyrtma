@@ -1,16 +1,28 @@
 import json
+import rich
+from rich.prompt import Prompt
+from rich.markup import escape
 
 import pyrtma.core_defs as cd
 from pyrtma.data_logger.data_logger_client import DataLoggerClient, DataSetConfig
 
 
 def add_dataset(mod: DataLoggerClient):
-    name = input("(dataset)->name: ")
-    save_path = input("(dataset)->save_path: ")
-    filename = input("(dataset)->filename: ")
-    formatter = input("(dataset)->formatter: ")
+    name = save_path = filename = formatter = raw = None
+    Prompt.prompt_suffix = ": "
+    while not name:
+        name = Prompt.ask("[bold](dataset)->[blue]name")
+    while not save_path:
+        save_path = Prompt.ask("[bold](dataset)->[blue]save_path")
+    while not filename:
+        filename = Prompt.ask("[bold](dataset)->[blue]filename")
+    while not formatter:
+        formatter = Prompt.ask("[bold](dataset)->[blue]formatter")
 
-    raw = input("(dataset)->msg_type: ")
+    while raw is None:
+        raw = Prompt.ask(
+            "[bold](dataset)->[blue]msg_type", default=None, show_default=False
+        )
     if raw.lower() in ("all", "*"):
         msg_types = [cd.ALL_MESSAGE_TYPES]
     else:
@@ -39,7 +51,8 @@ def main():
 
     try:
         while True:
-            cmd_str = input("(data_log)>> ")
+            Prompt.prompt_suffix = ">> "
+            cmd_str = Prompt.ask("[bold](data_log)", default=None, show_default=False)
             if not cmd_str:
                 help()
                 continue
@@ -81,48 +94,59 @@ def main():
             elif cmd in ("help", "?", "h"):
                 help()
             else:
-                print(f"Unknown command: {cmd_str}")
+                rich.print(f"Unknown command: {cmd_str}")
                 help()
 
             while True:
                 msg = mod.read_message(0.200)
                 if msg:
                     if isinstance(msg.data, cd.MDF_DATA_LOGGER_ERROR):
-                        print(msg.data.msg)
+                        rich.print(msg.data.msg)
                     elif isinstance(msg.data, cd.MDF_DATASET_STATUS):
-                        print(msg.data.to_json())
+                        rich.print(msg.data.to_json())
                     elif isinstance(msg.data, cd.MDF_DATA_LOGGER_CONFIG):
                         d = mod.process_data_logger_config_msg(msg.data)
-                        print(json.dumps(d, indent=2))
+                        rich.print(json.dumps(d, indent=2))
                 else:
                     break
 
     except KeyboardInterrupt:
         pass
 
-    print("Goodbye")
+    rich.print("Goodbye")
 
 
 def help():
-    print("data_logger_control:")
-    print("  * add/a - Add a dataset.")
-    print("  * remove/d NAME - Remove dataset NAME")
-    print("  * start/s NAME - Start dataset NAME")
-    print("  * start-all/sa - Start all datasets")
-    print("  * stop/x NAME - Stop dataset NAME")
-    print("  * stop-all/xa - Stop all datasets")
-    print("  * pause/p NAME - Pause dataset NAME")
-    print("  * pause-all/pa - Pause all datasets")
-    print("  * resume/r NAME - Resume dataset NAME")
-    print("  * resume-all/ra - Resume all datasets")
-    print("  * status/= NAME - Get status of dataset NAME")
-    print("  * status-all/=a - Get status of all datasets")
-    print("  * config/c - Get data_logger config")
-    print("  * reset/< - Reset data_logger")
-    print("  * kill/k - Close data_logger")
-    print("  * help/h/? - print this help")
-    print("  * exit/quit/q - close application.")
-    print()
+    rich.print(f"\n[u]data_logger_control:")
+    rich.print(f"  * [green]add[/]/[green]a[/] - Add a dataset.")
+    rich.print(
+        f"  * [green]remove[/]/[green]d[/] [blue]{escape('[NAME]')}[/] - Remove dataset NAME"
+    )
+    rich.print(
+        f"  * [green]start[/]/[green]s[/] [blue]{escape('[NAME]')}[/] - Start dataset NAME"
+    )
+    rich.print(f"  * [green]start-all[/]/[green]sa[/] - Start all datasets")
+    rich.print(
+        f"  * [green]stop[/]/[green]x[/] [blue]{escape('[NAME]')}[/] - Stop dataset NAME"
+    )
+    rich.print(f"  * [green]stop-all[/]/[green]xa[/] - Stop all datasets")
+    rich.print(
+        f"  * [green]pause[/]/[green]p[/] [blue]{escape('[NAME]')}[/] - Pause dataset NAME"
+    )
+    rich.print(f"  * [green]pause-all[/]/[green]pa[/] - Pause all datasets")
+    rich.print(
+        f"  * [green]resume[/]/[green]r[/] [blue]{escape('[NAME]')}[/] - Resume dataset NAME"
+    )
+    rich.print(f"  * [green]resume-all[/]/[green]ra[/] - Resume all datasets")
+    rich.print(
+        f"  * [green]status[/]/[green]=[/] [blue]{escape('[NAME]')}[/] - Get status of dataset NAME"
+    )
+    rich.print(f"  * [green]status-all[/]/[green]=a[/] - Get status of all datasets")
+    rich.print(f"  * [green]config[/]/[green]c[/] - Get data_logger config")
+    rich.print(f"  * [green]reset[/]/[green]<[/] - Reset data_logger")
+    rich.print(f"  * [green]kill[/]/[green]k[/] - Close data_logger")
+    rich.print(f"  * [green]help[/]/[green]h[/]/[green]?[/] - rich.print this help")
+    rich.print(f"  * [green]exit[/]/[green]quit[/]/[green]q[/] - close application.\n")
 
 
 if __name__ == "__main__":
