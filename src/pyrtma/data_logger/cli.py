@@ -1,8 +1,6 @@
-import pyrtma
-import pyrtma.core_defs as cd
 import json
 
-from pyrtma.core_defs import ALL_MESSAGE_TYPES
+import pyrtma.core_defs as cd
 from pyrtma.data_logger.data_logger_client import DataLoggerClient, DataSetConfig
 
 
@@ -13,7 +11,10 @@ def add_dataset(mod: DataLoggerClient):
     formatter = input("(dataset)->formatter: ")
 
     raw = input("(dataset)->msg_type: ")
-    msg_types = list(map(int, raw.split()))
+    if raw.lower() in ("all", "*"):
+        msg_types = [cd.ALL_MESSAGE_TYPES]
+    else:
+        msg_types = list(map(int, raw.split()))
 
     config = DataSetConfig(
         name=name,
