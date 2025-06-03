@@ -5,7 +5,7 @@ import pyrtma.core_defs as cd
 
 from pyrtma.exceptions import UnknownMessageType
 
-from .data_set import DataSet
+from .dataset import DataSet
 from .data_formatter import get_formatter
 from .exceptions import *
 
@@ -13,7 +13,7 @@ from typing import cast
 
 
 class DataLogger:
-    MAX_DATA_SETS = 6
+    MAX_DATASETS = 6
     ALL_SETS = ("*", "all")
 
     def __init__(self, rtma_server_ip: str, log_level: int):
@@ -22,13 +22,13 @@ class DataLogger:
         self.client.connect(rtma_server_ip, logger_status=True)
         self.logger = self.client.logger
         self.ctrl_msg_types = [
-            cd.MT_DATA_SET_START,
-            cd.MT_DATA_SET_STOP,
-            cd.MT_DATA_SET_PAUSE,
-            cd.MT_DATA_SET_RESUME,
-            cd.MT_DATA_SET_ADD,
-            cd.MT_DATA_SET_REMOVE,
-            cd.MT_DATA_SET_STATUS_REQUEST,
+            cd.MT_DATASET_START,
+            cd.MT_DATASET_STOP,
+            cd.MT_DATASET_PAUSE,
+            cd.MT_DATASET_RESUME,
+            cd.MT_DATASET_ADD,
+            cd.MT_DATASET_REMOVE,
+            cd.MT_DATASET_STATUS_REQUEST,
             cd.MT_DATA_LOGGER_CONFIG_REQUEST,
             cd.MT_DATA_LOGGER_RESET,
             cd.MT_EXIT,
@@ -52,17 +52,17 @@ class DataLogger:
                 ds.update(msg)
 
         for name in dead:
-            self.rm_data_set(name)
+            self.rm_dataset(name)
 
-    def rm_data_set(self, name: str):
+    def rm_dataset(self, name: str):
         try:
             self.datasets.pop(name)
-            self.logger.info(f"Removed data set: '{name}'")
+            self.logger.info(f"Removed dataset: '{name}'")
         except KeyError:
             pass
 
     def send_status(self, name: str = "all"):
-        msg = cd.MDF_DATA_SET_STATUS()
+        msg = cd.MDF_DATASET_STATUS()
         msg.timestamp = time.time()
 
         if name in DataLogger.ALL_SETS:
@@ -75,7 +75,7 @@ class DataLogger:
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(f"Data set named '{name}' not found.")
+                raise DataSetNotFound(f"Dataset named '{name}' not found.")
 
             msg.name = ds.name
             msg.elapsed_time = ds.elapsed_time
@@ -86,10 +86,10 @@ class DataLogger:
     def send_config(self):
         msg = cd.MDF_DATA_LOGGER_CONFIG()
 
-        msg.num_data_sets = len(self.datasets)
+        msg.num_datasets = len(self.datasets)
 
         for i, ds in enumerate(self.datasets.values()):
-            d = msg.data_sets[i]
+            d = msg.datasets[i]
 
             d.name = ds.name
             d.save_path = str(ds.save_path)
@@ -106,21 +106,21 @@ class DataLogger:
         if name in DataLogger.ALL_SETS:
             for ds in self.datasets.values():
                 ds.start()
-                start_msg = cd.MDF_DATA_SET_STARTED()
+                start_msg = cd.MDF_DATASET_STARTED()
                 start_msg.name = ds.name
                 self.client.send_message(start_msg)
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(f"Data set named '{name}' not found.")
+                raise DataSetNotFound(f"Dataset named '{name}' not found.")
 
             if ds.recording:
                 raise DataSetInProgress(
-                    f"Recording in progresss for data set '{ds.name}'"
+                    f"Recording in progresss for dataset '{ds.name}'"
                 )
 
             ds.start()
-            start_msg = cd.MDF_DATA_SET_STARTED()
+            start_msg = cd.MDF_DATASET_STARTED()
             start_msg.name = ds.name
             self.client.send_message(start_msg)
 
@@ -130,17 +130,17 @@ class DataLogger:
         if name in DataLogger.ALL_SETS:
             for ds in self.datasets.values():
                 ds.stop()
-                stop_msg = cd.MDF_DATA_SET_STOPPED()
+                stop_msg = cd.MDF_DATASET_STOPPED()
                 stop_msg.name = ds.name
                 self.client.send_message(stop_msg)
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(f"Data set named '{name}' not found.")
+                raise DataSetNotFound(f"Dataset named '{name}' not found.")
 
             ds.stop()
 
-            stop_msg = cd.MDF_DATA_SET_STOPPED()
+            stop_msg = cd.MDF_DATASET_STOPPED()
             stop_msg.name = ds.name
             self.client.send_message(stop_msg)
 
@@ -153,7 +153,7 @@ class DataLogger:
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(f"Data set named '{name}' not found.")
+                raise DataSetNotFound(f"Dataset named '{name}' not found.")
 
             ds.pause()
 
@@ -166,45 +166,45 @@ class DataLogger:
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(f"Data set named '{name}' not found.")
+                raise DataSetNotFound(f"Dataset named '{name}' not found.")
 
             ds.resume()
 
         self.send_status()
 
-    def add_data_set(self, msg: cd.MDF_DATA_SET_ADD):
-        data_set = DataSet(
-            name=msg.data_set.name,
-            save_path=msg.data_set.save_path,
-            filename=msg.data_set.filename,
-            msg_types=msg.data_set.msg_types[:],
-            formatter_cls=get_formatter(msg.data_set.formatter),
-            subdivide_interval=msg.data_set.subdivide_interval,
+    def add_dataset(self, msg: cd.MDF_DATASET_ADD):
+        dataset = DataSet(
+            name=msg.dataset.name,
+            save_path=msg.dataset.save_path,
+            filename=msg.dataset.filename,
+            msg_types=msg.dataset.msg_types[:],
+            formatter_cls=get_formatter(msg.dataset.formatter),
+            subdivide_interval=msg.dataset.subdivide_interval,
             parent_logger=self.logger,
         )
 
-        if len(self.datasets) == DataLogger.MAX_DATA_SETS:
+        if len(self.datasets) == DataLogger.MAX_DATASETS:
             raise DataLoggerFullError(
-                "Logger has maximum allowed data sets configured."
+                "Logger has maximum allowed datasets configured."
             )
 
-        if data_set.name in self.datasets.keys():
+        if dataset.name in self.datasets.keys():
             raise DataSetExistsError(
-                "A data set with name '{data_set.name}' already exists"
+                "A dataset with name '{dataset.name}' already exists"
             )
 
-        self.datasets[data_set.name] = data_set
-        self.logger.info(f"Added data set: {data_set.name}")
+        self.datasets[dataset.name] = dataset
+        self.logger.info(f"Added dataset: {dataset.name}")
 
     def reset(self):
-        self.client.info(f"Reset DataLogger. All Data Sets will be cleared")
+        self.client.info(f"Reset DataLogger. All Datasets will be cleared")
         rm = []
         for ds in self.datasets.values():
             ds.stop()
             rm.append(ds.name)
 
         for name in rm:
-            self.rm_data_set(name)
+            self.rm_dataset(name)
 
     def send_error(self, msg: str):
         err = cd.MDF_DATA_LOGGER_ERROR()
@@ -226,21 +226,21 @@ class DataLogger:
 
                 try:
                     match (msg.data.type_id):
-                        case cd.MT_DATA_SET_START:
+                        case cd.MT_DATASET_START:
                             self.start_logging(cast(str, msg.data.name))
-                        case cd.MT_DATA_SET_STOP:
+                        case cd.MT_DATASET_STOP:
                             self.stop_logging(cast(str, msg.data.name))
-                        case cd.MT_DATA_SET_PAUSE:
+                        case cd.MT_DATASET_PAUSE:
                             self.pause_logging(cast(str, msg.data.name))
-                        case cd.MT_DATA_SET_RESUME:
+                        case cd.MT_DATASET_RESUME:
                             self.resume_logging(cast(str, msg.data.name))
-                        case cd.MT_DATA_SET_ADD:
-                            self.add_data_set(cast(cd.MDF_DATA_SET_ADD, msg.data))
-                        case cd.MT_DATA_SET_REMOVE:
-                            self.rm_data_set(cast(str, msg.data.name))
+                        case cd.MT_DATASET_ADD:
+                            self.add_dataset(cast(cd.MDF_DATASET_ADD, msg.data))
+                        case cd.MT_DATASET_REMOVE:
+                            self.rm_dataset(cast(str, msg.data.name))
                         case cd.MT_DATA_LOGGER_RESET:
                             self.reset()
-                        case cd.MT_DATA_SET_STATUS_REQUEST:
+                        case cd.MT_DATASET_STATUS_REQUEST:
                             self.send_status(cast(str, msg.data.name))
                         case cd.MT_DATA_LOGGER_CONFIG_REQUEST:
                             self.send_config()

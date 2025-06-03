@@ -6,13 +6,13 @@ from pyrtma.core_defs import ALL_MESSAGE_TYPES
 from pyrtma.data_logger.data_logger_client import DataLoggerClient, DataSetConfig
 
 
-def add_data_set(mod: DataLoggerClient):
-    name = input("(data-set)->name: ")
-    save_path = input("(data-set)->save_path: ")
-    filename = input("(data-set)->filename: ")
-    formatter = input("(data-set)->formatter: ")
+def add_dataset(mod: DataLoggerClient):
+    name = input("(dataset)->name: ")
+    save_path = input("(dataset)->save_path: ")
+    filename = input("(dataset)->filename: ")
+    formatter = input("(dataset)->formatter: ")
 
-    raw = input("(data-set)->msg_type: ")
+    raw = input("(dataset)->msg_type: ")
     msg_types = list(map(int, raw.split()))
 
     config = DataSetConfig(
@@ -43,29 +43,29 @@ def main():
             nargs = len(args)
             cmd = args[0].lower()
             if cmd in ("add", "a") and nargs == 1:
-                add_data_set(mod)
+                add_dataset(mod)
             elif cmd in ("remove", "d") and nargs == 2:
-                mod.rm_data_set(args[1])
+                mod.rm_dataset(args[1])
             elif cmd in ("start", "s") and nargs == 2:
-                mod.start_data_set(args[1])
+                mod.start_dataset(args[1])
             elif cmd in ("start-all", "sa") and nargs == 1:
-                mod.start_all_data_sets()
+                mod.start_all_datasets()
             elif cmd in ("stop", "x") and nargs == 2:
-                mod.stop_data_set(args[1])
+                mod.stop_dataset(args[1])
             elif cmd in ("stop-all", "xa") and nargs == 1:
-                mod.stop_all_data_sets()
+                mod.stop_all_datasets()
             elif cmd in ("pause", "p") and nargs == 2:
-                mod.pause_data_set(args[1])
+                mod.pause_dataset(args[1])
             elif cmd in ("pause-all", "pa") and nargs == 1:
-                mod.pause_all_data_sets()
+                mod.pause_all_datasets()
             elif cmd in ("resume", "r") and nargs == 2:
-                mod.resume_data_set(args[1])
+                mod.resume_dataset(args[1])
             elif cmd in ("resume-all", "ra") and nargs == 1:
-                mod.resume_all_data_sets()
+                mod.resume_all_datasets()
             elif cmd in ("status", "=") and nargs == 2:
-                mod.request_data_set_status(args[1])
+                mod.request_dataset_status(args[1])
             elif cmd in ("status-all", "=a") and nargs == 1:
-                mod.request_all_data_set_status()
+                mod.request_all_dataset_status()
             elif cmd in ("config", "c") and nargs == 1:
                 mod.request_data_logger_config()
             elif cmd in ("reset", "<") and nargs == 1:
@@ -83,7 +83,7 @@ def main():
                 if msg:
                     if isinstance(msg.data, cd.MDF_DATA_LOGGER_ERROR):
                         print(msg.data.msg)
-                    elif isinstance(msg.data, cd.MDF_DATA_SET_STATUS):
+                    elif isinstance(msg.data, cd.MDF_DATASET_STATUS):
                         print(msg.data.to_json())
                     elif isinstance(msg.data, cd.MDF_DATA_LOGGER_CONFIG):
                         d = mod.process_data_logger_config_msg(msg.data)

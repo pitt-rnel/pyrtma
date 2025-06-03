@@ -2,26 +2,26 @@
 # Unused legacy RTMA_types were repurposed here
 
 constants:
-  MAX_DATA_SETS: 6
+  MAX_DATASETS: 6
   DATASET_NAME_LEN: 32
 
 struct_defs:
-  DATA_SET:
+  DATASET:
     fields:
         name: char[DATASET_NAME_LEN]
-        save_path: char[256]      # Data set save directory 
-        filename: char[128]       # Data set saved file name without the file extension
+        save_path: char[256]      # Dataset save directory 
+        filename: char[128]       # Dataset saved file name without the file extension
         formatter: char[32]       # Builtin Options: quicklogger, json, raw, msg_header
         subdivide_interval: int32 # <=0: Single File, >=30: Subdivide recording files
-        msg_types: int32[64]      # Message type ids that should be passed to data_set formatter
+        msg_types: int32[64]      # Message type ids that should be passed to dataset formatter
 
 message_defs:
-  DATA_SET_STATUS_REQUEST:
+  DATASET_STATUS_REQUEST:
     id: 62
     fields:
       name: char[DATASET_NAME_LEN]
 
-  DATA_SET_STATUS:
+  DATASET_STATUS:
     id: 63
     fields:
       name: char[DATASET_NAME_LEN]
@@ -30,12 +30,12 @@ message_defs:
       is_recording: int32
       is_paused: int32
 
-  DATA_SET_ADD:
+  DATASET_ADD:
     id: 66
     fields:
-        data_set: DATA_SET
+        dataset: DATASET
 
-  DATA_SET_REMOVE:
+  DATASET_REMOVE:
     id: 67
     fields:
       name: char[DATASET_NAME_LEN]
@@ -47,40 +47,40 @@ message_defs:
   DATA_LOGGER_CONFIG:
     id: 69
     fields:
-        num_data_sets: int32
-        data_sets: DATA_SET[6]
+        num_datasets: int32
+        datasets: DATASET[6]
 
-  DATA_SET_STARTED:
+  DATASET_STARTED:
     id: 70
     fields:
       name: char[DATASET_NAME_LEN]
 
-  DATA_SET_STOPPED:
+  DATASET_STOPPED:
     id: 71
     fields:
       name: char[DATASET_NAME_LEN]
 
-  DATA_SET_SAVED:
+  DATASET_SAVED:
     id: 72
     fields:
       name: char[DATASET_NAME_LEN]
 
-  DATA_SET_START:
+  DATASET_START:
     id: 73
     fields:
       name: char[DATASET_NAME_LEN]
 
-  DATA_SET_STOP:
+  DATASET_STOP:
     id: 74
     fields:
       name: char[DATASET_NAME_LEN]
 
-  DATA_SET_PAUSE:
+  DATASET_PAUSE:
     id: 75
     fields:
       name: char[DATASET_NAME_LEN]
 
-  DATA_SET_RESUME:
+  DATASET_RESUME:
     id: 76
     fields:
       name: char[DATASET_NAME_LEN]

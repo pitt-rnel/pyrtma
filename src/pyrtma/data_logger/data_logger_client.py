@@ -27,7 +27,7 @@ class DataSetConfig:
         self._client: Optional[pyrtma.Client] = None
 
     def register_client(self, client: pyrtma.Client):
-        """Register a pyrtma client with this data set config
+        """Register a pyrtma client with this dataset config
 
         Args:
             client (pyrtma.Client): client to register
@@ -35,7 +35,7 @@ class DataSetConfig:
         self._client = client
 
     def add(self, client: Optional[pyrtma.Client] = None):
-        """Add data set config to data_logger
+        """Add dataset config to data_logger
 
         Args:
             client (Optional[pyrtma.Client], optional): Client to register. If None (default), assumes :py:func:`send_message` has already been called.
@@ -46,19 +46,19 @@ class DataSetConfig:
         if client:
             self.register_client(client)
         if self._client:
-            msg = cd.MDF_DATA_SET_ADD()
-            msg.data_set.name = self.name
-            msg.data_set.save_path = str(self.save_path)
-            msg.data_set.filename = self.filename
-            msg.data_set.formatter = self.formatter
-            msg.data_set.msg_types[: len(self.msg_types)] = self.msg_types
-            msg.data_set.subdivide_interval = self.subdivide_interval
+            msg = cd.MDF_DATASET_ADD()
+            msg.dataset.name = self.name
+            msg.dataset.save_path = str(self.save_path)
+            msg.dataset.filename = self.filename
+            msg.dataset.formatter = self.formatter
+            msg.dataset.msg_types[: len(self.msg_types)] = self.msg_types
+            msg.dataset.subdivide_interval = self.subdivide_interval
             self._client.send_message(msg)
         else:
             raise NoClientError
 
     def remove(self, client: Optional[pyrtma.Client] = None):
-        """Remove data set config from data_logger
+        """Remove dataset config from data_logger
 
         Args:
             client (Optional[pyrtma.Client], optional): Client to register. If None (default), assumes :py:func:`send_message` has already been called.
@@ -69,14 +69,14 @@ class DataSetConfig:
         if client:
             self.register_client(client)
         if self._client:
-            msg = cd.MDF_DATA_SET_REMOVE()
+            msg = cd.MDF_DATASET_REMOVE()
             msg.name = self.name
             self._client.send_message(msg)
         else:
             raise NoClientError
 
     def start(self, client: Optional[pyrtma.Client] = None):
-        """Start data set recording in data_logger
+        """Start dataset recording in data_logger
 
         Args:
             client (Optional[pyrtma.Client], optional): Client to register. If None (default), assumes :py:func:`send_message` has already been called.
@@ -87,14 +87,14 @@ class DataSetConfig:
         if client:
             self.register_client(client)
         if self._client:
-            msg = cd.MDF_DATA_SET_START()
+            msg = cd.MDF_DATASET_START()
             msg.name = self.name
             self._client.send_message(msg)
         else:
             raise NoClientError
 
     def stop(self, client: Optional[pyrtma.Client] = None):
-        """Stop data set recording in data_logger
+        """Stop dataset recording in data_logger
 
         Args:
             client (Optional[pyrtma.Client], optional): Client to register. If None (default), assumes :py:func:`send_message` has already been called.
@@ -105,14 +105,14 @@ class DataSetConfig:
         if client:
             self.register_client(client)
         if self._client:
-            msg = cd.MDF_DATA_SET_STOP()
+            msg = cd.MDF_DATASET_STOP()
             msg.name = self.name
             self._client.send_message(msg)
         else:
             raise NoClientError
 
     def pause(self, client: Optional[pyrtma.Client] = None):
-        """Pause data set recording in data_logger
+        """Pause dataset recording in data_logger
 
         Args:
             client (Optional[pyrtma.Client], optional): Client to register. If None (default), assumes :py:func:`send_message` has already been called.
@@ -123,14 +123,14 @@ class DataSetConfig:
         if client:
             self.register_client(client)
         if self._client:
-            msg = cd.MDF_DATA_SET_PAUSE()
+            msg = cd.MDF_DATASET_PAUSE()
             msg.name = self.name
             self._client.send_message(msg)
         else:
             raise NoClientError
 
     def resume(self, client: Optional[pyrtma.Client] = None):
-        """Resume data set recording in data_logger
+        """Resume dataset recording in data_logger
 
         Args:
             client (Optional[pyrtma.Client], optional): Client to register. If None (default), assumes :py:func:`send_message` has already been called.
@@ -141,7 +141,7 @@ class DataSetConfig:
         if client:
             self.register_client(client)
         if self._client:
-            msg = cd.MDF_DATA_SET_RESUME()
+            msg = cd.MDF_DATASET_RESUME()
             msg.name = self.name
             self._client.send_message(msg)
         else:
@@ -160,7 +160,7 @@ class DataLoggerClient(pyrtma.Client):
     """
 
     _data_client_types = (
-        cd.MT_DATA_SET_STATUS,
+        cd.MT_DATASET_STATUS,
         cd.MT_DATA_LOGGER_CONFIG,
         cd.MT_DATA_LOGGER_ERROR,
     )
@@ -191,111 +191,111 @@ class DataLoggerClient(pyrtma.Client):
         super().connect(server_name, *args, **kwargs)
         self.subscribe(self._data_client_types)
 
-    def add_data_set(self, config: DataSetConfig):
-        """Add data set config to data_logger
+    def add_dataset(self, config: DataSetConfig):
+        """Add dataset config to data_logger
 
         Args:
             config (DataSetConfig): config object to add
         """
         config.add(self)
 
-    def rm_data_set(self, config: Union[DataSetConfig, str]):
-        """Remove data set config from data_logger
+    def rm_dataset(self, config: Union[DataSetConfig, str]):
+        """Remove dataset config from data_logger
 
         Args:
-            config (DataSetConfig | str): Data set config object or name
+            config (DataSetConfig | str): Dataset config object or name
         """
         if isinstance(config, str):
-            msg = cd.MDF_DATA_SET_REMOVE()
+            msg = cd.MDF_DATASET_REMOVE()
             msg.name = config
             self.send_message(msg)
         else:
             config.remove(self)
 
-    def start_data_set(self, config: Union[DataSetConfig, str]):
-        """Start data set recording in data_logger
+    def start_dataset(self, config: Union[DataSetConfig, str]):
+        """Start dataset recording in data_logger
 
         Args:
-            config (DataSetConfig | str): Data set config object or name
+            config (DataSetConfig | str): Dataset config object or name
         """
         if isinstance(config, str):
-            msg = cd.MDF_DATA_SET_START()
+            msg = cd.MDF_DATASET_START()
             msg.name = config
             self.send_message(msg)
         else:
             config.start(self)
 
-    def start_all_data_sets(self):
-        """Start all data set recordings in data_logger"""
-        self.start_data_set(config="*")
+    def start_all_datasets(self):
+        """Start all dataset recordings in data_logger"""
+        self.start_dataset(config="*")
 
-    def stop_data_set(self, config: Union[DataSetConfig, str]):
-        """Stop data set recording in data_logger
+    def stop_dataset(self, config: Union[DataSetConfig, str]):
+        """Stop dataset recording in data_logger
 
         Args:
-            config (DataSetConfig | str): Data set config object or name
+            config (DataSetConfig | str): Dataset config object or name
         """
         if isinstance(config, str):
-            msg = cd.MDF_DATA_SET_STOP()
+            msg = cd.MDF_DATASET_STOP()
             msg.name = config
             self.send_message(msg)
         else:
             config.stop(self)
 
-    def stop_all_data_sets(self):
-        """Stop all data set recordings in data_logger"""
-        self.stop_data_set(config="*")
+    def stop_all_datasets(self):
+        """Stop all dataset recordings in data_logger"""
+        self.stop_dataset(config="*")
 
-    def pause_data_set(self, config: Union[DataSetConfig, str]):
-        """Pause data set recording in data_logger
+    def pause_dataset(self, config: Union[DataSetConfig, str]):
+        """Pause dataset recording in data_logger
 
         Args:
-            config (DataSetConfig | str): Data set config object or name
+            config (DataSetConfig | str): Dataset config object or name
         """
         if isinstance(config, str):
-            msg = cd.MDF_DATA_SET_PAUSE()
+            msg = cd.MDF_DATASET_PAUSE()
             msg.name = config
             self.send_message(msg)
         else:
             config.pause(self)
 
-    def pause_all_data_sets(self):
-        """Pause all data set recordings in data_logger"""
-        self.pause_data_set(config="*")
+    def pause_all_datasets(self):
+        """Pause all dataset recordings in data_logger"""
+        self.pause_dataset(config="*")
 
-    def resume_data_set(self, config: Union[DataSetConfig, str]):
-        """Resume data set recording in data_logger
+    def resume_dataset(self, config: Union[DataSetConfig, str]):
+        """Resume dataset recording in data_logger
 
         Args:
-            config (DataSetConfig | str): Data set config object or name
+            config (DataSetConfig | str): Dataset config object or name
         """
         if isinstance(config, str):
-            msg = cd.MDF_DATA_SET_RESUME()
+            msg = cd.MDF_DATASET_RESUME()
             msg.name = config
             self.send_message(msg)
         else:
             config.resume(self)
 
-    def resume_all_data_sets(self):
-        """Resume all data set recordings in data_logger"""
-        self.resume_data_set(config="*")
+    def resume_all_datasets(self):
+        """Resume all dataset recordings in data_logger"""
+        self.resume_dataset(config="*")
 
-    def request_data_set_status(self, config: Union[DataSetConfig, str]):
-        """Request data set status from data_logger
+    def request_dataset_status(self, config: Union[DataSetConfig, str]):
+        """Request dataset status from data_logger
 
         Args:
-            config (DataSetConfig | str): Data set config object or name
+            config (DataSetConfig | str): Dataset config object or name
         """
-        msg = cd.MDF_DATA_SET_STATUS_REQUEST()
+        msg = cd.MDF_DATASET_STATUS_REQUEST()
         if isinstance(config, str):
             msg.name = config
         else:
             msg.name = config.name
         self.send_message(msg)
 
-    def request_all_data_set_status(self):
-        """Request all data set statuses from data_logger"""
-        self.request_data_set_status(config="*")
+    def request_all_dataset_status(self):
+        """Request all dataset statuses from data_logger"""
+        self.request_dataset_status(config="*")
 
     def request_data_logger_config(self):
         """Request data_logger config"""
@@ -317,7 +317,7 @@ class DataLoggerClient(pyrtma.Client):
             Dict[str, Any]: data_logger config dict
         """
         d = msg_data.to_dict()
-        for ds in d["data_sets"]:
+        for ds in d["datasets"]:
             names = []
             for msg_type in ds["msg_types"]:
                 if msg_type < 1:
@@ -330,5 +330,5 @@ class DataLoggerClient(pyrtma.Client):
                     except UnknownMessageType:
                         names.append(msg_type)
             ds["msg_types"] = names
-        d["data_sets"] = d["data_sets"][: d["num_data_sets"]]
+        d["datasets"] = d["datasets"][: d["num_datasets"]]
         return d
