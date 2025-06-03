@@ -117,36 +117,28 @@ def main():
 
 
 def help():
+    name = escape("[NAME]")
+    g = "[green]"
+    b = "[blue]"
+
     rich.print(f"\n[u]data_logger_control:")
-    rich.print(f"  * [green]add[/]/[green]a[/] - Add a dataset.")
-    rich.print(
-        f"  * [green]remove[/]/[green]d[/] [blue]{escape('[NAME]')}[/] - Remove dataset NAME"
-    )
-    rich.print(
-        f"  * [green]start[/]/[green]s[/] [blue]{escape('[NAME]')}[/] - Start dataset NAME"
-    )
-    rich.print(f"  * [green]start-all[/]/[green]sa[/] - Start all datasets")
-    rich.print(
-        f"  * [green]stop[/]/[green]x[/] [blue]{escape('[NAME]')}[/] - Stop dataset NAME"
-    )
-    rich.print(f"  * [green]stop-all[/]/[green]xa[/] - Stop all datasets")
-    rich.print(
-        f"  * [green]pause[/]/[green]p[/] [blue]{escape('[NAME]')}[/] - Pause dataset NAME"
-    )
-    rich.print(f"  * [green]pause-all[/]/[green]pa[/] - Pause all datasets")
-    rich.print(
-        f"  * [green]resume[/]/[green]r[/] [blue]{escape('[NAME]')}[/] - Resume dataset NAME"
-    )
-    rich.print(f"  * [green]resume-all[/]/[green]ra[/] - Resume all datasets")
-    rich.print(
-        f"  * [green]status[/]/[green]=[/] [blue]{escape('[NAME]')}[/] - Get status of dataset NAME"
-    )
-    rich.print(f"  * [green]status-all[/]/[green]=a[/] - Get status of all datasets")
-    rich.print(f"  * [green]config[/]/[green]c[/] - Get data_logger config")
-    rich.print(f"  * [green]reset[/]/[green]<[/] - Reset data_logger")
-    rich.print(f"  * [green]kill[/]/[green]k[/] - Close data_logger")
-    rich.print(f"  * [green]help[/]/[green]h[/]/[green]?[/] - rich.print this help")
-    rich.print(f"  * [green]exit[/]/[green]quit[/]/[green]q[/] - close application.\n")
+    rich.print(f"  * {g}add[/]/{g}a[/] - Add a dataset.")
+    rich.print(f"  * {g}remove[/]/{g}d[/] {b}{name}[/] - Remove dataset NAME")
+    rich.print(f"  * {g}start[/]/{g}s[/] {b}{name}[/] - Start dataset NAME")
+    rich.print(f"  * {g}start-all[/]/{g}sa[/] - Start all datasets")
+    rich.print(f"  * {g}stop[/]/{g}x[/] {b}{name}[/] - Stop dataset NAME")
+    rich.print(f"  * {g}stop-all[/]/{g}xa[/] - Stop all datasets")
+    rich.print(f"  * {g}pause[/]/{g}p[/] {b}{name}[/] - Pause dataset NAME")
+    rich.print(f"  * {g}pause-all[/]/{g}pa[/] - Pause all datasets")
+    rich.print(f"  * {g}resume[/]/{g}r[/] {b}{name}[/] - Resume dataset NAME")
+    rich.print(f"  * {g}resume-all[/]/{g}ra[/] - Resume all datasets")
+    rich.print(f"  * {g}status[/]/{g}=[/] {b}{name}[/] - Get status of dataset NAME")
+    rich.print(f"  * {g}status-all[/]/{g}=a[/] - Get status of all datasets")
+    rich.print(f"  * {g}config[/]/{g}c[/] - Get data_logger config")
+    rich.print(f"  * {g}reset[/]/{g}<[/] - Reset data_logger")
+    rich.print(f"  * {g}kill[/]/{g}k[/] - Close data_logger")
+    rich.print(f"  * {g}help[/]/{g}h[/]/{g}?[/] - rich.print this help")
+    rich.print(f"  * {g}exit[/]/{g}quit[/]/{g}q[/] - close application.\n")
 
 
 if __name__ == "__main__":
