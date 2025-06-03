@@ -189,7 +189,7 @@ class DataLogger:
 
         if dataset.name in self.datasets.keys():
             raise DataSetExistsError(
-                "A dataset with name '{dataset.name}' already exists"
+                f"A dataset with name '{dataset.name}' already exists"
             )
 
         self.datasets[dataset.name] = dataset
