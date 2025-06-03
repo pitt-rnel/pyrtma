@@ -25,10 +25,6 @@ def add_data_set(mod: DataLoggerClient):
     config.add(mod)
 
 
-def rm_data_set(mod: DataLoggerClient):
-    mod.rm_data_set(input("(remove)->name: "))
-
-
 def main():
     import sys
 
@@ -44,41 +40,42 @@ def main():
         while True:
             cmd_str = input("(data_log)>> ")
             args = cmd_str.split()
-            cmd = args[0]
-            if cmd == "add":
+            nargs = len(args)
+            cmd = args[0].lower()
+            if cmd in ("add", "a") and nargs == 1:
                 add_data_set(mod)
-            elif cmd == "remove":
-                rm_data_set(mod)
-            elif cmd == "pause":
-                mod.pause_data_set(args[1])
-            elif cmd == "pause-all":
-                mod.pause_all_data_sets()
-            elif cmd == "resume":
-                mod.resume_data_set(args[1])
-            elif cmd == "resume-all":
-                mod.resume_all_data_sets()
-            elif cmd == "start":
+            elif cmd in ("remove", "d") and nargs == 2:
+                mod.rm_data_set(args[1])
+            elif cmd in ("start", "s") and nargs == 2:
                 mod.start_data_set(args[1])
-            elif cmd == "start-all":
+            elif cmd in ("start-all", "sa") and nargs == 1:
                 mod.start_all_data_sets()
-            elif cmd == "stop":
+            elif cmd in ("stop", "x") and nargs == 2:
                 mod.stop_data_set(args[1])
-            elif cmd == "stop-all":
+            elif cmd in ("stop-all", "xa") and nargs == 1:
                 mod.stop_all_data_sets()
-            elif cmd == "status":
+            elif cmd in ("pause", "p") and nargs == 2:
+                mod.pause_data_set(args[1])
+            elif cmd in ("pause-all", "pa") and nargs == 1:
+                mod.pause_all_data_sets()
+            elif cmd in ("resume", "r") and nargs == 2:
+                mod.resume_data_set(args[1])
+            elif cmd in ("resume-all", "ra") and nargs == 1:
+                mod.resume_all_data_sets()
+            elif cmd in ("status", "=") and nargs == 2:
                 mod.request_data_set_status(args[1])
-            elif cmd == "status-all":
+            elif cmd in ("status-all", "=a") and nargs == 1:
                 mod.request_all_data_set_status()
-            elif cmd == "config":
+            elif cmd in ("config", "c") and nargs == 1:
                 mod.request_data_logger_config()
-            elif cmd == "reset":
+            elif cmd in ("reset", "<") and nargs == 1:
                 mod.reset_data_logger()
-            elif cmd in ("help", "?", "h"):
-                help()
             elif cmd in ("exit", "quit", "q"):
                 break
+            elif cmd in ("help", "?", "h"):
+                help()
             else:
-                print(f"Unknown command: {cmd}")
+                print(f"Unknown command: {cmd_str}")
                 help()
 
             while True:
@@ -102,15 +99,20 @@ def main():
 
 def help():
     print("data_logger_control:")
-    print("  * add - Add a data set.")
-    print("  * remove - Remove a data set")
-    print("  * start")
-    print("  * stop")
-    print("  * pause")
-    print("  * resume")
-    print("  * reset")
-    print("  * status")
-    print("  * config")
+    print("  * add/a - Add a dataset.")
+    print("  * remove/d NAME - Remove dataset NAME")
+    print("  * start/s NAME - Start dataset NAME")
+    print("  * start-all/sa - Start all datasets")
+    print("  * stop/x NAME - Stop dataset NAME")
+    print("  * stop-all/xa - Stop all datasets")
+    print("  * pause/p NAME - Pause dataset NAME")
+    print("  * pause-all/pa - Pause all datasets")
+    print("  * resume/r NAME - Resume dataset NAME")
+    print("  * resume-all/ra - Resume all datasets")
+    print("  * status/= NAME - Get status of dataset NAME")
+    print("  * status-all/=a - Get status of all datasets")
+    print("  * config/c - Get data_logger config")
+    print("  * reset/< - Reset data_logger")
     print("  * help/h/? - print this help")
     print("  * exit/quit/q - close application.")
     print()
