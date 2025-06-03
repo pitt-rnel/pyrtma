@@ -184,9 +184,7 @@ class DataLogger:
         )
 
         if len(self.datasets) == DataLogger.MAX_DATASETS:
-            raise DataLoggerFullError(
-                "Logger has maximum allowed datasets configured."
-            )
+            raise DataLoggerFullError("Logger has maximum allowed datasets configured.")
 
         if dataset.name in self.datasets.keys():
             raise DataSetExistsError(

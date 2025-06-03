@@ -102,15 +102,21 @@ class DataSet:
                 self.stop()
 
     def pause(self):
+        if self.paused:
+            self.logger.warning(f"Dataset {self.name} is already paused")
+            return
         elapsed = self.elapsed_time
         self._elapsed_time = elapsed
         self._paused = True
-        self.logger.info(f"Pausing data set: {self.name}")
+        self.logger.info(f"Pausing dataset: {self.name}")
 
     def resume(self):
+        if not self.paused:
+            self.logger.warning(f"Dataset {self.name} is not paused")
+            return
         self._paused = False
         self.ref_time = time.time()
-        self.logger.info(f"Resuming data set: {self.name}")
+        self.logger.info(f"Resuming dataset: {self.name}")
 
     @property
     def elapsed_time(self) -> float:
@@ -143,6 +149,10 @@ class DataSet:
         return self._dead
 
     def start(self):
+        if self.recording:
+            self.logger.warning(f"Dataset {self.name} is already recording")
+            return
+
         # Reset some tracking vars
         self.sub_index = 0
         self.subdivide_flag = False
@@ -150,7 +160,7 @@ class DataSet:
         # Start the write thread
         self.write_thread.start()
 
-        self.logger.info(f"Saving Data Set:{self.name} to {self.file_path}")
+        self.logger.info(f"Saving Dataset:{self.name} to {self.file_path}")
 
         self.fd = open(self.file_path, self.formatter_cls.mode)
         self.formatter = self.formatter_cls(self.fd)
@@ -209,7 +219,7 @@ class DataSet:
         if self.file_path.exists():
             raise DataSetExistsError(f"{self.file_path} already exists.")
 
-        self.logger.info(f"Sub-dividing data set: {self.file_path}")
+        self.logger.info(f"Sub-dividing dataset: {self.file_path}")
 
         self.fd = open(self.file_path, self.formatter_cls.mode)
         self.formatter = self.formatter_cls(self.fd)
@@ -217,12 +227,14 @@ class DataSet:
     def stop(self):
         if self.recording:
             self.stop_flag.set()
-            self.logger.info(f"Stopping data set: {self.name}")
+            self.logger.info(f"Stopping dataset: {self.name}")
             self.start_time = -1
             self.ref_time = -1
             self._recording = False
             self._paused = False
             self.next_write = -1.0
+        else:
+            self.logger.warning(f"Dataset {self.name} is not recording")
 
     def stage_for_write(self):
         """Set the write buffer data for the data collection write thread"""
@@ -232,7 +244,7 @@ class DataSet:
         self.write_finished.clear()
         self.write_to_disk.set()
 
-        self.logger.debug("Writing data set buffers to disk.")
+        self.logger.debug("Writing dataset buffers to disk.")
 
     def write(self):
         """Write Threads main function"""
