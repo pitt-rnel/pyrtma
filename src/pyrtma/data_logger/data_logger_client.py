@@ -17,11 +17,11 @@ from typing import TYPE_CHECKING, List, Dict, Any, Union, Optional
 if TYPE_CHECKING:
     from _typeshed import StrPath
 
-__all__ = ["DataSetConfig", "DataLoggerClient"]
+__all__ = ["DatasetConfig", "DataLoggerClient"]
 
 
 @dataclass
-class DataSetConfig:
+class DatasetConfig:
     """Configuration for a data_logger dataset"""
 
     name: str
@@ -200,19 +200,19 @@ class DataLoggerClient(pyrtma.Client):
         super().connect(server_name, *args, **kwargs)
         self.subscribe(self._data_client_types)
 
-    def add_dataset(self, config: DataSetConfig):
+    def add_dataset(self, config: DatasetConfig):
         """Add dataset config to data_logger
 
         Args:
-            config (DataSetConfig): config object to add
+            config (DatasetConfig): config object to add
         """
         config.add(self)
 
-    def rm_dataset(self, config: Union[DataSetConfig, str]):
+    def rm_dataset(self, config: Union[DatasetConfig, str]):
         """Remove dataset config from data_logger
 
         Args:
-            config (DataSetConfig | str): Dataset config object or name
+            config (DatasetConfig | str): Dataset config object or name
         """
         if isinstance(config, str):
             msg = cd.MDF_DATASET_REMOVE()
@@ -221,11 +221,11 @@ class DataLoggerClient(pyrtma.Client):
         else:
             config.remove(self)
 
-    def start_dataset(self, config: Union[DataSetConfig, str]):
+    def start_dataset(self, config: Union[DatasetConfig, str]):
         """Start dataset recording in data_logger
 
         Args:
-            config (DataSetConfig | str): Dataset config object or name
+            config (DatasetConfig | str): Dataset config object or name
         """
         if isinstance(config, str):
             msg = cd.MDF_DATASET_START()
@@ -238,11 +238,11 @@ class DataLoggerClient(pyrtma.Client):
         """Start all dataset recordings in data_logger"""
         self.start_dataset(config="*")
 
-    def stop_dataset(self, config: Union[DataSetConfig, str]):
+    def stop_dataset(self, config: Union[DatasetConfig, str]):
         """Stop dataset recording in data_logger
 
         Args:
-            config (DataSetConfig | str): Dataset config object or name
+            config (DatasetConfig | str): Dataset config object or name
         """
         if isinstance(config, str):
             msg = cd.MDF_DATASET_STOP()
@@ -255,11 +255,11 @@ class DataLoggerClient(pyrtma.Client):
         """Stop all dataset recordings in data_logger"""
         self.stop_dataset(config="*")
 
-    def pause_dataset(self, config: Union[DataSetConfig, str]):
+    def pause_dataset(self, config: Union[DatasetConfig, str]):
         """Pause dataset recording in data_logger
 
         Args:
-            config (DataSetConfig | str): Dataset config object or name
+            config (DatasetConfig | str): Dataset config object or name
         """
         if isinstance(config, str):
             msg = cd.MDF_DATASET_PAUSE()
@@ -272,11 +272,11 @@ class DataLoggerClient(pyrtma.Client):
         """Pause all dataset recordings in data_logger"""
         self.pause_dataset(config="*")
 
-    def resume_dataset(self, config: Union[DataSetConfig, str]):
+    def resume_dataset(self, config: Union[DatasetConfig, str]):
         """Resume dataset recording in data_logger
 
         Args:
-            config (DataSetConfig | str): Dataset config object or name
+            config (DatasetConfig | str): Dataset config object or name
         """
         if isinstance(config, str):
             msg = cd.MDF_DATASET_RESUME()
@@ -289,11 +289,11 @@ class DataLoggerClient(pyrtma.Client):
         """Resume all dataset recordings in data_logger"""
         self.resume_dataset(config="*")
 
-    def request_dataset_status(self, config: Union[DataSetConfig, str]):
+    def request_dataset_status(self, config: Union[DatasetConfig, str]):
         """Request dataset status from data_logger
 
         Args:
-            config (DataSetConfig | str): Dataset config object or name
+            config (DatasetConfig | str): Dataset config object or name
         """
         msg = cd.MDF_DATASET_STATUS_REQUEST()
         if isinstance(config, str):

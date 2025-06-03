@@ -9,7 +9,7 @@ from rich.prompt import Prompt
 from rich.markup import escape
 
 import pyrtma.core_defs as cd
-from pyrtma.data_logger.data_logger_client import DataLoggerClient, DataSetConfig
+from pyrtma.data_logger.data_logger_client import DataLoggerClient, DatasetConfig
 
 
 def add_dataset(mod: DataLoggerClient):
@@ -34,7 +34,7 @@ def add_dataset(mod: DataLoggerClient):
     else:
         msg_types = list(map(int, raw.split()))
 
-    config = DataSetConfig(
+    config = DatasetConfig(
         name=name,
         save_path=save_path,
         filename=filename,
