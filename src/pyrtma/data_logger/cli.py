@@ -1,31 +1,51 @@
-import pyrtma
-import pyrtma.core_defs as cd
+"""pyrtma.data_logger.cli - Command Line Interface for pyrtma data logger control
+
+Run with python -m pyrtma.data_logger.cli [MM_SERVER_ADDRESS]
+"""
+
 import json
+import rich
+from rich.prompt import Prompt
+from rich.markup import escape
 
-from pyrtma.core_defs import ALL_MESSAGE_TYPES
-
-
-def add_data_set(mod: pyrtma.Client):
-    msg = cd.MDF_DATA_SET_ADD()
-    msg.data_set.name = input("(data-set)->name: ")
-    msg.data_set.save_path = input("(data-set)->save_path: ")
-    msg.data_set.filename = input("(data-set)->filename: ")
-    msg.data_set.formatter = input("(data-set)->formatter: ")
-
-    raw = input("(data-set)->msg_type: ")
-    msg_types = list(map(int, raw.split()))
-
-    msg.data_set.msg_types[: len(msg_types)] = msg_types
-    mod.send_message(msg)
+import pyrtma.core_defs as cd
+from pyrtma.data_logger.data_logger_client import DataLoggerClient, DatasetConfig
 
 
-def rm_data_set(mod: pyrtma.Client):
-    msg = cd.MDF_DATA_SET_REMOVE()
-    msg.name = input("(remove)->name: ")
-    mod.send_message(msg)
+def add_dataset(mod: DataLoggerClient):
+    """Prompts for dataset configuration and adds it to the data logger"""
+    name = save_path = filename = formatter = raw = None
+    Prompt.prompt_suffix = ": "
+    while not name:
+        name = Prompt.ask("[bold](dataset)->[blue]name")
+    while not save_path:
+        save_path = Prompt.ask("[bold](dataset)->[blue]save_path")
+    while not filename:
+        filename = Prompt.ask("[bold](dataset)->[blue]filename")
+    while not formatter:
+        formatter = Prompt.ask("[bold](dataset)->[blue]formatter")
+
+    while raw is None:
+        raw = Prompt.ask(
+            "[bold](dataset)->[blue]msg_type", default=None, show_default=False
+        )
+    if raw.lower() in ("all", "*"):
+        msg_types = [cd.ALL_MESSAGE_TYPES]
+    else:
+        msg_types = list(map(int, raw.split()))
+
+    config = DatasetConfig(
+        name=name,
+        save_path=save_path,
+        filename=filename,
+        formatter=formatter,
+        msg_types=msg_types,
+    )
+    config.add(mod)
 
 
 def main():
+    """Main function for the data_logger control CLI."""
     import sys
 
     if len(sys.argv) > 1:
@@ -33,102 +53,100 @@ def main():
     else:
         server = "127.0.0.1:7111"
 
-    mod = pyrtma.Client()
+    mod = DataLoggerClient()
     mod.connect(server)
-    mod.subscribe(
-        [
-            cd.MT_DATA_SET_STATUS,
-            cd.MT_DATA_LOGGER_CONFIG,
-            cd.MT_DATA_LOGGER_ERROR,
-        ]
-    )
-
-    metadata = {}
 
     try:
         while True:
-            cmd_str = input("(data_log)>> ")
-            args = cmd_str.split()
-            cmd = args[0]
-            if cmd == "add":
-                add_data_set(mod)
-            elif cmd == "remove":
-                rm_data_set(mod)
-            elif cmd == "pause":
-                msg = cd.MDF_DATA_SET_PAUSE()
-                msg.name = args[1]
-                mod.send_message(msg)
-            elif cmd == "resume":
-                msg = cd.MDF_DATA_SET_RESUME()
-                msg.name = args[1]
-                mod.send_message(msg)
-            elif cmd == "start":
-                msg = cd.MDF_DATA_SET_START()
-                msg.name = args[1]
-                mod.send_message(msg)
-            elif cmd == "stop":
-                msg = cd.MDF_DATA_SET_STOP()
-                msg.name = args[1]
-                mod.send_message(msg)
-            elif cmd == "status":
-                msg = cd.MDF_DATA_SET_STATUS_REQUEST()
-                msg.name = args[1]
-                mod.send_message(msg)
-            elif cmd == "config":
-                mod.send_signal(cd.MT_DATA_LOGGER_CONFIG_REQUEST)
-            elif cmd == "reset":
-                mod.send_signal(cd.MT_DATA_LOGGER_RESET)
-            elif cmd == "help":
+            Prompt.prompt_suffix = ">> "
+            cmd_str = Prompt.ask("[bold](data_log)", default=None, show_default=False)
+            if not cmd_str:
                 help()
-            elif cmd == "exit":
+                continue
+            args = cmd_str.split()
+            nargs = len(args)
+            cmd = args[0].lower()
+            if cmd in ("add", "a") and nargs == 1:
+                add_dataset(mod)
+            elif cmd in ("remove", "d") and nargs == 2:
+                mod.rm_dataset(args[1])
+            elif cmd in ("start", "s") and nargs == 2:
+                mod.start_dataset(args[1])
+            elif cmd in ("start-all", "sa") and nargs == 1:
+                mod.start_all_datasets()
+            elif cmd in ("stop", "x") and nargs == 2:
+                mod.stop_dataset(args[1])
+            elif cmd in ("stop-all", "xa") and nargs == 1:
+                mod.stop_all_datasets()
+            elif cmd in ("pause", "p") and nargs == 2:
+                mod.pause_dataset(args[1])
+            elif cmd in ("pause-all", "pa") and nargs == 1:
+                mod.pause_all_datasets()
+            elif cmd in ("resume", "r") and nargs == 2:
+                mod.resume_dataset(args[1])
+            elif cmd in ("resume-all", "ra") and nargs == 1:
+                mod.resume_all_datasets()
+            elif cmd in ("status", "=") and nargs == 2:
+                mod.request_dataset_status(args[1])
+            elif cmd in ("status-all", "=a") and nargs == 1:
+                mod.request_all_dataset_status()
+            elif cmd in ("config", "c") and nargs == 1:
+                mod.request_data_logger_config()
+            elif cmd in ("reset", "<") and nargs == 1:
+                mod.reset_data_logger()
+            elif cmd in ("kill", "k") and nargs == 1:
+                mod.send_signal(cd.MT_LM_EXIT)
+            elif cmd in ("exit", "quit", "q"):
                 break
+            elif cmd in ("help", "?", "h"):
+                help()
             else:
-                print(f"Unknown command: {cmd}")
+                rich.print(f"Unknown command: {cmd_str}")
                 help()
 
             while True:
                 msg = mod.read_message(0.200)
                 if msg:
                     if isinstance(msg.data, cd.MDF_DATA_LOGGER_ERROR):
-                        print(msg.data.msg)
-                    elif isinstance(msg.data, cd.MDF_DATA_SET_STATUS):
-                        print(msg.data.to_json())
+                        rich.print(msg.data.msg)
+                    elif isinstance(msg.data, cd.MDF_DATASET_STATUS):
+                        rich.print(msg.data.to_json())
                     elif isinstance(msg.data, cd.MDF_DATA_LOGGER_CONFIG):
-                        d = msg.data.to_dict()
-                        for ds in d["data_sets"]:
-                            names = []
-                            for msg_type in ds["msg_types"]:
-                                if msg_type < 1:
-                                    continue
-                                if msg_type == ALL_MESSAGE_TYPES:
-                                    names.append("ALL_MESSAGE_TYPES")
-                                else:
-                                    names.append(pyrtma.get_msg_cls(msg_type).type_name)
-                            ds["msg_types"] = names
-                        d["data_sets"] = d["data_sets"][: d["num_data_sets"]]
-                        print(json.dumps(d, indent=2))
+                        d = mod.process_data_logger_config_msg(msg.data)
+                        rich.print(json.dumps(d, indent=2))
                 else:
                     break
 
     except KeyboardInterrupt:
         pass
 
-    print("Goodbye")
+    rich.print("Goodbye")
 
 
 def help():
-    print("data_logger_control:")
-    print("  * add - Add a data set.")
-    print("  * remove - Remove a data set")
-    print("  * start")
-    print("  * stop")
-    print("  * pause")
-    print("  * resume")
-    print("  * reset")
-    print("  * status")
-    print("  * config")
-    print("  * exit - close application.")
-    print()
+    """Prints the help message for the data_logger control CLI."""
+    name = escape("[NAME]")
+    g = "[green]"
+    b = "[blue]"
+
+    rich.print(f"\n[u]data_logger control:")
+    rich.print(f"  * {g}add[/]/{g}a[/] - Add a dataset.")
+    rich.print(f"  * {g}remove[/]/{g}d[/] {b}{name}[/] - Remove dataset NAME")
+    rich.print(f"  * {g}start[/]/{g}s[/] {b}{name}[/] - Start dataset NAME")
+    rich.print(f"  * {g}start-all[/]/{g}sa[/] - Start all datasets")
+    rich.print(f"  * {g}stop[/]/{g}x[/] {b}{name}[/] - Stop dataset NAME")
+    rich.print(f"  * {g}stop-all[/]/{g}xa[/] - Stop all datasets")
+    rich.print(f"  * {g}pause[/]/{g}p[/] {b}{name}[/] - Pause dataset NAME")
+    rich.print(f"  * {g}pause-all[/]/{g}pa[/] - Pause all datasets")
+    rich.print(f"  * {g}resume[/]/{g}r[/] {b}{name}[/] - Resume dataset NAME")
+    rich.print(f"  * {g}resume-all[/]/{g}ra[/] - Resume all datasets")
+    rich.print(f"  * {g}status[/]/{g}=[/] {b}{name}[/] - Get status of dataset NAME")
+    rich.print(f"  * {g}status-all[/]/{g}=a[/] - Get status of all datasets")
+    rich.print(f"  * {g}config[/]/{g}c[/] - Get data_logger config")
+    rich.print(f"  * {g}reset[/]/{g}<[/] - Reset data_logger")
+    rich.print(f"  * {g}kill[/]/{g}k[/] - Close data_logger")
+    rich.print(f"  * {g}help[/]/{g}h[/]/{g}?[/] - rich.print this help")
+    rich.print(f"  * {g}exit[/]/{g}quit[/]/{g}q[/] - close application.\n")
 
 
 if __name__ == "__main__":

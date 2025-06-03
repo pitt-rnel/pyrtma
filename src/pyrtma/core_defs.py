@@ -38,7 +38,8 @@ COMPILED_PYRTMA_VERSION: str = "2.3.5"
 check_compiled_version(COMPILED_PYRTMA_VERSION)
 
 # Constants
-MAX_DATA_SETS: int = 6
+MAX_DATASETS: int = 6
+DATASET_NAME_LEN: int = 32
 MAX_LOGGER_FILENAME_LENGTH: int = 256
 MAX_MODULES: int = 200
 DYN_MOD_ID_START: int = 100
@@ -74,19 +75,19 @@ MID_DATA_LOGGER: int = 4
 MID_QUICK_LOGGER: int = 5
 
 # Message Type IDs
-MT_DATA_SET_STATUS_REQUEST: int = 62
-MT_DATA_SET_STATUS: int = 63
-MT_DATA_SET_ADD: int = 66
-MT_DATA_SET_REMOVE: int = 67
+MT_DATASET_STATUS_REQUEST: int = 62
+MT_DATASET_STATUS: int = 63
+MT_DATASET_ADD: int = 66
+MT_DATASET_REMOVE: int = 67
 MT_DATA_LOGGER_CONFIG_REQUEST: int = 68
 MT_DATA_LOGGER_CONFIG: int = 69
-MT_DATA_SET_STARTED: int = 70
-MT_DATA_SET_STOPPED: int = 71
-MT_DATA_SET_SAVED: int = 72
-MT_DATA_SET_START: int = 73
-MT_DATA_SET_STOP: int = 74
-MT_DATA_SET_PAUSE: int = 75
-MT_DATA_SET_RESUME: int = 76
+MT_DATASET_STARTED: int = 70
+MT_DATASET_STOPPED: int = 71
+MT_DATASET_SAVED: int = 72
+MT_DATASET_START: int = 73
+MT_DATASET_STOP: int = 74
+MT_DATASET_PAUSE: int = 75
+MT_DATASET_RESUME: int = 76
 MT_DATA_LOGGER_RESET: int = 77
 MT_DATA_LOGGER_ERROR: int = 78
 MT_DATA_LOG_TEST_2048: int = 79
@@ -129,21 +130,21 @@ MT_RESUME_SUBSCRIPTION: int = 86
 
 
 # Struct Definitions
-class DATA_SET(MessageBase, metaclass=MessageMeta):
-    type_name: ClassVar[str] = "DATA_SET"
-    type_hash: ClassVar[int] = 0x3B694CA3
-    type_size: ClassVar[int] = 452
+class DATASET(MessageBase, metaclass=MessageMeta):
+    type_name: ClassVar[str] = "DATASET"
+    type_hash: ClassVar[int] = 0xE2E58374
+    type_size: ClassVar[int] = 708
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_SET:\n  fields:\n    name: char[32]\n    save_path: char[128]\n    filename: char[128]\n    formatter: char[32]\n    subdivide_interval: int32\n    msg_types: int32[32]'"
+        "'DATASET:\n  fields:\n    name: char[DATASET_NAME_LEN]\n    save_path: char[256]\n    filename: char[128]\n    formatter: char[32]\n    subdivide_interval: int32\n    msg_types: int32[64]'"
     )
 
     name: String = String(32)
-    save_path: String = String(128)
+    save_path: String = String(256)
     filename: String = String(128)
     formatter: String = String(32)
     subdivide_interval: Int32 = Int32()
-    msg_types: IntArray[Int32] = IntArray(Int32, 32)
+    msg_types: IntArray[Int32] = IntArray(Int32, 64)
 
 
 class RTMA_MSG_HEADER(MessageBase, metaclass=MessageMeta):
@@ -171,28 +172,28 @@ class RTMA_MSG_HEADER(MessageBase, metaclass=MessageMeta):
 
 # Message Definitions
 @pyrtma.message_def
-class MDF_DATA_SET_STATUS_REQUEST(MessageData, metaclass=MessageMeta):
+class MDF_DATASET_STATUS_REQUEST(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 62
-    type_name: ClassVar[str] = "DATA_SET_STATUS_REQUEST"
-    type_hash: ClassVar[int] = 0x1D00BFBA
+    type_name: ClassVar[str] = "DATASET_STATUS_REQUEST"
+    type_hash: ClassVar[int] = 0x2256A79F
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_SET_STATUS_REQUEST:\n  id: 62\n  fields:\n    name: char[32]'"
+        "'DATASET_STATUS_REQUEST:\n  id: 62\n  fields:\n    name: char[DATASET_NAME_LEN]'"
     )
 
     name: String = String(32)
 
 
 @pyrtma.message_def
-class MDF_DATA_SET_STATUS(MessageData, metaclass=MessageMeta):
+class MDF_DATASET_STATUS(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 63
-    type_name: ClassVar[str] = "DATA_SET_STATUS"
-    type_hash: ClassVar[int] = 0x30AD7168
+    type_name: ClassVar[str] = "DATASET_STATUS"
+    type_hash: ClassVar[int] = 0xB608D5F6
     type_size: ClassVar[int] = 56
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_SET_STATUS:\n  id: 63\n  fields:\n    name: char[32]\n    timestamp: double\n    elapsed_time: double\n    is_recording: int32\n    is_paused: int32'"
+        "'DATASET_STATUS:\n  id: 63\n  fields:\n    name: char[DATASET_NAME_LEN]\n    timestamp: double\n    elapsed_time: double\n    is_recording: int32\n    is_paused: int32'"
     )
 
     name: String = String(32)
@@ -203,28 +204,28 @@ class MDF_DATA_SET_STATUS(MessageData, metaclass=MessageMeta):
 
 
 @pyrtma.message_def
-class MDF_DATA_SET_ADD(MessageData, metaclass=MessageMeta):
+class MDF_DATASET_ADD(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 66
-    type_name: ClassVar[str] = "DATA_SET_ADD"
-    type_hash: ClassVar[int] = 0x403561F8
-    type_size: ClassVar[int] = 452
+    type_name: ClassVar[str] = "DATASET_ADD"
+    type_hash: ClassVar[int] = 0xBCCBB90E
+    type_size: ClassVar[int] = 708
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_SET_ADD:\n  id: 66\n  fields:\n    data_set: DATA_SET'"
+        "'DATASET_ADD:\n  id: 66\n  fields:\n    dataset: DATASET'"
     )
 
-    data_set: Struct[DATA_SET] = Struct(DATA_SET)
+    dataset: Struct[DATASET] = Struct(DATASET)
 
 
 @pyrtma.message_def
-class MDF_DATA_SET_REMOVE(MessageData, metaclass=MessageMeta):
+class MDF_DATASET_REMOVE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 67
-    type_name: ClassVar[str] = "DATA_SET_REMOVE"
-    type_hash: ClassVar[int] = 0x8FD5BA98
+    type_name: ClassVar[str] = "DATASET_REMOVE"
+    type_hash: ClassVar[int] = 0x97E3C6BD
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_SET_REMOVE:\n  id: 67\n  fields:\n    name: char[32]'"
+        "'DATASET_REMOVE:\n  id: 67\n  fields:\n    name: char[DATASET_NAME_LEN]'"
     )
 
     name: String = String(32)
@@ -244,110 +245,110 @@ class MDF_DATA_LOGGER_CONFIG_REQUEST(MessageData, metaclass=MessageMeta):
 class MDF_DATA_LOGGER_CONFIG(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 69
     type_name: ClassVar[str] = "DATA_LOGGER_CONFIG"
-    type_hash: ClassVar[int] = 0x932023E8
-    type_size: ClassVar[int] = 2716
+    type_hash: ClassVar[int] = 0x085048FB
+    type_size: ClassVar[int] = 4252
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_LOGGER_CONFIG:\n  id: 69\n  fields:\n    num_data_sets: int32\n    data_sets: DATA_SET[6]'"
+        "'DATA_LOGGER_CONFIG:\n  id: 69\n  fields:\n    num_datasets: int32\n    datasets: DATASET[6]'"
     )
 
-    num_data_sets: Int32 = Int32()
-    data_sets: StructArray[DATA_SET] = StructArray(DATA_SET, 6)
+    num_datasets: Int32 = Int32()
+    datasets: StructArray[DATASET] = StructArray(DATASET, 6)
 
 
 @pyrtma.message_def
-class MDF_DATA_SET_STARTED(MessageData, metaclass=MessageMeta):
+class MDF_DATASET_STARTED(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 70
-    type_name: ClassVar[str] = "DATA_SET_STARTED"
-    type_hash: ClassVar[int] = 0x30DCBFCC
+    type_name: ClassVar[str] = "DATASET_STARTED"
+    type_hash: ClassVar[int] = 0x5A6BC4E6
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_SET_STARTED:\n  id: 70\n  fields:\n    name: char[32]'"
+        "'DATASET_STARTED:\n  id: 70\n  fields:\n    name: char[DATASET_NAME_LEN]'"
     )
 
     name: String = String(32)
 
 
 @pyrtma.message_def
-class MDF_DATA_SET_STOPPED(MessageData, metaclass=MessageMeta):
+class MDF_DATASET_STOPPED(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 71
-    type_name: ClassVar[str] = "DATA_SET_STOPPED"
-    type_hash: ClassVar[int] = 0x842597C8
+    type_name: ClassVar[str] = "DATASET_STOPPED"
+    type_hash: ClassVar[int] = 0x19F8847F
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_SET_STOPPED:\n  id: 71\n  fields:\n    name: char[32]'"
+        "'DATASET_STOPPED:\n  id: 71\n  fields:\n    name: char[DATASET_NAME_LEN]'"
     )
 
     name: String = String(32)
 
 
 @pyrtma.message_def
-class MDF_DATA_SET_SAVED(MessageData, metaclass=MessageMeta):
+class MDF_DATASET_SAVED(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 72
-    type_name: ClassVar[str] = "DATA_SET_SAVED"
-    type_hash: ClassVar[int] = 0x869199BF
+    type_name: ClassVar[str] = "DATASET_SAVED"
+    type_hash: ClassVar[int] = 0x1583C453
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_SET_SAVED:\n  id: 72\n  fields:\n    name: char[32]'"
+        "'DATASET_SAVED:\n  id: 72\n  fields:\n    name: char[DATASET_NAME_LEN]'"
     )
 
     name: String = String(32)
 
 
 @pyrtma.message_def
-class MDF_DATA_SET_START(MessageData, metaclass=MessageMeta):
+class MDF_DATASET_START(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 73
-    type_name: ClassVar[str] = "DATA_SET_START"
-    type_hash: ClassVar[int] = 0x80A69613
+    type_name: ClassVar[str] = "DATASET_START"
+    type_hash: ClassVar[int] = 0x019BBFB4
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_SET_START:\n  id: 73\n  fields:\n    name: char[32]'"
+        "'DATASET_START:\n  id: 73\n  fields:\n    name: char[DATASET_NAME_LEN]'"
     )
 
     name: String = String(32)
 
 
 @pyrtma.message_def
-class MDF_DATA_SET_STOP(MessageData, metaclass=MessageMeta):
+class MDF_DATASET_STOP(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 74
-    type_name: ClassVar[str] = "DATA_SET_STOP"
-    type_hash: ClassVar[int] = 0xDFA958E5
+    type_name: ClassVar[str] = "DATASET_STOP"
+    type_hash: ClassVar[int] = 0xFC4A83B1
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_SET_STOP:\n  id: 74\n  fields:\n    name: char[32]'"
+        "'DATASET_STOP:\n  id: 74\n  fields:\n    name: char[DATASET_NAME_LEN]'"
     )
 
     name: String = String(32)
 
 
 @pyrtma.message_def
-class MDF_DATA_SET_PAUSE(MessageData, metaclass=MessageMeta):
+class MDF_DATASET_PAUSE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 75
-    type_name: ClassVar[str] = "DATA_SET_PAUSE"
-    type_hash: ClassVar[int] = 0x9766070C
+    type_name: ClassVar[str] = "DATASET_PAUSE"
+    type_hash: ClassVar[int] = 0x0DCFA7B0
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_SET_PAUSE:\n  id: 75\n  fields:\n    name: char[32]'"
+        "'DATASET_PAUSE:\n  id: 75\n  fields:\n    name: char[DATASET_NAME_LEN]'"
     )
 
     name: String = String(32)
 
 
 @pyrtma.message_def
-class MDF_DATA_SET_RESUME(MessageData, metaclass=MessageMeta):
+class MDF_DATASET_RESUME(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 76
-    type_name: ClassVar[str] = "DATA_SET_RESUME"
-    type_hash: ClassVar[int] = 0x966919C7
+    type_name: ClassVar[str] = "DATASET_RESUME"
+    type_hash: ClassVar[int] = 0xF4E01F27
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_SET_RESUME:\n  id: 76\n  fields:\n    name: char[32]'"
+        "'DATASET_RESUME:\n  id: 76\n  fields:\n    name: char[DATASET_NAME_LEN]'"
     )
 
     name: String = String(32)

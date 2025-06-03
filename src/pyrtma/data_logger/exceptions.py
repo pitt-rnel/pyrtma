@@ -1,3 +1,6 @@
+"""data_logger exceptions"""
+
+
 class DataLoggerError(Exception):
     pass
 
@@ -32,3 +35,10 @@ class DataFormatterKeyError(DataLoggerError):
 
 class DataLoggerFullError(DataLoggerError):
     pass
+
+
+class NoClientError(DataLoggerError):
+    """Client must first be registered to DataSetConfig"""
+
+    def __init__(self, msg=None, *args, **kwargs):
+        super().__init__(msg or self.__doc__, *args, **kwargs)

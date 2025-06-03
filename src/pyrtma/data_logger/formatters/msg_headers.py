@@ -1,3 +1,5 @@
+"""data_logger Message Header Formatter"""
+
 import pyrtma
 
 from ..data_formatter import DataFormatter

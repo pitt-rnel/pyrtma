@@ -1,3 +1,5 @@
+"""data_logger legacy QuickLogger Formatter"""
+
 import pyrtma
 import os
 import sys
