@@ -3,27 +3,28 @@
 
 constants:
   MAX_DATA_SETS: 6
+  DATASET_NAME_LEN: 32
 
 struct_defs:
   DATA_SET:
     fields:
-        name: char[32]
-        save_path: char[128]      # Data set save directory 
+        name: char[DATASET_NAME_LEN]
+        save_path: char[256]      # Data set save directory 
         filename: char[128]       # Data set saved file name without the file extension
         formatter: char[32]       # Builtin Options: quicklogger, json, raw, msg_header
         subdivide_interval: int32 # <=0: Single File, >=30: Subdivide recording files
-        msg_types: int32[32]      # Message type ids that should be passed to data_set formatter
+        msg_types: int32[64]      # Message type ids that should be passed to data_set formatter
 
 message_defs:
   DATA_SET_STATUS_REQUEST:
     id: 62
     fields:
-      name: char[32]
+      name: char[DATASET_NAME_LEN]
 
   DATA_SET_STATUS:
     id: 63
     fields:
-      name: char[32]
+      name: char[DATASET_NAME_LEN]
       timestamp: double
       elapsed_time: double
       is_recording: int32
@@ -37,7 +38,7 @@ message_defs:
   DATA_SET_REMOVE:
     id: 67
     fields:
-      name: char[32]
+      name: char[DATASET_NAME_LEN]
 
   DATA_LOGGER_CONFIG_REQUEST:
     id: 68
@@ -52,37 +53,37 @@ message_defs:
   DATA_SET_STARTED:
     id: 70
     fields:
-      name: char[32]
+      name: char[DATASET_NAME_LEN]
 
   DATA_SET_STOPPED:
     id: 71
     fields:
-      name: char[32]
+      name: char[DATASET_NAME_LEN]
 
   DATA_SET_SAVED:
     id: 72
     fields:
-      name: char[32]
+      name: char[DATASET_NAME_LEN]
 
   DATA_SET_START:
     id: 73
     fields:
-      name: char[32]
+      name: char[DATASET_NAME_LEN]
 
   DATA_SET_STOP:
     id: 74
     fields:
-      name: char[32]
+      name: char[DATASET_NAME_LEN]
 
   DATA_SET_PAUSE:
     id: 75
     fields:
-      name: char[32]
+      name: char[DATASET_NAME_LEN]
 
   DATA_SET_RESUME:
     id: 76
     fields:
-      name: char[32]
+      name: char[DATASET_NAME_LEN]
 
   DATA_LOGGER_RESET:
     id: 77
