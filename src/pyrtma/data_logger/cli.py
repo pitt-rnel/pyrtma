@@ -90,18 +90,6 @@ def main():
                         print(msg.data.to_json())
                     elif isinstance(msg.data, cd.MDF_DATA_LOGGER_CONFIG):
                         d = mod.process_data_logger_config_msg(msg.data)
-                        # d = msg.data.to_dict()
-                        # for ds in d["data_sets"]:
-                        #     names = []
-                        #     for msg_type in ds["msg_types"]:
-                        #         if msg_type < 1:
-                        #             continue
-                        #         if msg_type == ALL_MESSAGE_TYPES:
-                        #             names.append("ALL_MESSAGE_TYPES")
-                        #         else:
-                        #             names.append(pyrtma.get_msg_cls(msg_type).type_name)
-                        #     ds["msg_types"] = names
-                        # d["data_sets"] = d["data_sets"][: d["num_data_sets"]]
                         print(json.dumps(d, indent=2))
                 else:
                     break
