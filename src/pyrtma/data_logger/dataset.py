@@ -78,7 +78,7 @@ class Dataset:
         self.add()
 
     def close(self):
-        if not self._user_client and self._client:
+        if not self._managed_client and self._client:
             self._client.disconnect()
 
     def __del__(self):
