@@ -22,6 +22,8 @@ class DataLogger:
     ALL_SETS = ("*", "all")
 
     def __init__(self, rtma_server_ip: str, log_level: int):
+        self.mm_ip = rtma_server_ip
+
         self.client = pyrtma.Client(module_id=cd.MID_DATA_LOGGER, name="data_logger")
         self.client.logger.set_all_levels(log_level)
         self.client.connect(rtma_server_ip, logger_status=True)
@@ -63,6 +65,9 @@ class DataLogger:
     def rm_dataset(self, name: str):
         try:
             self.datasets.pop(name)
+            reply = cd.MDF_DATASET_ADDED()
+            reply.name = name
+            self.client.send_message(reply)
             self.logger.info(f"Removed dataset: '{name}'")
         except KeyError:
             pass
@@ -133,9 +138,11 @@ class DataLogger:
         self.send_status()
 
     def stop_logging(self, name: str):
+        rm = []
         if name in DataLogger.ALL_SETS:
             for ds in self.datasets.values():
                 ds.stop()
+                rm.append(ds.name)
                 stop_msg = cd.MDF_DATASET_STOPPED()
                 stop_msg.name = ds.name
                 self.client.send_message(stop_msg)
@@ -144,6 +151,7 @@ class DataLogger:
             if ds is None:
                 raise DataSetNotFound(f"Dataset named '{name}' not found.")
 
+            rm.append(ds.name)
             ds.stop()
 
             stop_msg = cd.MDF_DATASET_STOPPED()
@@ -151,6 +159,10 @@ class DataLogger:
             self.client.send_message(stop_msg)
 
         self.send_status()
+
+        # Remove the dataset after stoppping
+        for name in rm:
+            self.rm_dataset(name)
 
     def pause_logging(self, name: str):
         if name in DataLogger.ALL_SETS:
@@ -161,7 +173,12 @@ class DataLogger:
             if ds is None:
                 raise DataSetNotFound(f"Dataset named '{name}' not found.")
 
+            if ds.paused:
+                self.logger.warning(f"Dataset {ds.name} is already paused")
+                return
+
             ds.pause()
+            self.logger.info(f"Pausing dataset: {ds.name}")
 
         self.send_status()
 
@@ -174,19 +191,24 @@ class DataLogger:
             if ds is None:
                 raise DataSetNotFound(f"Dataset named '{name}' not found.")
 
+            if not ds.paused:
+                self.logger.warning(f"Dataset {ds.name} is not paused")
+                return
+
             ds.resume()
+            self.logger.info(f"Resuming dataset: {ds.name}")
 
         self.send_status()
 
     def add_dataset(self, msg: cd.MDF_DATASET_ADD):
         dataset = DataSet(
+            self.mm_ip,
             name=msg.dataset.name,
             save_path=msg.dataset.save_path,
             filename=msg.dataset.filename,
             msg_types=msg.dataset.msg_types[:],
             formatter_cls=get_formatter(msg.dataset.formatter),
             subdivide_interval=msg.dataset.subdivide_interval,
-            parent_logger=self.logger,
         )
 
         if len(self.datasets) == DataLogger.MAX_DATASETS:
@@ -198,6 +220,10 @@ class DataLogger:
             )
 
         self.datasets[dataset.name] = dataset
+        reply = cd.MDF_DATASET_ADDED()
+        reply.name = dataset.name
+        self.client.send_message(reply)
+
         self.logger.info(f"Added dataset: {dataset.name}")
 
     def reset(self):
