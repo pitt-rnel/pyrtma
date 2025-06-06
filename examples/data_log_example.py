@@ -1,20 +1,23 @@
 import time
-from pyrtma.data_logger.data_logger_client import DataLoggerClient, DatasetConfig
+import pyrtma
 import pathlib
 import pyrtma.core_defs as cd
+from pyrtma.data_logger.dataset import Dataset
 
 
 def main(trial_num: int, count: int):
-    mod = DataLoggerClient()
+    # Reset the DataLogger for a clean start
+    mod = pyrtma.Client()
     mod.connect()
-
     mod.send_signal(cd.MT_DATA_LOGGER_RESET)
 
     # Add Datasets to the DataLogger
     base_path = pathlib.Path.home() / "data_logger"
 
+    datasets: list[Dataset] = list()
+
     # JSONFormatter
-    jsonf_config = DatasetConfig(
+    jsonf_ds = Dataset(
         name="json",
         save_path=base_path / f"trial_{trial_num:04d}" / "json",
         filename=f"trial_{trial_num:04d}",
@@ -22,11 +25,10 @@ def main(trial_num: int, count: int):
         msg_types=[cd.MT_DATA_LOG_TEST_2048],
         subdivide_interval=30,
     )
-    # add via client interface
-    mod.add_dataset(jsonf_config)
+    datasets.append(jsonf_ds)
 
     # MsgHeaderFormatter
-    headersf_config = DatasetConfig(
+    headersf_ds = Dataset(
         name="headers",
         save_path=str(base_path / f"trial_{trial_num:04d}" / "headers"),
         filename=f"trial_{trial_num:04d}",
@@ -34,34 +36,32 @@ def main(trial_num: int, count: int):
         msg_types=[cd.MT_DATA_LOG_TEST_2048],
         subdivide_interval=0,
     )
-    # add via DatasetConfig interface
-    headersf_config.register_client(mod)
-    headersf_config.add()
+    datasets.append(headersf_ds)
 
     # QLFormatter
-    qlf_config = DatasetConfig(
+    qlf_ds = Dataset(
         name="quicklogger",
         save_path=str(base_path / f"trial_{trial_num:04d}" / "quicklogger"),
         filename=f"trial_{trial_num:04d}",
         formatter="quicklogger",
         msg_types=[cd.MT_DATA_LOG_TEST_2048],
     )
-    # add via DatasetConfig interface in 1 line
-    qlf_config.add(client=mod)
+    datasets.append(qlf_ds)
 
     # RawFormatter (Alternative binary format [Header->Data->Header->Data])
-    # rawf_config = DatasetConfig(
+    # rawf_ds = Dataset(
     #     name="raw",
     #     save_path=str(base_path / f"trial_{trial_num:04d}" / "raw"),
     #     filename=f"trial_{trial_num:04d}",
     #     formatter="raw",
     #     msg_types=[cd.MT_DATA_LOG_TEST_2048]
     # )
-    # rawf_config.add(client=mod)
+    # datasets.append(raw_ds)
 
     # Start all the data sets
     input("Hit enter to start the data sets...")
-    mod.start_all_datasets()
+    for ds in datasets:
+        ds.start()
 
     input("Hit enter to start sending packets...")
     msg = cd.MDF_DATA_LOG_TEST_2048.from_random()
@@ -88,8 +88,8 @@ def main(trial_num: int, count: int):
         pass
     finally:
         print(f"Sent {n} packets.")
-        if mod.connected:
-            mod.stop_all_datasets()
+        for ds in datasets:
+            ds.stop()
 
     print("Done")
 
