@@ -232,14 +232,11 @@ class DatasetWriter:
     def stop(self):
         if self.recording:
             self.stop_flag.set()
-            self.logger.info(f"Stopping dataset: {self.name}")
             self.start_time = -1
             self.ref_time = -1
             self._recording = False
             self._paused = False
             self.next_write = -1.0
-        else:
-            self.logger.warning(f"Dataset {self.name} is not recording")
 
     def send_error(self, exc: DataLoggerError):
         err = cd.MDF_DATA_LOGGER_ERROR()

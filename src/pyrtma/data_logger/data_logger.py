@@ -141,7 +141,11 @@ class DataLogger:
         rm = []
         if name in DataLogger.ALL_SETS:
             for ds in self.datasets.values():
+                if not ds.recording:
+                    self.logger.warning(f"Dataset {ds.name} is not recording")
+                    continue
                 ds.stop()
+                self.logger.info(f"Stopping dataset: '{ds.name}'")
                 rm.append(ds.name)
                 stop_msg = cd.MDF_DATASET_STOPPED()
                 stop_msg.name = ds.name
@@ -151,8 +155,13 @@ class DataLogger:
             if ds is None:
                 raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
 
+            if not ds.recording:
+                self.logger.warning(f"Dataset {ds.name} is not recording")
+                return
+
             rm.append(ds.name)
             ds.stop()
+            self.logger.info(f"Stopping dataset: '{ds.name}'")
 
             stop_msg = cd.MDF_DATASET_STOPPED()
             stop_msg.name = ds.name
@@ -178,7 +187,7 @@ class DataLogger:
                 return
 
             ds.pause()
-            self.logger.info(f"Pausing dataset: {ds.name}")
+            self.logger.info(f"Pausing dataset: '{ds.name}'")
 
         self.send_status()
 
@@ -226,7 +235,7 @@ class DataLogger:
         reply.name = dataset.name
         self.client.send_message(reply)
 
-        self.logger.info(f"Added dataset: {dataset.name}")
+        self.logger.info(f"Added dataset: '{dataset.name}'")
 
     def reset(self):
         self.client.info(f"Reset DataLogger. All Datasets will be cleared")
