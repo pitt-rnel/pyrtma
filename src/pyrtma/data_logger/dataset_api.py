@@ -1,7 +1,4 @@
-"""pyrtma.data_logger.data_logger_client
-
-Subclass of :py:class:`pyrtma.Client` that provides additional functions for managing the pyrtma data_logger
-"""
+"""pyrtma.data_logger.dataset"""
 
 from __future__ import annotations
 
