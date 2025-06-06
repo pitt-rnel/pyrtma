@@ -28,8 +28,9 @@ class Dataset:
         formatter: str,
         subdivide_interval: int = 0,
         msg_types: List[int] | None = None,
-        mm_ip: str = "localhost:7111",
+        mm_ip: str = "127.0.0.1:7111",
         status_interval: float = 5.0,
+        create_client: bool = True,
     ):
 
         _datalogger_types = (
@@ -43,9 +44,14 @@ class Dataset:
             cd.MT_DATA_LOGGER_ERROR,
         )
 
-        self._client = pyrtma.Client(0, name=name)
-        self._client.connect(mm_ip)
-        self._client.subscribe(_datalogger_types)
+        if create_client:
+            self._client = pyrtma.Client(0, name=name)
+            self._client.connect(mm_ip)
+            self._client.subscribe(_datalogger_types)
+            self._managed_client = True
+        else:
+            # User needs to register a client
+            self._client = None
 
         self._name = name
         self._save_path = Path(save_path)
@@ -68,6 +74,29 @@ class Dataset:
 
         self.status_interval = status_interval
         self._last_status = time.time()
+
+        self.add()
+
+    def close(self):
+        if not self._user_client and self._client:
+            self._client.disconnect()
+
+    def __del__(self):
+        self.close
+
+    def register_client(self, client: pyrtma.Client):
+        """Register a pyrtma client with this dataset
+        Args:
+            client (pyrtma.Client): client to register
+        """
+        if self._managed_client and self._client:
+            self._client.disconnect()
+        self._client = client
+        self._managed_client = False
+
+    def unregister_client(self):
+        if not self._managed_client:
+            self._client = None
 
     @property
     def name(self) -> str:
@@ -126,6 +155,11 @@ class Dataset:
         return bool(self._status.is_paused)
 
     def poll(self, timeout: float = 0) -> cd.MDF_DATA_LOGGER_ERROR | None:
+        if not self._managed_client:
+            raise NotImplementedError(
+                "User must implement a custom 'poll' function after registering an external pyrtma.Client to a Dataset"
+            )
+
         if self._client is None:
             raise NoClientError
 
@@ -135,39 +169,42 @@ class Dataset:
             self._client.send_message(req)
             self._last_request = now
 
-        while msg := self._client.read_message(timeout):
-            if msg.type_id in (
-                cd.MT_DATASET_STATUS,
-                cd.MT_DATASET_ADDED,
-                cd.MT_DATASET_STARTED,
-                cd.MT_DATASET_STOPPED,
-                cd.MT_DATASET_REMOVED,
-                cd.MT_DATASET_SAVED,
-                cd.MT_DATA_LOGGER_ERROR,
-            ):
-                if msg.name != self._name:
-                    return
+        if msg := self._client.read_message(timeout):
+            return self.process_msg(msg)
 
-            match (msg.type_id):
-                case cd.MT_DATASET_STATUS:
-                    self._status = cast(cd.MDF_DATASET_STATUS, msg.data)
-                    self._last_status = time.time()
-                case cd.MT_DATASET_STARTED:
-                    self._started = True
-                case cd.MT_DATASET_STOPPED:
-                    self._stopped = True
-                case cd.MT_DATASET_ADDED:
-                    self._added = True
-                case cd.MT_DATASET_REMOVED:
-                    self._removed = True
-                case cd.MT_DATASET_SAVED:
-                    self._saved.append(cast(cd.MDF_DATASET_SAVED, msg.data).filepath)
-                case cd.MT_DATA_LOGGER_ERROR:
-                    return cast(cd.MDF_DATA_LOGGER_ERROR, msg.data)
-                case cd.MT_DATA_LOGGER_CONFIG:
-                    self.datalogger_config = self.process_data_logger_config_msg(
-                        cast(cd.MDF_DATA_LOGGER_CONFIG, msg.data)
-                    )
+    def process_msg(self, msg: pyrtma.Message) -> cd.MDF_DATA_LOGGER_ERROR | None:
+        if msg.type_id in (
+            cd.MT_DATASET_STATUS,
+            cd.MT_DATASET_ADDED,
+            cd.MT_DATASET_STARTED,
+            cd.MT_DATASET_STOPPED,
+            cd.MT_DATASET_REMOVED,
+            cd.MT_DATASET_SAVED,
+            cd.MT_DATA_LOGGER_ERROR,
+        ):
+            if msg.name != self._name:
+                return
+
+        match (msg.type_id):
+            case cd.MT_DATASET_STATUS:
+                self._status = cast(cd.MDF_DATASET_STATUS, msg.data)
+                self._last_status = time.time()
+            case cd.MT_DATASET_STARTED:
+                self._started = True
+            case cd.MT_DATASET_STOPPED:
+                self._stopped = True
+            case cd.MT_DATASET_ADDED:
+                self._added = True
+            case cd.MT_DATASET_REMOVED:
+                self._removed = True
+            case cd.MT_DATASET_SAVED:
+                self._saved.append(cast(cd.MDF_DATASET_SAVED, msg.data).filepath)
+            case cd.MT_DATA_LOGGER_ERROR:
+                return cast(cd.MDF_DATA_LOGGER_ERROR, msg.data)
+            case cd.MT_DATA_LOGGER_CONFIG:
+                self.datalogger_config = self.process_data_logger_config_msg(
+                    cast(cd.MDF_DATA_LOGGER_CONFIG, msg.data)
+                )
 
     def add(self) -> cd.MDF_DATASET_ADD:
         msg = cd.MDF_DATASET_ADD()
