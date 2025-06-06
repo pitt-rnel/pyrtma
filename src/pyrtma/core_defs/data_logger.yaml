@@ -103,6 +103,8 @@ message_defs:
   DATA_LOGGER_ERROR:
     id: 78
     fields:
+      dataset_name: char[DATASET_NAME_LEN]
+      exc_type: char[64]
       msg: char[512]
 
   DATA_LOG_TEST_2048:

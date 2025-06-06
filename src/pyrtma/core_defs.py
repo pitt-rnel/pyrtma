@@ -399,13 +399,15 @@ class MDF_DATA_LOGGER_RESET(MessageData, metaclass=MessageMeta):
 class MDF_DATA_LOGGER_ERROR(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 78
     type_name: ClassVar[str] = "DATA_LOGGER_ERROR"
-    type_hash: ClassVar[int] = 0xAD3B4A67
-    type_size: ClassVar[int] = 512
+    type_hash: ClassVar[int] = 0x630C7107
+    type_size: ClassVar[int] = 608
     type_source: ClassVar[str] = "data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_LOGGER_ERROR:\n  id: 78\n  fields:\n    msg: char[512]'"
+        "'DATA_LOGGER_ERROR:\n  id: 78\n  fields:\n    dataset_name: char[DATASET_NAME_LEN]\n    exc_type: char[64]\n    msg: char[512]'"
     )
 
+    dataset_name: String = String(32)
+    exc_type: String = String(64)
     msg: String = String(512)
 
 
