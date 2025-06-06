@@ -31,11 +31,21 @@ message_defs:
       is_paused: int32
 
   DATASET_ADD:
-    id: 66
+    id: 64
     fields:
         dataset: DATASET
 
+  DATASET_ADDED:
+    id: 65
+    fields:
+      name: char[DATASET_NAME_LEN]
+
   DATASET_REMOVE:
+    id: 66
+    fields:
+      name: char[DATASET_NAME_LEN]
+
+  DATASET_REMOVED:
     id: 67
     fields:
       name: char[DATASET_NAME_LEN]
@@ -64,6 +74,7 @@ message_defs:
     id: 72
     fields:
       name: char[DATASET_NAME_LEN]
+      filepath: char[1024]
 
   DATASET_START:
     id: 73
