@@ -86,7 +86,7 @@ class DataLogger:
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(f"Dataset named '{name}' not found.")
+                raise DataSetNotFound(name, f"Dataset named '{name}' not found.")
 
             msg.name = ds.name
             msg.elapsed_time = ds.elapsed_time
@@ -123,11 +123,11 @@ class DataLogger:
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(f"Dataset named '{name}' not found.")
+                raise DataSetNotFound(name, f"Dataset named '{name}' not found.")
 
             if ds.recording:
                 raise DataSetInProgress(
-                    f"Recording in progresss for dataset '{ds.name}'"
+                    name, f"Recording in progresss for dataset '{ds.name}'"
                 )
 
             ds.start()
@@ -149,7 +149,7 @@ class DataLogger:
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(f"Dataset named '{name}' not found.")
+                raise DataSetNotFound(name, f"Dataset named '{name}' not found.")
 
             rm.append(ds.name)
             ds.stop()
@@ -171,7 +171,7 @@ class DataLogger:
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(f"Dataset named '{name}' not found.")
+                raise DataSetNotFound(name, f"Dataset named '{name}' not found.")
 
             if ds.paused:
                 self.logger.warning(f"Dataset {ds.name} is already paused")
@@ -189,7 +189,7 @@ class DataLogger:
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(f"Dataset named '{name}' not found.")
+                raise DataSetNotFound(name, f"Dataset named '{name}' not found.")
 
             if not ds.paused:
                 self.logger.warning(f"Dataset {ds.name} is not paused")
@@ -212,11 +212,13 @@ class DataLogger:
         )
 
         if len(self.datasets) == DataLogger.MAX_DATASETS:
-            raise DataLoggerFullError("Logger has maximum allowed datasets configured.")
+            raise DataLoggerFullError(
+                dataset.name, "Logger has maximum allowed datasets configured."
+            )
 
         if dataset.name in self.datasets.keys():
             raise DataSetExistsError(
-                f"A dataset with name '{dataset.name}' already exists"
+                dataset.name, f"A dataset with name '{dataset.name}' already exists"
             )
 
         self.datasets[dataset.name] = dataset
@@ -236,9 +238,11 @@ class DataLogger:
         for name in rm:
             self.rm_dataset(name)
 
-    def send_error(self, msg: str):
+    def send_error(self, exc: DataLoggerError):
         err = cd.MDF_DATA_LOGGER_ERROR()
-        err.msg = msg
+        err.dataset_name = exc.dataset
+        err.exc_type = type(exc).__name__
+        err.msg = exc.msg
         self.client.send_message(err)
 
     def run(self):
@@ -284,8 +288,8 @@ class DataLogger:
 
                     self.update(msg)
                 except DataLoggerError as e:
-                    self.client.error(e.args[0])
-                    self.send_error(f"{e.__class__.__name__}:{e.args[0]}")
+                    self.client.error(e.msg)
+                    self.send_error(e)
 
         except KeyboardInterrupt:
             pass

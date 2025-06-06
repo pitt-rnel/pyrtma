@@ -13,7 +13,12 @@ from ..core_defs import ALL_MESSAGE_TYPES
 from typing import Type, Optional, IO, Any, List
 
 from .data_formatter import DataFormatter
-from .exceptions import DataSetExistsError, DataSetThreadError
+from .exceptions import (
+    DataSetExistsError,
+    DataSetThreadError,
+    DataLoggerError,
+    DataSetError,
+)
 
 
 class DataSet:
@@ -96,7 +101,7 @@ class DataSet:
         self.file_path = self.save_path / self.filename
 
         if self.file_path.exists():
-            raise DataSetExistsError(f"{self.file_path} already exists.")
+            raise DataSetExistsError(self.name, f"{self.file_path} already exists.")
 
     def __del__(self):
         if self._dead:
@@ -171,7 +176,8 @@ class DataSet:
 
         if not self.write_thread.is_alive():
             raise DataSetThreadError(
-                "Data collection write thread is no longer active. Reset the logger."
+                self.name,
+                "Data collection write thread is no longer active. Reset the logger.",
             )
 
         if msg:
@@ -216,7 +222,7 @@ class DataSet:
         self.file_path = self.file_path.parent / new_filename
 
         if self.file_path.exists():
-            raise DataSetExistsError(f"{self.file_path} already exists.")
+            raise DataSetExistsError(self.name, f"{self.file_path} already exists.")
 
         self.logger.info(f"Sub-dividing dataset: {self.file_path}")
 
@@ -234,6 +240,13 @@ class DataSet:
             self.next_write = -1.0
         else:
             self.logger.warning(f"Dataset {self.name} is not recording")
+
+    def send_error(self, exc: DataLoggerError):
+        err = cd.MDF_DATA_LOGGER_ERROR()
+        err.dataset_name = exc.dataset
+        err.exc_type = type(exc).__name__
+        err.msg = exc.msg
+        self.client.send_message(err)
 
     def stage_for_write(self):
         """Set the write buffer data for the data collection write thread"""
@@ -270,6 +283,9 @@ class DataSet:
 
         except KeyboardInterrupt:
             pass
+        except DataLoggerError as e:
+            self.client.error(e.msg)
+            self.send_error(e)
         finally:
             self.logger.debug("Collection write thread exited.")
 

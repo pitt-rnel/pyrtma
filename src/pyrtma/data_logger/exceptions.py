@@ -2,30 +2,38 @@
 
 
 class DataLoggerError(Exception):
-    pass
+    def __init__(self, dataset: str = "", msg: str = ""):
+        self.dataset = dataset
+        self.msg = msg
+
+        super().__init__(msg)
 
 
 class DataSetNotConfigured(DataLoggerError):
     pass
 
 
-class DataSetNotFound(DataLoggerError):
+class DataSetError(DataLoggerError):
     pass
 
 
-class DataSetInProgress(DataLoggerError):
+class DataSetNotFound(DataSetError):
     pass
 
 
-class InvalidFormatter(DataLoggerError):
+class DataSetInProgress(DataSetError):
     pass
 
 
-class DataSetExistsError(DataLoggerError):
+class InvalidFormatter(DataSetError):
     pass
 
 
-class DataSetThreadError(DataLoggerError):
+class DataSetExistsError(DataSetError):
+    pass
+
+
+class DataSetThreadError(DataSetError):
     pass
 
 
@@ -33,12 +41,12 @@ class DataFormatterKeyError(DataLoggerError):
     pass
 
 
-class DataLoggerFullError(DataLoggerError):
+class DataLoggerFullError(DataSetError):
     pass
 
 
 class NoClientError(DataLoggerError):
-    """Client must first be registered to DataSetConfig"""
+    """Client must first be registered to Dataset"""
 
-    def __init__(self, msg=None, *args, **kwargs):
-        super().__init__(msg or self.__doc__, *args, **kwargs)
+    def __init__(self):
+        super().__init__(msg=self.__doc__ or "")
