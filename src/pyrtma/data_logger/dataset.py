@@ -7,6 +7,7 @@ import time
 import threading
 import pyrtma
 
+import pyrtma.core_defs as cd
 from ..message import Message
 from ..core_defs import ALL_MESSAGE_TYPES
 from typing import Type, Optional, IO, Any, List
@@ -23,16 +24,17 @@ class DataSet:
 
     def __init__(
         self,
+        mm_ip: str,
         name: str,
         save_path: str,
         filename: str,
         formatter_cls: Type[DataFormatter],
         subdivide_interval: int,
         msg_types: List[int],
-        parent_logger: pyrtma.client.RTMALogger,
     ):
-        self.logger = parent_logger.add_child(f"{name}")
-        self.logger.name = f"{name}"
+        self.client = pyrtma.Client(0, name=name)
+        self.client.connect(mm_ip)
+        self.logger = self.client.logger
         self.name = name
         self.save_path = pathlib.Path(save_path)
         self.formatter_cls = formatter_cls
@@ -104,21 +106,13 @@ class DataSet:
                 self.stop()
 
     def pause(self):
-        if self.paused:
-            self.logger.warning(f"Dataset {self.name} is already paused")
-            return
         elapsed = self.elapsed_time
         self._elapsed_time = elapsed
         self._paused = True
-        self.logger.info(f"Pausing dataset: {self.name}")
 
     def resume(self):
-        if not self.paused:
-            self.logger.warning(f"Dataset {self.name} is not paused")
-            return
         self._paused = False
         self.ref_time = time.time()
-        self.logger.info(f"Resuming dataset: {self.name}")
 
     @property
     def elapsed_time(self) -> float:
@@ -151,10 +145,6 @@ class DataSet:
         return self._dead
 
     def start(self):
-        if self.recording:
-            self.logger.warning(f"Dataset {self.name} is already recording")
-            return
-
         # Reset some tracking vars
         self.sub_index = 0
         self.subdivide_flag = False
@@ -206,12 +196,19 @@ class DataSet:
                 self.next_write = elapsed + DataSet.WRITE_PERIOD
                 self.stage_for_write()
 
+    def send_saved(self):
+        msg = cd.MDF_DATASET_SAVED()
+        msg.name = self.name
+        msg.filepath = str(self.file_path)
+        self.client.send_message(msg)
+
     def subdivide(self):
         self.sub_index += 1
         self.formatter.finalize(self.wbuf)
 
         if self.fd:
             self.fd.close()
+            self.send_saved()
 
         new_filename = (
             f"{self.base_file_name}_{self.sub_index:04d}{self.formatter_cls.ext}"
@@ -267,6 +264,7 @@ class DataSet:
                     self.formatter.finalize(self.wbuf)
                     if self.fd is not None:
                         self.fd.close()
+                        self.send_saved()
                     self._dead = True
                     break
 
