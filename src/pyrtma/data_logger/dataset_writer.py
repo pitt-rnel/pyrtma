@@ -14,14 +14,14 @@ from typing import Type, Optional, IO, Any, List
 
 from .data_formatter import DataFormatter
 from .exceptions import (
-    DataSetExistsError,
-    DataSetThreadError,
+    DatasetExistsError,
+    DatasetThreadError,
     DataLoggerError,
-    DataSetError,
+    DatasetError,
 )
 
 
-class DataSet:
+class DatasetWriter:
     MIN_INTERVAL = 30
     MAX_INTERVAL = 600
     CONTINUOUS = math.inf
@@ -37,7 +37,7 @@ class DataSet:
         subdivide_interval: int,
         msg_types: List[int],
     ):
-        self.client = pyrtma.Client(0, name=name)
+        self.client = pyrtma.Client(0, name=f"dataset.{name}")
         self.client.connect(mm_ip)
         self.logger = self.client.logger
         self.name = name
@@ -49,11 +49,11 @@ class DataSet:
         self.base_file_name = filename
 
         if subdivide_interval <= 0:
-            self.subdivide_interval = DataSet.CONTINUOUS
-        elif subdivide_interval < DataSet.MIN_INTERVAL:
-            self.subdivide_interval = DataSet.MIN_INTERVAL
-        elif subdivide_interval > DataSet.MAX_INTERVAL:
-            self.subdivide_interval = DataSet.MAX_INTERVAL
+            self.subdivide_interval = DatasetWriter.CONTINUOUS
+        elif subdivide_interval < DatasetWriter.MIN_INTERVAL:
+            self.subdivide_interval = DatasetWriter.MIN_INTERVAL
+        elif subdivide_interval > DatasetWriter.MAX_INTERVAL:
+            self.subdivide_interval = DatasetWriter.MAX_INTERVAL
         else:
             self.subdivide_interval = subdivide_interval
 
@@ -101,7 +101,7 @@ class DataSet:
         self.file_path = self.save_path / self.filename
 
         if self.file_path.exists():
-            raise DataSetExistsError(self.name, f"{self.file_path} already exists.")
+            raise DatasetExistsError(self.name, f"{self.file_path} already exists.")
 
     def __del__(self):
         if self._dead:
@@ -166,7 +166,7 @@ class DataSet:
         self.start_time = time.time()
         self.ref_time = self.start_time
 
-        self.next_write = DataSet.WRITE_PERIOD
+        self.next_write = DatasetWriter.WRITE_PERIOD
         self._recording = True
         self._paused = False
 
@@ -175,7 +175,7 @@ class DataSet:
             return
 
         if not self.write_thread.is_alive():
-            raise DataSetThreadError(
+            raise DatasetThreadError(
                 self.name,
                 "Data collection write thread is no longer active. Reset the logger.",
             )
@@ -199,7 +199,7 @@ class DataSet:
                 # TODO: What is the right behavior here?
                 self.logger.warning("Unable to write fast enough.")
             else:
-                self.next_write = elapsed + DataSet.WRITE_PERIOD
+                self.next_write = elapsed + DatasetWriter.WRITE_PERIOD
                 self.stage_for_write()
 
     def send_saved(self):
@@ -222,7 +222,7 @@ class DataSet:
         self.file_path = self.file_path.parent / new_filename
 
         if self.file_path.exists():
-            raise DataSetExistsError(self.name, f"{self.file_path} already exists.")
+            raise DatasetExistsError(self.name, f"{self.file_path} already exists.")
 
         self.logger.info(f"Sub-dividing dataset: {self.file_path}")
 

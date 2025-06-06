@@ -9,31 +9,31 @@ class DataLoggerError(Exception):
         super().__init__(msg)
 
 
-class DataSetNotConfigured(DataLoggerError):
+class DatasetNotConfigured(DataLoggerError):
     pass
 
 
-class DataSetError(DataLoggerError):
+class DatasetError(DataLoggerError):
     pass
 
 
-class DataSetNotFound(DataSetError):
+class DatasetNotFound(DatasetError):
     pass
 
 
-class DataSetInProgress(DataSetError):
+class DatasetInProgress(DatasetError):
     pass
 
 
-class InvalidFormatter(DataSetError):
+class InvalidFormatter(DatasetError):
     pass
 
 
-class DataSetExistsError(DataSetError):
+class DatasetExistsError(DatasetError):
     pass
 
 
-class DataSetThreadError(DataSetError):
+class DatasetThreadError(DatasetError):
     pass
 
 
@@ -41,7 +41,7 @@ class DataFormatterKeyError(DataLoggerError):
     pass
 
 
-class DataLoggerFullError(DataSetError):
+class DataLoggerFullError(DatasetError):
     pass
 
 

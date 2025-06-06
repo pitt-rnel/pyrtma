@@ -10,7 +10,7 @@ import pyrtma.core_defs as cd
 
 from pyrtma.exceptions import UnknownMessageType
 
-from .dataset import DataSet
+from .dataset_writer import DatasetWriter
 from .data_formatter import get_formatter
 from .exceptions import *
 
@@ -49,7 +49,7 @@ class DataLogger:
 
         self.client.info("DataLogger connected and waiting for configuration.")
 
-        self.datasets: dict[str, DataSet] = {}
+        self.datasets: dict[str, DatasetWriter] = {}
 
     def update(self, msg: pyrtma.Message):
         dead = []
@@ -72,7 +72,7 @@ class DataLogger:
         except KeyError:
             pass
 
-    def send_status(self, name: str = "all"):
+    def send_status(self, name: str = "all", dest_mod_id: int = 0):
         msg = cd.MDF_DATASET_STATUS()
         msg.timestamp = time.time()
 
@@ -82,19 +82,19 @@ class DataLogger:
                 msg.elapsed_time = ds.elapsed_time
                 msg.is_recording = ds.recording
                 msg.is_paused = ds.paused
-                self.client.send_message(msg)
+                self.client.send_message(msg, dest_mod_id=dest_mod_id)
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(name, f"Dataset named '{name}' not found.")
+                raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
 
             msg.name = ds.name
             msg.elapsed_time = ds.elapsed_time
             msg.is_recording = ds.recording
             msg.is_paused = ds.paused
-            self.client.send_message(msg)
+            self.client.send_message(msg, dest_mod_id=dest_mod_id)
 
-    def send_config(self):
+    def send_config(self, dest_mod_id: int = 0):
         msg = cd.MDF_DATA_LOGGER_CONFIG()
 
         msg.num_datasets = len(self.datasets)
@@ -111,7 +111,7 @@ class DataLogger:
                 0 if isinstance(ds.subdivide_interval, float) else ds.subdivide_interval
             )
 
-        self.client.send_message(msg)
+        self.client.send_message(msg, dest_mod_id=dest_mod_id)
 
     def start_logging(self, name: str):
         if name in DataLogger.ALL_SETS:
@@ -123,10 +123,10 @@ class DataLogger:
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(name, f"Dataset named '{name}' not found.")
+                raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
 
             if ds.recording:
-                raise DataSetInProgress(
+                raise DatasetInProgress(
                     name, f"Recording in progresss for dataset '{ds.name}'"
                 )
 
@@ -149,7 +149,7 @@ class DataLogger:
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(name, f"Dataset named '{name}' not found.")
+                raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
 
             rm.append(ds.name)
             ds.stop()
@@ -171,7 +171,7 @@ class DataLogger:
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(name, f"Dataset named '{name}' not found.")
+                raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
 
             if ds.paused:
                 self.logger.warning(f"Dataset {ds.name} is already paused")
@@ -189,7 +189,7 @@ class DataLogger:
         else:
             ds = self.datasets.get(name)
             if ds is None:
-                raise DataSetNotFound(name, f"Dataset named '{name}' not found.")
+                raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
 
             if not ds.paused:
                 self.logger.warning(f"Dataset {ds.name} is not paused")
@@ -201,7 +201,7 @@ class DataLogger:
         self.send_status()
 
     def add_dataset(self, msg: cd.MDF_DATASET_ADD):
-        dataset = DataSet(
+        dataset = DatasetWriter(
             self.mm_ip,
             name=msg.dataset.name,
             save_path=msg.dataset.save_path,
@@ -217,7 +217,7 @@ class DataLogger:
             )
 
         if dataset.name in self.datasets.keys():
-            raise DataSetExistsError(
+            raise DatasetExistsError(
                 dataset.name, f"A dataset with name '{dataset.name}' already exists"
             )
 
@@ -275,9 +275,12 @@ class DataLogger:
                         case cd.MT_DATA_LOGGER_RESET:
                             self.reset()
                         case cd.MT_DATASET_STATUS_REQUEST:
-                            self.send_status(cast(str, msg.data.name))
+                            self.send_status(
+                                cast(str, msg.data.name),
+                                dest_mod_id=msg.header.src_mod_id,
+                            )
                         case cd.MT_DATA_LOGGER_CONFIG_REQUEST:
-                            self.send_config()
+                            self.send_config(dest_mod_id=msg.header.src_mod_id)
                         case cd.MT_EXIT:
                             if msg.header.dest_mod_id == self.client.module_id:
                                 self._running = False
