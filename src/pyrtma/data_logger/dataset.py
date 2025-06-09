@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import textwrap
 import pyrtma
 import pyrtma.core_defs as cd
 from pyrtma.data_logger.exceptions import NoClientError
@@ -73,16 +74,29 @@ class Dataset:
         self._saved: list[str] = []
 
         self.status_interval = status_interval
-        self._last_status = time.time()
-
-        self.add()
+        self._last_request = time.time()
 
     def close(self):
-        if not self._managed_client and self._client:
+        if self._managed_client and self._client:
             self._client.disconnect()
 
     def __del__(self):
         self.close
+
+    def __str__(self) -> str:
+        s = f"""\
+        name         = {self.name}
+        filename     = {self.filename}
+        formatter    = {self.formatter}
+        subdivide    = {self.subdivide_interval}
+        msg_types    = {self.msg_names}
+        added        = {self.added}
+        is_recording = {self.is_recording}
+        is_paused    = {self.is_paused}
+        elapsed_time = {self.elapsed_time}
+        """
+
+        return textwrap.dedent(s)
 
     def register_client(self, client: pyrtma.Client):
         """Register a pyrtma client with this dataset
@@ -121,6 +135,21 @@ class Dataset:
     @property
     def msg_types(self) -> tuple[int, ...]:
         return self._msg_types
+
+    @property
+    def msg_names(self) -> tuple[str, ...]:
+        names = []
+        for msg_type in self.msg_types:
+            if msg_type < 1:
+                continue
+            if msg_type == cd.ALL_MESSAGE_TYPES:
+                names.append("ALL_MESSAGE_TYPES")
+            else:
+                try:
+                    names.append(pyrtma.get_msg_cls(msg_type).type_name)
+                except UnknownMessageType:
+                    names.append(msg_type)
+        return tuple(names)
 
     @property
     def added(self) -> bool:
@@ -169,7 +198,8 @@ class Dataset:
             self._client.send_message(req)
             self._last_request = now
 
-        if msg := self._client.read_message(timeout):
+        msg = self._client.read_message(timeout)
+        if msg:
             return self.process_msg(msg)
 
     def process_msg(self, msg: pyrtma.Message) -> cd.MDF_DATA_LOGGER_ERROR | None:
@@ -182,7 +212,7 @@ class Dataset:
             cd.MT_DATASET_SAVED,
             cd.MT_DATA_LOGGER_ERROR,
         ):
-            if msg.name != self._name:
+            if msg.data.name != self._name:
                 return
 
         match (msg.type_id):
