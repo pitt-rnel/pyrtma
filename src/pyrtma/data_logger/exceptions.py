@@ -45,6 +45,10 @@ class DataLoggerFullError(DatasetError):
     pass
 
 
+class DatasetWriterError(DatasetError):
+    pass
+
+
 class NoClientError(DataLoggerError):
     """Client must first be registered to Dataset"""
 
