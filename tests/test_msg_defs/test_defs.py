@@ -211,8 +211,10 @@ MID_SENSOR_STIM_TRANSFORM_PY: int = 99
 # Message Type IDs
 MT_DATASET_STATUS_REQUEST: int = 62
 MT_DATASET_STATUS: int = 63
-MT_DATASET_ADD: int = 66
-MT_DATASET_REMOVE: int = 67
+MT_DATASET_ADD: int = 64
+MT_DATASET_ADDED: int = 65
+MT_DATASET_REMOVE: int = 66
+MT_DATASET_REMOVED: int = 67
 MT_DATA_LOGGER_CONFIG_REQUEST: int = 68
 MT_DATA_LOGGER_CONFIG: int = 69
 MT_DATASET_STARTED: int = 70
@@ -727,27 +729,55 @@ class MDF_DATASET_STATUS(MessageData, metaclass=MessageMeta):
 
 @pyrtma.message_def
 class MDF_DATASET_ADD(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 66
+    type_id: ClassVar[int] = 64
     type_name: ClassVar[str] = "DATASET_ADD"
-    type_hash: ClassVar[int] = 0xBCCBB90E
+    type_hash: ClassVar[int] = 0xD94DA73E
     type_size: ClassVar[int] = 708
     type_source: ClassVar[str] = "core_defs/data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATASET_ADD:\n  id: 66\n  fields:\n    dataset: DATASET'"
+        "'DATASET_ADD:\n  id: 64\n  fields:\n    dataset: DATASET'"
     )
 
     dataset: Struct[DATASET] = Struct(DATASET)
 
 
 @pyrtma.message_def
-class MDF_DATASET_REMOVE(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 67
-    type_name: ClassVar[str] = "DATASET_REMOVE"
-    type_hash: ClassVar[int] = 0x97E3C6BD
+class MDF_DATASET_ADDED(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 65
+    type_name: ClassVar[str] = "DATASET_ADDED"
+    type_hash: ClassVar[int] = 0xCFA9917E
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "core_defs/data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATASET_REMOVE:\n  id: 67\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+        "'DATASET_ADDED:\n  id: 65\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+    )
+
+    name: String = String(32)
+
+
+@pyrtma.message_def
+class MDF_DATASET_REMOVE(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 66
+    type_name: ClassVar[str] = "DATASET_REMOVE"
+    type_hash: ClassVar[int] = 0x13EEE304
+    type_size: ClassVar[int] = 32
+    type_source: ClassVar[str] = "core_defs/data_logger.yaml"
+    type_def: ClassVar[str] = (
+        "'DATASET_REMOVE:\n  id: 66\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+    )
+
+    name: String = String(32)
+
+
+@pyrtma.message_def
+class MDF_DATASET_REMOVED(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 67
+    type_name: ClassVar[str] = "DATASET_REMOVED"
+    type_hash: ClassVar[int] = 0x7F388965
+    type_size: ClassVar[int] = 32
+    type_source: ClassVar[str] = "core_defs/data_logger.yaml"
+    type_def: ClassVar[str] = (
+        "'DATASET_REMOVED:\n  id: 67\n  fields:\n    name: char[DATASET_NAME_LEN]'"
     )
 
     name: String = String(32)
@@ -810,14 +840,15 @@ class MDF_DATASET_STOPPED(MessageData, metaclass=MessageMeta):
 class MDF_DATASET_SAVED(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 72
     type_name: ClassVar[str] = "DATASET_SAVED"
-    type_hash: ClassVar[int] = 0x1583C453
-    type_size: ClassVar[int] = 32
+    type_hash: ClassVar[int] = 0x964F725E
+    type_size: ClassVar[int] = 1056
     type_source: ClassVar[str] = "core_defs/data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATASET_SAVED:\n  id: 72\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+        "'DATASET_SAVED:\n  id: 72\n  fields:\n    name: char[DATASET_NAME_LEN]\n    filepath: char[1024]'"
     )
 
     name: String = String(32)
+    filepath: String = String(1024)
 
 
 @pyrtma.message_def
@@ -890,13 +921,15 @@ class MDF_DATA_LOGGER_RESET(MessageData, metaclass=MessageMeta):
 class MDF_DATA_LOGGER_ERROR(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 78
     type_name: ClassVar[str] = "DATA_LOGGER_ERROR"
-    type_hash: ClassVar[int] = 0xAD3B4A67
-    type_size: ClassVar[int] = 512
+    type_hash: ClassVar[int] = 0x630C7107
+    type_size: ClassVar[int] = 608
     type_source: ClassVar[str] = "core_defs/data_logger.yaml"
     type_def: ClassVar[str] = (
-        "'DATA_LOGGER_ERROR:\n  id: 78\n  fields:\n    msg: char[512]'"
+        "'DATA_LOGGER_ERROR:\n  id: 78\n  fields:\n    dataset_name: char[DATASET_NAME_LEN]\n    exc_type: char[64]\n    msg: char[512]'"
     )
 
+    dataset_name: String = String(32)
+    exc_type: String = String(64)
     msg: String = String(512)
 
 
