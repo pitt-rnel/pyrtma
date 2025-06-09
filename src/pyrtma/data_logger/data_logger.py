@@ -59,15 +59,23 @@ class DataLogger:
             else:
                 ds.update(msg)
 
+            if ds.file_saved.is_set():
+                self.client.send_message(ds.save_msg)
+                ds.file_saved.clear()
+                self.logger.info(f"Saved file: {ds.save_msg.filepath}")
+            elif ds.error_event.is_set():
+                self.client.send_message(ds.error)
+                self.client.error(ds.error)
+
         for name in dead:
             self.rm_dataset(name)
 
-    def rm_dataset(self, name: str):
+    def rm_dataset(self, name: str, dest_mod_id: int = 0):
         try:
             self.datasets.pop(name)
-            reply = cd.MDF_DATASET_ADDED()
+            reply = cd.MDF_DATASET_REMOVED()
             reply.name = name
-            self.client.send_message(reply)
+            self.client.send_message(reply, dest_mod_id=dest_mod_id)
             self.logger.info(f"Removed dataset: '{name}'")
         except KeyError:
             pass
@@ -113,10 +121,11 @@ class DataLogger:
 
         self.client.send_message(msg, dest_mod_id=dest_mod_id)
 
-    def start_logging(self, name: str):
+    def start_logging(self, name: str, dest_mod_id: int = 0):
         if name in DataLogger.ALL_SETS:
             for ds in self.datasets.values():
                 ds.start()
+                self.logger.info(f"Saving Dataset:{ds.name} to {ds.file_path}")
                 start_msg = cd.MDF_DATASET_STARTED()
                 start_msg.name = ds.name
                 self.client.send_message(start_msg)
@@ -135,9 +144,9 @@ class DataLogger:
             start_msg.name = ds.name
             self.client.send_message(start_msg)
 
-        self.send_status()
+        self.send_status(dest_mod_id=dest_mod_id)
 
-    def stop_logging(self, name: str):
+    def stop_logging(self, name: str, dest_mod_id: int = 0):
         rm = []
         if name in DataLogger.ALL_SETS:
             for ds in self.datasets.values():
@@ -167,13 +176,13 @@ class DataLogger:
             stop_msg.name = ds.name
             self.client.send_message(stop_msg)
 
-        self.send_status()
+        self.send_status(dest_mod_id=dest_mod_id)
 
         # Remove the dataset after stoppping
         for name in rm:
             self.rm_dataset(name)
 
-    def pause_logging(self, name: str):
+    def pause_logging(self, name: str, dest_mod_id: int = 0):
         if name in DataLogger.ALL_SETS:
             for ds in self.datasets.values():
                 ds.pause()
@@ -189,9 +198,9 @@ class DataLogger:
             ds.pause()
             self.logger.info(f"Pausing dataset: '{ds.name}'")
 
-        self.send_status()
+        self.send_status(dest_mod_id=dest_mod_id)
 
-    def resume_logging(self, name: str):
+    def resume_logging(self, name: str, dest_mod_id: int = 0):
         if name in DataLogger.ALL_SETS:
             for ds in self.datasets.values():
                 ds.resume()
@@ -207,11 +216,10 @@ class DataLogger:
             ds.resume()
             self.logger.info(f"Resuming dataset: {ds.name}")
 
-        self.send_status()
+        self.send_status(dest_mod_id=dest_mod_id)
 
-    def add_dataset(self, msg: cd.MDF_DATASET_ADD):
+    def add_dataset(self, msg: cd.MDF_DATASET_ADD, dest_mod_id: int = 0):
         dataset = DatasetWriter(
-            self.mm_ip,
             name=msg.dataset.name,
             save_path=msg.dataset.save_path,
             filename=msg.dataset.filename,
@@ -233,11 +241,11 @@ class DataLogger:
         self.datasets[dataset.name] = dataset
         reply = cd.MDF_DATASET_ADDED()
         reply.name = dataset.name
-        self.client.send_message(reply)
+        self.client.send_message(reply, dest_mod_id=dest_mod_id)
 
         self.logger.info(f"Added dataset: '{dataset.name}'")
 
-    def reset(self):
+    def reset(self, dest_mod_id: int = 0):
         self.client.info(f"Reset DataLogger. All Datasets will be cleared")
         rm = []
         for ds in self.datasets.values():
@@ -245,7 +253,7 @@ class DataLogger:
             rm.append(ds.name)
 
         for name in rm:
-            self.rm_dataset(name)
+            self.rm_dataset(name, dest_mod_id=dest_mod_id)
 
     def send_error(self, exc: DataLoggerError):
         err = cd.MDF_DATA_LOGGER_ERROR()
@@ -268,28 +276,42 @@ class DataLogger:
                     continue
 
                 try:
+                    dest_mod_id = msg.header.dest_mod_id
                     match (msg.data.type_id):
                         case cd.MT_DATASET_START:
-                            self.start_logging(cast(str, msg.data.name))
+                            self.start_logging(
+                                cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                            )
                         case cd.MT_DATASET_STOP:
-                            self.stop_logging(cast(str, msg.data.name))
+                            self.stop_logging(
+                                cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                            )
                         case cd.MT_DATASET_PAUSE:
-                            self.pause_logging(cast(str, msg.data.name))
+                            self.pause_logging(
+                                cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                            )
                         case cd.MT_DATASET_RESUME:
-                            self.resume_logging(cast(str, msg.data.name))
+                            self.resume_logging(
+                                cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                            )
                         case cd.MT_DATASET_ADD:
-                            self.add_dataset(cast(cd.MDF_DATASET_ADD, msg.data))
+                            self.add_dataset(
+                                cast(cd.MDF_DATASET_ADD, msg.data),
+                                dest_mod_id=dest_mod_id,
+                            )
                         case cd.MT_DATASET_REMOVE:
-                            self.rm_dataset(cast(str, msg.data.name))
+                            self.rm_dataset(
+                                cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                            )
                         case cd.MT_DATA_LOGGER_RESET:
-                            self.reset()
+                            self.reset(dest_mod_id=0)
                         case cd.MT_DATASET_STATUS_REQUEST:
                             self.send_status(
                                 cast(str, msg.data.name),
                                 dest_mod_id=msg.header.src_mod_id,
                             )
                         case cd.MT_DATA_LOGGER_CONFIG_REQUEST:
-                            self.send_config(dest_mod_id=msg.header.src_mod_id)
+                            self.send_config(dest_mod_id=dest_mod_id)
                         case cd.MT_EXIT:
                             if msg.header.dest_mod_id == self.client.module_id:
                                 self._running = False
