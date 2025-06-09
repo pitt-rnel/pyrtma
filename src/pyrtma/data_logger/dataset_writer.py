@@ -17,7 +17,7 @@ from .exceptions import (
     DatasetExistsError,
     DatasetThreadError,
     DataLoggerError,
-    DatasetError,
+    DatasetWriterError,
 )
 
 
@@ -29,7 +29,6 @@ class DatasetWriter:
 
     def __init__(
         self,
-        mm_ip: str,
         name: str,
         save_path: str,
         filename: str,
@@ -38,8 +37,10 @@ class DatasetWriter:
         msg_types: List[int],
     ):
         self.client = pyrtma.Client(0, name=f"dataset.{name}")
-        self.client.connect(mm_ip)
+        # Note: We don't connect. Just want to use the RTMALogger
+        # self.client.connect(mm_ip)
         self.logger = self.client.logger
+
         self.name = name
         self.save_path = pathlib.Path(save_path)
         self.formatter_cls = formatter_cls
@@ -96,9 +97,17 @@ class DatasetWriter:
         self.next_subdivide = math.inf
         self.sub_index = 0
 
+        self.error_event = threading.Event()
+        self.error = cd.MDF_DATA_LOGGER_ERROR()
+
         # Save location
         self.save_path.mkdir(parents=True, exist_ok=True)
         self.file_path = self.save_path / self.filename
+
+        # List of all the files saved
+        self.saved_files: list[pathlib.Path] = []
+        self.file_saved = threading.Event()
+        self.save_msg = cd.MDF_DATASET_SAVED()
 
         if self.file_path.exists():
             raise DatasetExistsError(self.name, f"{self.file_path} already exists.")
@@ -157,8 +166,6 @@ class DatasetWriter:
         # Start the write thread
         self.write_thread.start()
 
-        self.logger.info(f"Saving Dataset:{self.name} to {self.file_path}")
-
         self.fd = open(self.file_path, self.formatter_cls.mode)
         self.formatter = self.formatter_cls(self.fd)
         self.next_subdivide = self.subdivide_interval
@@ -197,16 +204,19 @@ class DatasetWriter:
         if write:
             if self.write_to_disk.is_set():
                 # TODO: What is the right behavior here?
-                self.logger.warning("Unable to write fast enough.")
+                raise DatasetWriterError("Unable to write fast enough.")
             else:
                 self.next_write = elapsed + DatasetWriter.WRITE_PERIOD
                 self.stage_for_write()
 
-    def send_saved(self):
-        msg = cd.MDF_DATASET_SAVED()
-        msg.name = self.name
-        msg.filepath = str(self.file_path)
-        self.client.send_message(msg)
+    def store_saved(self):
+        if not self.file_saved.is_set():
+            self.save_msg = cd.MDF_DATASET_SAVED()
+            self.save_msg.name = self.name
+            self.save_msg.filepath = str(self.file_path)
+            self.file_saved.set()
+        self.saved_files.append(self.file_path)
+        self.last_saved = self.file_path
 
     def subdivide(self):
         self.sub_index += 1
@@ -214,7 +224,7 @@ class DatasetWriter:
 
         if self.fd:
             self.fd.close()
-            self.send_saved()
+            self.store_saved()
 
         new_filename = (
             f"{self.base_file_name}_{self.sub_index:04d}{self.formatter_cls.ext}"
@@ -224,7 +234,7 @@ class DatasetWriter:
         if self.file_path.exists():
             raise DatasetExistsError(self.name, f"{self.file_path} already exists.")
 
-        self.logger.info(f"Sub-dividing dataset: {self.file_path}")
+        self.logger.debug(f"Sub-dividing dataset: {self.file_path}")
 
         self.fd = open(self.file_path, self.formatter_cls.mode)
         self.formatter = self.formatter_cls(self.fd)
@@ -239,11 +249,10 @@ class DatasetWriter:
             self.next_write = -1.0
 
     def send_error(self, exc: DataLoggerError):
-        err = cd.MDF_DATA_LOGGER_ERROR()
-        err.dataset_name = exc.dataset
-        err.exc_type = type(exc).__name__
-        err.msg = exc.msg
-        self.client.send_message(err)
+        self.error.dataset_name = exc.dataset
+        self.error.exc_type = type(exc).__name__
+        self.error.msg = exc.msg
+        self.error_event.set()
 
     def stage_for_write(self):
         """Set the write buffer data for the data collection write thread"""
@@ -274,7 +283,7 @@ class DatasetWriter:
                     self.formatter.finalize(self.wbuf)
                     if self.fd is not None:
                         self.fd.close()
-                        self.send_saved()
+                        self.store_saved()
                     self._dead = True
                     break
 
