@@ -1,7 +1,9 @@
 import time
+import threading
 import pyrtma
 import pathlib
 import pyrtma.core_defs as cd
+
 from pyrtma.data_logger.dataset import Dataset
 
 
@@ -25,6 +27,11 @@ def main(trial_num: int, count: int):
         msg_types=[cd.MT_DATA_LOG_TEST_2048],
         subdivide_interval=30,
     )
+
+    # Could also reset before adding a Dataset
+    jsonf_ds.reset_data_logger()
+
+    jsonf_ds.add()
     datasets.append(jsonf_ds)
 
     # MsgHeaderFormatter
@@ -36,6 +43,7 @@ def main(trial_num: int, count: int):
         msg_types=[cd.MT_DATA_LOG_TEST_2048],
         subdivide_interval=0,
     )
+    headersf_ds.add()
     datasets.append(headersf_ds)
 
     # QLFormatter
@@ -46,6 +54,7 @@ def main(trial_num: int, count: int):
         formatter="quicklogger",
         msg_types=[cd.MT_DATA_LOG_TEST_2048],
     )
+    qlf_ds.add()
     datasets.append(qlf_ds)
 
     # RawFormatter (Alternative binary format [Header->Data->Header->Data])
@@ -62,34 +71,54 @@ def main(trial_num: int, count: int):
     input("Hit enter to start the data sets...")
     for ds in datasets:
         ds.start()
+        print(str(ds))
 
     input("Hit enter to start sending packets...")
-    msg = cd.MDF_DATA_LOG_TEST_2048.from_random()
-    n = 0
+    stop = threading.Event()
+
+    def thread_func(count):
+        msg = cd.MDF_DATA_LOG_TEST_2048.from_random()
+        n = 0
+        try:
+            if count > 0:
+                print(f"Sending {count} packets...")
+                for _ in range(count):
+                    mod.send_message(msg)
+                    n += 1
+
+                    tic = time.perf_counter()
+                    while (time.perf_counter() - tic) < 0.002:
+                        pass
+            else:
+                while not stop.is_set():
+                    mod.send_message(msg)
+                    n += 1
+
+                    tic = time.perf_counter()
+                    while (time.perf_counter() - tic) < 0.002:
+                        pass
+        finally:
+            print(f"Sent {n} packets.")
+            stop.set()
+
+    t = threading.Thread(target=thread_func, args=(count,))
+    t.start()
+
+    # Monitor our data collection
     try:
-        if count > 0:
-            print(f"Sending {count} packets...")
-            for _ in range(count):
-                mod.send_message(msg)
-                n += 1
+        while not stop.is_set():
+            for ds in datasets:
+                ds.poll()
 
-                tic = time.perf_counter()
-                while (time.perf_counter() - tic) < 0.002:
-                    pass
-        else:
-            while True:
-                mod.send_message(msg)
-                n += 1
-
-                tic = time.perf_counter()
-                while (time.perf_counter() - tic) < 0.002:
-                    pass
+            time.sleep(0.250)
     except KeyboardInterrupt:
-        pass
+        stop.set()
     finally:
-        print(f"Sent {n} packets.")
         for ds in datasets:
             ds.stop()
+            print(str(ds))
+
+        t.join()
 
     print("Done")
 
