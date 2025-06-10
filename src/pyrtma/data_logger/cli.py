@@ -5,14 +5,16 @@ Run with python -m pyrtma.data_logger.cli [MM_SERVER_ADDRESS]
 
 import json
 import rich
+import pyrtma
+import pyrtma.core_defs as cd
+
 from rich.prompt import Prompt
 from rich.markup import escape
 
-import pyrtma.core_defs as cd
-from pyrtma.data_logger.data_logger_client import DataLoggerClient, DatasetConfig
+from pyrtma.data_logger.dataset import Dataset
 
 
-def add_dataset(mod: DataLoggerClient):
+def add_dataset() -> Dataset:
     """Prompts for dataset configuration and adds it to the data logger"""
     name = save_path = filename = formatter = raw = None
     Prompt.prompt_suffix = ": "
@@ -34,14 +36,16 @@ def add_dataset(mod: DataLoggerClient):
     else:
         msg_types = list(map(int, raw.split()))
 
-    config = DatasetConfig(
+    ds = Dataset(
         name=name,
         save_path=save_path,
         filename=filename,
         formatter=formatter,
         msg_types=msg_types,
     )
-    config.add(mod)
+
+    ds.add()
+    return ds
 
 
 def main():
@@ -53,9 +57,11 @@ def main():
     else:
         server = "127.0.0.1:7111"
 
-    mod = DataLoggerClient()
+    mod = pyrtma.Client()
     mod.connect(server)
+    mod.subscribe(Dataset.DATALOGGER_TYPES)
 
+    datasets = []
     try:
         while True:
             Prompt.prompt_suffix = ">> "
@@ -67,33 +73,55 @@ def main():
             nargs = len(args)
             cmd = args[0].lower()
             if cmd in ("add", "a") and nargs == 1:
-                add_dataset(mod)
+                datasets.append(add_dataset())
             elif cmd in ("remove", "d") and nargs == 2:
-                mod.rm_dataset(args[1])
+                msg = cd.MDF_DATASET_REMOVE()
+                msg.name = args[1]
+                mod.send_message(msg)
             elif cmd in ("start", "s") and nargs == 2:
-                mod.start_dataset(args[1])
+                msg = cd.MDF_DATASET_START()
+                msg.name = args[1]
+                mod.send_message(msg)
             elif cmd in ("start-all", "sa") and nargs == 1:
-                mod.start_all_datasets()
+                msg = cd.MDF_DATASET_START()
+                msg.name = "*"
+                mod.send_message(msg)
             elif cmd in ("stop", "x") and nargs == 2:
-                mod.stop_dataset(args[1])
+                msg = cd.MDF_DATASET_STOP()
+                msg.name = args[1]
+                mod.send_message(msg)
             elif cmd in ("stop-all", "xa") and nargs == 1:
-                mod.stop_all_datasets()
+                msg = cd.MDF_DATASET_STOP()
+                msg.name = "*"
+                mod.send_message(msg)
             elif cmd in ("pause", "p") and nargs == 2:
-                mod.pause_dataset(args[1])
+                msg = cd.MDF_DATASET_PAUSE()
+                msg.name = args[1]
+                mod.send_message(msg)
             elif cmd in ("pause-all", "pa") and nargs == 1:
-                mod.pause_all_datasets()
+                msg = cd.MDF_DATASET_PAUSE()
+                msg.name = "*"
+                mod.send_message(msg)
             elif cmd in ("resume", "r") and nargs == 2:
-                mod.resume_dataset(args[1])
+                msg = cd.MDF_DATASET_RESUME()
+                msg.name = args[1]
+                mod.send_message(msg)
             elif cmd in ("resume-all", "ra") and nargs == 1:
-                mod.resume_all_datasets()
+                msg = cd.MDF_DATASET_RESUME()
+                msg.name = "*"
+                mod.send_message(msg)
             elif cmd in ("status", "=") and nargs == 2:
-                mod.request_dataset_status(args[1])
+                msg = cd.MDF_DATASET_STATUS_REQUEST()
+                msg.name = args[1]
+                mod.send_message(msg)
             elif cmd in ("status-all", "=a") and nargs == 1:
-                mod.request_all_dataset_status()
+                msg = cd.MDF_DATASET_STATUS_REQUEST()
+                msg.name = "*"
+                mod.send_message(msg)
             elif cmd in ("config", "c") and nargs == 1:
-                mod.request_data_logger_config()
+                mod.send_signal(cd.MT_DATA_LOGGER_CONFIG_REQUEST)
             elif cmd in ("reset", "<") and nargs == 1:
-                mod.reset_data_logger()
+                mod.send_signal(cd.MT_DATA_LOGGER_RESET)
             elif cmd in ("kill", "k") and nargs == 1:
                 mod.send_signal(cd.MT_LM_EXIT)
             elif cmd in ("exit", "quit", "q"):
@@ -107,12 +135,23 @@ def main():
             while True:
                 msg = mod.read_message(0.200)
                 if msg:
-                    if isinstance(msg.data, cd.MDF_DATA_LOGGER_ERROR):
-                        rich.print(msg.data.msg)
-                    elif isinstance(msg.data, cd.MDF_DATASET_STATUS):
+                    if isinstance(
+                        msg.data,
+                        (
+                            cd.MDF_DATA_LOGGER_ERROR,
+                            cd.MDF_DATASET_STATUS,
+                            cd.MDF_DATASET_ADDED,
+                            cd.MDF_DATASET_STARTED,
+                            cd.MDF_DATASET_STOPPED,
+                            cd.MDF_DATASET_REMOVED,
+                            cd.MDF_DATASET_SAVED,
+                        ),
+                    ):
+                        rich.print(f"{msg.data.type_name}:")
                         rich.print(msg.data.to_json())
                     elif isinstance(msg.data, cd.MDF_DATA_LOGGER_CONFIG):
-                        d = mod.process_data_logger_config_msg(msg.data)
+                        d = Dataset.process_data_logger_config_msg(msg.data)
+                        rich.print(f"{msg.data.type_name}:")
                         rich.print(json.dumps(d, indent=2))
                 else:
                     break
