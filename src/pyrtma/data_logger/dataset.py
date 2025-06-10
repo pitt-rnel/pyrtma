@@ -9,7 +9,7 @@ import pyrtma.core_defs as cd
 from pyrtma.data_logger.exceptions import NoClientError
 from pyrtma.exceptions import UnknownMessageType
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Any, Union, Optional, cast
+from typing import TYPE_CHECKING, List, Dict, Any, ClassVar, cast
 
 
 if TYPE_CHECKING:
@@ -19,7 +19,16 @@ __all__ = ["Dataset"]
 
 
 class Dataset:
-    """Configuration for a data_logger dataset"""
+    DATALOGGER_TYPES: ClassVar[tuple[int, ...]] = (
+        cd.MT_DATASET_STATUS,
+        cd.MT_DATASET_ADDED,
+        cd.MT_DATASET_REMOVED,
+        cd.MT_DATASET_STARTED,
+        cd.MT_DATASET_STOPPED,
+        cd.MT_DATASET_SAVED,
+        cd.MT_DATA_LOGGER_CONFIG,
+        cd.MT_DATA_LOGGER_ERROR,
+    )
 
     def __init__(
         self,
@@ -34,21 +43,10 @@ class Dataset:
         create_client: bool = True,
     ):
 
-        _datalogger_types = (
-            cd.MT_DATASET_STATUS,
-            cd.MT_DATASET_ADDED,
-            cd.MT_DATASET_REMOVED,
-            cd.MT_DATASET_STARTED,
-            cd.MT_DATASET_STOPPED,
-            cd.MT_DATASET_SAVED,
-            cd.MT_DATA_LOGGER_CONFIG,
-            cd.MT_DATA_LOGGER_ERROR,
-        )
-
         if create_client:
             self._client = pyrtma.Client(0, name=name)
             self._client.connect(mm_ip)
-            self._client.subscribe(_datalogger_types)
+            self._client.subscribe(Dataset.DATALOGGER_TYPES)
             self._managed_client = True
         else:
             # User needs to register a client
@@ -91,6 +89,9 @@ class Dataset:
         subdivide    = {self.subdivide_interval}
         msg_types    = {self.msg_names}
         added        = {self.added}
+        started      = {self.started}
+        stopped      = {self.stopped}
+        removed      = {self.removed}
         is_recording = {self.is_recording}
         is_paused    = {self.is_paused}
         elapsed_time = {self.elapsed_time}
@@ -337,8 +338,9 @@ class Dataset:
         else:
             raise NoClientError
 
+    @staticmethod
     def process_data_logger_config_msg(
-        self, msg_data: cd.MDF_DATA_LOGGER_CONFIG
+        msg_data: cd.MDF_DATA_LOGGER_CONFIG,
     ) -> Dict[str, Any]:
         """Process a data_logger config message
 
