@@ -51,7 +51,7 @@ class DataLogger:
 
         self.datasets: dict[str, DatasetWriter] = {}
 
-    def update(self, msg: pyrtma.Message):
+    def update(self, msg: pyrtma.Message | None):
         dead = []
         for name, ds in self.datasets.items():
             if ds.dead:
@@ -67,18 +67,26 @@ class DataLogger:
                 self.client.send_message(ds.error)
                 self.client.error(ds.error)
 
+        # Remove the dataset after stoppping
         for name in dead:
             self.rm_dataset(name)
 
     def rm_dataset(self, name: str, dest_mod_id: int = 0):
-        try:
-            self.datasets.pop(name)
-            reply = cd.MDF_DATASET_REMOVED()
-            reply.name = name
-            self.client.send_message(reply, dest_mod_id=dest_mod_id)
-            self.logger.info(f"Removed dataset: '{name}'")
-        except KeyError:
-            pass
+        ds = self.datasets.get(name)
+
+        if ds is None:
+            raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
+
+        if ds.recording:
+            raise DatasetInProgress(
+                name, f"Recording in progresss for dataset '{ds.name}'"
+            )
+
+        self.datasets.pop(name)
+        reply = cd.MDF_DATASET_REMOVED()
+        reply.name = name
+        self.client.send_message(reply, dest_mod_id=dest_mod_id)
+        self.logger.info(f"Removed dataset: '{name}'")
 
     def send_status(self, name: str = "all", dest_mod_id: int = 0):
         msg = cd.MDF_DATASET_STATUS()
@@ -125,6 +133,7 @@ class DataLogger:
         if name in DataLogger.ALL_SETS:
             for ds in self.datasets.values():
                 ds.start()
+                self.logger.info(f"Starting dataset: '{ds.name}'")
                 self.logger.info(f"Saving Dataset:{ds.name} to {ds.file_path}")
                 start_msg = cd.MDF_DATASET_STARTED()
                 start_msg.name = ds.name
@@ -140,6 +149,8 @@ class DataLogger:
                 )
 
             ds.start()
+            self.logger.info(f"Starting dataset: '{ds.name}'")
+            self.logger.info(f"Saving Dataset:{ds.name} to {ds.file_path}")
             start_msg = cd.MDF_DATASET_STARTED()
             start_msg.name = ds.name
             self.client.send_message(start_msg)
@@ -177,10 +188,6 @@ class DataLogger:
             self.client.send_message(stop_msg)
 
         self.send_status(dest_mod_id=dest_mod_id)
-
-        # Remove the dataset after stoppping
-        for name in rm:
-            self.rm_dataset(name)
 
     def pause_logging(self, name: str, dest_mod_id: int = 0):
         if name in DataLogger.ALL_SETS:
@@ -272,58 +279,58 @@ class DataLogger:
                     self.client.warning(f"UnknownMessageType: {e.args[0]}")
                     continue
 
-                if msg is None:
-                    continue
-
-                try:
-                    dest_mod_id = msg.header.dest_mod_id
-                    match (msg.data.type_id):
-                        case cd.MT_DATASET_START:
-                            self.start_logging(
-                                cast(str, msg.data.name), dest_mod_id=dest_mod_id
-                            )
-                        case cd.MT_DATASET_STOP:
-                            self.stop_logging(
-                                cast(str, msg.data.name), dest_mod_id=dest_mod_id
-                            )
-                        case cd.MT_DATASET_PAUSE:
-                            self.pause_logging(
-                                cast(str, msg.data.name), dest_mod_id=dest_mod_id
-                            )
-                        case cd.MT_DATASET_RESUME:
-                            self.resume_logging(
-                                cast(str, msg.data.name), dest_mod_id=dest_mod_id
-                            )
-                        case cd.MT_DATASET_ADD:
-                            self.add_dataset(
-                                cast(cd.MDF_DATASET_ADD, msg.data),
-                                dest_mod_id=dest_mod_id,
-                            )
-                        case cd.MT_DATASET_REMOVE:
-                            self.rm_dataset(
-                                cast(str, msg.data.name), dest_mod_id=dest_mod_id
-                            )
-                        case cd.MT_DATA_LOGGER_RESET:
-                            self.reset(dest_mod_id=0)
-                        case cd.MT_DATASET_STATUS_REQUEST:
-                            self.send_status(
-                                cast(str, msg.data.name),
-                                dest_mod_id=msg.header.src_mod_id,
-                            )
-                        case cd.MT_DATA_LOGGER_CONFIG_REQUEST:
-                            self.send_config(dest_mod_id=dest_mod_id)
-                        case cd.MT_EXIT:
-                            if msg.header.dest_mod_id == self.client.module_id:
+                if msg is not None:
+                    try:
+                        dest_mod_id = msg.header.dest_mod_id
+                        match (msg.data.type_id):
+                            case cd.MT_DATASET_START:
+                                self.start_logging(
+                                    cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                                )
+                            case cd.MT_DATASET_STOP:
+                                self.stop_logging(
+                                    cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                                )
+                            case cd.MT_DATASET_PAUSE:
+                                self.pause_logging(
+                                    cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                                )
+                            case cd.MT_DATASET_RESUME:
+                                self.resume_logging(
+                                    cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                                )
+                            case cd.MT_DATASET_ADD:
+                                self.add_dataset(
+                                    cast(cd.MDF_DATASET_ADD, msg.data),
+                                    dest_mod_id=dest_mod_id,
+                                )
+                            case cd.MT_DATASET_REMOVE:
+                                self.rm_dataset(
+                                    cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                                )
+                            case cd.MT_DATA_LOGGER_RESET:
+                                self.reset(dest_mod_id=0)
+                            case cd.MT_DATASET_STATUS_REQUEST:
+                                self.send_status(
+                                    cast(str, msg.data.name),
+                                    dest_mod_id=msg.header.src_mod_id,
+                                )
+                            case cd.MT_DATA_LOGGER_CONFIG_REQUEST:
+                                self.send_config(dest_mod_id=dest_mod_id)
+                            case cd.MT_EXIT:
+                                if msg.header.dest_mod_id == self.client.module_id:
+                                    self._running = False
+                                    self.client.info(
+                                        "Received EXIT request. Closing..."
+                                    )
+                            case cd.MT_LM_EXIT:
                                 self._running = False
-                                self.client.info("Received EXIT request. Closing...")
-                        case cd.MT_LM_EXIT:
-                            self._running = False
-                            self.client.info("Received LM_EXIT request. Closing...")
+                                self.client.info("Received LM_EXIT request. Closing...")
+                    except DataLoggerError as e:
+                        self.client.error(e.msg)
+                        self.send_error(e)
 
-                    self.update(msg)
-                except DataLoggerError as e:
-                    self.client.error(e.msg)
-                    self.send_error(e)
+                self.update(msg)
 
         except KeyboardInterrupt:
             pass
