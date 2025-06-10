@@ -286,13 +286,13 @@ class DatasetWriter:
                         self.store_saved()
                     self._dead = True
                     break
-
         except KeyboardInterrupt:
             pass
         except DataLoggerError as e:
             self.client.error(e.msg)
             self.send_error(e)
         finally:
+            self._dead = True
             self.logger.debug("Collection write thread exited.")
 
     def blocking_write(self):
