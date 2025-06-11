@@ -11,7 +11,6 @@ import pyrtma.core_defs as cd
 from pyrtma.exceptions import UnknownMessageType
 
 from .dataset_writer import DatasetWriter
-from .data_formatter import get_formatter
 from .exceptions import *
 
 from typing import cast
@@ -231,7 +230,7 @@ class DataLogger:
             save_path=msg.dataset.save_path,
             filename=msg.dataset.filename,
             msg_types=msg.dataset.msg_types[:],
-            formatter_cls=get_formatter(msg.dataset.formatter),
+            formatter=msg.dataset.formatter,
             subdivide_interval=msg.dataset.subdivide_interval,
         )
 

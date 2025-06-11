@@ -10,10 +10,13 @@ import pyrtma
 import pyrtma.core_defs as cd
 from ..message import Message
 from ..core_defs import ALL_MESSAGE_TYPES
+from .data_formatter import get_formatter
 from typing import Type, Optional, IO, Any, List
 
 from .data_formatter import DataFormatter
 from .exceptions import (
+    DatasetError,
+    InvalidFormatter,
     DatasetExistsError,
     DatasetThreadError,
     DataLoggerError,
@@ -32,21 +35,34 @@ class DatasetWriter:
         name: str,
         save_path: str,
         filename: str,
-        formatter_cls: Type[DataFormatter],
+        formatter: str,
         subdivide_interval: int,
         msg_types: List[int],
     ):
+        self._dead = False
+        self._recording = False
+        self._paused = False
+        self._close = False
+        self._elapsed_time = 0.0
+
+        self.name = name
+
         self.client = pyrtma.Client(0, name=f"dataset.{name}")
         # Note: We don't connect. Just want to use the RTMALogger
         # self.client.connect(mm_ip)
         self.logger = self.client.logger
 
-        self.name = name
         self.save_path = pathlib.Path(save_path)
-        self.formatter_cls = formatter_cls
+
+        self.formatter_name = formatter
+        formatter_cls = get_formatter(formatter)
+        if formatter_cls is None:
+            raise InvalidFormatter(self.name, f"No DataFormatter class named {name}")
+        else:
+            self.formatter_cls = formatter_cls
 
         # Append the formatter extension
-        self.filename = filename + formatter_cls.ext
+        self.filename = filename + self.formatter_cls.ext
         self.base_file_name = filename
 
         if subdivide_interval <= 0:
@@ -60,16 +76,14 @@ class DatasetWriter:
 
         # Placeholder for type checking purposes
         if "b" in self.formatter_cls.mode:
-            self.formatter = formatter_cls(io.BytesIO())
+            self.formatter = self.formatter_cls(io.BytesIO())
         else:
-            self.formatter = formatter_cls(io.StringIO())
+            self.formatter = self.formatter_cls(io.StringIO())
 
         self.rbuf: List[Message] = []
         self.wbuf: List[Message] = []
 
         self.fd: Optional[IO[Any]] = None
-
-        self._dead = False
 
         self.write_to_disk = threading.Event()
         self.write_finished = threading.Event()
@@ -85,11 +99,6 @@ class DatasetWriter:
         else:
             self.all_sub = False
 
-        self._recording = False
-        self._paused = False
-        self._close = False
-
-        self._elapsed_time = 0.0
         self.ref_time = -1
         self.start_time = -1
 
@@ -101,7 +110,13 @@ class DatasetWriter:
         self.error = cd.MDF_DATA_LOGGER_ERROR()
 
         # Save location
-        self.save_path.mkdir(parents=True, exist_ok=True)
+        try:
+            self.save_path.mkdir(parents=True, exist_ok=True)
+        except FileNotFoundError as e:
+            raise DatasetError(self.name, f"Save path not found: {self.save_path}")
+        except PermissionError as e:
+            raise DatasetError(self.name, f"File Permission Error: Access is denied.")
+
         self.file_path = self.save_path / self.filename
 
         # List of all the files saved
