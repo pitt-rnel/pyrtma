@@ -1,3 +1,5 @@
+"""DataFormatter abstract base class and formatter registration functions"""
+
 import pyrtma
 from typing import Type, Optional, ClassVar, IO, Any, Union, List, Dict
 from abc import ABC
@@ -48,10 +50,5 @@ def add_formatter(fmt_cls: Type[DataFormatter]):
     _formatter_map[fmt_cls.name] = fmt_cls
 
 
-def get_formatter(name: str) -> Type[DataFormatter]:
-    fmt_cls = _formatter_map.get(name)
-
-    if fmt_cls is not None:
-        return fmt_cls
-    else:
-        raise InvalidFormatter(f"No DataFormatter class named {name}")
+def get_formatter(name: str) -> Type[DataFormatter] | None:
+    return _formatter_map.get(name)

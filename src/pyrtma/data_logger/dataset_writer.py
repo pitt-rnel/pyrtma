@@ -1,3 +1,5 @@
+"""DataSet class used internally by data_logger"""
+
 import pathlib
 import io
 import math
@@ -5,15 +7,24 @@ import time
 import threading
 import pyrtma
 
+import pyrtma.core_defs as cd
 from ..message import Message
 from ..core_defs import ALL_MESSAGE_TYPES
+from .data_formatter import get_formatter
 from typing import Type, Optional, IO, Any, List
 
 from .data_formatter import DataFormatter
-from .exceptions import DataSetExistsError, DataSetThreadError
+from .exceptions import (
+    DatasetError,
+    InvalidFormatter,
+    DatasetExistsError,
+    DatasetThreadError,
+    DataLoggerError,
+    DatasetWriterError,
+)
 
 
-class DataSet:
+class DatasetWriter:
     MIN_INTERVAL = 30
     MAX_INTERVAL = 600
     CONTINUOUS = math.inf
@@ -24,42 +35,55 @@ class DataSet:
         name: str,
         save_path: str,
         filename: str,
-        formatter_cls: Type[DataFormatter],
+        formatter: str,
         subdivide_interval: int,
         msg_types: List[int],
-        parent_logger: pyrtma.client.RTMALogger,
     ):
-        self.logger = parent_logger.add_child(f"{name}")
-        self.logger.name = f"{name}"
+        self._dead = False
+        self._recording = False
+        self._paused = False
+        self._close = False
+        self._elapsed_time = 0.0
+
         self.name = name
+
+        self.client = pyrtma.Client(0, name=f"dataset.{name}")
+        # Note: We don't connect. Just want to use the RTMALogger
+        # self.client.connect(mm_ip)
+        self.logger = self.client.logger
+
         self.save_path = pathlib.Path(save_path)
-        self.formatter_cls = formatter_cls
+
+        self.formatter_name = formatter
+        formatter_cls = get_formatter(formatter)
+        if formatter_cls is None:
+            raise InvalidFormatter(self.name, f"No DataFormatter class named {name}")
+        else:
+            self.formatter_cls = formatter_cls
 
         # Append the formatter extension
-        self.filename = filename + formatter_cls.ext
+        self.filename = filename + self.formatter_cls.ext
         self.base_file_name = filename
 
         if subdivide_interval <= 0:
-            self.subdivide_interval = DataSet.CONTINUOUS
-        elif subdivide_interval < DataSet.MIN_INTERVAL:
-            self.subdivide_interval = DataSet.MIN_INTERVAL
-        elif subdivide_interval > DataSet.MAX_INTERVAL:
-            self.subdivide_interval = DataSet.MAX_INTERVAL
+            self.subdivide_interval = DatasetWriter.CONTINUOUS
+        elif subdivide_interval < DatasetWriter.MIN_INTERVAL:
+            self.subdivide_interval = DatasetWriter.MIN_INTERVAL
+        elif subdivide_interval > DatasetWriter.MAX_INTERVAL:
+            self.subdivide_interval = DatasetWriter.MAX_INTERVAL
         else:
             self.subdivide_interval = subdivide_interval
 
         # Placeholder for type checking purposes
         if "b" in self.formatter_cls.mode:
-            self.formatter = formatter_cls(io.BytesIO())
+            self.formatter = self.formatter_cls(io.BytesIO())
         else:
-            self.formatter = formatter_cls(io.StringIO())
+            self.formatter = self.formatter_cls(io.StringIO())
 
         self.rbuf: List[Message] = []
         self.wbuf: List[Message] = []
 
         self.fd: Optional[IO[Any]] = None
-
-        self._dead = False
 
         self.write_to_disk = threading.Event()
         self.write_finished = threading.Event()
@@ -75,11 +99,6 @@ class DataSet:
         else:
             self.all_sub = False
 
-        self._recording = False
-        self._paused = False
-        self._close = False
-
-        self._elapsed_time = 0.0
         self.ref_time = -1
         self.start_time = -1
 
@@ -87,12 +106,26 @@ class DataSet:
         self.next_subdivide = math.inf
         self.sub_index = 0
 
+        self.error_event = threading.Event()
+        self.error = cd.MDF_DATA_LOGGER_ERROR()
+
         # Save location
-        self.save_path.mkdir(parents=True, exist_ok=True)
+        try:
+            self.save_path.mkdir(parents=True, exist_ok=True)
+        except FileNotFoundError as e:
+            raise DatasetError(self.name, f"Save path not found: {self.save_path}")
+        except PermissionError as e:
+            raise DatasetError(self.name, f"File Permission Error: Access is denied.")
+
         self.file_path = self.save_path / self.filename
 
+        # List of all the files saved
+        self.saved_files: list[pathlib.Path] = []
+        self.file_saved = threading.Event()
+        self.save_msg = cd.MDF_DATASET_SAVED()
+
         if self.file_path.exists():
-            raise DataSetExistsError(f"{self.file_path} already exists.")
+            raise DatasetExistsError(self.name, f"{self.file_path} already exists.")
 
     def __del__(self):
         if self._dead:
@@ -105,12 +138,10 @@ class DataSet:
         elapsed = self.elapsed_time
         self._elapsed_time = elapsed
         self._paused = True
-        self.logger.info(f"Pausing data set: {self.name}")
 
     def resume(self):
         self._paused = False
         self.ref_time = time.time()
-        self.logger.info(f"Resuming data set: {self.name}")
 
     @property
     def elapsed_time(self) -> float:
@@ -150,8 +181,6 @@ class DataSet:
         # Start the write thread
         self.write_thread.start()
 
-        self.logger.info(f"Saving Data Set:{self.name} to {self.file_path}")
-
         self.fd = open(self.file_path, self.formatter_cls.mode)
         self.formatter = self.formatter_cls(self.fd)
         self.next_subdivide = self.subdivide_interval
@@ -159,7 +188,7 @@ class DataSet:
         self.start_time = time.time()
         self.ref_time = self.start_time
 
-        self.next_write = DataSet.WRITE_PERIOD
+        self.next_write = DatasetWriter.WRITE_PERIOD
         self._recording = True
         self._paused = False
 
@@ -168,8 +197,9 @@ class DataSet:
             return
 
         if not self.write_thread.is_alive():
-            raise DataSetThreadError(
-                "Data collection write thread is no longer active. Reset the logger."
+            raise DatasetThreadError(
+                self.name,
+                "Data collection write thread is no longer active. Reset the logger.",
             )
 
         if msg:
@@ -189,10 +219,19 @@ class DataSet:
         if write:
             if self.write_to_disk.is_set():
                 # TODO: What is the right behavior here?
-                self.logger.warning("Unable to write fast enough.")
+                raise DatasetWriterError("Unable to write fast enough.")
             else:
-                self.next_write = elapsed + DataSet.WRITE_PERIOD
+                self.next_write = elapsed + DatasetWriter.WRITE_PERIOD
                 self.stage_for_write()
+
+    def store_saved(self):
+        if not self.file_saved.is_set():
+            self.save_msg = cd.MDF_DATASET_SAVED()
+            self.save_msg.name = self.name
+            self.save_msg.filepath = str(self.file_path)
+            self.file_saved.set()
+        self.saved_files.append(self.file_path)
+        self.last_saved = self.file_path
 
     def subdivide(self):
         self.sub_index += 1
@@ -200,6 +239,7 @@ class DataSet:
 
         if self.fd:
             self.fd.close()
+            self.store_saved()
 
         new_filename = (
             f"{self.base_file_name}_{self.sub_index:04d}{self.formatter_cls.ext}"
@@ -207,9 +247,9 @@ class DataSet:
         self.file_path = self.file_path.parent / new_filename
 
         if self.file_path.exists():
-            raise DataSetExistsError(f"{self.file_path} already exists.")
+            raise DatasetExistsError(self.name, f"{self.file_path} already exists.")
 
-        self.logger.info(f"Sub-dividing data set: {self.file_path}")
+        self.logger.debug(f"Sub-dividing dataset: {self.file_path}")
 
         self.fd = open(self.file_path, self.formatter_cls.mode)
         self.formatter = self.formatter_cls(self.fd)
@@ -217,12 +257,17 @@ class DataSet:
     def stop(self):
         if self.recording:
             self.stop_flag.set()
-            self.logger.info(f"Stopping data set: {self.name}")
             self.start_time = -1
             self.ref_time = -1
             self._recording = False
             self._paused = False
             self.next_write = -1.0
+
+    def send_error(self, exc: DataLoggerError):
+        self.error.dataset_name = exc.dataset
+        self.error.exc_type = type(exc).__name__
+        self.error.msg = exc.msg
+        self.error_event.set()
 
     def stage_for_write(self):
         """Set the write buffer data for the data collection write thread"""
@@ -232,7 +277,7 @@ class DataSet:
         self.write_finished.clear()
         self.write_to_disk.set()
 
-        self.logger.debug("Writing data set buffers to disk.")
+        self.logger.debug("Writing dataset buffers to disk.")
 
     def write(self):
         """Write Threads main function"""
@@ -253,13 +298,17 @@ class DataSet:
                     self.formatter.finalize(self.wbuf)
                     if self.fd is not None:
                         self.fd.close()
+                        self.store_saved()
                     self._dead = True
                     break
-
         except KeyboardInterrupt:
             pass
+        except DataLoggerError as e:
+            self.client.error(e.msg)
+            self.send_error(e)
         finally:
-            print("Collection write thread exited.")
+            self._dead = True
+            self.logger.debug("Collection write thread exited.")
 
     def blocking_write(self):
         """Blocking write without bg thread"""
