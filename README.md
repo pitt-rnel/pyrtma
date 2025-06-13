@@ -199,7 +199,7 @@ See [rtma-js](https://github.com/pitt-rnel/rtma-js) for developing rtma clients 
 
 # DataLogger
 
-See `examples/data_logger_example.py` for an example on how to configure data collection for a DataLogger.
+See `examples/data_log_example.py` for an example on how to configure data collection for a DataLogger.
 
 To start up the logging module:
 ```shell

@@ -45,6 +45,10 @@ message_defs:
     id: 61
     fields: null
   
+  DEBUG_TEXT: # legacy string data
+    id: 91
+    fields: null
+
   LM_READY:
     id: 96
     fields: null

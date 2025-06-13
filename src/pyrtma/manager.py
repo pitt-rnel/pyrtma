@@ -845,7 +845,8 @@ class MessageManager(ClientLike):
             header (MessageHeader): Message header of the incoming message
         """
         msg_type = header.msg_type
-        if msg_type >= 100:
+        if msg_type >= 100 or msg_type == cd.MT_DEBUG_TEXT:
+            # NOTE: DEBUG_TEXT is unsupported legacy STRING_DATA type
             return
 
         core_msg = self.decode_core_message(header)
