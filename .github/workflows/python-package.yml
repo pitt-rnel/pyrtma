@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.8", "3.12", "3.13"]
+        python-version: ["3.10", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +35,6 @@ jobs:
         if: ${{ matrix.python-version == '3.13' }}
         uses: psf/black@stable
       - name: Test compiler
-        if: ${{ matrix.python-version != '3.7' }}
         run: |
           python -m pyrtma.compile -i ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml --py -o ${{ github.workspace }}/tests/test_msg_defs
       - name: Test with unittest
