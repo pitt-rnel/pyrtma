@@ -831,7 +831,7 @@ class MessageManager(ClientLike):
 
     def decode_core_message(
         self, src_module: Module, hdr: MessageHeader
-    ) -> Message | None:
+    ) -> Union[Message, None]:
         data_cls = _get_core_defs().get(hdr.msg_type)
         if data_cls:
             data = data_cls.from_buffer(self.data_buffer)
