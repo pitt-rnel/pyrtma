@@ -829,13 +829,17 @@ class MessageManager(ClientLike):
         self.send_message(msg)
         self.last_client_info = msg.timestamp
 
-    def decode_core_message(self, src_module: Module, hdr: MessageHeader) -> Message | None:
+    def decode_core_message(
+        self, src_module: Module, hdr: MessageHeader
+    ) -> Message | None:
         data_cls = _get_core_defs().get(hdr.msg_type)
         if data_cls:
             data = data_cls.from_buffer(self.data_buffer)
             return Message(hdr, data)
         else:
-            self.logger.critical(f"Unknown core_def MT={hdr.msg_type} received from {src_module.name}")
+            self.logger.critical(
+                f"Unknown core_def MT={hdr.msg_type} received from {src_module.name}"
+            )
             self.remove_module(src_module)
             return None
 
