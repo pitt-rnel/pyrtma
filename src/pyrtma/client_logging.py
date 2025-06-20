@@ -152,7 +152,7 @@ class RTMALogger(object):
         level: int = logging.NOTSET,
     ):
         # default formatter
-        self._default_fmt = "{levelname:<8} - {asctime} - {log_name:<16} - {message}"
+        self._default_fmt = "{levelname:<8} - {asctime} - {log_name:<16} - {message} - {funcName}:{lineno}"
         self._rich_fmt = "[bold yellow]{log_name:<16}[/]   {message}"
         self._default_formatter: Optional[logging.Formatter] = logging.Formatter(
             self._default_fmt, style="{"
@@ -345,10 +345,10 @@ class RTMALogger(object):
 
     @property
     def log_filename(self) -> Union[str, pathlib.Path]:
-        if self.file_handler:
-            return self.file_handler.baseFilename
-        else:
+        if self.log_filename:
             return self._log_filename
+        else:
+            return self.file_handler.baseFilename
 
     @log_filename.setter
     def log_filename(self, value: Union[str, pathlib.Path]):
