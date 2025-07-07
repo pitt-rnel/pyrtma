@@ -845,7 +845,9 @@ class MessageManager(ClientLike):
             header (MessageHeader): Message header of the incoming message
         """
         msg_type = header.msg_type
-        if msg_type >= 100:
+        if msg_type >= 100 or msg_type == 91:
+            # 91 is legacy MT_DEBUG_TEXT, incompatible with pyrtma but sent by legacy QL
+            # TODO deprecate when switching to new data_logger
             return
 
         core_msg = self.decode_core_message(header)
