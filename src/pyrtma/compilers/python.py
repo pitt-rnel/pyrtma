@@ -118,10 +118,14 @@ class PyDefCompiler:
                 return f":{dtype} = {dtype}()"
 
             # Array Field
-            if dtype.startswith("Int") or dtype.startswith("Uint"):
-                return f":IntArray[{dtype}] = IntArray({dtype}, {flen})"
-            elif dtype.startswith("Float") or dtype.startswith("Double"):
-                return f":FloatArray[{dtype}] = FloatArray({dtype}, {flen})"
+            if (
+                dtype.startswith("Int")
+                or dtype.startswith("Uint")
+                or dtype.startswith("Double")
+            ):
+                return f":{dtype}Array = {dtype}Array({flen})"
+            elif dtype.startswith("Float"):
+                return f":Float32Array = Float32Array({flen})"
             elif dtype.startswith("Char"):
                 return f":String = String({flen})"
             elif dtype.startswith("Byte"):
@@ -229,7 +233,34 @@ class PyDefCompiler:
 
         from pyrtma.message_base import MessageBase, MessageMeta
         from pyrtma.message_data import MessageData
-        from pyrtma.validators import Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float, Double, Struct, IntArray, FloatArray, StructArray, Char, String, Byte, ByteArray
+        from pyrtma.validators import (
+            Int8,
+            Int16,
+            Int32,
+            Int64,
+            Uint8,
+            Uint16,
+            Uint32,
+            Uint64,
+            Float,
+            Double,
+            Struct,
+            Int8Array,
+            Int16Array,
+            Int32Array,
+            Int64Array,
+            Uint8Array,
+            Uint16Array,
+            Uint32Array,
+            Uint64Array,
+            Float32Array,
+            DoubleArray,
+            StructArray,
+            Char,
+            String,
+            Byte,
+            ByteArray,
+        )
         
         if _ver_parse(__version__) >= _ver_parse("2.3.0"):
             from pyrtma.context import _update_context, get_context
