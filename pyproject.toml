@@ -31,6 +31,10 @@ dependencies = [
 
 [project.optional-dependencies]
 numpy = ["numpy"]
+typing = [
+  "numpy",
+  "typing_extensions",
+  ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
