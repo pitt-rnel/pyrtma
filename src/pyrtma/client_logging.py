@@ -345,10 +345,10 @@ class RTMALogger(object):
 
     @property
     def log_filename(self) -> Union[str, pathlib.Path]:
-        if self.log_filename:
-            return self._log_filename
-        else:
+        if self.file_handler:
             return self.file_handler.baseFilename
+        else:
+            return self._log_filename
 
     @log_filename.setter
     def log_filename(self, value: Union[str, pathlib.Path]):
