@@ -152,7 +152,7 @@ class RTMALogger(object):
         level: int = logging.NOTSET,
     ):
         # default formatter
-        self._default_fmt = "{levelname:<8} - {asctime} - {log_name:<16} - {message}"
+        self._default_fmt = "{levelname:<8} - {asctime} - {log_name:<16} - {message} - {funcName}:{lineno}"
         self._rich_fmt = "[bold yellow]{log_name:<16}[/]   {message}"
         self._default_formatter: Optional[logging.Formatter] = logging.Formatter(
             self._default_fmt, style="{"
