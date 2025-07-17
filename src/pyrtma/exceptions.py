@@ -80,3 +80,9 @@ class InvalidSubscription(ClientError):
     """Raised when a subscription command is invalid"""
 
     pass
+
+
+class LoggingConfigurationError(BaseException):
+    """Raised when an attempt to configure a client logger is invalid"""
+
+    pass

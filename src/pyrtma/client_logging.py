@@ -6,7 +6,7 @@ import weakref
 
 from .message import MessageData
 from abc import ABC, abstractmethod
-from .exceptions import ClientError
+from .exceptions import ClientError, LoggingConfigurationError
 
 from typing import Union, Type, Dict, Optional, List
 from contextlib import contextmanager
@@ -352,6 +352,10 @@ class RTMALogger(object):
 
     @log_filename.setter
     def log_filename(self, value: Union[str, pathlib.Path]):
+        if self.file_handler:
+            raise LoggingConfigurationError(
+                "Filename cannot be changed after file handler is initialized"
+            )
         self._log_filename = value
 
     @property
@@ -363,7 +367,7 @@ class RTMALogger(object):
     @console_level.setter
     def console_level(self, value: int):
         if self.console_handler:
-            self.console_handler.level = value
+            self.console_handler.setLevel(value)
         self._console_level = value
 
     @property
@@ -375,7 +379,7 @@ class RTMALogger(object):
     @rtma_level.setter
     def rtma_level(self, value: int):
         if self.rtma_handler:
-            self.rtma_handler.level = value
+            self.rtma_handler.setLevel(value)
         self._rtma_level = value
 
     @property
@@ -387,7 +391,7 @@ class RTMALogger(object):
     @file_level.setter
     def file_level(self, value: int):
         if self.file_handler:
-            self.file_handler.level = value
+            self.file_handler.setLevel(value)
         self._file_level = value
 
     @property
