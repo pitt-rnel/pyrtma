@@ -1,6 +1,6 @@
 import pyrtma
 import time
-from logging import DEBUG, INFO
+from logging import DEBUG, INFO, WARNING
 from pyrtma.exceptions import LoggingConfigurationError
 
 
@@ -39,14 +39,24 @@ def exception_test(client: pyrtma.Client):
 if __name__ == "__main__":
     with pyrtma.client_context(name="logging_test") as client:
 
-        client.logger.set_all_levels(1)
+        client.info(f"Initial log level is: {client.logger.level}")
+        client.logger.set_all_levels(WARNING)
+        client.warning(
+            f"After setting all levels to WARNING ({WARNING}) log level is {client.logger.level}"
+        )
         client.logger.rtma_level = INFO
         client.logger.console_level = INFO
+        client.info(
+            f"After setting rtma and console handlers to INFO ({INFO}) log level is {client.logger.level}"
+        )
 
         # enable log file (console and RTMA logs enabled by default), set to DEBUG
         client.logger.log_filename = "client_log_test.log"
         client.logger.file_level = DEBUG
         client.logger.enable_file = True
+        client.logger.info(
+            f"After setting file handler level to DEBUG {DEBUG} log level is {client.logger.level}"
+        )
 
         client.info("Initialized logger, have not connected to RTMA yet")
 
