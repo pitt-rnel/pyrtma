@@ -316,6 +316,15 @@ class RTMALogger(object):
     def level(self, value: int):
         self._logger.setLevel(value)
 
+    @property
+    def min_handler_level(self) -> int:
+        """Minimum level of all handlers"""
+        mlevel = None
+        for h in self.logger.handlers:
+            if h.level:
+                mlevel = min(mlevel, h.level) if mlevel else h.level
+        return mlevel if mlevel else 0
+
     def add_child(self, child_name: str) -> logging.Logger:
         child_logger = self._logger.getChild(child_name)
         child_logger.setLevel(self.level)
@@ -369,6 +378,8 @@ class RTMALogger(object):
         if self.console_handler:
             self.console_handler.setLevel(value)
         self._console_level = value
+        if value < self.level:
+            self.level = value
 
     @property
     def rtma_level(self) -> int:
@@ -381,6 +392,8 @@ class RTMALogger(object):
         if self.rtma_handler:
             self.rtma_handler.setLevel(value)
         self._rtma_level = value
+        if value < self.level:
+            self.level = value
 
     @property
     def file_level(self) -> int:
@@ -393,6 +406,8 @@ class RTMALogger(object):
         if self.file_handler:
             self.file_handler.setLevel(value)
         self._file_level = value
+        if value < self.level:
+            self.level = value
 
     @property
     def console_formatter(self) -> Optional[logging.Formatter]:
