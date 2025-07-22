@@ -149,7 +149,7 @@ class RTMALogger(object):
         self,
         log_name: str,
         rtma_client: ClientLike,
-        level: int = logging.NOTSET,
+        level: int = logging.INFO,
     ):
         # default formatter
         self._default_fmt = "{levelname:<8} - {asctime} - {log_name:<16} - {message} - {funcName}:{lineno}"
