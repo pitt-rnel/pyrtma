@@ -197,6 +197,7 @@ class RTMALogger(object):
         self.critical = self.logger.critical
 
     def __del__(self):
+        return  # below causes error in logger.removeHandler when exiting REPL and is likely unecessary
         if self._console_handler:
             self._logger.removeHandler(self._console_handler)
 
@@ -209,7 +210,8 @@ class RTMALogger(object):
 
         # remove any other handlers
         for handler in self._logger.handlers:
-            self._logger.removeHandler(handler)
+            if handler is not None:
+                self._logger.removeHandler(handler)
 
     @property
     def logger(self) -> logging.Logger:  # read only
