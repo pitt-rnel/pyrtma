@@ -701,7 +701,7 @@ class Parser:
 
     def check_alignment(self, s: Union[SDF, MDF]):
         """Confirm 64 bit alignment of structures"""
-        PADDING_BYTE_TYPE = "char"
+        PADDING_BYTE_TYPE = "byte"
 
         # This value will represent the memory address currently pointed to in the struct layout
         ptr = 0
