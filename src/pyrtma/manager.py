@@ -829,13 +829,19 @@ class MessageManager(ClientLike):
         self.send_message(msg)
         self.last_client_info = msg.timestamp
 
-    def decode_core_message(self, hdr: MessageHeader) -> Message:
+    def decode_core_message(
+        self, src_module: Module, hdr: MessageHeader
+    ) -> Union[Message, None]:
         data_cls = _get_core_defs().get(hdr.msg_type)
         if data_cls:
             data = data_cls.from_buffer(self.data_buffer)
             return Message(hdr, data)
         else:
-            raise RuntimeError(f"Unknown core_def MT={hdr.msg_type}")
+            self.logger.critical(
+                f"Unknown core_def MT={hdr.msg_type} received from {src_module.name}"
+            )
+            self.remove_module(src_module)
+            return None
 
     def process_core_message(self, src_module: Module, header: MessageHeader):
         """Process incoming core message
@@ -849,7 +855,9 @@ class MessageManager(ClientLike):
             # NOTE: DEBUG_TEXT is unsupported legacy STRING_DATA type
             return
 
-        core_msg = self.decode_core_message(header)
+        core_msg = self.decode_core_message(src_module, header)
+        if core_msg is None:
+            return
 
         if msg_type == cd.MT_CONNECT or msg_type == cd.MT_CONNECT_V2:
             if self.connect_module(src_module, core_msg):
