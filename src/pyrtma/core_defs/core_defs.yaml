@@ -121,16 +121,6 @@ message_defs:
     fields:
       pid: int32
 
-  MESSAGE_TRAFFIC:
-    id: 30
-    fields:
-      seqno: uint32
-      sub_seqno: uint32
-      start_timestamp: double
-      end_timestamp: double
-      msg_type: MSG_TYPE[MESSAGE_TRAFFIC_SIZE]
-      msg_count: uint16[MESSAGE_TRAFFIC_SIZE]
-
   ACTIVE_CLIENTS:
     id: 31
     fields:

@@ -115,7 +115,6 @@ class MessageManager(ClientLike):
     RTMA Message Manager server implemented in python.
     """
 
-    TRAFFIC_INTERVAL = 1.0
     INFO_INTERVAL = 5.0
 
     def __init__(
@@ -179,12 +178,6 @@ class MessageManager(ClientLike):
         self.min_timing_message_period = 0.9
 
         self.last_client_info: float = time.perf_counter()
-        self.sending_traffic: ContextVar[bool] = ContextVar(
-            "sending_traffic", default=False
-        )
-        self.traffic_counter: typing.Counter[int] = Counter()
-        self.traffic_start: float = time.perf_counter()
-        self.traffic_seqno: int = 1
 
         # Disable Nagle Algorithm
         self.listen_socket.setsockopt(
@@ -225,12 +218,6 @@ class MessageManager(ClientLike):
     @property
     def logger(self) -> RTMALogger:
         return self._logger
-
-    @contextmanager
-    def sending_traffic_ctx(self):
-        token = self.sending_traffic.set(True)
-        yield
-        self.sending_traffic.reset(token)
 
     def generate_uid(self) -> int:
         self._uid += 1
@@ -538,11 +525,8 @@ class MessageManager(ClientLike):
         src_name = src_module.name or f"Module({src_module.mod_id})"
 
         # Increment message counts
-        # Note: skip traffic count if we are currently forwarding out traffic messages)
-        if not self.sending_traffic.get():
-            if self.b_send_msg_timing:
-                self.message_counts[header.msg_type] += 1
-            self.traffic_counter[header.msg_type] += 1
+        if self.b_send_msg_timing:
+            self.message_counts[header.msg_type] += 1
 
         dest_mod_id = header.dest_mod_id
         dest_host_id = header.dest_host_id
@@ -738,43 +722,6 @@ class MessageManager(ClientLike):
             data.ModulePID[mod.mod_id] = mod.pid
 
         data.send_time = time.perf_counter()
-        with self.sending_traffic_ctx():
-            self.send_message(data)
-
-    def send_traffic(self):
-        """Send MESSAGE_TRAFFIC"""
-        with self.sending_traffic_ctx():
-            self.logger.debug("MESSAGE_TRAFFIC")
-            data = cd.MDF_MESSAGE_TRAFFIC()
-            now = time.perf_counter()
-            sub_seqno = 1
-            nsent = 0
-            i = -1
-            for n, (mt, count) in enumerate(self.traffic_counter.items()):
-                data.seqno = self.traffic_seqno
-                data.sub_seqno = sub_seqno
-                data.start_timestamp = self.traffic_start
-                data.end_timestamp = now
-
-                i = n % cd.MESSAGE_TRAFFIC_SIZE
-                data.msg_type[i] = mt
-                data.msg_count[i] = count
-
-                if (n % cd.MESSAGE_TRAFFIC_SIZE) == 0:
-                    nsent = n
-                    self.send_message(data)
-                    sub_seqno += 1
-
-            # Send any remaining
-            if i >= 0:
-                i += 1
-                if nsent < len(self.traffic_counter):
-                    data.msg_type[i:] = [-1 for _ in range(cd.MESSAGE_TRAFFIC_SIZE - i)]
-                    self.send_message(data)
-
-        self.traffic_counter.clear()
-        self.traffic_start = now
-        self.traffic_seqno += 1
 
     def send_client_close(self, module: Module):
         """Send CLIENT_CLOSED
@@ -975,9 +922,6 @@ class MessageManager(ClientLike):
                     ):
                         self.send_timing_message()
                         self.t_last_message_count = now
-
-                    if (now - self.traffic_start) > self.TRAFFIC_INTERVAL:
-                        self.send_traffic()
 
                     if (now - self.last_client_info) > self.INFO_INTERVAL:
                         self.send_active_clients()

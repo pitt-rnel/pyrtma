@@ -248,7 +248,6 @@ MT_DISCONNECT: int = 14
 MT_SUBSCRIBE: int = 15
 MT_UNSUBSCRIBE: int = 16
 MT_MODULE_READY: int = 26
-MT_MESSAGE_TRAFFIC: int = 30
 MT_ACTIVE_CLIENTS: int = 31
 MT_CLIENT_INFO: int = 32
 MT_CLIENT_CLOSED: int = 33
@@ -1209,25 +1208,6 @@ class MDF_MODULE_READY(MessageData, metaclass=MessageMeta):
     type_def: ClassVar[str] = "'MODULE_READY:\n  id: 26\n  fields:\n    pid: int32'"
 
     pid: Int32 = Int32()
-
-
-@pyrtma.message_def
-class MDF_MESSAGE_TRAFFIC(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 30
-    type_name: ClassVar[str] = "MESSAGE_TRAFFIC"
-    type_hash: ClassVar[int] = 0xA5D05FF5
-    type_size: ClassVar[int] = 408
-    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
-    type_def: ClassVar[str] = (
-        "'MESSAGE_TRAFFIC:\n  id: 30\n  fields:\n    seqno: uint32\n    sub_seqno: uint32\n    start_timestamp: double\n    end_timestamp: double\n    msg_type: MSG_TYPE[MESSAGE_TRAFFIC_SIZE]\n    msg_count: uint16[MESSAGE_TRAFFIC_SIZE]'"
-    )
-
-    seqno: Uint32 = Uint32()
-    sub_seqno: Uint32 = Uint32()
-    start_timestamp: Double = Double()
-    end_timestamp: Double = Double()
-    msg_type: IntArray[Int32] = IntArray(Int32, 64)
-    msg_count: IntArray[Uint16] = IntArray(Uint16, 64)
 
 
 @pyrtma.message_def
