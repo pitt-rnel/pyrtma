@@ -1,3 +1,6 @@
+"""data_logger CLI main entry point"""
+
+
 def main():
     """Main function for starting base Data Logger"""
     import argparse
@@ -61,10 +64,10 @@ def main():
     try:
         d.run()
     except MessageManagerNotFound as e:
-        d.mod.error(f"MessageManagerNotFound: {e.args[0]}")
+        d.client.error(f"MessageManagerNotFound: {e.args[0]}")
         sys.exit(1)
     except ConnectionLost as e:
-        d.mod.error(f"ConnectionLost: Connection to MessageManager is broken.")
+        d.client.error(f"ConnectionLost: Connection to MessageManager is broken.")
         sys.exit(1)
 
 
