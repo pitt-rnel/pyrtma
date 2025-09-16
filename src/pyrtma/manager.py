@@ -125,6 +125,7 @@ class MessageManager(ClientLike):
         log_level=logging.INFO,
         debug=False,
         send_msg_timing=True,
+        send_active_clients=True,
     ):
         """MessageManager class
 
@@ -137,6 +138,7 @@ class MessageManager(ClientLike):
             log_level (int, optional): logging level, defaults to logging.INFO.
             debug (bool, optional): Flag for debug mode. Defaults to False.
             send_msg_timing (bool, optional): Flag to send TIMING_MSG. Defaults to True.
+            send_active_clients (bool, optional): Flag to send ACTIVE_CLIENTS. Defaults to True.
         """
         self._keep_running = False
         self.ip_address = ip_address
@@ -150,7 +152,8 @@ class MessageManager(ClientLike):
         self.read_timeout = 0.200
         self.write_timeout = 0  # c++ message manager uses timeout = 0 for all modules except logger modules, which uses -1 (blocking)
         self._debug = debug
-        self.b_send_msg_timing = send_msg_timing
+        self.send_msg_timing = send_msg_timing
+        self.send_active_clients_msg = send_active_clients
 
         self._logger = RTMALogger(f"message_manager", self, logging.INFO)
         self.logger.set_all_levels(log_level)
@@ -525,7 +528,7 @@ class MessageManager(ClientLike):
         src_name = src_module.name or f"Module({src_module.mod_id})"
 
         # Increment message counts
-        if self.b_send_msg_timing:
+        if self.send_msg_timing:
             self.message_counts[header.msg_type] += 1
 
         dest_mod_id = header.dest_mod_id
@@ -916,14 +919,17 @@ class MessageManager(ClientLike):
                     now = time.perf_counter()
 
                     if (
-                        self.b_send_msg_timing
+                        self.send_msg_timing
                         and (now - self.t_last_message_count)
                         > self.min_timing_message_period
                     ):
                         self.send_timing_message()
                         self.t_last_message_count = now
 
-                    if (now - self.last_client_info) > self.INFO_INTERVAL:
+                    if (
+                        self.send_active_clients_msg
+                        and (now - self.last_client_info) > self.INFO_INTERVAL
+                    ):
                         self.send_active_clients()
 
         except KeyboardInterrupt:
@@ -962,6 +968,13 @@ def main():
         action="store_true",
         help="Disable sending of TIMING_MESSAGE",
     )
+
+    parser.add_argument(
+        "--disable_active_clients_msg",
+        action="store_true",
+        help="Disable sending of ACTIVE_CLIENTS message periodically",
+    )
+
     args = parser.parse_args()
 
     if args.addr:  # a non-empty host address was passed in.
@@ -989,6 +1002,7 @@ def main():
             log_level=level,
             debug=args.debug,
             send_msg_timing=(not args.disable_timing_msg),
+            send_active_clients=(not args.disable_active_clients_msg),
         )
 
         msg_mgr.run()
