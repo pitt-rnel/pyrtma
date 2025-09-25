@@ -1136,6 +1136,13 @@ class Parser:
         if mdf["fields"] is None:
             self.handle_signal(name, mdf)
             return
+        
+        # Ensure all fieldnames are valid
+        for k, v in mdf["fields"].items():
+            if isinstance(k, str) and k.startswith('_'): # Matlab does not allow variables to start with '_'
+                raise RTMASyntaxError(
+                    f"Field '{k}' in message {name} cannot start with an underscore."
+                )
 
         # Create a string representation of the defintion to hash
         f: Union[str, List[str]]
