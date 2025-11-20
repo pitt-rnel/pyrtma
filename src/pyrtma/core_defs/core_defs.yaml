@@ -116,6 +116,10 @@ message_defs:
     fields:
       msg_type: MSG_TYPE
 
+  SHUTDOWN_RTMA:
+    id: 17
+    fields: null
+
   MODULE_READY:
     id: 26
     fields:
