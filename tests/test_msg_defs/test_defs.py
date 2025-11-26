@@ -21,8 +21,16 @@ from pyrtma.validators import (
     Float,
     Double,
     Struct,
-    IntArray,
-    FloatArray,
+    Int8Array,
+    Int16Array,
+    Int32Array,
+    Int64Array,
+    Uint8Array,
+    Uint16Array,
+    Uint32Array,
+    Uint64Array,
+    Float32Array,
+    DoubleArray,
     StructArray,
     Char,
     String,
@@ -517,7 +525,7 @@ class DATA_SET(MessageBase, metaclass=MessageMeta):
     file_name_fmt: String = String(128)
     formatter: String = String(32)
     subdivide_interval: Int32 = Int32()
-    msg_types: IntArray[Int32] = IntArray(Int32, 32)
+    msg_types: Int32Array = Int32Array(32)
 
 
 class DATA_COLLECTION(MessageBase, metaclass=MessageMeta):
@@ -550,7 +558,7 @@ class DATA_SET_INFO(MessageBase, metaclass=MessageMeta):
     formatter: String = String(32)
     save_path: String = String(256)
     subdivide_interval: Int32 = Int32()
-    msg_types: IntArray[Int32] = IntArray(Int32, 32)
+    msg_types: Int32Array = Int32Array(32)
 
 
 class DATA_COLLECTION_INFO(MessageBase, metaclass=MessageMeta):
@@ -624,24 +632,24 @@ class VALIDATOR_STRUCT(MessageBase, metaclass=MessageMeta):
     uint16: Uint16 = Uint16()
     uint32: Uint32 = Uint32()
     uint64: Uint64 = Uint64()
-    int8_arr: IntArray[Int8] = IntArray(Int8, 4)
-    int16_arr: IntArray[Int16] = IntArray(Int16, 4)
-    int32_arr: IntArray[Int32] = IntArray(Int32, 4)
+    int8_arr: Int8Array = Int8Array(4)
+    int16_arr: Int16Array = Int16Array(4)
+    int32_arr: Int32Array = Int32Array(4)
     padding_1_: String = String(4)
-    int64_arr: IntArray[Int64] = IntArray(Int64, 4)
-    uint8_arr: IntArray[Uint8] = IntArray(Uint8, 4)
-    uint16_arr: IntArray[Uint16] = IntArray(Uint16, 4)
-    uint32_arr: IntArray[Uint32] = IntArray(Uint32, 4)
+    int64_arr: Int64Array = Int64Array(4)
+    uint8_arr: Uint8Array = Uint8Array(4)
+    uint16_arr: Uint16Array = Uint16Array(4)
+    uint32_arr: Uint32Array = Uint32Array(4)
     padding_2_: String = String(4)
-    uint64_arr: IntArray[Uint64] = IntArray(Uint64, 4)
+    uint64_arr: Uint64Array = Uint64Array(4)
     byte_: Byte = Byte()
     byte_arr: ByteArray = ByteArray(4)
     string: String = String(4)
     padding_3_: String = String(3)
     float_: Float = Float()
     double_: Double = Double()
-    float_arr: FloatArray[Float] = FloatArray(Float, 4)
-    double_arr: FloatArray[Double] = FloatArray(Double, 4)
+    float_arr: Float32Array = Float32Array(4)
+    double_arr: DoubleArray = DoubleArray(4)
 
 
 class MSG_HEADER(MessageBase, metaclass=MessageMeta):
@@ -671,11 +679,11 @@ class SPIKE_SNIPPET_TYPE(MessageBase, metaclass=MessageMeta):
     unit: Byte = Byte()
     reserved1: Byte = Byte()
     source_timestamp: Double = Double()
-    fPattern: FloatArray[Double] = FloatArray(Double, 3)
+    fPattern: DoubleArray = DoubleArray(3)
     nPeak: Int16 = Int16()
     nValley: Int16 = Int16()
     reserved2: Int32 = Int32()
-    snippet: IntArray[Int16] = IntArray(Int16, 48)
+    snippet: Int16Array = Int16Array(48)
 
 
 class REJECTED_SNIPPET_TYPE(MessageBase, metaclass=MessageMeta):
@@ -692,11 +700,11 @@ class REJECTED_SNIPPET_TYPE(MessageBase, metaclass=MessageMeta):
     unit: Byte = Byte()
     reserved1: Byte = Byte()
     source_timestamp: Double = Double()
-    fPattern: FloatArray[Double] = FloatArray(Double, 3)
+    fPattern: DoubleArray = DoubleArray(3)
     nPeak: Int16 = Int16()
     nValley: Int16 = Int16()
     rejectType: Int32 = Int32()
-    snippet: IntArray[Int16] = IntArray(Int16, 48)
+    snippet: Int16Array = Int16Array(48)
 
 
 class DEKA_CAN_MSG(MessageBase, metaclass=MessageMeta):
@@ -724,8 +732,8 @@ class RH_FINGER_DATA(MessageBase, metaclass=MessageMeta):
 
     proximal_angle: Float = Float()
     distal_angle: Float = Float()
-    pressure: FloatArray[Float] = FloatArray(Float, 9)
-    contact: IntArray[Int32] = IntArray(Int32, 9)
+    pressure: Float32Array = Float32Array(9)
+    contact: Int32Array = Int32Array(9)
 
 
 class DYNAMIXEL_INFO(MessageBase, metaclass=MessageMeta):
@@ -737,12 +745,12 @@ class DYNAMIXEL_INFO(MessageBase, metaclass=MessageMeta):
         "'DYNAMIXEL_INFO:\n  fields:\n    joint_angle: float[NUM_DYNAMIXEL]\n    raw_angle: float[NUM_DYNAMIXEL]\n    velocity: float[NUM_DYNAMIXEL]\n    load: float[NUM_DYNAMIXEL]\n    voltage: float[NUM_DYNAMIXEL]\n    temperature: int[NUM_DYNAMIXEL]'"
     )
 
-    joint_angle: FloatArray[Float] = FloatArray(Float, 4)
-    raw_angle: FloatArray[Float] = FloatArray(Float, 4)
-    velocity: FloatArray[Float] = FloatArray(Float, 4)
-    load: FloatArray[Float] = FloatArray(Float, 4)
-    voltage: FloatArray[Float] = FloatArray(Float, 4)
-    temperature: IntArray[Int32] = IntArray(Int32, 4)
+    joint_angle: Float32Array = Float32Array(4)
+    raw_angle: Float32Array = Float32Array(4)
+    velocity: Float32Array = Float32Array(4)
+    load: Float32Array = Float32Array(4)
+    voltage: Float32Array = Float32Array(4)
+    temperature: Int32Array = Int32Array(4)
 
 
 # Message Definitions
@@ -1196,7 +1204,7 @@ class MDF_FAILED_MESSAGE(MessageData, metaclass=MessageMeta):
     )
 
     dest_mod_id: Int16 = Int16()
-    reserved: IntArray[Int16] = IntArray(Int16, 3)
+    reserved: Int16Array = Int16Array(3)
     time_of_failure: Double = Double()
     msg_header: Struct[RTMA_MSG_HEADER] = Struct(RTMA_MSG_HEADER)
 
@@ -1291,8 +1299,8 @@ class MDF_MESSAGE_TRAFFIC(MessageData, metaclass=MessageMeta):
     sub_seqno: Uint32 = Uint32()
     start_timestamp: Double = Double()
     end_timestamp: Double = Double()
-    msg_type: IntArray[Int32] = IntArray(Int32, 64)
-    msg_count: IntArray[Uint16] = IntArray(Uint16, 64)
+    msg_type: Int32Array = Int32Array(64)
+    msg_count: Uint16Array = Uint16Array(64)
 
 
 @pyrtma.message_def
@@ -1310,8 +1318,8 @@ class MDF_ACTIVE_CLIENTS(MessageData, metaclass=MessageMeta):
     num_clients: Int16 = Int16()
     padding: Int16 = Int16()
     reserved: Int32 = Int32()
-    client_mod_id: IntArray[Int16] = IntArray(Int16, 256)
-    client_pid: IntArray[Int32] = IntArray(Int32, 256)
+    client_mod_id: Int16Array = Int16Array(256)
+    client_pid: Int32Array = Int32Array(256)
 
 
 @pyrtma.message_def
@@ -1501,8 +1509,8 @@ class MDF_TIMING_MESSAGE(MessageData, metaclass=MessageMeta):
         "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: uint16[MAX_MESSAGE_TYPES]\n    ModulePID: int32[MAX_MODULES]\n    send_time: double'"
     )
 
-    timing: IntArray[Uint16] = IntArray(Uint16, 10000)
-    ModulePID: IntArray[Int32] = IntArray(Int32, 200)
+    timing: Uint16Array = Uint16Array(10000)
+    ModulePID: Int32Array = Int32Array(200)
     send_time: Double = Double()
 
 
@@ -1577,15 +1585,15 @@ class MDF_MUJOCO_VR_REPLY_STATE(MessageData, metaclass=MessageMeta):
     requester_MID: Int32 = Int32()
     reserved: Int32 = Int32()
     sim_time: Double = Double()
-    body_position: FloatArray[Double] = FloatArray(Double, 192)
-    body_orientation: FloatArray[Double] = FloatArray(Double, 256)
-    motor_ctrltype: IntArray[Int32] = IntArray(Int32, 32)
-    motor_position: FloatArray[Double] = FloatArray(Double, 32)
-    motor_velocity: FloatArray[Double] = FloatArray(Double, 32)
-    joint_position: FloatArray[Double] = FloatArray(Double, 128)
-    joint_velocity: FloatArray[Double] = FloatArray(Double, 128)
-    joint_torque: FloatArray[Double] = FloatArray(Double, 128)
-    contact: FloatArray[Double] = FloatArray(Double, 32)
+    body_position: DoubleArray = DoubleArray(192)
+    body_orientation: DoubleArray = DoubleArray(256)
+    motor_ctrltype: Int32Array = Int32Array(32)
+    motor_position: DoubleArray = DoubleArray(32)
+    motor_velocity: DoubleArray = DoubleArray(32)
+    joint_position: DoubleArray = DoubleArray(128)
+    joint_velocity: DoubleArray = DoubleArray(128)
+    joint_torque: DoubleArray = DoubleArray(128)
+    contact: DoubleArray = DoubleArray(32)
 
 
 @pyrtma.message_def
@@ -1602,9 +1610,9 @@ class MDF_MUJOCO_VR_MOCAP_MOVE(MessageData, metaclass=MessageMeta):
     header: Struct[MJVR_MSG_HEADER] = Struct(MJVR_MSG_HEADER)
     num_id: Int32 = Int32()
     padding: Int32 = Int32()
-    id: IntArray[Int32] = IntArray(Int32, 32)
-    position: FloatArray[Double] = FloatArray(Double, 96)
-    orientation: FloatArray[Double] = FloatArray(Double, 128)
+    id: Int32Array = Int32Array(32)
+    position: DoubleArray = DoubleArray(96)
+    orientation: DoubleArray = DoubleArray(128)
 
 
 @pyrtma.message_def
@@ -1621,8 +1629,8 @@ class MDF_MUJOCO_VR_MOTOR_MOVE(MessageData, metaclass=MessageMeta):
     header: Struct[MJVR_MSG_HEADER] = Struct(MJVR_MSG_HEADER)
     num_id: Int32 = Int32()
     padding: Int32 = Int32()
-    id: IntArray[Int32] = IntArray(Int32, 32)
-    position: FloatArray[Double] = FloatArray(Double, 32)
+    id: Int32Array = Int32Array(32)
+    position: DoubleArray = DoubleArray(32)
 
 
 @pyrtma.message_def
@@ -1665,16 +1673,16 @@ class MDF_MUJOCO_VR_REPLY_MODEL_INFO(MessageData, metaclass=MessageMeta):
     num_contact: Int32 = Int32()
     num_tendon: Int32 = Int32()
     reserved1: Int32 = Int32()
-    body_id: IntArray[Int32] = IntArray(Int32, 64)
-    mocap_id: IntArray[Int32] = IntArray(Int32, 32)
-    float_id: IntArray[Int32] = IntArray(Int32, 32)
-    motor_id: IntArray[Int32] = IntArray(Int32, 32)
-    joint_id: IntArray[Int32] = IntArray(Int32, 64)
-    contact_id: IntArray[Int32] = IntArray(Int32, 32)
-    tendon_id: IntArray[Int32] = IntArray(Int32, 32)
-    joint_type: IntArray[Int32] = IntArray(Int32, 64)
-    max_motor_limits: FloatArray[Double] = FloatArray(Double, 32)
-    min_motor_limits: FloatArray[Double] = FloatArray(Double, 32)
+    body_id: Int32Array = Int32Array(64)
+    mocap_id: Int32Array = Int32Array(32)
+    float_id: Int32Array = Int32Array(32)
+    motor_id: Int32Array = Int32Array(32)
+    joint_id: Int32Array = Int32Array(64)
+    contact_id: Int32Array = Int32Array(32)
+    tendon_id: Int32Array = Int32Array(32)
+    joint_type: Int32Array = Int32Array(64)
+    max_motor_limits: DoubleArray = DoubleArray(32)
+    min_motor_limits: DoubleArray = DoubleArray(32)
     body_names: String = String(1024)
     mocap_names: String = String(1024)
     float_names: String = String(1024)
@@ -1714,13 +1722,13 @@ class MDF_MUJOCO_VR_REPLY_LINK_STATE(MessageData, metaclass=MessageMeta):
     reserved: Int32 = Int32()
     nlink: Int32 = Int32()
     nfloat: Int32 = Int32()
-    body_linkid: IntArray[Int32] = IntArray(Int32, 64)
-    link_followerid: IntArray[Int32] = IntArray(Int32, 64)
-    link_leaderid: IntArray[Int32] = IntArray(Int32, 64)
+    body_linkid: Int32Array = Int32Array(64)
+    link_followerid: Int32Array = Int32Array(64)
+    link_leaderid: Int32Array = Int32Array(64)
     link_active: String = String(64)
-    link_rpos: FloatArray[Double] = FloatArray(Double, 192)
-    link_quat_leader: FloatArray[Double] = FloatArray(Double, 256)
-    link_quat_follower: FloatArray[Double] = FloatArray(Double, 256)
+    link_rpos: DoubleArray = DoubleArray(192)
+    link_quat_leader: DoubleArray = DoubleArray(256)
+    link_quat_follower: DoubleArray = DoubleArray(256)
 
 
 @pyrtma.message_def
@@ -1737,8 +1745,8 @@ class MDF_MUJOCO_VR_LINK(MessageData, metaclass=MessageMeta):
     header: Struct[MJVR_MSG_HEADER] = Struct(MJVR_MSG_HEADER)
     num_links: Int32 = Int32()
     padding: Int32 = Int32()
-    follower_id: IntArray[Int32] = IntArray(Int32, 32)
-    leader_id: IntArray[Int32] = IntArray(Int32, 32)
+    follower_id: Int32Array = Int32Array(32)
+    leader_id: Int32Array = Int32Array(32)
 
 
 @pyrtma.message_def
@@ -1755,7 +1763,7 @@ class MDF_MUJOCO_VR_LINK_RESET(MessageData, metaclass=MessageMeta):
     header: Struct[MJVR_MSG_HEADER] = Struct(MJVR_MSG_HEADER)
     num_links: Int32 = Int32()
     padding: Int32 = Int32()
-    follower_id: IntArray[Int32] = IntArray(Int32, 32)
+    follower_id: Int32Array = Int32Array(32)
 
 
 @pyrtma.message_def
@@ -1772,9 +1780,9 @@ class MDF_MUJOCO_VR_FLOATBODY_MOVE(MessageData, metaclass=MessageMeta):
     header: Struct[MJVR_MSG_HEADER] = Struct(MJVR_MSG_HEADER)
     num_id: Int32 = Int32()
     padding: Int32 = Int32()
-    float_body_id: IntArray[Int32] = IntArray(Int32, 32)
-    position: FloatArray[Double] = FloatArray(Double, 96)
-    orientation: FloatArray[Double] = FloatArray(Double, 128)
+    float_body_id: Int32Array = Int32Array(32)
+    position: DoubleArray = DoubleArray(96)
+    orientation: DoubleArray = DoubleArray(128)
     disable_link: String = String(32)
 
 
@@ -1846,8 +1854,8 @@ class MDF_MUJOCO_VR_MOTOR_CTRL(MessageData, metaclass=MessageMeta):
     header: Struct[MJVR_MSG_HEADER] = Struct(MJVR_MSG_HEADER)
     num_id: Int32 = Int32()
     padding: Int32 = Int32()
-    id: IntArray[Int32] = IntArray(Int32, 32)
-    ctrl: FloatArray[Double] = FloatArray(Double, 32)
+    id: Int32Array = Int32Array(32)
+    ctrl: DoubleArray = DoubleArray(32)
 
 
 @pyrtma.message_def
@@ -1864,12 +1872,12 @@ class MDF_MUJOCO_VR_MOTOR_CONFIG(MessageData, metaclass=MessageMeta):
     header: Struct[MJVR_MSG_HEADER] = Struct(MJVR_MSG_HEADER)
     num_id: Int32 = Int32()
     padding: Int32 = Int32()
-    id: IntArray[Int32] = IntArray(Int32, 32)
-    type: IntArray[Int32] = IntArray(Int32, 32)
-    k_p: FloatArray[Double] = FloatArray(Double, 32)
-    k_i: FloatArray[Double] = FloatArray(Double, 32)
-    k_d: FloatArray[Double] = FloatArray(Double, 32)
-    setpt: FloatArray[Double] = FloatArray(Double, 32)
+    id: Int32Array = Int32Array(32)
+    type: Int32Array = Int32Array(32)
+    k_p: DoubleArray = DoubleArray(32)
+    k_i: DoubleArray = DoubleArray(32)
+    k_d: DoubleArray = DoubleArray(32)
+    setpt: DoubleArray = DoubleArray(32)
 
 
 @pyrtma.message_def
@@ -1886,7 +1894,7 @@ class MDF_MUJOCO_VR_SET_RGBA(MessageData, metaclass=MessageMeta):
     header: Struct[MJVR_MSG_HEADER] = Struct(MJVR_MSG_HEADER)
     type: Int32 = Int32()
     id: Int32 = Int32()
-    rgba: FloatArray[Float] = FloatArray(Float, 4)
+    rgba: Float32Array = Float32Array(4)
 
 
 @pyrtma.message_def
@@ -1932,8 +1940,8 @@ class MDF_FINISHED_COMMAND(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    command: FloatArray[Double] = FloatArray(Double, 30)
-    stiffness: FloatArray[Double] = FloatArray(Double, 54)
+    command: DoubleArray = DoubleArray(30)
+    stiffness: DoubleArray = DoubleArray(54)
     src: Int32 = Int32()
     reserved: Int32 = Int32()
 
@@ -1950,8 +1958,8 @@ class MDF_CONTROL_SPACE_FEEDBACK(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    position: FloatArray[Double] = FloatArray(Double, 30)
-    velocity: FloatArray[Double] = FloatArray(Double, 30)
+    position: DoubleArray = DoubleArray(30)
+    velocity: DoubleArray = DoubleArray(30)
 
 
 @pyrtma.message_def
@@ -1966,8 +1974,8 @@ class MDF_CONTROL_SPACE_COMMAND(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    command: FloatArray[Double] = FloatArray(Double, 30)
-    dZ: FloatArray[Double] = FloatArray(Double, 9)
+    command: DoubleArray = DoubleArray(30)
+    dZ: DoubleArray = DoubleArray(9)
     src: Int32 = Int32()
     actual_pos: Int32 = Int32()
 
@@ -1984,10 +1992,10 @@ class MDF_MPL_RAW_PERCEPT(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    position: FloatArray[Double] = FloatArray(Double, 54)
-    velocity: FloatArray[Double] = FloatArray(Double, 54)
-    torque: FloatArray[Double] = FloatArray(Double, 54)
-    temperature: FloatArray[Double] = FloatArray(Double, 54)
+    position: DoubleArray = DoubleArray(54)
+    velocity: DoubleArray = DoubleArray(54)
+    torque: DoubleArray = DoubleArray(54)
+    temperature: DoubleArray = DoubleArray(54)
 
 
 @pyrtma.message_def
@@ -2002,8 +2010,8 @@ class MDF_BIAS_COMMAND(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    command: FloatArray[Double] = FloatArray(Double, 30)
-    dZ: FloatArray[Double] = FloatArray(Double, 9)
+    command: DoubleArray = DoubleArray(30)
+    dZ: DoubleArray = DoubleArray(9)
     src: Int32 = Int32()
     reserved: Int32 = Int32()
 
@@ -2020,13 +2028,13 @@ class MDF_MPL_REBIASED_SENSORDATA(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    torque: FloatArray[Double] = FloatArray(Double, 54)
-    ind_force: FloatArray[Double] = FloatArray(Double, 14)
-    mid_force: FloatArray[Double] = FloatArray(Double, 14)
-    rng_force: FloatArray[Double] = FloatArray(Double, 14)
-    lit_force: FloatArray[Double] = FloatArray(Double, 14)
-    thb_force: FloatArray[Double] = FloatArray(Double, 14)
-    contacts: IntArray[Int16] = IntArray(Int16, 16)
+    torque: DoubleArray = DoubleArray(54)
+    ind_force: DoubleArray = DoubleArray(14)
+    mid_force: DoubleArray = DoubleArray(14)
+    rng_force: DoubleArray = DoubleArray(14)
+    lit_force: DoubleArray = DoubleArray(14)
+    thb_force: DoubleArray = DoubleArray(14)
+    contacts: Int16Array = Int16Array(16)
 
 
 @pyrtma.message_def
@@ -2053,7 +2061,7 @@ class MDF_CONTROL_SPACE_POS_COMMAND(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    command: FloatArray[Double] = FloatArray(Double, 30)
+    command: DoubleArray = DoubleArray(30)
     src: Int32 = Int32()
     reserved: Int32 = Int32()
 
@@ -2070,17 +2078,17 @@ class MDF_MPL_SEGMENT_PERCEPTS(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    ind_force: FloatArray[Double] = FloatArray(Double, 14)
-    mid_force: FloatArray[Double] = FloatArray(Double, 14)
-    rng_force: FloatArray[Double] = FloatArray(Double, 14)
-    lit_force: FloatArray[Double] = FloatArray(Double, 14)
-    thb_force: FloatArray[Double] = FloatArray(Double, 14)
-    ind_accel: FloatArray[Double] = FloatArray(Double, 3)
-    mid_accel: FloatArray[Double] = FloatArray(Double, 3)
-    rng_accel: FloatArray[Double] = FloatArray(Double, 3)
-    lit_accel: FloatArray[Double] = FloatArray(Double, 3)
-    thb_accel: FloatArray[Double] = FloatArray(Double, 3)
-    contacts: IntArray[Int16] = IntArray(Int16, 16)
+    ind_force: DoubleArray = DoubleArray(14)
+    mid_force: DoubleArray = DoubleArray(14)
+    rng_force: DoubleArray = DoubleArray(14)
+    lit_force: DoubleArray = DoubleArray(14)
+    thb_force: DoubleArray = DoubleArray(14)
+    ind_accel: DoubleArray = DoubleArray(3)
+    mid_accel: DoubleArray = DoubleArray(3)
+    rng_accel: DoubleArray = DoubleArray(3)
+    lit_accel: DoubleArray = DoubleArray(3)
+    thb_accel: DoubleArray = DoubleArray(3)
+    contacts: Int16Array = Int16Array(16)
 
 
 @pyrtma.message_def
@@ -2094,8 +2102,8 @@ class MDF_WAM_FEEDBACK(MessageData, metaclass=MessageMeta):
         "'WAM_FEEDBACK:\n  id: 1712\n  fields:\n    position: double[7]\n    velocity: double[7]'"
     )
 
-    position: FloatArray[Double] = FloatArray(Double, 7)
-    velocity: FloatArray[Double] = FloatArray(Double, 7)
+    position: DoubleArray = DoubleArray(7)
+    velocity: DoubleArray = DoubleArray(7)
 
 
 @pyrtma.message_def
@@ -2110,7 +2118,7 @@ class MDF_IMPEDANCE_COMMAND(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    stiffness: FloatArray[Double] = FloatArray(Double, 54)
+    stiffness: DoubleArray = DoubleArray(54)
     src: Int32 = Int32()
     reserved: Int32 = Int32()
 
@@ -2143,13 +2151,13 @@ class MDF_CURSOR_FEEDBACK(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    torque: FloatArray[Double] = FloatArray(Double, 54)
-    ind_force: FloatArray[Double] = FloatArray(Double, 14)
-    mid_force: FloatArray[Double] = FloatArray(Double, 14)
-    rng_force: FloatArray[Double] = FloatArray(Double, 14)
-    lit_force: FloatArray[Double] = FloatArray(Double, 14)
-    thb_force: FloatArray[Double] = FloatArray(Double, 14)
-    contacts: IntArray[Int16] = IntArray(Int16, 16)
+    torque: DoubleArray = DoubleArray(54)
+    ind_force: DoubleArray = DoubleArray(14)
+    mid_force: DoubleArray = DoubleArray(14)
+    rng_force: DoubleArray = DoubleArray(14)
+    lit_force: DoubleArray = DoubleArray(14)
+    thb_force: DoubleArray = DoubleArray(14)
+    contacts: Int16Array = Int16Array(16)
 
 
 @pyrtma.message_def
@@ -2221,7 +2229,7 @@ class MDF_GRIP_COMMAND(MessageData, metaclass=MessageMeta):
     velocity: Double = Double()
     force: Double = Double()
     impedance: Double = Double()
-    controlMask: IntArray[Int16] = IntArray(Int16, 4)
+    controlMask: Int16Array = Int16Array(4)
     src: Int32 = Int32()
     reserved: Int32 = Int32()
 
@@ -2242,7 +2250,7 @@ class MDF_GRIP_FINISHED_COMMAND(MessageData, metaclass=MessageMeta):
     velocity: Double = Double()
     force: Double = Double()
     impedance: Double = Double()
-    controlMask: IntArray[Int16] = IntArray(Int16, 4)
+    controlMask: Int16Array = Int16Array(4)
     effector: String = String(64)
 
 
@@ -2260,7 +2268,7 @@ class MDF_GRIPPER_FEEDBACK(MessageData, metaclass=MessageMeta):
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
     grip_pos: Double = Double()
     velocity: Double = Double()
-    force: FloatArray[Double] = FloatArray(Double, 5)
+    force: DoubleArray = DoubleArray(5)
     effector: String = String(64)
 
 
@@ -2276,12 +2284,12 @@ class MDF_MUJOCO_SENSOR(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    motor_pos: FloatArray[Double] = FloatArray(Double, 32)
-    motor_vel: FloatArray[Double] = FloatArray(Double, 32)
-    motor_torque: FloatArray[Double] = FloatArray(Double, 32)
-    joint_pos: FloatArray[Double] = FloatArray(Double, 64)
-    joint_vel: FloatArray[Double] = FloatArray(Double, 64)
-    contact: FloatArray[Double] = FloatArray(Double, 32)
+    motor_pos: DoubleArray = DoubleArray(32)
+    motor_vel: DoubleArray = DoubleArray(32)
+    motor_torque: DoubleArray = DoubleArray(32)
+    joint_pos: DoubleArray = DoubleArray(64)
+    joint_vel: DoubleArray = DoubleArray(64)
+    contact: DoubleArray = DoubleArray(32)
 
 
 @pyrtma.message_def
@@ -2319,7 +2327,7 @@ class MDF_MUJOCO_MOVE(MessageData, metaclass=MessageMeta):
 
     mocap_id: Uint32 = Uint32()
     link_objects: Uint32 = Uint32()
-    pos: FloatArray[Double] = FloatArray(Double, 3)
+    pos: DoubleArray = DoubleArray(3)
 
 
 @pyrtma.message_def
@@ -2364,8 +2372,8 @@ class MDF_MUJOCO_OBJMOVE(MessageData, metaclass=MessageMeta):
 
     obj_id: Uint32 = Uint32()
     padding: Int32 = Int32()
-    pos: FloatArray[Double] = FloatArray(Double, 3)
-    orientation: FloatArray[Double] = FloatArray(Double, 3)
+    pos: DoubleArray = DoubleArray(3)
+    orientation: DoubleArray = DoubleArray(3)
 
 
 @pyrtma.message_def
@@ -2380,8 +2388,8 @@ class MDF_OPENHAND_CMD(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    motor_sp: IntArray[Uint16] = IntArray(Uint16, 2)
-    reserved1: IntArray[Uint16] = IntArray(Uint16, 2)
+    motor_sp: Uint16Array = Uint16Array(2)
+    reserved1: Uint16Array = Uint16Array(2)
     mode: Byte = Byte()
     reserved2: ByteArray = ByteArray(3)
 
@@ -2415,10 +2423,10 @@ class MDF_PRENSILIA_SENS(MessageData, metaclass=MessageMeta):
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
     stream_type: Uint16 = Uint16()
-    current: IntArray[Uint16] = IntArray(Uint16, 5)
-    position: IntArray[Uint16] = IntArray(Uint16, 5)
-    external: IntArray[Uint16] = IntArray(Uint16, 7)
-    tension: IntArray[Uint16] = IntArray(Uint16, 5)
+    current: Uint16Array = Uint16Array(5)
+    position: Uint16Array = Uint16Array(5)
+    external: Uint16Array = Uint16Array(7)
+    tension: Uint16Array = Uint16Array(5)
     reserved: Uint16 = Uint16()
 
 
@@ -2434,8 +2442,8 @@ class MDF_PRENSILIA_CMD(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    mode: IntArray[Int16] = IntArray(Int16, 5)
-    command: IntArray[Int16] = IntArray(Int16, 5)
+    mode: Int16Array = Int16Array(5)
+    command: Int16Array = Int16Array(5)
 
 
 @pyrtma.message_def
@@ -2450,11 +2458,11 @@ class MDF_TABLE_LOAD_CELLS(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    left_plate: FloatArray[Double] = FloatArray(Double, 4)
+    left_plate: DoubleArray = DoubleArray(4)
     left_plate_mean: Double = Double()
-    center_plate: FloatArray[Double] = FloatArray(Double, 4)
+    center_plate: DoubleArray = DoubleArray(4)
     center_plate_mean: Double = Double()
-    right_plate: FloatArray[Double] = FloatArray(Double, 4)
+    right_plate: DoubleArray = DoubleArray(4)
     right_plate_mean: Double = Double()
 
 
@@ -2480,9 +2488,9 @@ class MDF_SINGLETACT_DATA(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    raw_analog: IntArray[Int32] = IntArray(Int32, 3)
+    raw_analog: Int32Array = Int32Array(3)
     padding: Int32 = Int32()
-    force: FloatArray[Double] = FloatArray(Double, 3)
+    force: DoubleArray = DoubleArray(3)
 
 
 @pyrtma.message_def
@@ -2545,7 +2553,7 @@ class MDF_SPM_SPIKECOUNT(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    source_timestamp: FloatArray[Double] = FloatArray(Double, 2)
+    source_timestamp: DoubleArray = DoubleArray(2)
     count_interval: Double = Double()
     counts: ByteArray = ByteArray(1280)
 
@@ -2578,7 +2586,7 @@ class MDF_RAW_CTSDATA(MessageData, metaclass=MessageMeta):
     source_index: Int32 = Int32()
     num_chans_enabled: Int32 = Int32()
     source_timestamp: Double = Double()
-    data: IntArray[Int16] = IntArray(Int16, 1280)
+    data: Int16Array = Int16Array(1280)
 
 
 @pyrtma.message_def
@@ -2593,8 +2601,8 @@ class MDF_SPM_CTSDATA(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    source_timestamp: FloatArray[Double] = FloatArray(Double, 2)
-    data: IntArray[Int16] = IntArray(Int16, 5120)
+    source_timestamp: DoubleArray = DoubleArray(2)
+    data: Int16Array = Int16Array(5120)
 
 
 @pyrtma.message_def
@@ -2625,7 +2633,7 @@ class MDF_RAW_DIGITAL_EVENT(MessageData, metaclass=MessageMeta):
     source_index: Int32 = Int32()
     channel: Int32 = Int32()
     source_timestamp: Double = Double()
-    data: IntArray[Uint32] = IntArray(Uint32, 2)
+    data: Uint32Array = Uint32Array(2)
 
 
 @pyrtma.message_def
@@ -2640,10 +2648,10 @@ class MDF_SPM_DIGITAL_EVENT(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    source_index: IntArray[Int32] = IntArray(Int32, 10)
-    source_timestamp: FloatArray[Double] = FloatArray(Double, 2)
-    byte0: IntArray[Uint16] = IntArray(Uint16, 10)
-    byte1: IntArray[Uint16] = IntArray(Uint16, 10)
+    source_index: Int32Array = Int32Array(10)
+    source_timestamp: DoubleArray = DoubleArray(2)
+    byte0: Uint16Array = Uint16Array(10)
+    byte1: Uint16Array = Uint16Array(10)
     num_events: Int32 = Int32()
     reserved: Int32 = Int32()
 
@@ -2715,7 +2723,7 @@ class MDF_RAW_ANALOGDATA(MessageData, metaclass=MessageMeta):
     source_index: Int32 = Int32()
     num_chans_enabled: Int32 = Int32()
     source_timestamp: Double = Double()
-    data: IntArray[Int16] = IntArray(Int16, 160)
+    data: Int16Array = Int16Array(160)
 
 
 @pyrtma.message_def
@@ -2730,8 +2738,8 @@ class MDF_SPM_ANALOGDATA(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    source_timestamp: FloatArray[Double] = FloatArray(Double, 2)
-    data: IntArray[Int16] = IntArray(Int16, 640)
+    source_timestamp: DoubleArray = DoubleArray(2)
+    data: Int16Array = Int16Array(640)
 
 
 @pyrtma.message_def
@@ -2766,7 +2774,7 @@ class MDF_RAW_CTSDATA_N256(MessageData, metaclass=MessageMeta):
     source_index: Int32 = Int32()
     num_chans_enabled: Int32 = Int32()
     source_timestamp: Double = Double()
-    data: IntArray[Int16] = IntArray(Int16, 2560)
+    data: Int16Array = Int16Array(2560)
 
 
 @pyrtma.message_def
@@ -2799,7 +2807,7 @@ class MDF_SAMPLE_GENERATED(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    source_timestamp: FloatArray[Double] = FloatArray(Double, 2)
+    source_timestamp: DoubleArray = DoubleArray(2)
 
 
 @pyrtma.message_def
@@ -2814,9 +2822,9 @@ class MDF_XIPP_EMG_DATA_RAW(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    num_chans_per_headstage: IntArray[Int32] = IntArray(Int32, 2)
-    source_timestamp: IntArray[Uint32] = IntArray(Uint32, 20)
-    data: FloatArray[Float] = FloatArray(Float, 1280)
+    num_chans_per_headstage: Int32Array = Int32Array(2)
+    source_timestamp: Uint32Array = Uint32Array(20)
+    data: Float32Array = Float32Array(1280)
 
 
 @pyrtma.message_def
@@ -2831,8 +2839,8 @@ class MDF_MYO_EMG_DATA(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    source_timestamp: IntArray[Uint64] = IntArray(Uint64, 4)
-    data: IntArray[Int32] = IntArray(Int32, 32)
+    source_timestamp: Uint64Array = Uint64Array(4)
+    data: Int32Array = Int32Array(32)
 
 
 @pyrtma.message_def
@@ -2848,9 +2856,9 @@ class MDF_MYO_KIN_DATA(MessageData, metaclass=MessageMeta):
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
     source_timestamp: Uint64 = Uint64()
-    orientation: FloatArray[Float] = FloatArray(Float, 4)
-    gyroscope: FloatArray[Float] = FloatArray(Float, 3)
-    acceleration: FloatArray[Float] = FloatArray(Float, 3)
+    orientation: Float32Array = Float32Array(4)
+    gyroscope: Float32Array = Float32Array(3)
+    acceleration: Float32Array = Float32Array(3)
 
 
 @pyrtma.message_def
@@ -2866,7 +2874,7 @@ class MDF_INPUT_DOF_DATA(MessageData, metaclass=MessageMeta):
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
     tag: String = String(64)
-    dof_vals: FloatArray[Double] = FloatArray(Double, 30)
+    dof_vals: DoubleArray = DoubleArray(30)
 
 
 @pyrtma.message_def
@@ -2882,8 +2890,8 @@ class MDF_DATAGLOVE(MessageData, metaclass=MessageMeta):
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
     tag: String = String(64)
-    raw_vals: FloatArray[Double] = FloatArray(Double, 18)
-    calib_vals: FloatArray[Double] = FloatArray(Double, 18)
+    raw_vals: DoubleArray = DoubleArray(18)
+    calib_vals: DoubleArray = DoubleArray(18)
     gesture: Int32 = Int32()
     glovetype: Int32 = Int32()
     hand: Int32 = Int32()
@@ -2904,8 +2912,8 @@ class MDF_OPTITRACK_RIGID_BODY(MessageData, metaclass=MessageMeta):
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
     ID: Int32 = Int32()
     reserved: Int32 = Int32()
-    pos: FloatArray[Double] = FloatArray(Double, 3)
-    orient: FloatArray[Double] = FloatArray(Double, 3)
+    pos: DoubleArray = DoubleArray(3)
+    orient: DoubleArray = DoubleArray(3)
     timestamp: Double = Double()
     name: String = String(128)
 
@@ -2922,24 +2930,24 @@ class MDF_TASK_STATE_CONFIG(MessageData, metaclass=MessageMeta):
     )
 
     state_name: String = String(128)
-    target: FloatArray[Double] = FloatArray(Double, 30)
-    active_assist_weight: FloatArray[Double] = FloatArray(Double, 6)
-    brain_control_weight: FloatArray[Double] = FloatArray(Double, 6)
-    passive_assist_weight: FloatArray[Double] = FloatArray(Double, 6)
-    jstick_control_weight: FloatArray[Double] = FloatArray(Double, 6)
-    gain: FloatArray[Double] = FloatArray(Double, 6)
-    threshold: FloatArray[Double] = FloatArray(Double, 6)
-    force_targ: FloatArray[Double] = FloatArray(Double, 9)
+    target: DoubleArray = DoubleArray(30)
+    active_assist_weight: DoubleArray = DoubleArray(6)
+    brain_control_weight: DoubleArray = DoubleArray(6)
+    passive_assist_weight: DoubleArray = DoubleArray(6)
+    jstick_control_weight: DoubleArray = DoubleArray(6)
+    gain: DoubleArray = DoubleArray(6)
+    threshold: DoubleArray = DoubleArray(6)
+    force_targ: DoubleArray = DoubleArray(9)
     dZ_gain: Double = Double()
     force_thresh: Double = Double()
-    active_override: IntArray[Int32] = IntArray(Int32, 30)
+    active_override: Int32Array = Int32Array(30)
     use_for_calib: Int32 = Int32()
     result_code: Int32 = Int32()
     stim_enable: Int32 = Int32()
     force_calib: Int32 = Int32()
     targ_set: Int32 = Int32()
     targ_idx: Int32 = Int32()
-    gripperControlMask: IntArray[Int16] = IntArray(Int16, 4)
+    gripperControlMask: Int16Array = Int16Array(4)
 
 
 @pyrtma.message_def
@@ -2954,24 +2962,24 @@ class MDF_PHASE_RESULT(MessageData, metaclass=MessageMeta):
     )
 
     state_name: String = String(128)
-    target: FloatArray[Double] = FloatArray(Double, 30)
-    active_assist_weight: FloatArray[Double] = FloatArray(Double, 6)
-    brain_control_weight: FloatArray[Double] = FloatArray(Double, 6)
-    passive_assist_weight: FloatArray[Double] = FloatArray(Double, 6)
-    jstick_control_weight: FloatArray[Double] = FloatArray(Double, 6)
-    gain: FloatArray[Double] = FloatArray(Double, 6)
-    threshold: FloatArray[Double] = FloatArray(Double, 6)
-    force_targ: FloatArray[Double] = FloatArray(Double, 9)
+    target: DoubleArray = DoubleArray(30)
+    active_assist_weight: DoubleArray = DoubleArray(6)
+    brain_control_weight: DoubleArray = DoubleArray(6)
+    passive_assist_weight: DoubleArray = DoubleArray(6)
+    jstick_control_weight: DoubleArray = DoubleArray(6)
+    gain: DoubleArray = DoubleArray(6)
+    threshold: DoubleArray = DoubleArray(6)
+    force_targ: DoubleArray = DoubleArray(9)
     dZ_gain: Double = Double()
     force_thresh: Double = Double()
-    active_override: IntArray[Int32] = IntArray(Int32, 30)
+    active_override: Int32Array = Int32Array(30)
     use_for_calib: Int32 = Int32()
     result_code: Int32 = Int32()
     stim_enable: Int32 = Int32()
     force_calib: Int32 = Int32()
     targ_set: Int32 = Int32()
     targ_idx: Int32 = Int32()
-    gripperControlMask: IntArray[Int16] = IntArray(Int16, 4)
+    gripperControlMask: Int16Array = Int16Array(4)
 
 
 @pyrtma.message_def
@@ -3313,10 +3321,10 @@ class MDF_STIMDATA(MessageData, metaclass=MessageMeta):
         "'STIMDATA:\n  id: 2005\n  fields:\n    ConfigID: double[12]\n    Vmax: double[12]\n    Vmin: double[12]\n    interphase: double[12]'"
     )
 
-    ConfigID: FloatArray[Double] = FloatArray(Double, 12)
-    Vmax: FloatArray[Double] = FloatArray(Double, 12)
-    Vmin: FloatArray[Double] = FloatArray(Double, 12)
-    interphase: FloatArray[Double] = FloatArray(Double, 12)
+    ConfigID: DoubleArray = DoubleArray(12)
+    Vmax: DoubleArray = DoubleArray(12)
+    Vmin: DoubleArray = DoubleArray(12)
+    interphase: DoubleArray = DoubleArray(12)
 
 
 @pyrtma.message_def
@@ -3604,7 +3612,7 @@ class MDF_FOFIX_INPUT(MessageData, metaclass=MessageMeta):
         "'FOFIX_INPUT:\n  id: 3601\n  fields:\n    notes_strummed: int[5]\n    reserved: short\n    hit_note: short\n    game_time: double'"
     )
 
-    notes_strummed: IntArray[Int32] = IntArray(Int32, 5)
+    notes_strummed: Int32Array = Int32Array(5)
     reserved: Int16 = Int16()
     hit_note: Int16 = Int16()
     game_time: Double = Double()
@@ -3668,10 +3676,10 @@ class MDF_CERESTIM_CONFIG_MODULE(MessageData, metaclass=MessageMeta):
         "'CERESTIM_CONFIG_MODULE:\n  id: 4000\n  fields:\n    configID: int[MAX_CS_CONFIGS]\n    amp1: int[MAX_CS_CONFIGS]\n    amp2: int[MAX_CS_CONFIGS]\n    frequency: int[MAX_CS_CONFIGS]\n    num_modules: int\n    afcf: int\n    width1: int\n    width2: int\n    interphase: int'"
     )
 
-    configID: IntArray[Int32] = IntArray(Int32, 16)
-    amp1: IntArray[Int32] = IntArray(Int32, 16)
-    amp2: IntArray[Int32] = IntArray(Int32, 16)
-    frequency: IntArray[Int32] = IntArray(Int32, 16)
+    configID: Int32Array = Int32Array(16)
+    amp1: Int32Array = Int32Array(16)
+    amp2: Int32Array = Int32Array(16)
+    frequency: Int32Array = Int32Array(16)
     num_modules: Int32 = Int32()
     afcf: Int32 = Int32()
     width1: Int32 = Int32()
@@ -3693,8 +3701,8 @@ class MDF_CERESTIM_CONFIG_CHAN_PRESAFETY(MessageData, metaclass=MessageMeta):
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
     stop: Int32 = Int32()
     numChans: Int32 = Int32()
-    channel: IntArray[Int32] = IntArray(Int32, 64)
-    pattern: IntArray[Int32] = IntArray(Int32, 64)
+    channel: Int32Array = Int32Array(64)
+    pattern: Int32Array = Int32Array(64)
     reps: Int32 = Int32()
     pause_t: Float = Float()
 
@@ -3713,8 +3721,8 @@ class MDF_CERESTIM_CONFIG_CHAN(MessageData, metaclass=MessageMeta):
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
     stop: Int32 = Int32()
     numChans: Int32 = Int32()
-    channel: IntArray[Int32] = IntArray(Int32, 12)
-    pattern: IntArray[Int32] = IntArray(Int32, 12)
+    channel: Int32Array = Int32Array(12)
+    pattern: Int32Array = Int32Array(12)
     reps: Int32 = Int32()
     pause_t: Float = Float()
 
@@ -3768,8 +3776,8 @@ class MDF_CERESTIM_CONFIG_CHAN_PRESAFETY_ARBITRARY(MessageData, metaclass=Messag
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
     stop: Int32 = Int32()
     numChans: Int32 = Int32()
-    channel: IntArray[Int32] = IntArray(Int32, 64)
-    pattern: IntArray[Int32] = IntArray(Int32, 64)
+    channel: Int32Array = Int32Array(64)
+    pattern: Int32Array = Int32Array(64)
     reps: Int32 = Int32()
     reserved: Int32 = Int32()
     pathname: String = String(256)
@@ -3817,13 +3825,13 @@ class MDF_STIM_VOLTAGE_MONITOR_DATA(MessageData, metaclass=MessageMeta):
 
     sample_rate: Int32 = Int32()
     pulse_count: Int32 = Int32()
-    daq_channel: IntArray[Int32] = IntArray(Int32, 26)
-    array_channel: IntArray[Int32] = IntArray(Int32, 26)
-    daq_timestamp: FloatArray[Double] = FloatArray(Double, 26)
-    voltage: FloatArray[Float] = FloatArray(Float, 2600)
-    interphase: FloatArray[Float] = FloatArray(Float, 26)
-    Vmax: FloatArray[Float] = FloatArray(Float, 26)
-    Vmin: FloatArray[Float] = FloatArray(Float, 26)
+    daq_channel: Int32Array = Int32Array(26)
+    array_channel: Int32Array = Int32Array(26)
+    daq_timestamp: DoubleArray = DoubleArray(26)
+    voltage: Float32Array = Float32Array(2600)
+    interphase: Float32Array = Float32Array(26)
+    Vmax: Float32Array = Float32Array(26)
+    Vmin: Float32Array = Float32Array(26)
 
 
 @pyrtma.message_def
@@ -3837,8 +3845,8 @@ class MDF_STIM_VOLTAGE_MONITOR_DIGITAL_DATA(MessageData, metaclass=MessageMeta):
         "'STIM_VOLTAGE_MONITOR_DIGITAL_DATA:\n  id: 4010\n  fields:\n    stim_sync_event: float[30]\n    stim_param_event: float[5]\n    padding: float\n    spm_daq_delta_t: double'"
     )
 
-    stim_sync_event: FloatArray[Float] = FloatArray(Float, 30)
-    stim_param_event: FloatArray[Float] = FloatArray(Float, 5)
+    stim_sync_event: Float32Array = Float32Array(30)
+    stim_param_event: Float32Array = Float32Array(5)
     padding: Float = Float()
     spm_daq_delta_t: Double = Double()
 
@@ -4084,7 +4092,7 @@ class MDF_DIR_PIXEL_COORDS(MessageData, metaclass=MessageMeta):
     img: String = String(32)
     moreMsgs: Int32 = Int32()
     reserved: Int32 = Int32()
-    pixels: FloatArray[Float] = FloatArray(Float, 64)
+    pixels: Float32Array = Float32Array(64)
 
 
 @pyrtma.message_def
@@ -4101,7 +4109,7 @@ class MDF_PIXEL_COORDS(MessageData, metaclass=MessageMeta):
     img: String = String(32)
     moreMsgs: Int32 = Int32()
     reserved: Int32 = Int32()
-    pixels: FloatArray[Float] = FloatArray(Float, 64)
+    pixels: Float32Array = Float32Array(64)
 
 
 @pyrtma.message_def
@@ -4186,8 +4194,8 @@ class MDF_USER_DEFINED_STIM(MessageData, metaclass=MessageMeta):
     )
 
     frequency: Int32 = Int32()
-    amplitude: IntArray[Int32] = IntArray(Int32, 3)
-    channel: IntArray[Int32] = IntArray(Int32, 3)
+    amplitude: Int32Array = Int32Array(3)
+    channel: Int32Array = Int32Array(3)
 
 
 @pyrtma.message_def
@@ -4204,18 +4212,18 @@ class MDF_USER_BEHAVIOUR(MessageData, metaclass=MessageMeta):
     current_trial: Int32 = Int32()
     current_screen: String = String(256)
     current_object: String = String(256)
-    left_canvas: IntArray[Int32] = IntArray(Int32, 2)
-    right_canvas: IntArray[Int32] = IntArray(Int32, 2)
+    left_canvas: Int32Array = Int32Array(2)
+    right_canvas: Int32Array = Int32Array(2)
     frequency: Int32 = Int32()
     freq_choice: Int32 = Int32()
     bio: Int32 = Int32()
     drag: Int32 = Int32()
-    amplitude: IntArray[Int32] = IntArray(Int32, 3)
+    amplitude: Int32Array = Int32Array(3)
     satisfaction: Int32 = Int32()
     certainty: Int32 = Int32()
     chosen_object: String = String(256)
-    object_quest: IntArray[Int32] = IntArray(Int32, 6)
-    affective_quest: IntArray[Int32] = IntArray(Int32, 5)
+    object_quest: Int32Array = Int32Array(6)
+    affective_quest: Int32Array = Int32Array(5)
 
 
 @pyrtma.message_def
@@ -4383,8 +4391,8 @@ class MDF_DEKA_SENSOR(MessageData, metaclass=MessageMeta):
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
     position_msg_1: Struct[DEKA_CAN_MSG] = Struct(DEKA_CAN_MSG)
     position_msg_2: Struct[DEKA_CAN_MSG] = Struct(DEKA_CAN_MSG)
-    motor_pos: FloatArray[Double] = FloatArray(Double, 7)
-    motor_current: FloatArray[Double] = FloatArray(Double, 7)
+    motor_pos: DoubleArray = DoubleArray(7)
+    motor_current: DoubleArray = DoubleArray(7)
     mode: Int32 = Int32()
     sync: Int32 = Int32()
     grip: Int32 = Int32()
@@ -4453,10 +4461,10 @@ class MDF_DEKA_HAND_SENSOR(MessageData, metaclass=MessageMeta):
     force_msg_1: Struct[DEKA_CAN_MSG] = Struct(DEKA_CAN_MSG)
     force_msg_2: Struct[DEKA_CAN_MSG] = Struct(DEKA_CAN_MSG)
     force_msg_3: Struct[DEKA_CAN_MSG] = Struct(DEKA_CAN_MSG)
-    motor_pos: FloatArray[Double] = FloatArray(Double, 6)
-    contact: FloatArray[Double] = FloatArray(Double, 13)
+    motor_pos: DoubleArray = DoubleArray(6)
+    contact: DoubleArray = DoubleArray(13)
     mode: Int32 = Int32()
-    status: IntArray[Int32] = IntArray(Int32, 13)
+    status: Int32Array = Int32Array(13)
     sync: Int32 = Int32()
     grip: Int32 = Int32()
 
@@ -4473,7 +4481,7 @@ class MDF_DEKA_HAND_JSTICK_CMD(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    ref_vel: FloatArray[Double] = FloatArray(Double, 6)
+    ref_vel: DoubleArray = DoubleArray(6)
 
 
 @pyrtma.message_def
@@ -4506,12 +4514,12 @@ class MDF_KUKA_JOINT_COMMAND(MessageData, metaclass=MessageMeta):
     )
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
-    joint_dest: FloatArray[Double] = FloatArray(Double, 7)
+    joint_dest: DoubleArray = DoubleArray(7)
     err_move_mode: Int32 = Int32()
-    err_input_cap: IntArray[Int32] = IntArray(Int32, 6)
-    err_cart_wall_eef: IntArray[Int32] = IntArray(Int32, 6)
-    err_cart_wall_arm: IntArray[Int32] = IntArray(Int32, 6)
-    err_jpos_stop: IntArray[Int32] = IntArray(Int32, 3)
+    err_input_cap: Int32Array = Int32Array(6)
+    err_cart_wall_eef: Int32Array = Int32Array(6)
+    err_cart_wall_arm: Int32Array = Int32Array(6)
+    err_jpos_stop: Int32Array = Int32Array(3)
 
 
 @pyrtma.message_def
@@ -4527,13 +4535,13 @@ class MDF_KUKA_FEEDBACK(MessageData, metaclass=MessageMeta):
 
     header: Struct[MSG_HEADER] = Struct(MSG_HEADER)
     time: Double = Double()
-    joint_pos: FloatArray[Double] = FloatArray(Double, 7)
-    cart_pos: FloatArray[Double] = FloatArray(Double, 3)
-    cart_angle: FloatArray[Double] = FloatArray(Double, 3)
-    cart_pos_vel: FloatArray[Double] = FloatArray(Double, 3)
-    cart_rot_vel: FloatArray[Double] = FloatArray(Double, 3)
-    cart_force: FloatArray[Double] = FloatArray(Double, 3)
-    cart_torque: FloatArray[Double] = FloatArray(Double, 3)
+    joint_pos: DoubleArray = DoubleArray(7)
+    cart_pos: DoubleArray = DoubleArray(3)
+    cart_angle: DoubleArray = DoubleArray(3)
+    cart_pos_vel: DoubleArray = DoubleArray(3)
+    cart_rot_vel: DoubleArray = DoubleArray(3)
+    cart_force: DoubleArray = DoubleArray(3)
+    cart_torque: DoubleArray = DoubleArray(3)
     dest_delta_t: Double = Double()
     mode: Int32 = Int32()
     reserved: Int32 = Int32()
@@ -4565,7 +4573,7 @@ class MDF_KUKA_PTP_JOINT(MessageData, metaclass=MessageMeta):
         "'KUKA_PTP_JOINT:\n  id: 4211\n  fields:\n    joint_pos: double[KUKA_DOF_COUNT]'"
     )
 
-    joint_pos: FloatArray[Double] = FloatArray(Double, 7)
+    joint_pos: DoubleArray = DoubleArray(7)
 
 
 @pyrtma.message_def
@@ -4579,7 +4587,7 @@ class MDF_KUKA_DEBUG(MessageData, metaclass=MessageMeta):
         "'KUKA_DEBUG:\n  id: 4212\n  fields:\n    joint_pos: double[KUKA_DOF_COUNT]'"
     )
 
-    joint_pos: FloatArray[Double] = FloatArray(Double, 7)
+    joint_pos: DoubleArray = DoubleArray(7)
 
 
 @pyrtma.message_def
@@ -5000,24 +5008,24 @@ class MDF_VALIDATOR_A(MessageData, metaclass=MessageMeta):
     uint16: Uint16 = Uint16()
     uint32: Uint32 = Uint32()
     uint64: Uint64 = Uint64()
-    int8_arr: IntArray[Int8] = IntArray(Int8, 4)
-    int16_arr: IntArray[Int16] = IntArray(Int16, 4)
-    int32_arr: IntArray[Int32] = IntArray(Int32, 4)
+    int8_arr: Int8Array = Int8Array(4)
+    int16_arr: Int16Array = Int16Array(4)
+    int32_arr: Int32Array = Int32Array(4)
     padding_1_: String = String(4)
-    int64_arr: IntArray[Int64] = IntArray(Int64, 4)
-    uint8_arr: IntArray[Uint8] = IntArray(Uint8, 4)
-    uint16_arr: IntArray[Uint16] = IntArray(Uint16, 4)
-    uint32_arr: IntArray[Uint32] = IntArray(Uint32, 4)
+    int64_arr: Int64Array = Int64Array(4)
+    uint8_arr: Uint8Array = Uint8Array(4)
+    uint16_arr: Uint16Array = Uint16Array(4)
+    uint32_arr: Uint32Array = Uint32Array(4)
     padding_2_: String = String(4)
-    uint64_arr: IntArray[Uint64] = IntArray(Uint64, 4)
+    uint64_arr: Uint64Array = Uint64Array(4)
     byte_: Byte = Byte()
     byte_arr: ByteArray = ByteArray(4)
     string: String = String(4)
     padding_3_: String = String(3)
     float_: Float = Float()
     double_: Double = Double()
-    float_arr: FloatArray[Float] = FloatArray(Float, 4)
-    double_arr: FloatArray[Double] = FloatArray(Double, 4)
+    float_arr: Float32Array = Float32Array(4)
+    double_arr: DoubleArray = DoubleArray(4)
     struct_: Struct[VALIDATOR_STRUCT] = Struct(VALIDATOR_STRUCT)
     struct_arr: StructArray[VALIDATOR_STRUCT] = StructArray(VALIDATOR_STRUCT, 4)
 
@@ -5043,22 +5051,22 @@ class MDF_VALIDATOR_B(MessageData, metaclass=MessageMeta):
     uint16: Uint16 = Uint16()
     uint32: Uint32 = Uint32()
     uint64: Uint64 = Uint64()
-    int8_arr: IntArray[Int8] = IntArray(Int8, 8)
-    int16_arr: IntArray[Int16] = IntArray(Int16, 8)
-    int32_arr: IntArray[Int32] = IntArray(Int32, 8)
-    int64_arr: IntArray[Int64] = IntArray(Int64, 8)
-    uint8_arr: IntArray[Uint8] = IntArray(Uint8, 8)
-    uint16_arr: IntArray[Uint16] = IntArray(Uint16, 8)
-    uint32_arr: IntArray[Uint32] = IntArray(Uint32, 8)
-    uint64_arr: IntArray[Uint64] = IntArray(Uint64, 8)
+    int8_arr: Int8Array = Int8Array(8)
+    int16_arr: Int16Array = Int16Array(8)
+    int32_arr: Int32Array = Int32Array(8)
+    int64_arr: Int64Array = Int64Array(8)
+    uint8_arr: Uint8Array = Uint8Array(8)
+    uint16_arr: Uint16Array = Uint16Array(8)
+    uint32_arr: Uint32Array = Uint32Array(8)
+    uint64_arr: Uint64Array = Uint64Array(8)
     byte_: Byte = Byte()
     byte_arr: ByteArray = ByteArray(8)
     string: String = String(8)
     padding_1_: String = String(3)
     float_: Float = Float()
     double_: Double = Double()
-    float_arr: FloatArray[Float] = FloatArray(Float, 8)
-    double_arr: FloatArray[Double] = FloatArray(Double, 8)
+    float_arr: Float32Array = Float32Array(8)
+    double_arr: DoubleArray = DoubleArray(8)
     struct_: Struct[VALIDATOR_STRUCT] = Struct(VALIDATOR_STRUCT)
     struct_arr: StructArray[VALIDATOR_STRUCT] = StructArray(VALIDATOR_STRUCT, 8)
 
@@ -5074,7 +5082,7 @@ class MDF_TEST_MSG_128(MessageData, metaclass=MessageMeta):
         "'TEST_MSG_128:\n  id: 5002\n  fields:\n    blob: uint8[128]'"
     )
 
-    blob: IntArray[Uint8] = IntArray(Uint8, 128)
+    blob: Uint8Array = Uint8Array(128)
 
 
 @pyrtma.message_def
@@ -5088,7 +5096,7 @@ class MDF_TEST_MSG_256(MessageData, metaclass=MessageMeta):
         "'TEST_MSG_256:\n  id: 5003\n  fields:\n    blob: uint8[256]'"
     )
 
-    blob: IntArray[Uint8] = IntArray(Uint8, 256)
+    blob: Uint8Array = Uint8Array(256)
 
 
 @pyrtma.message_def
@@ -5102,7 +5110,7 @@ class MDF_TEST_MSG_512(MessageData, metaclass=MessageMeta):
         "'TEST_MSG_512:\n  id: 5004\n  fields:\n    blob: uint8[512]'"
     )
 
-    blob: IntArray[Uint8] = IntArray(Uint8, 512)
+    blob: Uint8Array = Uint8Array(512)
 
 
 @pyrtma.message_def
@@ -5116,7 +5124,7 @@ class MDF_TEST_MSG_1024(MessageData, metaclass=MessageMeta):
         "'TEST_MSG_1024:\n  id: 5005\n  fields:\n    blob: uint8[1024]'"
     )
 
-    blob: IntArray[Uint8] = IntArray(Uint8, 1024)
+    blob: Uint8Array = Uint8Array(1024)
 
 
 @pyrtma.message_def
@@ -5130,7 +5138,7 @@ class MDF_TEST_MSG_2048(MessageData, metaclass=MessageMeta):
         "'TEST_MSG_2048:\n  id: 5006\n  fields:\n    blob: uint8[2048]'"
     )
 
-    blob: IntArray[Uint8] = IntArray(Uint8, 2048)
+    blob: Uint8Array = Uint8Array(2048)
 
 
 @pyrtma.message_def
@@ -5144,7 +5152,7 @@ class MDF_TEST_MSG_4096(MessageData, metaclass=MessageMeta):
         "'TEST_MSG_4096:\n  id: 5007\n  fields:\n    blob: uint8[4096]'"
     )
 
-    blob: IntArray[Uint8] = IntArray(Uint8, 4096)
+    blob: Uint8Array = Uint8Array(4096)
 
 
 @pyrtma.message_def
@@ -5158,7 +5166,7 @@ class MDF_TEST_MSG_8192(MessageData, metaclass=MessageMeta):
         "'TEST_MSG_8192:\n  id: 5008\n  fields:\n    blob: uint8[8192]'"
     )
 
-    blob: IntArray[Uint8] = IntArray(Uint8, 8192)
+    blob: Uint8Array = Uint8Array(8192)
 
 
 @pyrtma.message_def

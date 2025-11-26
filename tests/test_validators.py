@@ -2,6 +2,7 @@ import unittest
 
 # Import message defs to add to pyrtma.msg_defs map
 from .test_msg_defs.test_defs import *
+from pyrtma.validators import IntArray, FloatArray
 
 
 class TestEncoding(unittest.TestCase):
@@ -367,15 +368,25 @@ class TestEncoding(unittest.TestCase):
         self.assertIsInstance(m.string, str)
         self.assertIsInstance(m.struct_, VALIDATOR_STRUCT)
 
+        self.assertIsInstance(m.int8_arr, Int8Array)
         self.assertIsInstance(m.int8_arr, IntArray)
+        self.assertIsInstance(m.int16_arr, Int16Array)
         self.assertIsInstance(m.int16_arr, IntArray)
+        self.assertIsInstance(m.int32_arr, Int32Array)
         self.assertIsInstance(m.int32_arr, IntArray)
+        self.assertIsInstance(m.int64_arr, Int64Array)
         self.assertIsInstance(m.int64_arr, IntArray)
+        self.assertIsInstance(m.uint8_arr, Uint8Array)
         self.assertIsInstance(m.uint8_arr, IntArray)
+        self.assertIsInstance(m.uint16_arr, Uint16Array)
         self.assertIsInstance(m.uint16_arr, IntArray)
+        self.assertIsInstance(m.uint32_arr, Uint32Array)
         self.assertIsInstance(m.uint32_arr, IntArray)
+        self.assertIsInstance(m.uint64_arr, Uint64Array)
         self.assertIsInstance(m.uint64_arr, IntArray)
+        self.assertIsInstance(m.float_arr, Float32Array)
         self.assertIsInstance(m.float_arr, FloatArray)
+        self.assertIsInstance(m.double_arr, DoubleArray)
         self.assertIsInstance(m.double_arr, FloatArray)
         self.assertIsInstance(m.byte_arr, ByteArray)
         self.assertIsInstance(m.struct_arr, StructArray)
@@ -490,100 +501,100 @@ class TestEncoding(unittest.TestCase):
             A.int8_arr = B.int8_arr
 
         with self.assertRaises(TypeError):
-            A.int8_arr = IntArray(Int16, 4)
+            A.int8_arr = Int16Array(4)
 
         with self.assertRaises(ValueError):
-            A.int8_arr = IntArray(Int8, 4)
+            A.int8_arr = Int8Array(4)
 
         # Int16
         with self.assertRaises(ValueError):
             A.int16_arr = B.int16_arr
 
         with self.assertRaises(TypeError):
-            A.int16_arr = IntArray(Int8, 4)
+            A.int16_arr = Int8Array(4)
 
         with self.assertRaises(ValueError):
-            A.int16_arr = IntArray(Int16, 4)
+            A.int16_arr = Int16Array(4)
 
         # Int32
         with self.assertRaises(ValueError):
             A.int32_arr = B.int32_arr
 
         with self.assertRaises(TypeError):
-            A.int32_arr = IntArray(Int16, 4)
+            A.int32_arr = Int16Array(4)
 
         with self.assertRaises(ValueError):
-            A.int32_arr = IntArray(Int32, 4)
+            A.int32_arr = Int32Array(4)
 
         # Int64
         with self.assertRaises(ValueError):
             A.int64_arr = B.int64_arr
 
         with self.assertRaises(TypeError):
-            A.int64_arr = IntArray(Int16, 4)
+            A.int64_arr = Int16Array(4)
 
         with self.assertRaises(ValueError):
-            A.int64_arr = IntArray(Int64, 4)
+            A.int64_arr = Int64Array(4)
 
         # Uint8
         with self.assertRaises(ValueError):
             A.uint8_arr = B.uint8_arr
 
         with self.assertRaises(TypeError):
-            A.uint8_arr = IntArray(Int16, 4)
+            A.uint8_arr = Int16Array(4)
 
         with self.assertRaises(ValueError):
-            A.uint8_arr = IntArray(Uint8, 4)
+            A.uint8_arr = Uint8Array(4)
 
         # Uint16
         with self.assertRaises(ValueError):
             A.uint16_arr = B.uint16_arr
 
         with self.assertRaises(TypeError):
-            A.uint16_arr = IntArray(Int16, 4)
+            A.uint16_arr = Int16Array(4)
 
         with self.assertRaises(ValueError):
-            A.uint16_arr = IntArray(Uint16, 4)
+            A.uint16_arr = Uint16Array(4)
 
         # Uint32
         with self.assertRaises(ValueError):
             A.uint32_arr = B.uint32_arr
 
         with self.assertRaises(TypeError):
-            A.uint32_arr = IntArray(Int16, 4)
+            A.uint32_arr = Int16Array(4)
 
         with self.assertRaises(ValueError):
-            A.uint32_arr = IntArray(Uint32, 4)
+            A.uint32_arr = Uint32Array(4)
 
         # Uint64
         with self.assertRaises(ValueError):
             A.uint64_arr = B.uint64_arr
 
         with self.assertRaises(TypeError):
-            A.uint64_arr = IntArray(Int16, 4)
+            A.uint64_arr = Int16Array(4)
 
         with self.assertRaises(ValueError):
-            A.uint64_arr = IntArray(Uint64, 4)
+            A.uint64_arr = Uint64Array(4)
 
         # Float
         with self.assertRaises(ValueError):
             A.float_arr = B.float_arr
 
         with self.assertRaises(TypeError):
-            A.float_arr = FloatArray(Double, 4)
+            A.float_arr = DoubleArray(4)
 
         with self.assertRaises(ValueError):
-            A.float_arr = FloatArray(Float, 4)
+            A.float_arr = Float32Array(4)
 
         # Double
         with self.assertRaises(ValueError):
             A.double_arr = B.double_arr
 
         with self.assertRaises(TypeError):
-            A.double_arr = FloatArray(Float, 4)
+            A.double_arr = Float32Array(4)
 
         with self.assertRaises(ValueError):
-            A.double_arr = FloatArray(Double, 4)
+            A.double_arr = DoubleArray(4)
 
         # Byte
         with self.assertRaises(ValueError):

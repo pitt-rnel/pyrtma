@@ -21,8 +21,16 @@ from pyrtma.validators import (
     Float,
     Double,
     Struct,
-    IntArray,
-    FloatArray,
+    Int8Array,
+    Int16Array,
+    Int32Array,
+    Int64Array,
+    Uint8Array,
+    Uint16Array,
+    Uint32Array,
+    Uint64Array,
+    Float32Array,
+    DoubleArray,
     StructArray,
     Char,
     String,
@@ -148,7 +156,7 @@ class DATA_SET(MessageBase, metaclass=MessageMeta):
     file_name_fmt: String = String(128)
     formatter: String = String(32)
     subdivide_interval: Int32 = Int32()
-    msg_types: IntArray[Int32] = IntArray(Int32, 32)
+    msg_types: Int32Array = Int32Array(32)
 
 
 class DATA_COLLECTION(MessageBase, metaclass=MessageMeta):
@@ -181,7 +189,7 @@ class DATA_SET_INFO(MessageBase, metaclass=MessageMeta):
     formatter: String = String(32)
     save_path: String = String(256)
     subdivide_interval: Int32 = Int32()
-    msg_types: IntArray[Int32] = IntArray(Int32, 32)
+    msg_types: Int32Array = Int32Array(32)
 
 
 class DATA_COLLECTION_INFO(MessageBase, metaclass=MessageMeta):
@@ -674,7 +682,7 @@ class MDF_FAILED_MESSAGE(MessageData, metaclass=MessageMeta):
     )
 
     dest_mod_id: Int16 = Int16()
-    reserved: IntArray[Int16] = IntArray(Int16, 3)
+    reserved: Int16Array = Int16Array(3)
     time_of_failure: Double = Double()
     msg_header: Struct[RTMA_MSG_HEADER] = Struct(RTMA_MSG_HEADER)
 
@@ -769,8 +777,8 @@ class MDF_MESSAGE_TRAFFIC(MessageData, metaclass=MessageMeta):
     sub_seqno: Uint32 = Uint32()
     start_timestamp: Double = Double()
     end_timestamp: Double = Double()
-    msg_type: IntArray[Int32] = IntArray(Int32, 64)
-    msg_count: IntArray[Uint16] = IntArray(Uint16, 64)
+    msg_type: Int32Array = Int32Array(64)
+    msg_count: Uint16Array = Uint16Array(64)
 
 
 @pyrtma.message_def
@@ -788,8 +796,8 @@ class MDF_ACTIVE_CLIENTS(MessageData, metaclass=MessageMeta):
     num_clients: Int16 = Int16()
     padding: Int16 = Int16()
     reserved: Int32 = Int32()
-    client_mod_id: IntArray[Int16] = IntArray(Int16, 256)
-    client_pid: IntArray[Int32] = IntArray(Int32, 256)
+    client_mod_id: Int16Array = Int16Array(256)
+    client_pid: Int32Array = Int32Array(256)
 
 
 @pyrtma.message_def
@@ -979,8 +987,8 @@ class MDF_TIMING_MESSAGE(MessageData, metaclass=MessageMeta):
         "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: uint16[MAX_MESSAGE_TYPES]\n    ModulePID: int32[MAX_MODULES]\n    send_time: double'"
     )
 
-    timing: IntArray[Uint16] = IntArray(Uint16, 10000)
-    ModulePID: IntArray[Int32] = IntArray(Int32, 200)
+    timing: Uint16Array = Uint16Array(10000)
+    ModulePID: Int32Array = Int32Array(200)
     send_time: Double = Double()
 
 
