@@ -119,6 +119,7 @@ MT_CONNECT: int = 13
 MT_DISCONNECT: int = 14
 MT_SUBSCRIBE: int = 15
 MT_UNSUBSCRIBE: int = 16
+MT_SHUTDOWN_RTMA: int = 17
 MT_MODULE_READY: int = 26
 MT_ACTIVE_CLIENTS: int = 31
 MT_CLIENT_INFO: int = 32
@@ -709,6 +710,16 @@ class MDF_UNSUBSCRIBE(MessageData, metaclass=MessageMeta):
     )
 
     msg_type: Int32 = Int32()
+
+
+@pyrtma.message_def
+class MDF_SHUTDOWN_RTMA(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 17
+    type_name: ClassVar[str] = "SHUTDOWN_RTMA"
+    type_hash: ClassVar[int] = 0x0912BFA5
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "core_defs/core_defs.yaml"
+    type_def: ClassVar[str] = "'SHUTDOWN_RTMA:\n  id: 17\n  fields: null'"
 
 
 @pyrtma.message_def
