@@ -950,6 +950,10 @@ class Parser:
                             f"{fname} is a reserved field name for {language} use."
                         )
 
+                if fname[0] not in string.ascii_letters:
+                    raise RTMASyntaxError(
+                        f"Field names must start with a letter: {mdf.name}=> {fname} -> {self.current_file}"
+                    )
                 if not isinstance(fstr, str):
                     raise InvalidTypeError(
                         f"Field types must be a string not {type(fstr).__name__}: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
@@ -1201,7 +1205,7 @@ class Parser:
 
         # Generate reserved defintion placeholders
         for id in reserved:
-            name = f"_RESERVED_{id:06d}"
+            name = f"RESERVED_{id:06d}"
             self.handle_signal(name, dict(id=id, fields=None))
 
     def parse_options_text(self, text: str):

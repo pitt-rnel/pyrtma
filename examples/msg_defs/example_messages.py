@@ -140,18 +140,18 @@ MT_ANOTHER_EXAMPLE: int = 5678
 MT_USER_SIGNAL: int = 2468
 MT_PERSON_LIST: int = 1357
 MT_EMPLOYEES: int = 1368
-MT__RESERVED_001000: int = 1000
-MT__RESERVED_001002: int = 1002
-MT__RESERVED_001003: int = 1003
-MT__RESERVED_001004: int = 1004
-MT__RESERVED_001005: int = 1005
-MT__RESERVED_001006: int = 1006
-MT__RESERVED_001007: int = 1007
-MT__RESERVED_001008: int = 1008
-MT__RESERVED_001009: int = 1009
-MT__RESERVED_001010: int = 1010
-MT__RESERVED_001011: int = 1011
-MT__RESERVED_001012: int = 1012
+MT_RESERVED_001000: int = 1000
+MT_RESERVED_001002: int = 1002
+MT_RESERVED_001003: int = 1003
+MT_RESERVED_001004: int = 1004
+MT_RESERVED_001005: int = 1005
+MT_RESERVED_001006: int = 1006
+MT_RESERVED_001007: int = 1007
+MT_RESERVED_001008: int = 1008
+MT_RESERVED_001009: int = 1009
+MT_RESERVED_001010: int = 1010
+MT_RESERVED_001011: int = 1011
+MT_RESERVED_001012: int = 1012
 
 
 # Struct Definitions
@@ -1057,123 +1057,123 @@ class MDF_EMPLOYEES(MessageData, metaclass=MessageMeta):
 
 
 @pyrtma.message_def
-class MDF__RESERVED_001000(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_001000(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1000
-    type_name: ClassVar[str] = "_RESERVED_001000"
-    type_hash: ClassVar[int] = 0x08E66D54
+    type_name: ClassVar[str] = "RESERVED_001000"
+    type_hash: ClassVar[int] = 0x1051EF7A
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "example_messages.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_001000:\n  id: 1000\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_001000:\n  id: 1000\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_001002(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_001002(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1002
-    type_name: ClassVar[str] = "_RESERVED_001002"
-    type_hash: ClassVar[int] = 0xBD402EAA
+    type_name: ClassVar[str] = "RESERVED_001002"
+    type_hash: ClassVar[int] = 0x84516E0B
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "example_messages.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_001002:\n  id: 1002\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_001002:\n  id: 1002\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_001003(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_001003(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1003
-    type_name: ClassVar[str] = "_RESERVED_001003"
-    type_hash: ClassVar[int] = 0x4D10FC66
+    type_name: ClassVar[str] = "RESERVED_001003"
+    type_hash: ClassVar[int] = 0x5E10A6F1
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "example_messages.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_001003:\n  id: 1003\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_001003:\n  id: 1003\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_001004(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_001004(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1004
-    type_name: ClassVar[str] = "_RESERVED_001004"
-    type_hash: ClassVar[int] = 0x1F3379B5
+    type_name: ClassVar[str] = "RESERVED_001004"
+    type_hash: ClassVar[int] = 0xB9939617
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "example_messages.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_001004:\n  id: 1004\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_001004:\n  id: 1004\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_001005(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_001005(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1005
-    type_name: ClassVar[str] = "_RESERVED_001005"
-    type_hash: ClassVar[int] = 0x2A5253B3
+    type_name: ClassVar[str] = "RESERVED_001005"
+    type_hash: ClassVar[int] = 0x1F98FFC2
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "example_messages.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_001005:\n  id: 1005\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_001005:\n  id: 1005\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_001006(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_001006(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1006
-    type_name: ClassVar[str] = "_RESERVED_001006"
-    type_hash: ClassVar[int] = 0xE67B66D3
+    type_name: ClassVar[str] = "RESERVED_001006"
+    type_hash: ClassVar[int] = 0x4469E520
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "example_messages.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_001006:\n  id: 1006\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_001006:\n  id: 1006\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_001007(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_001007(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1007
-    type_name: ClassVar[str] = "_RESERVED_001007"
-    type_hash: ClassVar[int] = 0x8DC1AAE8
+    type_name: ClassVar[str] = "RESERVED_001007"
+    type_hash: ClassVar[int] = 0x919F2CC2
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "example_messages.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_001007:\n  id: 1007\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_001007:\n  id: 1007\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_001008(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_001008(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1008
-    type_name: ClassVar[str] = "_RESERVED_001008"
-    type_hash: ClassVar[int] = 0x3ABE111F
+    type_name: ClassVar[str] = "RESERVED_001008"
+    type_hash: ClassVar[int] = 0xC646C82F
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "example_messages.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_001008:\n  id: 1008\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_001008:\n  id: 1008\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_001009(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_001009(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1009
-    type_name: ClassVar[str] = "_RESERVED_001009"
-    type_hash: ClassVar[int] = 0x1E42BAA4
+    type_name: ClassVar[str] = "RESERVED_001009"
+    type_hash: ClassVar[int] = 0x3B070968
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "example_messages.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_001009:\n  id: 1009\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_001009:\n  id: 1009\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_001010(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_001010(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1010
-    type_name: ClassVar[str] = "_RESERVED_001010"
-    type_hash: ClassVar[int] = 0xAE4C92D4
+    type_name: ClassVar[str] = "RESERVED_001010"
+    type_hash: ClassVar[int] = 0x0E33BEA9
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "example_messages.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_001010:\n  id: 1010\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_001010:\n  id: 1010\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_001011(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_001011(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1011
-    type_name: ClassVar[str] = "_RESERVED_001011"
-    type_hash: ClassVar[int] = 0x27E03BD7
+    type_name: ClassVar[str] = "RESERVED_001011"
+    type_hash: ClassVar[int] = 0xE761D26D
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "example_messages.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_001011:\n  id: 1011\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_001011:\n  id: 1011\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_001012(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_001012(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 1012
-    type_name: ClassVar[str] = "_RESERVED_001012"
-    type_hash: ClassVar[int] = 0x925028C4
+    type_name: ClassVar[str] = "RESERVED_001012"
+    type_hash: ClassVar[int] = 0xDB571F77
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "example_messages.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_001012:\n  id: 1012\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_001012:\n  id: 1012\n  fields: null'"
 
 
 # User Context

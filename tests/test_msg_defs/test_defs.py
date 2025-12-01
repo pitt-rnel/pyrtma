@@ -465,26 +465,26 @@ MT_MECH_STIM_CANCEL: int = 4265
 MT_MECH_STIM_DONE: int = 4266
 MT_MECH_STIM_ERROR: int = 4267
 MT_UC_MECH_STIM_CONFIGURE: int = 4268
-MT__RESERVED_004300: int = 4300
-MT__RESERVED_004360: int = 4360
-MT__RESERVED_004361: int = 4361
-MT__RESERVED_004362: int = 4362
-MT__RESERVED_004363: int = 4363
-MT__RESERVED_004364: int = 4364
-MT__RESERVED_004365: int = 4365
-MT__RESERVED_004366: int = 4366
-MT__RESERVED_004367: int = 4367
-MT__RESERVED_004368: int = 4368
-MT__RESERVED_004369: int = 4369
-MT__RESERVED_004370: int = 4370
-MT__RESERVED_004371: int = 4371
-MT__RESERVED_004372: int = 4372
-MT__RESERVED_004373: int = 4373
-MT__RESERVED_004374: int = 4374
-MT__RESERVED_004375: int = 4375
-MT__RESERVED_004376: int = 4376
-MT__RESERVED_004377: int = 4377
-MT__RESERVED_004378: int = 4378
+MT_RESERVED_004300: int = 4300
+MT_RESERVED_004360: int = 4360
+MT_RESERVED_004361: int = 4361
+MT_RESERVED_004362: int = 4362
+MT_RESERVED_004363: int = 4363
+MT_RESERVED_004364: int = 4364
+MT_RESERVED_004365: int = 4365
+MT_RESERVED_004366: int = 4366
+MT_RESERVED_004367: int = 4367
+MT_RESERVED_004368: int = 4368
+MT_RESERVED_004369: int = 4369
+MT_RESERVED_004370: int = 4370
+MT_RESERVED_004371: int = 4371
+MT_RESERVED_004372: int = 4372
+MT_RESERVED_004373: int = 4373
+MT_RESERVED_004374: int = 4374
+MT_RESERVED_004375: int = 4375
+MT_RESERVED_004376: int = 4376
+MT_RESERVED_004377: int = 4377
+MT_RESERVED_004378: int = 4378
 MT_VALIDATOR_A: int = 5000
 MT_VALIDATOR_B: int = 5001
 MT_TEST_MSG_128: int = 5002
@@ -4706,203 +4706,203 @@ class MDF_UC_MECH_STIM_CONFIGURE(MessageData, metaclass=MessageMeta):
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004300(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004300(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4300
-    type_name: ClassVar[str] = "_RESERVED_004300"
-    type_hash: ClassVar[int] = 0xCE2B74C1
+    type_name: ClassVar[str] = "RESERVED_004300"
+    type_hash: ClassVar[int] = 0x2FB5544D
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004300:\n  id: 4300\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004300:\n  id: 4300\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004360(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004360(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4360
-    type_name: ClassVar[str] = "_RESERVED_004360"
-    type_hash: ClassVar[int] = 0xA4288CBE
+    type_name: ClassVar[str] = "RESERVED_004360"
+    type_hash: ClassVar[int] = 0x323B7BC7
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004360:\n  id: 4360\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004360:\n  id: 4360\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004361(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004361(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4361
-    type_name: ClassVar[str] = "_RESERVED_004361"
-    type_hash: ClassVar[int] = 0xCA551012
+    type_name: ClassVar[str] = "RESERVED_004361"
+    type_hash: ClassVar[int] = 0xCEA6EA95
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004361:\n  id: 4361\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004361:\n  id: 4361\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004362(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004362(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4362
-    type_name: ClassVar[str] = "_RESERVED_004362"
-    type_hash: ClassVar[int] = 0x1FB4158D
+    type_name: ClassVar[str] = "RESERVED_004362"
+    type_hash: ClassVar[int] = 0x02A36526
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004362:\n  id: 4362\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004362:\n  id: 4362\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004363(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004363(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4363
-    type_name: ClassVar[str] = "_RESERVED_004363"
-    type_hash: ClassVar[int] = 0x6A1BE0D0
+    type_name: ClassVar[str] = "RESERVED_004363"
+    type_hash: ClassVar[int] = 0xECC4954A
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004363:\n  id: 4363\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004363:\n  id: 4363\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004364(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004364(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4364
-    type_name: ClassVar[str] = "_RESERVED_004364"
-    type_hash: ClassVar[int] = 0xC0CA6671
+    type_name: ClassVar[str] = "RESERVED_004364"
+    type_hash: ClassVar[int] = 0x7910FD63
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004364:\n  id: 4364\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004364:\n  id: 4364\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004365(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004365(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4365
-    type_name: ClassVar[str] = "_RESERVED_004365"
-    type_hash: ClassVar[int] = 0x862615BB
+    type_name: ClassVar[str] = "RESERVED_004365"
+    type_hash: ClassVar[int] = 0x935F393E
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004365:\n  id: 4365\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004365:\n  id: 4365\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004366(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004366(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4366
-    type_name: ClassVar[str] = "_RESERVED_004366"
-    type_hash: ClassVar[int] = 0xA703073C
+    type_name: ClassVar[str] = "RESERVED_004366"
+    type_hash: ClassVar[int] = 0xD519DA6B
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004366:\n  id: 4366\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004366:\n  id: 4366\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004367(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004367(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4367
-    type_name: ClassVar[str] = "_RESERVED_004367"
-    type_hash: ClassVar[int] = 0x442ABB7F
+    type_name: ClassVar[str] = "RESERVED_004367"
+    type_hash: ClassVar[int] = 0x08E1386F
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004367:\n  id: 4367\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004367:\n  id: 4367\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004368(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004368(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4368
-    type_name: ClassVar[str] = "_RESERVED_004368"
-    type_hash: ClassVar[int] = 0x8CD5099C
+    type_name: ClassVar[str] = "RESERVED_004368"
+    type_hash: ClassVar[int] = 0x99F64A37
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004368:\n  id: 4368\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004368:\n  id: 4368\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004369(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004369(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4369
-    type_name: ClassVar[str] = "_RESERVED_004369"
-    type_hash: ClassVar[int] = 0xC91AF2B3
+    type_name: ClassVar[str] = "RESERVED_004369"
+    type_hash: ClassVar[int] = 0xF4B70AB4
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004369:\n  id: 4369\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004369:\n  id: 4369\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004370(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004370(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4370
-    type_name: ClassVar[str] = "_RESERVED_004370"
-    type_hash: ClassVar[int] = 0x1A8E353C
+    type_name: ClassVar[str] = "RESERVED_004370"
+    type_hash: ClassVar[int] = 0xE46A53AF
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004370:\n  id: 4370\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004370:\n  id: 4370\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004371(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004371(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4371
-    type_name: ClassVar[str] = "_RESERVED_004371"
-    type_hash: ClassVar[int] = 0x09248DD4
+    type_name: ClassVar[str] = "RESERVED_004371"
+    type_hash: ClassVar[int] = 0x177FBC2F
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004371:\n  id: 4371\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004371:\n  id: 4371\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004372(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004372(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4372
-    type_name: ClassVar[str] = "_RESERVED_004372"
-    type_hash: ClassVar[int] = 0x9880225F
+    type_name: ClassVar[str] = "RESERVED_004372"
+    type_hash: ClassVar[int] = 0x01736936
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004372:\n  id: 4372\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004372:\n  id: 4372\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004373(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004373(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4373
-    type_name: ClassVar[str] = "_RESERVED_004373"
-    type_hash: ClassVar[int] = 0xA9E362D1
+    type_name: ClassVar[str] = "RESERVED_004373"
+    type_hash: ClassVar[int] = 0x72CF2D3F
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004373:\n  id: 4373\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004373:\n  id: 4373\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004374(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004374(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4374
-    type_name: ClassVar[str] = "_RESERVED_004374"
-    type_hash: ClassVar[int] = 0xF76E2A3C
+    type_name: ClassVar[str] = "RESERVED_004374"
+    type_hash: ClassVar[int] = 0xEC101B55
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004374:\n  id: 4374\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004374:\n  id: 4374\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004375(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004375(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4375
-    type_name: ClassVar[str] = "_RESERVED_004375"
-    type_hash: ClassVar[int] = 0xB01FBB58
+    type_name: ClassVar[str] = "RESERVED_004375"
+    type_hash: ClassVar[int] = 0xB41F9FC1
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004375:\n  id: 4375\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004375:\n  id: 4375\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004376(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004376(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4376
-    type_name: ClassVar[str] = "_RESERVED_004376"
-    type_hash: ClassVar[int] = 0xC4D255ED
+    type_name: ClassVar[str] = "RESERVED_004376"
+    type_hash: ClassVar[int] = 0xEBC7B874
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004376:\n  id: 4376\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004376:\n  id: 4376\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004377(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004377(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4377
-    type_name: ClassVar[str] = "_RESERVED_004377"
-    type_hash: ClassVar[int] = 0x5DB1542A
+    type_name: ClassVar[str] = "RESERVED_004377"
+    type_hash: ClassVar[int] = 0x4DCCD750
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004377:\n  id: 4377\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004377:\n  id: 4377\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF__RESERVED_004378(MessageData, metaclass=MessageMeta):
+class MDF_RESERVED_004378(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4378
-    type_name: ClassVar[str] = "_RESERVED_004378"
-    type_hash: ClassVar[int] = 0xD323D536
+    type_name: ClassVar[str] = "RESERVED_004378"
+    type_hash: ClassVar[int] = 0x75FB28B0
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs.yaml"
-    type_def: ClassVar[str] = "'_RESERVED_004378:\n  id: 4378\n  fields: null'"
+    type_def: ClassVar[str] = "'RESERVED_004378:\n  id: 4378\n  fields: null'"
 
 
 @pyrtma.message_def
