@@ -88,6 +88,13 @@ message_defs:
       reserved: int16
       msg_type: MSG_TYPE
 
+  SUBSCRIPTION_OPTION:
+    id: 7
+    fields:
+      msg_type: MSG_TYPE
+      option: int32 # Pause 0x01, TimingOnly 0x02
+      value: int32
+
   FAILED_MESSAGE:
     id: 8
     fields:
@@ -95,6 +102,14 @@ message_defs:
       reserved: int16[3]
       time_of_failure: double
       msg_header: RTMA_MSG_HEADER
+
+  MESSAGE_TIMING:
+    id: 9
+    fields:
+      msg_type: MSG_TYPE
+      src_id: MODULE_ID
+      reserved: int16
+      send_time: double
 
   CONNECT:
     id: 13
@@ -116,49 +131,52 @@ message_defs:
     fields:
       msg_type: MSG_TYPE
 
-  SHUTDOWN_RTMA:
-    id: 17
-    fields: null
-
   MODULE_READY:
     id: 26
     fields:
       pid: int32
 
-  ACTIVE_CLIENTS:
-    id: 31
+  # Test Connection sent at regular interval
+  # to inactive (quiet) clients
+  PING:
+    id: 29
     fields:
-      timestamp: double
-      num_clients: int16
-      padding: int16
-      reserved: int32
-      client_mod_id: MODULE_ID[MAX_ACTIVE_CLIENTS]
-      client_pid: int32[MAX_ACTIVE_CLIENTS]
+      uid: int32
+
+  # Test Response
+  PONG:
+    id: 30
+    fields:
+      uid: int32
+
+  # MM will send HELLO message for each connected 
+  # client to the module requesting the introduction
+  INTRODUCE:
+    id: 31
+    fields: null
     
-  CLIENT_INFO:
+  # Notification message when client joins
+  HELLO:
     id: 32
     fields:
-      addr: char[32]
       uid: int32
       pid: int32
       mod_id: MODULE_ID
-      is_logger: int16
-      is_unique: int16
-      port: uint16
+      reserved: int16
       name: char[MAX_NAME_LEN]
 
-  CLIENT_CLOSED:
+  # Notification message when client leaves
+  GOODBYE:
     id: 33
     fields:
-      addr: char[32]
       uid: int32
       pid: int32
       mod_id: MODULE_ID
-      is_logger: int16
-      is_unique: int16
-      port: uint16
+      reserved: int16
       name: char[MAX_NAME_LEN]
 
+  # Support for client naming in two steps
+  # for legacy support
   CLIENT_SET_NAME:
     id: 34
     fields:
@@ -251,3 +269,5 @@ message_defs:
     id: 86
     fields:
       msg_type: MSG_TYPE
+
+

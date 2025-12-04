@@ -108,16 +108,19 @@ MT_KILL: int = 1
 MT_ACKNOWLEDGE: int = 2
 MT_CONNECT_V2: int = 4
 MT_FAIL_SUBSCRIBE: int = 6
+MT_SUBSCRIPTION_OPTION: int = 7
 MT_FAILED_MESSAGE: int = 8
+MT_MESSAGE_TIMING: int = 9
 MT_CONNECT: int = 13
 MT_DISCONNECT: int = 14
 MT_SUBSCRIBE: int = 15
 MT_UNSUBSCRIBE: int = 16
-MT_SHUTDOWN_RTMA: int = 17
 MT_MODULE_READY: int = 26
-MT_ACTIVE_CLIENTS: int = 31
-MT_CLIENT_INFO: int = 32
-MT_CLIENT_CLOSED: int = 33
+MT_PING: int = 29
+MT_PONG: int = 30
+MT_INTRODUCE: int = 31
+MT_HELLO: int = 32
+MT_GOODBYE: int = 33
 MT_CLIENT_SET_NAME: int = 34
 MT_RTMA_LOG: int = 40
 MT_RTMA_LOG_CRITICAL: int = 41
@@ -607,6 +610,22 @@ class MDF_FAIL_SUBSCRIBE(MessageData, metaclass=MessageMeta):
 
 
 @pyrtma.message_def
+class MDF_SUBSCRIPTION_OPTION(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 7
+    type_name: ClassVar[str] = "SUBSCRIPTION_OPTION"
+    type_hash: ClassVar[int] = 0xFF6CEDFC
+    type_size: ClassVar[int] = 12
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[str] = (
+        "'SUBSCRIPTION_OPTION:\n  id: 7\n  fields:\n    msg_type: MSG_TYPE\n    option: int32\n    value: int32'"
+    )
+
+    msg_type: Int32 = Int32()
+    option: Int32 = Int32()
+    value: Int32 = Int32()
+
+
+@pyrtma.message_def
 class MDF_FAILED_MESSAGE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 8
     type_name: ClassVar[str] = "FAILED_MESSAGE"
@@ -621,6 +640,23 @@ class MDF_FAILED_MESSAGE(MessageData, metaclass=MessageMeta):
     reserved: IntArray[Int16] = IntArray(Int16, 3)
     time_of_failure: Double = Double()
     msg_header: Struct[RTMA_MSG_HEADER] = Struct(RTMA_MSG_HEADER)
+
+
+@pyrtma.message_def
+class MDF_MESSAGE_TIMING(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 9
+    type_name: ClassVar[str] = "MESSAGE_TIMING"
+    type_hash: ClassVar[int] = 0xE001C54C
+    type_size: ClassVar[int] = 16
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[str] = (
+        "'MESSAGE_TIMING:\n  id: 9\n  fields:\n    msg_type: MSG_TYPE\n    src_id: MODULE_ID\n    reserved: int16\n    send_time: double'"
+    )
+
+    msg_type: Int32 = Int32()
+    src_id: Int16 = Int16()
+    reserved: Int16 = Int16()
+    send_time: Double = Double()
 
 
 @pyrtma.message_def
@@ -677,16 +713,6 @@ class MDF_UNSUBSCRIBE(MessageData, metaclass=MessageMeta):
 
 
 @pyrtma.message_def
-class MDF_SHUTDOWN_RTMA(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 17
-    type_name: ClassVar[str] = "SHUTDOWN_RTMA"
-    type_hash: ClassVar[int] = 0x0912BFA5
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[str] = "'SHUTDOWN_RTMA:\n  id: 17\n  fields: null'"
-
-
-@pyrtma.message_def
 class MDF_MODULE_READY(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 26
     type_name: ClassVar[str] = "MODULE_READY"
@@ -699,63 +725,72 @@ class MDF_MODULE_READY(MessageData, metaclass=MessageMeta):
 
 
 @pyrtma.message_def
-class MDF_ACTIVE_CLIENTS(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 31
-    type_name: ClassVar[str] = "ACTIVE_CLIENTS"
-    type_hash: ClassVar[int] = 0xFC42B3AF
-    type_size: ClassVar[int] = 1552
+class MDF_PING(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 29
+    type_name: ClassVar[str] = "PING"
+    type_hash: ClassVar[int] = 0x43014E6F
+    type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[str] = (
-        "'ACTIVE_CLIENTS:\n  id: 31\n  fields:\n    timestamp: double\n    num_clients: int16\n    padding: int16\n    reserved: int32\n    client_mod_id: MODULE_ID[MAX_ACTIVE_CLIENTS]\n    client_pid: int32[MAX_ACTIVE_CLIENTS]'"
-    )
+    type_def: ClassVar[str] = "'PING:\n  id: 29\n  fields:\n    uid: int32'"
 
-    timestamp: Double = Double()
-    num_clients: Int16 = Int16()
-    padding: Int16 = Int16()
-    reserved: Int32 = Int32()
-    client_mod_id: IntArray[Int16] = IntArray(Int16, 256)
-    client_pid: IntArray[Int32] = IntArray(Int32, 256)
+    uid: Int32 = Int32()
 
 
 @pyrtma.message_def
-class MDF_CLIENT_INFO(MessageData, metaclass=MessageMeta):
+class MDF_PONG(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 30
+    type_name: ClassVar[str] = "PONG"
+    type_hash: ClassVar[int] = 0xDAC22B06
+    type_size: ClassVar[int] = 4
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[str] = "'PONG:\n  id: 30\n  fields:\n    uid: int32'"
+
+    uid: Int32 = Int32()
+
+
+@pyrtma.message_def
+class MDF_INTRODUCE(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 31
+    type_name: ClassVar[str] = "INTRODUCE"
+    type_hash: ClassVar[int] = 0x6F4769E8
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "core_defs.yaml"
+    type_def: ClassVar[str] = "'INTRODUCE:\n  id: 31\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_HELLO(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 32
-    type_name: ClassVar[str] = "CLIENT_INFO"
-    type_hash: ClassVar[int] = 0x401076E7
-    type_size: ClassVar[int] = 80
+    type_name: ClassVar[str] = "HELLO"
+    type_hash: ClassVar[int] = 0x1BDE1402
+    type_size: ClassVar[int] = 44
     type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
-        "'CLIENT_INFO:\n  id: 32\n  fields:\n    addr: char[32]\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    is_logger: int16\n    is_unique: int16\n    port: uint16\n    name: char[MAX_NAME_LEN]'"
+        "'HELLO:\n  id: 32\n  fields:\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    reserved: int16\n    name: char[MAX_NAME_LEN]'"
     )
 
-    addr: String = String(32)
     uid: Int32 = Int32()
     pid: Int32 = Int32()
     mod_id: Int16 = Int16()
-    is_logger: Int16 = Int16()
-    is_unique: Int16 = Int16()
-    port: Uint16 = Uint16()
+    reserved: Int16 = Int16()
     name: String = String(32)
 
 
 @pyrtma.message_def
-class MDF_CLIENT_CLOSED(MessageData, metaclass=MessageMeta):
+class MDF_GOODBYE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 33
-    type_name: ClassVar[str] = "CLIENT_CLOSED"
-    type_hash: ClassVar[int] = 0x087F4249
-    type_size: ClassVar[int] = 80
+    type_name: ClassVar[str] = "GOODBYE"
+    type_hash: ClassVar[int] = 0x9998622C
+    type_size: ClassVar[int] = 44
     type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
-        "'CLIENT_CLOSED:\n  id: 33\n  fields:\n    addr: char[32]\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    is_logger: int16\n    is_unique: int16\n    port: uint16\n    name: char[MAX_NAME_LEN]'"
+        "'GOODBYE:\n  id: 33\n  fields:\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    reserved: int16\n    name: char[MAX_NAME_LEN]'"
     )
 
-    addr: String = String(32)
     uid: Int32 = Int32()
     pid: Int32 = Int32()
     mod_id: Int16 = Int16()
-    is_logger: Int16 = Int16()
-    is_unique: Int16 = Int16()
-    port: Uint16 = Uint16()
+    reserved: Int16 = Int16()
     name: String = String(32)
 
 
