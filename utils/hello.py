@@ -5,14 +5,14 @@ import time
 
 
 def main():
-    client = pyrtma.Client(module_id=0, name="hello_test")
+    uid = uuid.uuid4().hex[:8]
+    client = pyrtma.Client(module_id=0, name=f"hello_{uid}")
     client.connect()
     client.subscribe([cd.MT_HELLO, cd.MT_GOODBYE])
-    set_name = cd.MDF_CLIENT_SET_NAME()
 
-    uid = uuid.uuid4().hex[:8]
-    set_name.name = f"hello_{uid}"
-    client.send_message(set_name)
+    # set_name = cd.MDF_CLIENT_SET_NAME()
+    # set_name.name = f"hello_{uid}"
+    # client.send_message(set_name)
 
     client.send_signal(cd.MT_INTRODUCE)
 
