@@ -41,8 +41,9 @@ check_compiled_version(COMPILED_PYRTMA_VERSION)
 MAX_DATASETS: int = 6
 DATASET_NAME_LEN: int = 32
 MAX_LOGGER_FILENAME_LENGTH: int = 256
-MAX_MODULES: int = 200
-DYN_MOD_ID_START: int = 100
+MAX_MODULES: int = 256
+DYN_MOD_ID_START: int = 10000
+MAX_MODULE_ID: int = 32000
 MAX_HOSTS: int = 5
 MAX_MESSAGE_TYPES: int = 10000
 MAX_RTMA_MSG_TYPE: int = 99
@@ -108,9 +109,7 @@ MT_KILL: int = 1
 MT_ACKNOWLEDGE: int = 2
 MT_CONNECT_V2: int = 4
 MT_FAIL_SUBSCRIBE: int = 6
-MT_SUBSCRIPTION_OPTION: int = 7
 MT_FAILED_MESSAGE: int = 8
-MT_MESSAGE_TIMING: int = 9
 MT_CONNECT: int = 13
 MT_DISCONNECT: int = 14
 MT_SUBSCRIBE: int = 15
@@ -128,7 +127,6 @@ MT_RTMA_LOG_ERROR: int = 42
 MT_RTMA_LOG_WARNING: int = 43
 MT_RTMA_LOG_INFO: int = 44
 MT_RTMA_LOG_DEBUG: int = 45
-MT_TIMING_MESSAGE: int = 80
 MT_FORCE_DISCONNECT: int = 82
 MT_PAUSE_SUBSCRIPTION: int = 85
 MT_RESUME_SUBSCRIPTION: int = 86
@@ -610,22 +608,6 @@ class MDF_FAIL_SUBSCRIBE(MessageData, metaclass=MessageMeta):
 
 
 @pyrtma.message_def
-class MDF_SUBSCRIPTION_OPTION(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 7
-    type_name: ClassVar[str] = "SUBSCRIPTION_OPTION"
-    type_hash: ClassVar[int] = 0xFF6CEDFC
-    type_size: ClassVar[int] = 12
-    type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[str] = (
-        "'SUBSCRIPTION_OPTION:\n  id: 7\n  fields:\n    msg_type: MSG_TYPE\n    option: int32\n    value: int32'"
-    )
-
-    msg_type: Int32 = Int32()
-    option: Int32 = Int32()
-    value: Int32 = Int32()
-
-
-@pyrtma.message_def
 class MDF_FAILED_MESSAGE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 8
     type_name: ClassVar[str] = "FAILED_MESSAGE"
@@ -640,23 +622,6 @@ class MDF_FAILED_MESSAGE(MessageData, metaclass=MessageMeta):
     reserved: IntArray[Int16] = IntArray(Int16, 3)
     time_of_failure: Double = Double()
     msg_header: Struct[RTMA_MSG_HEADER] = Struct(RTMA_MSG_HEADER)
-
-
-@pyrtma.message_def
-class MDF_MESSAGE_TIMING(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 9
-    type_name: ClassVar[str] = "MESSAGE_TIMING"
-    type_hash: ClassVar[int] = 0xE001C54C
-    type_size: ClassVar[int] = 16
-    type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[str] = (
-        "'MESSAGE_TIMING:\n  id: 9\n  fields:\n    msg_type: MSG_TYPE\n    src_id: MODULE_ID\n    reserved: int16\n    send_time: double'"
-    )
-
-    msg_type: Int32 = Int32()
-    src_id: Int16 = Int16()
-    reserved: Int16 = Int16()
-    send_time: Double = Double()
 
 
 @pyrtma.message_def
@@ -762,17 +727,18 @@ class MDF_INTRODUCE(MessageData, metaclass=MessageMeta):
 class MDF_HELLO(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 32
     type_name: ClassVar[str] = "HELLO"
-    type_hash: ClassVar[int] = 0x1BDE1402
-    type_size: ClassVar[int] = 44
+    type_hash: ClassVar[int] = 0xF393D643
+    type_size: ClassVar[int] = 76
     type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
-        "'HELLO:\n  id: 32\n  fields:\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    reserved: int16\n    name: char[MAX_NAME_LEN]'"
+        "'HELLO:\n  id: 32\n  fields:\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    port: uint16\n    addr: char[MAX_NAME_LEN]\n    name: char[MAX_NAME_LEN]'"
     )
 
     uid: Int32 = Int32()
     pid: Int32 = Int32()
     mod_id: Int16 = Int16()
-    reserved: Int16 = Int16()
+    port: Uint16 = Uint16()
+    addr: String = String(32)
     name: String = String(32)
 
 
@@ -780,17 +746,18 @@ class MDF_HELLO(MessageData, metaclass=MessageMeta):
 class MDF_GOODBYE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 33
     type_name: ClassVar[str] = "GOODBYE"
-    type_hash: ClassVar[int] = 0x9998622C
-    type_size: ClassVar[int] = 44
+    type_hash: ClassVar[int] = 0x1EC8D03F
+    type_size: ClassVar[int] = 76
     type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
-        "'GOODBYE:\n  id: 33\n  fields:\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    reserved: int16\n    name: char[MAX_NAME_LEN]'"
+        "'GOODBYE:\n  id: 33\n  fields:\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    port: uint16\n    addr: char[MAX_NAME_LEN]\n    name: char[MAX_NAME_LEN]'"
     )
 
     uid: Int32 = Int32()
     pid: Int32 = Int32()
     mod_id: Int16 = Int16()
-    reserved: Int16 = Int16()
+    port: Uint16 = Uint16()
+    addr: String = String(32)
     name: String = String(32)
 
 
@@ -926,22 +893,6 @@ class MDF_RTMA_LOG_DEBUG(MessageData, metaclass=MessageMeta):
     pathname: String = String(512)
     funcname: String = String(256)
     message: String = String(1024)
-
-
-@pyrtma.message_def
-class MDF_TIMING_MESSAGE(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 80
-    type_name: ClassVar[str] = "TIMING_MESSAGE"
-    type_hash: ClassVar[int] = 0xDAA7503D
-    type_size: ClassVar[int] = 20808
-    type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[str] = (
-        "'TIMING_MESSAGE:\n  id: 80\n  fields:\n    timing: uint16[MAX_MESSAGE_TYPES]\n    ModulePID: int32[MAX_MODULES]\n    send_time: double'"
-    )
-
-    timing: IntArray[Uint16] = IntArray(Uint16, 10000)
-    ModulePID: IntArray[Int32] = IntArray(Int32, 200)
-    send_time: Double = Double()
 
 
 @pyrtma.message_def

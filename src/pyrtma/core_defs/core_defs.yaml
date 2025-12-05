@@ -8,8 +8,9 @@ imports:
   - quick_logger.yaml # MTs 54-61, 96
 
 constants:
-  MAX_MODULES: 200
-  DYN_MOD_ID_START: 100
+  MAX_MODULES: 256
+  DYN_MOD_ID_START: 10000
+  MAX_MODULE_ID: 32000
   MAX_HOSTS: 5
   MAX_MESSAGE_TYPES: 10000
   MAX_RTMA_MSG_TYPE: 99
@@ -23,7 +24,6 @@ constants:
   MAX_LOG_LENGTH: 1024
   MESSAGE_TRAFFIC_SIZE: 64
   MAX_MESSAGE_SIZE: 65535
-
 
 string_constants: null
 
@@ -88,13 +88,6 @@ message_defs:
       reserved: int16
       msg_type: MSG_TYPE
 
-  SUBSCRIPTION_OPTION:
-    id: 7
-    fields:
-      msg_type: MSG_TYPE
-      option: int32 # Pause 0x01, TimingOnly 0x02
-      value: int32
-
   FAILED_MESSAGE:
     id: 8
     fields:
@@ -102,14 +95,6 @@ message_defs:
       reserved: int16[3]
       time_of_failure: double
       msg_header: RTMA_MSG_HEADER
-
-  MESSAGE_TIMING:
-    id: 9
-    fields:
-      msg_type: MSG_TYPE
-      src_id: MODULE_ID
-      reserved: int16
-      send_time: double
 
   CONNECT:
     id: 13
@@ -162,7 +147,8 @@ message_defs:
       uid: int32
       pid: int32
       mod_id: MODULE_ID
-      reserved: int16
+      port: uint16
+      addr: char[MAX_NAME_LEN]
       name: char[MAX_NAME_LEN]
 
   # Notification message when client leaves
@@ -172,7 +158,8 @@ message_defs:
       uid: int32
       pid: int32
       mod_id: MODULE_ID
-      reserved: int16
+      port: uint16
+      addr: char[MAX_NAME_LEN]
       name: char[MAX_NAME_LEN]
 
   # Support for client naming in two steps
@@ -247,13 +234,6 @@ message_defs:
       pathname: char[512] # name of source file
       funcname: char[256] # name of function making log
       message: char[MAX_LOG_LENGTH] # formatted message
-
-  TIMING_MESSAGE:
-    id: 80
-    fields:
-      timing: uint16[MAX_MESSAGE_TYPES]
-      ModulePID: int32[MAX_MODULES]
-      send_time: double
 
   FORCE_DISCONNECT:
     id: 82
