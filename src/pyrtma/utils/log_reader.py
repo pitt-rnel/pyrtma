@@ -212,15 +212,14 @@ def _parse_ql_file(
     # Import pyrtma from the temp directory location
     base = pathlib.Path(pyrtma_repo) / "src"
     sys.path.insert(0, (str(base.absolute())))
-    importlib.import_module("pyrtma")
+    pyrtma = importlib.import_module("pyrtma")
+    pyrtma_header = importlib.import_module("pyrtma", package="header")
+    pyrtma_message = importlib.import_module("pyrtma", package="message")
 
     # Import pyrtma from the temp directory location
     msg_base = pathlib.Path(msgdefs).parent
     sys.path.insert(0, (str(msg_base.absolute())))
-    importlib.import_module("message_defs")
-
-    import pyrtma.message
-    import pyrtma.header
+    md = importlib.import_module("message_defs")
 
     print(f"Parsing QL File: {binfile}")
     print(f"pyrtma version = {pyrtma.__file__}")
@@ -228,7 +227,7 @@ def _parse_ql_file(
 
     start_time = time.perf_counter()
 
-    headers: list[pyrtma.header.MessageHeader] = []
+    headers: list = []
     offsets: list[int] = []
 
     binfile_path = pathlib.Path(binfile)
@@ -243,7 +242,7 @@ def _parse_ql_file(
         # Extract the message headers
         for _ in range(file_header.num_messages):
             raw = f.read(msg_header_size)
-            headers.append(pyrtma.header.MessageHeader.from_buffer_copy(raw))
+            headers.append(pyrtma_header.MessageHeader.from_buffer_copy(raw))
 
         # Extract the message data offsets for each message
         offset_size = file_header.data_block_offset_size
@@ -259,7 +258,7 @@ def _parse_ql_file(
         for n, offset in enumerate(offsets):
             header = headers[n]
 
-            msg_cls = pyrtma.message.get_msg_cls(header.msg_type)
+            msg_cls = pyrtma_message.get_msg_cls(header.msg_type)
             raw_bytes = d_bytes[offset : offset + header.num_data_bytes]
 
             if msg_cls is None:
