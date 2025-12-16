@@ -223,6 +223,7 @@ def _parse_ql_file(
     import pyrtma.header
 
     print(f"Parsing QL File: {binfile}")
+    print(f"pyrtma version = {pyrtma.__file__}")
     print(f"pyrtma version = {pyrtma.__version__}")
 
     start_time = time.perf_counter()
