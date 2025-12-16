@@ -211,6 +211,7 @@ def _parse_ql_file(
 
     # Import pyrtma from the temp directory location
     base = pathlib.Path(pyrtma_repo) / "src"
+    print(base)
     sys.path.insert(0, (str(base.absolute())))
     pyrtma = importlib.import_module("pyrtma")
     pyrtma_header = importlib.import_module("pyrtma", package="header")
