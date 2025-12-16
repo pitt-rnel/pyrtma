@@ -206,30 +206,33 @@ def _parse_ql_file(
     import time
     import pathlib
     import sys
-    import importlib
     import base64
+    import importlib
+
+    importlib.invalidate_caches()
 
     # Import pyrtma from the temp directory location
     base = pathlib.Path(pyrtma_repo) / "src"
     print(base)
+
     sys.path.insert(0, (str(base.absolute())))
+    print(sys.path)
     import pyrtma
-    import pyrtma.header
-    import pyrtma.message
 
     # pyrtma = importlib.import_module("pyrtma")
     # pyrtma_header = importlib.import_module("pyrtma", package="header")
     # pyrtma_message = importlib.import_module("pyrtma", package="message")
+
+    print(f"Parsing QL File: {binfile}")
+    print(f"pyrtma file = {pyrtma.__file__}")
+    print(f"pyrtma version = {pyrtma.__version__}")
+    print()
 
     # Import pyrtma from the temp directory location
     msg_base = pathlib.Path(msgdefs).parent
     sys.path.insert(0, (str(msg_base.absolute())))
     # md = importlib.import_module("message_defs")
     import message_defs as md
-
-    print(f"Parsing QL File: {binfile}")
-    print(f"pyrtma version = {pyrtma.__file__}")
-    print(f"pyrtma version = {pyrtma.__version__}")
 
     start_time = time.perf_counter()
 
