@@ -121,7 +121,7 @@ class LogReader:
             for line in f.readlines():
                 if line.startswith("COMPILED_PYRTMA_VERSION"):
                     version = "v" + line.split("=")[1].strip().strip('"')
-                    print(version)
+                    print(f"COMPILED_PYRTMA_VERSION = {version}")
                     break
 
         # User message data
@@ -207,26 +207,18 @@ def _parse_ql_file(
     import pathlib
     import sys
     import base64
-    import importlib
-
-    importlib.invalidate_caches()
 
     # Import pyrtma from the temp directory location
     base = pathlib.Path(pyrtma_repo) / "src"
-    print(base)
-
     sys.path.insert(0, (str(base.absolute())))
-    print(sys.path)
     import pyrtma
+    import pyrtma.header
+    import pyrtma.message
 
-    # pyrtma = importlib.import_module("pyrtma")
-    # pyrtma_header = importlib.import_module("pyrtma", package="header")
-    # pyrtma_message = importlib.import_module("pyrtma", package="message")
-
-    print(f"Parsing QL File: {binfile}")
     print(f"pyrtma file = {pyrtma.__file__}")
     print(f"pyrtma version = {pyrtma.__version__}")
     print()
+    print(f"Parsing QL File: {binfile}")
 
     # Import pyrtma from the temp directory location
     msg_base = pathlib.Path(msgdefs).parent
@@ -267,7 +259,11 @@ def _parse_ql_file(
         for n, offset in enumerate(offsets):
             header = headers[n]
 
-            msg_cls = pyrtma.message.get_msg_cls(header.msg_type)
+            try:
+                msg_cls = pyrtma.message.get_msg_cls(header.msg_type)
+            except:
+                msg_cls = None
+
             raw_bytes = d_bytes[offset : offset + header.num_data_bytes]
 
             if msg_cls is None:
