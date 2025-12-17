@@ -348,6 +348,7 @@ def _start_process(
     # Store the result in MessageLog
     log = MessageLog(filename=str(binfile_path.absolute()))
 
+    # Main Collection Loop from QL parsing process
     while not done.is_set():
         try:
             item = result.get(timeout=0.050)
