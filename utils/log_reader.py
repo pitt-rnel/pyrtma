@@ -158,7 +158,6 @@ class LogReader:
             f"git reset --hard", cwd=str(pyrtma_copy), capture_output=True
         )
 
-        breakpoint()
         # Checkout the repo at the version tag
         proc = subprocess.run(
             f"git checkout {version}", cwd=str(pyrtma_copy), capture_output=True
