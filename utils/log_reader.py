@@ -153,10 +153,17 @@ class LogReader:
         msgdefs_copy = temp_path / "message_defs.py"
         shutil.copy(msgdefs_path, msgdefs_copy)
 
+        # Reset the repo copy to make sure that we can checkout the version tag
+        proc = subprocess.run(
+            f"git reset --hard", cwd=str(pyrtma_copy), capture_output=True
+        )
+
+        breakpoint()
         # Checkout the repo at the version tag
         proc = subprocess.run(
             f"git checkout {version}", cwd=str(pyrtma_copy), capture_output=True
         )
+
         if proc.returncode > 0:
             raise RuntimeError(
                 f"Failed to checkout version tag {version} in pyrtma repo."
