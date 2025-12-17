@@ -13,7 +13,7 @@ import json
 
 from multiprocessing.synchronize import Event
 from dataclasses import dataclass, field
-from typing import Generator, Any
+from typing import Generator, Any, Iterable
 
 from tkinter import filedialog
 
@@ -49,6 +49,9 @@ class MessageLog:
     @property
     def data(self) -> list[dict]:
         return [item["data"] for item in self._log]
+
+    def extend(self, other: list[dict]):
+        self._log.extend(other)
 
     def append(self, item: dict):
         self._log.append(item)
@@ -90,7 +93,7 @@ class MessageLog:
 class LogReader:
 
     @staticmethod
-    def browse() -> MessageLog:
+    def browse() -> list[MessageLog]:
         msg_defs_file = filedialog.askopenfilename(
             initialdir=pathlib.Path.home(),
             title="Select the Message Definition File",
@@ -99,22 +102,22 @@ class LogReader:
 
         msgdefs_path = pathlib.Path(msg_defs_file)
 
-        binfile = filedialog.askopenfilename(
+        binfiles = filedialog.askopenfilenames(
             initialdir=msgdefs_path.parent.parent,
-            title="Select QL File",
-            filetypes=(("QL file", "*.bin*"), ("All files", "*.*")),
+            title="Select QL Files",
+            filetypes=(("QL files", "*.bin*"), ("All files", "*.*")),
         )
 
-        return LogReader.load(msgdefs_path, binfile)
+        return LogReader.load(msgdefs_path, binfiles)
 
     @staticmethod
     def load(
         msg_defs: str | pathlib.Path,
-        binfile: str | pathlib.Path,
+        binfiles: Iterable[str | pathlib.Path],
         include: list[str | int] | None = None,
         exclude: list[str | int] | None = None,
         include_unknown: bool = False,
-    ) -> MessageLog:
+    ) -> list[MessageLog]:
         # Get message defs compiled version
         msgdefs_path = pathlib.Path(msg_defs)
         with open(msgdefs_path) as f:
@@ -123,10 +126,6 @@ class LogReader:
                     version = "v" + line.split("=")[1].strip().strip('"')
                     print(f"COMPILED_PYRTMA_VERSION = {version}")
                     break
-
-        # User message data
-        # Note: We don't copy the data file
-        binfile_path = pathlib.Path(binfile)
 
         # Get the pyrtma repo location
         pyrtma_env = os.getenv("PYRTMA")
@@ -173,12 +172,26 @@ class LogReader:
         )
         print(f"pyrtma commit = {proc.stdout.decode()[:8]}")
 
-        log = _start_process(
-            pyrtma_copy, msgdefs_copy, binfile_path, include, exclude, include_unknown
-        )
+        binfiles = [pathlib.Path(p) for p in binfiles]
+
+        logs = []
+        for binfile_path in binfiles:
+            if not binfile_path.exists():
+                print(f"FileNotFound: {binfile_path.absolute()}")
+                continue
+
+            log = _start_process(
+                pyrtma_copy,
+                msgdefs_copy,
+                binfile_path,
+                include,
+                exclude,
+                include_unknown,
+            )
+            logs.append(log)
 
         _cleanup_temp(temp_path)
-        return log
+        return logs
 
 
 def _cleanup_temp(temp_path: pathlib.Path):
