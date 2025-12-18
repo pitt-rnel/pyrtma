@@ -100,6 +100,9 @@ class LogReader:
             filetypes=(("python files", "*.py*"), ("All files", "*.*")),
         )
 
+        if msg_defs_file == "":
+            raise RuntimeError("No message definition file was selected.")
+
         msgdefs_path = pathlib.Path(msg_defs_file)
 
         binfiles = filedialog.askopenfilenames(
@@ -107,6 +110,9 @@ class LogReader:
             title="Select QL Files",
             filetypes=(("QL files", "*.bin*"), ("All files", "*.*")),
         )
+
+        if len(binfiles) <= 0:
+            raise RuntimeError("No quicklogger .bin files were selected.")
 
         return LogReader.load(msgdefs_path, binfiles)
 
