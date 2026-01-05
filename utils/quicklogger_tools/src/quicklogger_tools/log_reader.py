@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import datetime
 import stat
+import sys
 
 import multiprocessing
 import queue
@@ -201,20 +202,24 @@ class LogReader:
 
 
 def _cleanup_temp(temp_path: pathlib.Path):
-    def on_exc(func, path, exc_info):
-        # Note: Some files in .git directory on windows are read-only
-        # We need to change the permissions for removal to succeed
-        if ".git" in pathlib.Path(path).parts:
-            if type(exc_info) is PermissionError:
-                # Read-Only Permission issue
-                if "WinError 5" in str(exc_info):
-                    os.chmod(path, stat.S_IWRITE)
-                    os.unlink(path)
-                    return
-                else:
-                    raise
+    if sys.platform == "win32":
 
-    shutil.rmtree(temp_path, onexc=on_exc)
+        def on_exc(func, path, exc_info):
+            # Note: Some files in .git directory on windows are read-only
+            # We need to change the permissions for removal to succeed
+            if ".git" in pathlib.Path(path).parts:
+                if type(exc_info) is PermissionError:
+                    # Read-Only Permission issue
+                    if "WinError 5" in str(exc_info):
+                        os.chmod(path, stat.S_IWRITE)
+                        os.unlink(path)
+                        return
+                    else:
+                        raise
+
+        shutil.rmtree(temp_path, onexc=on_exc)
+    else:
+        shutil.rmtree(temp_path)
 
 
 def _parse_ql_file(
