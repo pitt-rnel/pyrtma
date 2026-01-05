@@ -1,361 +1,343 @@
+"""DataLogger class
+
+Run with python -m pyrtma.data_logger
+"""
+
 import time
 
 import pyrtma
 import pyrtma.core_defs as cd
 
 from pyrtma.exceptions import UnknownMessageType
-from typing import Optional, cast
 
-from .metadata import LoggingMetadata
-from .data_collection import DataCollection
-from .data_set import DataSet
-from .data_formatter import get_formatter
+from .dataset_writer import DatasetWriter
 from .exceptions import *
+
+from typing import cast
 
 
 class DataLogger:
+    MAX_DATASETS = 6
+    ALL_SETS = ("*", "all")
+
     def __init__(self, rtma_server_ip: str, log_level: int):
-        self.mod = pyrtma.Client(module_id=cd.MID_DATA_LOGGER, name="data_logger")
-        self.mod.logger.level = log_level
-        self.mod.connect(rtma_server_ip, logger_status=True)
+        self.mm_ip = rtma_server_ip
+
+        self.client = pyrtma.Client(module_id=cd.MID_DATA_LOGGER, name="data_logger")
+        self.client.logger.set_all_levels(log_level)
+        self.client.connect(rtma_server_ip, logger_status=True)
+        self.logger = self.client.logger
         self.ctrl_msg_types = [
-            cd.MT_DATA_LOGGER_START,
-            cd.MT_DATA_LOGGER_STOP,
-            cd.MT_DATA_LOGGER_PAUSE,
-            cd.MT_DATA_LOGGER_RESUME,
+            cd.MT_DATASET_START,
+            cd.MT_DATASET_STOP,
+            cd.MT_DATASET_PAUSE,
+            cd.MT_DATASET_RESUME,
+            cd.MT_DATASET_ADD,
+            cd.MT_DATASET_REMOVE,
+            cd.MT_DATASET_STATUS_REQUEST,
+            cd.MT_DATA_LOGGER_CONFIG_REQUEST,
             cd.MT_DATA_LOGGER_RESET,
-            cd.MT_ADD_DATA_COLLECTION,
-            cd.MT_ADD_DATA_SET,
-            cd.MT_REMOVE_DATA_COLLECTION,
-            cd.MT_REMOVE_DATA_SET,
-            cd.MT_DATA_COLLECTION_CONFIG_REQUEST,
-            cd.MT_DATA_LOGGER_STATUS_REQUEST,
-            cd.MT_DATA_LOGGER_METADATA_UPDATE,
-            cd.MT_DATA_LOGGER_METADATA_REQUEST,
             cd.MT_EXIT,
+            cd.MT_LM_EXIT,
         ]
 
-        self.mod.subscribe(self.ctrl_msg_types)
+        # self.client.subscribe(self.ctrl_msg_types)
+        self.client.subscribe([cd.ALL_MESSAGE_TYPES])
 
-        self.mod.send_module_ready()
+        self.client.send_module_ready()
 
-        self.mod.info("DataLogger connected and waiting for configuration.")
+        self.client.info("DataLogger connected and waiting for configuration.")
 
-        self.metadata = LoggingMetadata()
-        self.collection: Optional[DataCollection] = None
+        self.datasets: dict[str, DatasetWriter] = {}
 
-        self._running = False
-        self._recording = False
-        self._paused = False
-        self._elapsed_time = 0.0
+    def update(self, msg: pyrtma.Message | None):
+        dead = []
+        for name, ds in self.datasets.items():
+            if ds.dead:
+                dead.append(name)
+            else:
+                ds.update(msg)
 
-    def send_status(self):
-        msg = cd.MDF_DATA_LOGGER_STATUS()
+            if ds.file_saved.is_set():
+                self.client.send_message(ds.save_msg)
+                ds.file_saved.clear()
+                self.logger.info(f"Saved file: {ds.save_msg.filepath}")
+            elif ds.error_event.is_set():
+                self.client.send_message(ds.error)
+                self.client.error(ds.error)
+
+        # Remove the dataset after stoppping
+        for name in dead:
+            self.rm_dataset(name)
+
+    def rm_dataset(self, name: str, dest_mod_id: int = 0):
+        ds = self.datasets.get(name)
+
+        if ds is None:
+            raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
+
+        if ds.recording:
+            raise DatasetInProgress(
+                name, f"Recording in progresss for dataset '{ds.name}'"
+            )
+
+        self.datasets.pop(name)
+        reply = cd.MDF_DATASET_REMOVED()
+        reply.name = name
+        self.client.send_message(reply, dest_mod_id=dest_mod_id)
+        self.logger.info(f"Removed dataset: '{name}'")
+
+    def send_status(self, name: str = "all", dest_mod_id: int = 0):
+        msg = cd.MDF_DATASET_STATUS()
         msg.timestamp = time.time()
-        if self._recording and self.collection:
-            msg.elapsed_time = self.collection.elapsed_time
+
+        if name in DataLogger.ALL_SETS:
+            for ds in self.datasets.values():
+                msg.name = ds.name
+                msg.elapsed_time = ds.elapsed_time
+                msg.is_recording = ds.recording
+                msg.is_paused = ds.paused
+                self.client.send_message(msg, dest_mod_id=dest_mod_id)
         else:
-            msg.elapsed_time = -1
-        msg.is_recording = self._recording
-        msg.is_paused = self._paused
+            ds = self.datasets.get(name)
+            if ds is None:
+                raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
 
-        self.mod.send_message(msg)
+            msg.name = ds.name
+            msg.elapsed_time = ds.elapsed_time
+            msg.is_recording = ds.recording
+            msg.is_paused = ds.paused
+            self.client.send_message(msg, dest_mod_id=dest_mod_id)
 
-    def collection_info(self) -> cd.DATA_COLLECTION_INFO:
-        if self.collection:
-            c = cd.DATA_COLLECTION_INFO()
+    def send_config(self, dest_mod_id: int = 0):
+        msg = cd.MDF_DATA_LOGGER_CONFIG()
 
-            c.name = self.collection.name
-            c.save_path = str(self.collection.save_path)
-            c.num_data_sets = len(self.collection.datasets)
+        msg.num_datasets = len(self.datasets)
 
-            for i, ds in enumerate(self.collection.datasets):
-                c.data_sets[i].name = ds.name
-                c.data_sets[i].formatter = ds.formatter_cls.name
-                c.data_sets[i].save_path = str(ds.file_path)
-                c.data_sets[i].subdivide_interval = (
-                    0
-                    if isinstance(ds.subdivide_interval, float)
-                    else ds.subdivide_interval
-                )
-                c.data_sets[i].msg_types[: len(ds.msg_types)] = ds.msg_types
-
-        return c
-
-    def send_config(self):
-        msg = cd.MDF_DATA_COLLECTION_CONFIG()
-
-        if self.collection is None:
-            self.mod.send_message(msg)
-            return
-
-        msg.collection.name = self.collection.name
-        msg.collection.base_path = str(self.collection.base_path)
-        msg.collection.dir_fmt = self.collection.dir_fmt
-        msg.collection.num_data_sets = len(self.collection.datasets)
-
-        for i, ds in enumerate(self.collection.datasets):
-            d = msg.collection.data_sets[i]
+        for i, ds in enumerate(self.datasets.values()):
+            d = msg.datasets[i]
 
             d.name = ds.name
-            d.sub_dir_fmt = ds.sub_dir_fmt
-            d.file_name_fmt = ds.file_name_fmt
+            d.save_path = str(ds.save_path)
+            d.filename = ds.filename
             d.formatter = ds.formatter_cls.name
             d.msg_types[: len(ds.msg_types)] = ds.msg_types
             d.subdivide_interval = (
                 0 if isinstance(ds.subdivide_interval, float) else ds.subdivide_interval
             )
 
-        self.mod.send_message(msg)
+        self.client.send_message(msg, dest_mod_id=dest_mod_id)
 
-    def start_logging(self):
-        if self.collection:
-            if self._recording:
-                raise DataCollectionInProgress(
-                    "Cannot start collection while recording in progresss."
+    def start_logging(self, name: str, dest_mod_id: int = 0):
+        if name in DataLogger.ALL_SETS:
+            for ds in self.datasets.values():
+                ds.start()
+                self.logger.info(f"Starting dataset: '{ds.name}'")
+                self.logger.info(f"Saving Dataset:{ds.name} to {ds.file_path}")
+                start_msg = cd.MDF_DATASET_STARTED()
+                start_msg.name = ds.name
+                self.client.send_message(start_msg)
+        else:
+            ds = self.datasets.get(name)
+            if ds is None:
+                raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
+
+            if ds.recording:
+                raise DatasetInProgress(
+                    name, f"Recording in progresss for dataset '{ds.name}'"
                 )
 
-            self.mod.unsubscribe(self.ctrl_msg_types)
-            self.mod.subscribe([cd.ALL_MESSAGE_TYPES])
-            self.collection.start()
+            ds.start()
+            self.logger.info(f"Starting dataset: '{ds.name}'")
+            self.logger.info(f"Saving Dataset:{ds.name} to {ds.file_path}")
+            start_msg = cd.MDF_DATASET_STARTED()
+            start_msg.name = ds.name
+            self.client.send_message(start_msg)
 
-            msg = cd.MDF_DATA_COLLECTION_STARTED()
-            msg.collection = self.collection_info()
-            self.mod.send_message(msg)
+        self.send_status(dest_mod_id=dest_mod_id)
 
-            self.mod.info("Data logging started.")
-            self._recording = True
-            self._paused = False
+    def stop_logging(self, name: str, dest_mod_id: int = 0):
+        rm = []
+        if name in DataLogger.ALL_SETS:
+            for ds in self.datasets.values():
+                if not ds.recording:
+                    self.logger.warning(f"Dataset {ds.name} is not recording")
+                    continue
+                ds.stop()
+                self.logger.info(f"Stopping dataset: '{ds.name}'")
+                rm.append(ds.name)
+                stop_msg = cd.MDF_DATASET_STOPPED()
+                stop_msg.name = ds.name
+                self.client.send_message(stop_msg)
         else:
-            self.mod.unsubscribe([cd.ALL_MESSAGE_TYPES])
-            self.mod.subscribe(self.ctrl_msg_types)
-            raise DataCollectionNotConfigured("Ignoring start logging request.")
+            ds = self.datasets.get(name)
+            if ds is None:
+                raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
 
-        self.send_status()
+            if not ds.recording:
+                self.logger.warning(f"Dataset {ds.name} is not recording")
+                return
 
-    def stop_logging(self):
-        if self.collection:
-            if self._recording:
-                self.mod.unsubscribe([cd.ALL_MESSAGE_TYPES])
-                self.collection.stop()
-                self.mod.subscribe(self.ctrl_msg_types)
+            rm.append(ds.name)
+            ds.stop()
+            self.logger.info(f"Stopping dataset: '{ds.name}'")
 
-                msg = cd.MDF_DATA_COLLECTION_STOPPED()
-                msg.collection = self.collection_info()
-                self.mod.send_message(msg)
-                self.mod.send_signal(cd.MT_DATA_COLLECTION_SAVED)
+            stop_msg = cd.MDF_DATASET_STOPPED()
+            stop_msg.name = ds.name
+            self.client.send_message(stop_msg)
 
-                self.mod.info("Data logging stopped.")
-            else:
-                self.mod.warn("Logger not recording. Stop ignored.")
+        self.send_status(dest_mod_id=dest_mod_id)
+
+    def pause_logging(self, name: str, dest_mod_id: int = 0):
+        if name in DataLogger.ALL_SETS:
+            for ds in self.datasets.values():
+                ds.pause()
         else:
-            raise DataCollectionNotConfigured("Ignoring stop logging request.")
+            ds = self.datasets.get(name)
+            if ds is None:
+                raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
 
-        self._recording = False
-        self._paused = False
-        self.send_status()
+            if ds.paused:
+                self.logger.warning(f"Dataset {ds.name} is already paused")
+                return
 
-    def pause_logging(self):
-        if self.collection:
-            self.collection.pause()
-            self.mod.info("Data logging paused.")
-            self._paused = True
+            ds.pause()
+            self.logger.info(f"Pausing dataset: '{ds.name}'")
+
+        self.send_status(dest_mod_id=dest_mod_id)
+
+    def resume_logging(self, name: str, dest_mod_id: int = 0):
+        if name in DataLogger.ALL_SETS:
+            for ds in self.datasets.values():
+                ds.resume()
         else:
-            raise DataCollectionNotConfigured("Ignoring pause logging request.")
+            ds = self.datasets.get(name)
+            if ds is None:
+                raise DatasetNotFound(name, f"Dataset named '{name}' not found.")
 
-    def resume_logging(self):
-        if self.collection:
-            self.collection.resume()
-            self.mod.info("Data logging resumed.")
-            self._paused = False
-        else:
-            raise DataCollectionNotConfigured("Ignoring resume logging request.")
+            if not ds.paused:
+                self.logger.warning(f"Dataset {ds.name} is not paused")
+                return
 
-    def add_data_collection(self, msg: cd.MDF_ADD_DATA_COLLECTION):
-        if self._recording:
-            raise DataCollectionInProgress(
-                "Cannot add data collection while recording in progresss."
-            )
+            ds.resume()
+            self.logger.info(f"Resuming dataset: {ds.name}")
 
-        if self.collection:
-            self.mod.info(f"Closing previous collection: {self.collection.name}")
-            self.collection.close()
-            self.rm_data_collection()
+        self.send_status(dest_mod_id=dest_mod_id)
 
-        self.collection = DataCollection(
-            msg.collection.name,
-            msg.collection.base_path,
-            msg.collection.dir_fmt,
-            self.metadata,
-        )
-        self.mod.info(f"Created data collection: {msg.collection.name}")
-
-        for i in range(msg.collection.num_data_sets):
-            ds = msg.collection.data_sets[i]
-
-            try:
-                self.collection.add_data_set(
-                    DataSet(
-                        collection_name=self.collection.name,
-                        name=ds.name,
-                        sub_dir_fmt=ds.sub_dir_fmt,
-                        file_name_fmt=ds.file_name_fmt,
-                        msg_types=ds.msg_types[:],
-                        formatter_cls=get_formatter(ds.formatter),
-                        subdivide_interval=ds.subdivide_interval,
-                        metadata=self.collection.metadata,
-                    )
-                )
-            except (DataFormatterKeyError, InvalidFormatter, DataSetExistsError) as e:
-                self.mod.error(e.args[0])
-                self.send_error(f"{e.__class__.__name__}:{e.args[0]}")
-                continue
-
-    def add_data_set(self, msg: cd.MDF_ADD_DATA_SET):
-        if self._recording:
-            raise DataCollectionInProgress(
-                "Cannot add data set while recording in progresss."
-            )
-
-        if self.collection is None:
-            raise DataCollectionNotConfigured(
-                "Cannot add data set without setting up a collection first."
-            )
-
-        if msg.collection_name != self.collection.name:
-            DataCollectionNotFound(
-                f"add_data_set: trying to add to an unknown collection: {msg.collection_name}"
-            )
-
-        ds = DataSet(
-            collection_name=self.collection.name,
-            name=msg.data_set.name,
-            sub_dir_fmt=msg.data_set.sub_dir_fmt,
-            file_name_fmt=msg.data_set.file_name_fmt,
-            msg_types=msg.data_set.msg_types[:],
-            formatter_cls=get_formatter(msg.data_set.formatter),
-            subdivide_interval=msg.data_set.subdivide_interval,
-            metadata=self.collection.metadata,
+    def add_dataset(self, msg: cd.MDF_DATASET_ADD, dest_mod_id: int = 0):
+        dataset = DatasetWriter(
+            name=msg.dataset.name,
+            save_path=msg.dataset.save_path,
+            filename=msg.dataset.filename,
+            msg_types=msg.dataset.msg_types[:],
+            formatter=msg.dataset.formatter,
+            subdivide_interval=msg.dataset.subdivide_interval,
         )
 
-        self.collection.add_data_set(ds)
-
-    def rm_data_collection(self):
-        if self._recording:
-            raise DataCollectionInProgress(
-                "Cannot remove collection while recording in progress."
+        if len(self.datasets) == DataLogger.MAX_DATASETS:
+            raise DataLoggerFullError(
+                dataset.name, "Logger has maximum allowed datasets configured."
             )
 
-        if self.collection:
-            self.mod.info(f"Removed data collection: {self.collection.name}")
-            self.collection.close()
-            self.collection = None
-
-    def rm_data_set(self, msg: cd.MDF_REMOVE_DATA_SET):
-        if self._recording:
-            raise DataCollectionInProgress(
-                "Cannot remove data set while recording in progress."
+        if dataset.name in self.datasets.keys():
+            raise DatasetExistsError(
+                dataset.name, f"A dataset with name '{dataset.name}' already exists"
             )
 
-        if self.collection:
-            self.collection.rm_data_set(msg.name)
+        self.datasets[dataset.name] = dataset
+        reply = cd.MDF_DATASET_ADDED()
+        reply.name = dataset.name
+        self.client.send_message(reply, dest_mod_id=dest_mod_id)
 
-    def reset(self):
-        if (c := self.collection) is not None:
-            if self._recording:
-                self.mod.warn("Reset while recording in progress. Stopping collection!")
-                self.stop_logging()
+        self.logger.info(f"Added dataset: '{dataset.name}'")
 
-            self.rm_data_collection()
+    def reset(self, dest_mod_id: int = 0):
+        self.client.info(f"Reset DataLogger. All Datasets will be cleared")
+        rm = []
+        for ds in self.datasets.values():
+            ds.stop()
+            rm.append(ds.name)
 
-        self.metadata.clear()
-        self._recording = False
-        self._paused = False
-        self.mod.info(f"Reset DataLogger. All collection/sets are cleared")
+        for name in rm:
+            self.rm_dataset(name, dest_mod_id=dest_mod_id)
 
-    def update_metadata(self, json_str: str):
-        if self._recording:
-            raise DataCollectionInProgress(
-                "Cannot update metadata while recording in progress."
-            )
-
-        self.metadata.update(json_str)
-
-    def send_error(self, msg: str):
+    def send_error(self, exc: DataLoggerError):
         err = cd.MDF_DATA_LOGGER_ERROR()
-        err.msg = msg
-        self.mod.send_message(err)
+        err.dataset_name = exc.dataset
+        err.exc_type = type(exc).__name__
+        err.msg = exc.msg
+        self.client.send_message(err)
 
     def run(self):
         try:
             self._running = True
             while self._running:
                 try:
-                    msg = self.mod.read_message(0.100)
+                    msg = self.client.read_message(0.100)
                 except UnknownMessageType as e:
-                    self.mod.warn(f"UnknownMessageType: {e.args[0]}")
+                    self.client.warning(f"UnknownMessageType: {e.args[0]}")
                     continue
 
-                if self.collection and self._recording:
-                    self.collection.update(msg)
+                if msg is not None:
+                    try:
+                        dest_mod_id = msg.header.dest_mod_id
+                        match (msg.data.type_id):
+                            case cd.MT_DATASET_START:
+                                self.start_logging(
+                                    cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                                )
+                            case cd.MT_DATASET_STOP:
+                                self.stop_logging(
+                                    cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                                )
+                            case cd.MT_DATASET_PAUSE:
+                                self.pause_logging(
+                                    cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                                )
+                            case cd.MT_DATASET_RESUME:
+                                self.resume_logging(
+                                    cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                                )
+                            case cd.MT_DATASET_ADD:
+                                self.add_dataset(
+                                    cast(cd.MDF_DATASET_ADD, msg.data),
+                                    dest_mod_id=dest_mod_id,
+                                )
+                            case cd.MT_DATASET_REMOVE:
+                                self.rm_dataset(
+                                    cast(str, msg.data.name), dest_mod_id=dest_mod_id
+                                )
+                            case cd.MT_DATA_LOGGER_RESET:
+                                self.reset(dest_mod_id=0)
+                            case cd.MT_DATASET_STATUS_REQUEST:
+                                self.send_status(
+                                    cast(str, msg.data.name),
+                                    dest_mod_id=msg.header.src_mod_id,
+                                )
+                            case cd.MT_DATA_LOGGER_CONFIG_REQUEST:
+                                self.send_config(dest_mod_id=dest_mod_id)
+                            case cd.MT_EXIT:
+                                if msg.header.dest_mod_id == self.client.module_id:
+                                    self._running = False
+                                    self.client.info(
+                                        "Received EXIT request. Closing..."
+                                    )
+                            case cd.MT_LM_EXIT:
+                                self._running = False
+                                self.client.info("Received LM_EXIT request. Closing...")
+                    except DataLoggerError as e:
+                        self.client.error(e.msg)
+                        self.send_error(e)
 
-                if msg is None:
-                    continue
-
-                try:
-                    if msg.type_id == cd.MT_DATA_LOGGER_START:
-                        self.start_logging()
-                    elif msg.type_id == cd.MT_DATA_LOGGER_STOP:
-                        self.stop_logging()
-                    elif msg.type_id == cd.MT_DATA_LOGGER_PAUSE:
-                        self.pause_logging()
-                    elif msg.type_id == cd.MT_DATA_LOGGER_RESUME:
-                        self.resume_logging()
-                    elif msg.type_id == cd.MT_ADD_DATA_COLLECTION:
-                        self.add_data_collection(
-                            cast(cd.MDF_ADD_DATA_COLLECTION, msg.data)
-                        )
-                    elif msg.type_id == cd.MT_ADD_DATA_SET:
-                        self.add_data_set(cast(cd.MDF_ADD_DATA_SET, msg.data))
-                    elif msg.type_id == cd.MT_REMOVE_DATA_COLLECTION:
-                        self.rm_data_collection()
-                    elif msg.type_id == cd.MT_REMOVE_DATA_SET:
-                        self.rm_data_set(cast(cd.MDF_REMOVE_DATA_SET, msg.data))
-                    elif msg.type_id == cd.MT_DATA_LOGGER_RESET:
-                        self.reset()
-                    elif msg.type_id == cd.MT_DATA_LOGGER_STATUS_REQUEST:
-                        self.send_status()
-                    elif msg.type_id == cd.MT_DATA_COLLECTION_CONFIG_REQUEST:
-                        self.send_config()
-                    elif msg.type_id == cd.MT_DATA_LOGGER_METADATA_UPDATE:
-                        self.update_metadata(
-                            cast(cd.MDF_DATA_LOGGER_METADATA_UPDATE, msg.data).json
-                        )
-                    elif msg.type_id == cd.MT_DATA_LOGGER_METADATA_REQUEST:
-                        meta = cd.MDF_DATA_LOGGER_METADATA()
-                        meta.json = self.metadata.to_json()
-                        self.mod.send_message(meta)
-                    elif msg.type_id == cd.MT_EXIT:
-                        if msg.header.dest_mod_id == self.mod.module_id:
-                            self._running = False
-                            self.mod.info("Received EXIT request. Closing...")
-                except DataLoggerError as e:
-                    self.mod.error(e.args[0])
-                    self.send_error(f"{e.__class__.__name__}:{e.args[0]}")
-                    if self._recording:
-                        self.stop_logging()
+                self.update(msg)
 
         except KeyboardInterrupt:
             pass
         finally:
-            if self.collection and self._recording:
-                self.stop_logging()
+            for ds in self.datasets.values():
+                ds.stop()
 
-            self._running = False
+            if self.client.connected:
+                self.client.disconnect()
 
-            if self.collection:
-                self.collection.close()
-
-            if self.mod.connected:
-                self.mod.disconnect()
-            self.mod.info("DataLogger is exiting...")
+            self.client.info("DataLogger is exiting...")

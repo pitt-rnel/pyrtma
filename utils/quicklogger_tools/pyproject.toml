@@ -3,15 +3,13 @@ requires = ["setuptools>=61.0", "packaging"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pyrtma"
-# version defined in pyrtma.__version__.py
+name = "quicklogger_tools"
+# version defined in ql_utils.__version__.py
 authors = [
   { name="David Weir", email="dmw109@pitt.edu" },
   { name="Jeff Weiss", email="jmw182@pitt.edu" },
-  { name="Tyler Madonna", email="tjm159@pitt.edu" },
-  { name="Tyler Simpson", email="tws21@pitt.edu" },
 ]
-description = "A Python client for RTMA/Dragonfly"
+description = "Python utilities for parsing quicklogger binary files"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -22,8 +20,6 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
-  "ruamel.yaml",
-  "websocket-server",
   "rich",
   "black",
   "packaging",
@@ -33,18 +29,12 @@ dependencies = [
 where = ["src"]
 
 [tool.setuptools.dynamic]
-version = {attr = "pyrtma.__version__.__version__"}
+version = {attr = "quicklogger_tools.__version__.__version__"}
 
 [tool.setuptools.package-data]
-pyrtma = ["py.typed", "*.yaml"]
 
 [project.urls]
 "Homepage" = "https://github.com/pitt-rnel/pyrtma"
 "Bug Tracker" = "https://github.com/pitt-rnel/pyrtma/issues"
 
 [project.scripts]
-message_manager = "pyrtma.manager:main"
-web_manager = "pyrtma.web_manager:main"
-rtma_compiler = "pyrtma.compile:main"
-data_logger = "pyrtma.data_logger.__main__:main"
-data_logger_cli = "pyrtma.data_logger.cli:main"
