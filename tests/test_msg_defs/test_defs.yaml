@@ -1801,3 +1801,23 @@ message_defs:
   PUBLISHER_DONE:
     id: 5012
     fields: null
+
+  ARRAY_OF_ONE:
+    id: 5013
+    fields: 
+      u8: uint8[1]
+      u16: uint16[1]
+      u32: uint32[1]
+      u64: uint64[1]
+      i8: int8[1]
+      i16: int16[1]
+      i32: int32[1]
+      i64: int64[1]
+      f32: float[1]
+      f64: double[1]
+      c: char
+      c1: char[1]
+      s2: char[2]
+      b: byte
+      ba: byte[1]
+      sa: VALIDATOR_STRUCT[1]

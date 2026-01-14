@@ -6,7 +6,7 @@ import weakref
 
 from .message import MessageData
 from abc import ABC, abstractmethod
-from .exceptions import ClientError
+from .exceptions import ClientError, LoggingConfigurationError
 
 from typing import Union, Type, Dict, Optional, List
 from contextlib import contextmanager
@@ -149,7 +149,7 @@ class RTMALogger(object):
         self,
         log_name: str,
         rtma_client: ClientLike,
-        level: int = logging.NOTSET,
+        level: int = logging.INFO,
     ):
         # default formatter
         self._default_fmt = "{levelname:<8} - {asctime} - {log_name:<16} - {message} - {funcName}:{lineno}"
@@ -197,6 +197,7 @@ class RTMALogger(object):
         self.critical = self.logger.critical
 
     def __del__(self):
+        return  # below causes error in logger.removeHandler when exiting REPL and is likely unecessary
         if self._console_handler:
             self._logger.removeHandler(self._console_handler)
 
@@ -209,7 +210,8 @@ class RTMALogger(object):
 
         # remove any other handlers
         for handler in self._logger.handlers:
-            self._logger.removeHandler(handler)
+            if handler is not None:
+                self._logger.removeHandler(handler)
 
     @property
     def logger(self) -> logging.Logger:  # read only
@@ -316,6 +318,15 @@ class RTMALogger(object):
     def level(self, value: int):
         self._logger.setLevel(value)
 
+    @property
+    def min_handler_level(self) -> int:
+        """Minimum level of all handlers"""
+        mlevel = None
+        for h in self.logger.handlers:
+            if h.level:
+                mlevel = min(mlevel, h.level) if mlevel else h.level
+        return mlevel if mlevel else 0
+
     def add_child(self, child_name: str) -> logging.Logger:
         child_logger = self._logger.getChild(child_name)
         child_logger.setLevel(self.level)
@@ -352,6 +363,10 @@ class RTMALogger(object):
 
     @log_filename.setter
     def log_filename(self, value: Union[str, pathlib.Path]):
+        if self.file_handler:
+            raise LoggingConfigurationError(
+                "Filename cannot be changed after file handler is initialized"
+            )
         self._log_filename = value
 
     @property
@@ -363,8 +378,10 @@ class RTMALogger(object):
     @console_level.setter
     def console_level(self, value: int):
         if self.console_handler:
-            self.console_handler.level = value
+            self.console_handler.setLevel(value)
         self._console_level = value
+        if value < self.level:
+            self.level = value
 
     @property
     def rtma_level(self) -> int:
@@ -375,8 +392,10 @@ class RTMALogger(object):
     @rtma_level.setter
     def rtma_level(self, value: int):
         if self.rtma_handler:
-            self.rtma_handler.level = value
+            self.rtma_handler.setLevel(value)
         self._rtma_level = value
+        if value < self.level:
+            self.level = value
 
     @property
     def file_level(self) -> int:
@@ -387,8 +406,10 @@ class RTMALogger(object):
     @file_level.setter
     def file_level(self, value: int):
         if self.file_handler:
-            self.file_handler.level = value
+            self.file_handler.setLevel(value)
         self._file_level = value
+        if value < self.level:
+            self.level = value
 
     @property
     def console_formatter(self) -> Optional[logging.Formatter]:

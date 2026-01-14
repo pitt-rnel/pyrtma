@@ -8,8 +8,9 @@ imports:
   - quick_logger.yaml # MTs 54-61, 96
 
 constants:
-  MAX_MODULES: 200
-  DYN_MOD_ID_START: 100
+  MAX_MODULES: 256
+  DYN_MOD_ID_START: 10000
+  MAX_MODULE_ID: 32000
   MAX_HOSTS: 5
   MAX_MESSAGE_TYPES: 10000
   MAX_RTMA_MSG_TYPE: 99
@@ -23,7 +24,6 @@ constants:
   MAX_LOG_LENGTH: 1024
   MESSAGE_TRAFFIC_SIZE: 64
   MAX_MESSAGE_SIZE: 65535
-
 
 string_constants: null
 
@@ -116,59 +116,54 @@ message_defs:
     fields:
       msg_type: MSG_TYPE
 
-  SHUTDOWN_RTMA:
-    id: 17
-    fields: null
-
   MODULE_READY:
     id: 26
     fields:
       pid: int32
 
-  MESSAGE_TRAFFIC:
+  # Test Connection sent at regular interval
+  # to inactive (quiet) clients
+  PING:
+    id: 29
+    fields:
+      uid: int32
+
+  # Test Response
+  PONG:
     id: 30
     fields:
-      seqno: uint32
-      sub_seqno: uint32
-      start_timestamp: double
-      end_timestamp: double
-      msg_type: MSG_TYPE[MESSAGE_TRAFFIC_SIZE]
-      msg_count: uint16[MESSAGE_TRAFFIC_SIZE]
+      uid: int32
 
-  ACTIVE_CLIENTS:
+  # MM will send HELLO message for each connected 
+  # client to the module requesting the introduction
+  INTRODUCE:
     id: 31
-    fields:
-      timestamp: double
-      num_clients: int16
-      padding: int16
-      reserved: int32
-      client_mod_id: MODULE_ID[MAX_ACTIVE_CLIENTS]
-      client_pid: int32[MAX_ACTIVE_CLIENTS]
+    fields: null
     
-  CLIENT_INFO:
+  # Notification message when client joins
+  HELLO:
     id: 32
     fields:
-      addr: char[32]
       uid: int32
       pid: int32
       mod_id: MODULE_ID
-      is_logger: int16
-      is_unique: int16
       port: uint16
+      addr: char[MAX_NAME_LEN]
       name: char[MAX_NAME_LEN]
 
-  CLIENT_CLOSED:
+  # Notification message when client leaves
+  GOODBYE:
     id: 33
     fields:
-      addr: char[32]
       uid: int32
       pid: int32
       mod_id: MODULE_ID
-      is_logger: int16
-      is_unique: int16
       port: uint16
+      addr: char[MAX_NAME_LEN]
       name: char[MAX_NAME_LEN]
 
+  # Support for client naming in two steps
+  # for legacy support
   CLIENT_SET_NAME:
     id: 34
     fields:
@@ -240,13 +235,6 @@ message_defs:
       funcname: char[256] # name of function making log
       message: char[MAX_LOG_LENGTH] # formatted message
 
-  TIMING_MESSAGE:
-    id: 80
-    fields:
-      timing: uint16[MAX_MESSAGE_TYPES]
-      ModulePID: int32[MAX_MODULES]
-      send_time: double
-
   FORCE_DISCONNECT:
     id: 82
     fields:
@@ -261,3 +249,5 @@ message_defs:
     id: 86
     fields:
       msg_type: MSG_TYPE
+
+

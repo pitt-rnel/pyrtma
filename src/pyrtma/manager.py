@@ -115,7 +115,6 @@ class MessageManager(ClientLike):
     RTMA Message Manager server implemented in python.
     """
 
-    TRAFFIC_INTERVAL = 1.0
     INFO_INTERVAL = 5.0
 
     def __init__(
@@ -125,7 +124,6 @@ class MessageManager(ClientLike):
         timecode=False,
         log_level=logging.INFO,
         debug=False,
-        send_msg_timing=True,
     ):
         """MessageManager class
 
@@ -137,7 +135,6 @@ class MessageManager(ClientLike):
             timecode (bool, optional): Flag to use message header with timecode values. Defaults to False.
             log_level (int, optional): logging level, defaults to logging.INFO.
             debug (bool, optional): Flag for debug mode. Defaults to False.
-            send_msg_timing (bool, optional): Flag to send TIMING_MSG. Defaults to True.
         """
         self._keep_running = False
         self.ip_address = ip_address
@@ -151,7 +148,6 @@ class MessageManager(ClientLike):
         self.read_timeout = 0.200
         self.write_timeout = 0  # c++ message manager uses timeout = 0 for all modules except logger modules, which uses -1 (blocking)
         self._debug = debug
-        self.b_send_msg_timing = send_msg_timing
 
         self._logger = RTMALogger(f"message_manager", self, logging.INFO)
         self.logger.set_all_levels(log_level)
@@ -167,24 +163,10 @@ class MessageManager(ClientLike):
         self.listen_socket.listen(socket.SOMAXCONN)
         self.modules: Dict[socket.socket, Module] = {}
         self.logger_modules: Set[Module] = set()
-        self.next_dynamic_mod_id_offset = 0
 
         self.subscriptions: Dict[int, Set[Module]] = defaultdict(set)
         self.sockets = [self.listen_socket]
         self.start_time = time.time()
-
-        # dictionary of message type ids and message counts, reset each time timing_message is sent
-        self.message_counts: typing.Counter[int] = Counter()
-        self.t_last_message_count = time.perf_counter()
-        self.min_timing_message_period = 0.9
-
-        self.last_client_info: float = time.perf_counter()
-        self.sending_traffic: ContextVar[bool] = ContextVar(
-            "sending_traffic", default=False
-        )
-        self.traffic_counter: typing.Counter[int] = Counter()
-        self.traffic_start: float = time.perf_counter()
-        self.traffic_seqno: int = 1
 
         # Disable Nagle Algorithm
         self.listen_socket.setsockopt(
@@ -226,12 +208,6 @@ class MessageManager(ClientLike):
     def logger(self) -> RTMALogger:
         return self._logger
 
-    @contextmanager
-    def sending_traffic_ctx(self):
-        token = self.sending_traffic.set(True)
-        yield
-        self.sending_traffic.reset(token)
-
     def generate_uid(self) -> int:
         self._uid += 1
         return self._uid
@@ -247,13 +223,7 @@ class MessageManager(ClientLike):
         """
         current_ids = [mod.mod_id for mod in self.modules.values()]
 
-        MAX_DYN_IDS = cd.MAX_MODULES - cd.DYN_MOD_ID_START
-        for i in range(0, MAX_DYN_IDS):
-            mod_id = self.next_dynamic_mod_id_offset + cd.DYN_MOD_ID_START
-            self.next_dynamic_mod_id_offset += 1
-            if self.next_dynamic_mod_id_offset == MAX_DYN_IDS:
-                self.next_dynamic_mod_id_offset = 0
-
+        for mod_id in range(cd.DYN_MOD_ID_START, cd.MAX_MODULE_ID):
             # check if mod id is already used, if it is, continue looping until we find an unused one
             if mod_id not in current_ids:
                 return mod_id
@@ -363,7 +333,7 @@ class MessageManager(ClientLike):
         # Drop from our module mapping
         module.close()
 
-        self.send_client_close(module)
+        self.send_goodbye(module)
         del self.modules[module.conn]
 
     def disconnect_module(self, src_module: Module):
@@ -537,18 +507,11 @@ class MessageManager(ClientLike):
 
         src_name = src_module.name or f"Module({src_module.mod_id})"
 
-        # Increment message counts
-        # Note: skip traffic count if we are currently forwarding out traffic messages)
-        if not self.sending_traffic.get():
-            if self.b_send_msg_timing:
-                self.message_counts[header.msg_type] += 1
-            self.traffic_counter[header.msg_type] += 1
-
         dest_mod_id = header.dest_mod_id
         dest_host_id = header.dest_host_id
 
         # Verify that the module & host ids are valid
-        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULES:
+        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULE_ID:
             self.logger.error(
                 f"MessageManager::forward_message: Got invalid dest_mod_id [{dest_mod_id}] from {src_name}"
             )
@@ -727,115 +690,56 @@ class MessageManager(ClientLike):
         # send to logger modules AND modules subscribed to FAILED_MESSAGE
         self.forward_message(self.mm_module, out_header, data)
 
-    def send_timing_message(self):
-        """Send TIMING_MESSAGE"""
-        data = cd.MDF_TIMING_MESSAGE()
-        for mt, count in self.message_counts.items():
-            data.timing[mt] = count
-        self.message_counts.clear()
-
-        for mod in self.modules.values():
-            data.ModulePID[mod.mod_id] = mod.pid
-
-        data.send_time = time.perf_counter()
-        with self.sending_traffic_ctx():
-            self.send_message(data)
-
-    def send_traffic(self):
-        """Send MESSAGE_TRAFFIC"""
-        with self.sending_traffic_ctx():
-            self.logger.debug("MESSAGE_TRAFFIC")
-            data = cd.MDF_MESSAGE_TRAFFIC()
-            now = time.perf_counter()
-            sub_seqno = 1
-            nsent = 0
-            i = -1
-            for n, (mt, count) in enumerate(self.traffic_counter.items()):
-                data.seqno = self.traffic_seqno
-                data.sub_seqno = sub_seqno
-                data.start_timestamp = self.traffic_start
-                data.end_timestamp = now
-
-                i = n % cd.MESSAGE_TRAFFIC_SIZE
-                data.msg_type[i] = mt
-                data.msg_count[i] = count
-
-                if (n % cd.MESSAGE_TRAFFIC_SIZE) == 0:
-                    nsent = n
-                    self.send_message(data)
-                    sub_seqno += 1
-
-            # Send any remaining
-            if i >= 0:
-                i += 1
-                if nsent < len(self.traffic_counter):
-                    data.msg_type[i:] = [-1 for _ in range(cd.MESSAGE_TRAFFIC_SIZE - i)]
-                    self.send_message(data)
-
-        self.traffic_counter.clear()
-        self.traffic_start = now
-        self.traffic_seqno += 1
-
-    def send_client_close(self, module: Module):
-        """Send CLIENT_CLOSED
+    def send_goodbye(self, module: Module):
+        """Send GOODBYE
 
         Args:
             module (Module): Closed module object
         """
-        self.logger.debug("CLIENT_CLOSE")
-        msg = cd.MDF_CLIENT_CLOSED()
+        self.logger.debug("GOODBYE")
+        msg = cd.MDF_GOODBYE()
         msg.uid = module.uid
         msg.pid = module.pid
         msg.mod_id = module.mod_id
-        msg.is_logger = module.is_logger
-        msg.is_unique = module.unique
         msg.port = module.port
         msg.name = module.name
         msg.addr = module.addr
         self.send_message(msg)
 
-    def send_client_info(self, module: Module):
-        """Send CLIENT_INFO
+    def send_hello(self, module: Module, dest_mod_id: int = 0):
+        """Send HELLO
 
         Args:
             module (Module): Module object to send info for
         """
-        self.logger.debug("CLIENT_INFO")
-        msg = cd.MDF_CLIENT_INFO()
+        self.logger.debug("HELLO")
+        msg = cd.MDF_HELLO()
         msg.uid = module.uid
         msg.pid = module.pid
         msg.mod_id = module.mod_id
-        msg.is_logger = module.is_logger
-        msg.is_unique = module.unique
         msg.port = module.port
         msg.name = module.name
         msg.addr = module.addr
-        self.send_message(msg)
+        self.send_message(msg, dest_mod_id=dest_mod_id)
 
-    def send_active_clients(self):
-        """Send ACTIVE_CLIENTS"""
-        self.logger.debug("ACTIVE_CLIENTS")
-        msg = cd.MDF_ACTIVE_CLIENTS()
-        msg.timestamp = time.perf_counter()
+    def send_introductions(self, dest_module: Module):
+        self.logger.info(f"INTRODUCE -> {dest_module.name}")
+        for module in self.modules.values():
+            self.send_hello(module, dest_mod_id=dest_module.mod_id)
 
-        for i, (sock, module) in enumerate(self.modules.items()):
-            # if sock == self.listen_socket:
-            #     continue
-            msg.client_mod_id[i] = module.mod_id
-            msg.client_pid[i] = module.pid
-            self.send_client_info(module)
-
-        msg.num_clients = len(self.modules) - 1
-        self.send_message(msg)
-        self.last_client_info = msg.timestamp
-
-    def decode_core_message(self, hdr: MessageHeader) -> Message:
+    def decode_core_message(
+        self, src_module: Module, hdr: MessageHeader
+    ) -> Union[Message, None]:
         data_cls = _get_core_defs().get(hdr.msg_type)
         if data_cls:
             data = data_cls.from_buffer(self.data_buffer)
             return Message(hdr, data)
         else:
-            raise RuntimeError(f"Unknown core_def MT={hdr.msg_type}")
+            self.logger.critical(
+                f"Unknown core_def MT={hdr.msg_type} received from {src_module.name}"
+            )
+            self.remove_module(src_module)
+            return None
 
     def process_core_message(self, src_module: Module, header: MessageHeader):
         """Process incoming core message
@@ -845,17 +749,18 @@ class MessageManager(ClientLike):
             header (MessageHeader): Message header of the incoming message
         """
         msg_type = header.msg_type
-        if msg_type >= 100 or msg_type == 91:
-            # 91 is legacy MT_DEBUG_TEXT, incompatible with pyrtma but sent by legacy QL
-            # TODO deprecate when switching to new data_logger
+        if msg_type >= 100 or msg_type == cd.MT_DEBUG_TEXT:
+            # NOTE: DEBUG_TEXT is unsupported legacy STRING_DATA type
             return
 
-        core_msg = self.decode_core_message(header)
+        core_msg = self.decode_core_message(src_module, header)
+        if core_msg is None:
+            return
 
         if msg_type == cd.MT_CONNECT or msg_type == cd.MT_CONNECT_V2:
             if self.connect_module(src_module, core_msg):
                 self.send_ack(src_module)
-                self.send_client_info(src_module)
+                self.send_hello(src_module)
                 if msg_type == cd.MT_CONNECT:
                     self.logger.info(f"CONNECT - {src_module!s}")
                 else:
@@ -877,10 +782,12 @@ class MessageManager(ClientLike):
             self.send_ack(src_module)
         elif msg_type == cd.MT_CLIENT_SET_NAME:
             self.set_module_name(src_module, core_msg)
-            self.send_client_info(src_module)
+            self.send_hello(src_module)
         elif msg_type == cd.MT_MODULE_READY:
             self.register_module_ready(src_module, core_msg)
-            self.send_client_info(src_module)
+            self.send_hello(src_module)
+        elif msg_type == cd.MT_INTRODUCE:
+            self.send_introductions(src_module)
 
     def process_message(self, src_module: Module, header: MessageHeader):
         """Process incoming message
@@ -959,22 +866,6 @@ class MessageManager(ClientLike):
                                 if msg_hdr:
                                     self.process_message(src, msg_hdr)
 
-                    now = time.perf_counter()
-
-                    if (
-                        self.b_send_msg_timing
-                        and (now - self.t_last_message_count)
-                        > self.min_timing_message_period
-                    ):
-                        self.send_timing_message()
-                        self.t_last_message_count = now
-
-                    if (now - self.traffic_start) > self.TRAFFIC_INTERVAL:
-                        self.send_traffic()
-
-                    if (now - self.last_client_info) > self.INFO_INTERVAL:
-                        self.send_active_clients()
-
         except KeyboardInterrupt:
             self.logger.info("Stopping Message Manager")
         finally:
@@ -1005,12 +896,7 @@ def main():
     parser.add_argument(
         "-t", "--timecode", action="store_true", help="Use timecode in message header"
     )
-    parser.add_argument(
-        "-T",
-        "--disable_timing_msg",
-        action="store_true",
-        help="Disable sending of TIMING_MESSAGE",
-    )
+
     args = parser.parse_args()
 
     if args.addr:  # a non-empty host address was passed in.
@@ -1037,7 +923,6 @@ def main():
             timecode=args.timecode,
             log_level=level,
             debug=args.debug,
-            send_msg_timing=(not args.disable_timing_msg),
         )
 
         msg_mgr.run()

@@ -208,7 +208,7 @@ class Client(ClientLike):
         msg2.name = self.name
 
         self.send_message(msg2)
-        self.send_message(msg)
+        # self.send_message(msg)
         ack_msg = self._wait_for_acknowledgement()
 
         # save own module ID from ACK if asked to be assigned dynamic ID
@@ -264,9 +264,6 @@ class Client(ClientLike):
         self._socket_connect(server_name)
 
         ack = self._connect_helper(logger_status, daemon_status, allow_multiple)
-
-        # Send client pid
-        self.send_module_ready()
 
     def disconnect(self):
         """Disconnect from message manager server"""
