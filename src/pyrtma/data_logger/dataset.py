@@ -11,7 +11,6 @@ from pyrtma.exceptions import UnknownMessageType
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Dict, Any, ClassVar, cast
 
-
 if TYPE_CHECKING:
     from _typeshed import StrPath
 
