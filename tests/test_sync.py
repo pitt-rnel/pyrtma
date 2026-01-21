@@ -41,12 +41,12 @@ class TestSync(unittest.TestCase):
     def test_version_mismatch(self):
         with client_context(server_name=self.addr) as publisher:
             with client_context(
-                server_name=self.addr, msg_list=[td.MT_SET_START]
+                server_name=self.addr, msg_list=[td.MT_TEST_START]
             ) as subscriber:
                 time.sleep(0.250)
 
                 header = MessageHeader()
-                header.msg_type = td.MT_SET_START
+                header.msg_type = td.MT_TEST_START
                 header.msg_count = 1
                 header.send_time = time.perf_counter()
                 header.num_data_bytes = 0
@@ -54,7 +54,7 @@ class TestSync(unittest.TestCase):
                 # Change the version to create a mismatch between sender and receiver
                 header.version = 0xDEADBEEF
 
-                publisher.forward_message(header, td.MDF_SET_START())
+                publisher.forward_message(header, td.MDF_TEST_START())
 
                 with self.assertRaises(pyrtma.message.InvalidMessageDefinition):
                     msg = subscriber.read_message(timeout=0.100, sync_check=True)
@@ -62,17 +62,17 @@ class TestSync(unittest.TestCase):
     def test_size_mismatch(self):
         with client_context(server_name=self.addr) as publisher:
             with client_context(
-                server_name=self.addr, msg_list=[td.MT_SET_START]
+                server_name=self.addr, msg_list=[td.MT_TEST_START]
             ) as subscriber:
                 time.sleep(0.250)
 
                 header = MessageHeader()
-                header.msg_type = td.MT_SET_START
+                header.msg_type = td.MT_TEST_START
                 header.msg_count = 1
                 header.send_time = time.perf_counter()
 
                 # Create a size mismatch between sender and receiver
-                data = td.MDF_TRIAL_METADATA()
+                data = td.MDF_TEST_METADATA()
                 header.num_data_bytes = data.type_size
 
                 publisher.forward_message(header, data)
