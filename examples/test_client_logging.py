@@ -1,6 +1,7 @@
 import pyrtma
 import time
-from logging import DEBUG
+from logging import DEBUG, INFO, WARNING
+from pyrtma.exceptions import LoggingConfigurationError
 
 
 def warning_test_subfun(client: pyrtma.Client):
@@ -26,21 +27,44 @@ def exception_test(client: pyrtma.Client):
         with client.logger.exception_logging_context():
             try:
                 raise RuntimeError("This error is caught and should not be logged")
-            except Exception:
+            except RuntimeError:
                 pass
-            raise RuntimeError(f"This error should be logged")
+            raise RuntimeError(
+                f"This error should be logged but, tests should continue"
+            )
     except Exception:
-        pass  # let our test continue, catching outside of of with: logs the last error
+        pass  # let our test continue, catching outside of with: logs the last error
 
 
 if __name__ == "__main__":
     with pyrtma.client_context(name="logging_test") as client:
 
-        # enable log file (console and RTMA logs enabled by default)
+        client.info(f"Initial log level is: {client.logger.level}")
+        client.logger.set_all_levels(WARNING)
+        client.warning(
+            f"After setting all levels to WARNING ({WARNING}) log level is {client.logger.level}"
+        )
+        client.logger.rtma_level = INFO
+        client.logger.console_level = INFO
+        client.info(
+            f"After setting rtma and console handlers to INFO ({INFO}) log level is {client.logger.level}"
+        )
+
+        # enable log file (console and RTMA logs enabled by default), set to DEBUG
         client.logger.log_filename = "client_log_test.log"
+        client.logger.file_level = DEBUG
         client.logger.enable_file = True
+        client.logger.info(
+            f"After setting file handler level to DEBUG {DEBUG} log level is {client.logger.level}"
+        )
 
         client.info("Initialized logger, have not connected to RTMA yet")
+
+        try:
+            client.logger.log_filename = "bogus.log"
+        except LoggingConfigurationError:
+            client.warning("You cannot change the log filename after initializing it")
+
         time.sleep(1)
 
         client.connect()
@@ -69,4 +93,6 @@ if __name__ == "__main__":
         time.sleep(0.5)
 
         with client.logger.exception_logging_context():
-            raise RuntimeError(f"But this last error will crash it all")
+            raise RuntimeError(
+                f"This last error should be logged before crashing it all"
+            )

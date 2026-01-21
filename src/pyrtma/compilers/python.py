@@ -113,7 +113,11 @@ class PyDefCompiler:
         if ftype in type_map.keys():
             dtype = desctype_map[ftype]
             # Scalar Field
-            if flen <= 1:
+            if flen == 0:
+                return f":{dtype} = {dtype}()"
+            elif flen == 1 and ftype == "char":
+                # Note: char[1] will resolve to a scalar char field
+                # We only allow char arrays with length greater than 1
                 return f":{dtype} = {dtype}()"
 
             # Array Field
