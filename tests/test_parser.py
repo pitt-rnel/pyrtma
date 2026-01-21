@@ -620,38 +620,32 @@ class TestParser(unittest.TestCase):
             self.parser.parse(self.tmp.path)
 
     def test_prefix_fields(self):
-        text = textwrap.dedent(
-            """
+        text = textwrap.dedent("""
             message_defs:
                 A:
                     id: 1001
                     fields:
                         _bad_prefix: int
-            """
-        )
+            """)
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent(
-            """
+        text = textwrap.dedent("""
             message_defs:
                 A:
                     id: 1001
                     fields:
                         9bad_prefix: int
-            """
-        )
+            """)
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent(
-            """
+        text = textwrap.dedent("""
             constants:
                 _bad_prefix: 10
-            """
-        )
+            """)
 
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
