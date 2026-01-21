@@ -3,7 +3,6 @@ from pyrtma.context import get_context
 import timeit
 import statistics
 
-
 # Import message defs to add to pyrtma.msg_defs map
 from .test_msg_defs.test_defs import *
 

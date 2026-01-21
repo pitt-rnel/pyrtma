@@ -873,7 +873,7 @@ class MessageManager(ClientLike):
                     if len(rlist) > 0:
                         try:
                             rlist.remove(self.listen_socket)
-                            (conn, address) = self.listen_socket.accept()
+                            conn, address = self.listen_socket.accept()
                             self.logger.info(
                                 f"New connection accepted from {address[0]}:{address[1]}"
                             )
