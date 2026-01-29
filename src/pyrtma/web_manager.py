@@ -140,6 +140,11 @@ class RTMAWebSocketHandler(WebSocketHandler):
             bool(msg.data.daemon_status),
             allow_multiple=False,
         )
+
+        # We manually send the module ready message since
+        # bypass the normal Client.connect() method
+        self.proxy.send_module_ready()
+
         # forward ack
         # Pass message thru websocket as json
         if self.ws_ready_to_send:
@@ -165,6 +170,11 @@ class RTMAWebSocketHandler(WebSocketHandler):
             bool(msg.data.daemon_status),
             bool(msg.data.allow_multiple),  # TODO add CONNECT_V2 support to rtma-js
         )
+
+        # We manually send the module ready message since
+        # bypass the normal Client.connect() method
+        self.proxy.send_module_ready()
+
         # forward ack
         # Pass message thru websocket as json
         if self.ws_ready_to_send:
@@ -172,6 +182,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
                 f"Forwarding ACK from connect to ws. Mod ID = {self.proxy.module_id}"
             )
             self.send_message(ack_msg.to_json(minify=True))
+
         else:
             self.send_failed_message(ack_msg.header, time.perf_counter())
             logger.warning(
