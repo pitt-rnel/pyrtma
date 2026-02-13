@@ -39,6 +39,57 @@ except AttributeError:
     # changed from inf to maxsize to maintain int type
     MAX_MESSAGE_TYPES = sys.maxsize
 
+import os
+import re
+from typing import Optional
+
+
+def expand_env_variables(input_string: str) -> str:
+    """
+    Expand environment variables in a string using ${VAR_NAME} syntax.
+
+    Detects ${VAR_NAME} patterns, looks up the variable value from os.environ,
+    validates it's a string, and replaces the syntax with the value.
+
+    Args:
+        input_string: A string that may contain ${VAR_NAME} patterns
+
+    Returns:
+        The expanded string with environment variables replaced
+
+    Raises:
+        ValueError: If an environment variable is referenced but not found
+
+    Examples:
+        >>> os.environ['MY_PROJECT'] = '/home/user/myproject'
+        >>> expand_env_variables('C:/${MY_PROJECT}/path/to/file')
+        'C:/home/user/myproject/path/to/file'
+    """
+    # Pattern to find ${VAR_NAME} - matches word characters only
+    pattern = r"\$\{(?P<name>\w+)\}"
+
+    def replace_var(match):
+        var_name = match.group("name")
+
+        # Get the environment variable
+        value = os.environ.get(var_name)
+
+        if value is None:
+            raise ValueError(f"Environment variable '{var_name}' not found")
+
+        # Verify it's a string
+        if not isinstance(value, str):
+            raise ValueError(
+                f"Environment variable '{var_name}' is not a string, "
+                f"got {type(value).__name__}"
+            )
+
+        return value
+
+    # Replace all ${VAR_NAME} patterns with their values
+    expanded = re.sub(pattern, replace_var, input_string)
+    return expanded
+
 
 @dataclass
 class NativeType:
@@ -115,6 +166,12 @@ class DuplicateNameError(ParserError):
     pass
 
 
+class DuplicateFileError(ParserError):
+    """Raised when the a file is already in use"""
+
+    pass
+
+
 class MessageIDError(ParserError):
     """Raised when the a message id is already in use"""
 
@@ -164,6 +221,21 @@ class InvalidMessageSize(ParserError):
 
 
 @dataclass
+class CompilerOptions:
+    import_coredefs: bool = True
+    validate_alignment: bool = True
+    auto_pad: bool = True
+    project_root: Optional[str] = None
+
+
+@dataclass
+class MsgDefsFile:
+    name: str
+    value: str
+    file: pathlib.Path
+
+
+@dataclass
 class Metadata:
     name: str
     value: Union[int, float, bool, str]
@@ -171,14 +243,8 @@ class Metadata:
 
 
 @dataclass
-class CompilerOptions:
-    name: str
-    value: Union[int, float, bool, str]
-    src: pathlib.Path
-
-
-@dataclass
 class Import:
+    name: str
     file: pathlib.Path
     src: pathlib.Path
 
@@ -336,9 +402,6 @@ class Parser:
     def __init__(
         self,
         debug: bool = False,
-        validate_alignment: bool = True,
-        auto_pad: bool = True,
-        import_coredefs: bool = True,
     ):
         """Parser class
 
@@ -351,14 +414,8 @@ class Parser:
         self.debug = debug
         Parser._instance_count += 1
 
-        # compiler options
-        self.validate_alignment = validate_alignment
-        self.auto_pad = auto_pad
-        self.import_coredefs = import_coredefs
-
         self.yaml_dict: Dict[str, Dict[str, Any]] = dict(
             metadata={},
-            compiler_options={},
             imports={},
             constants={},
             string_constants={},
@@ -369,8 +426,11 @@ class Parser:
             message_defs={},
         )
 
+        # Compiler File Data:
+        self.index: Dict[str, MsgDefsFile] = {}
+        self.compiler_options = CompilerOptions()
+
         self.metadata: Dict[str, Metadata] = {}
-        self.compiler_options: Dict[str, CompilerOptions] = {}
         self.imports: List[Import] = []
         self.constants: Dict[str, ConstantExpr] = {}
         self.string_constants: Dict[str, ConstantString] = {}
@@ -400,6 +460,22 @@ class Parser:
         with open(reserved_file, "r") as f:
             self.reserved_field_names = json.load(f)
 
+    @property
+    def import_coredefs(self) -> bool:
+        return self.compiler_options.import_coredefs
+
+    @property
+    def auto_pad(self) -> bool:
+        return self.compiler_options.auto_pad
+
+    @property
+    def validate_alignment(self) -> bool:
+        return self.compiler_options.validate_alignment
+
+    @property
+    def project_root(self) -> Optional[str]:
+        return self.compiler_options.project_root
+
     def warning(self, msg: str):
         self.logger.warning(msg)
 
@@ -407,7 +483,6 @@ class Parser:
         self.current_file = pathlib.Path()
         self.yaml_dict = dict(
             metadata={},
-            compiler_options={},
             imports={},
             constants={},
             string_constants={},
@@ -417,9 +492,11 @@ class Parser:
             struct_defs={},
             message_defs={},
         )
+        self.compiler_options = CompilerOptions()
+        self.index = {}
+
         self.included_files = []
         self.metadata = {}
-        self.compiler_options = {}
         self.imports = []
         self.constants = {}
         self.string_constants = {}
@@ -486,7 +563,14 @@ class Parser:
         return expanded, value
 
     def handle_import(self, fname: str):
-        imp = Import(pathlib.Path(fname), src=self.trim_root(self.current_file))
+        if fname not in self.index.keys():
+            raise RTMASyntaxError(
+                f"The name '{fname}' was not found in the compiler defs file index."
+            )
+
+        msgdefs = self.index[fname]
+        imp = Import(fname, msgdefs.file, src=self.current_file)
+
         self.imports.append(imp)
         if imp.file.is_dir():
             raise FileFormatError(
@@ -522,17 +606,10 @@ class Parser:
 
     def handle_compiler_options(self, name: str, value: Union[int, float, bool, str]):
         self.check_name(name)
-        self.check_duplicate_name(
-            "compiler_options",
-            name,
-            namespaces=("compiler_options",),
-        )
-
-        self.compiler_options[name] = CompilerOptions(
-            name,
-            value,
-            src=self.trim_root(self.current_file),
-        )
+        try:
+            setattr(self.compiler_options, name, value)
+        except AttributeError:
+            raise RTMASyntaxError(f"Unknown compiler option: {name}")
 
     def handle_expression(self, name: str, expression: Union[int, float, str]):
         self.check_name(name)
@@ -1208,24 +1285,6 @@ class Parser:
             name = f"RESERVED_{id:06d}"
             self.handle_signal(name, dict(id=id, fields=None))
 
-    def parse_options_text(self, text: str):
-        # parse compiler options from root file
-        self.check_key_value_separation(text)
-
-        # Parse the yaml file
-        try:
-            yaml = YAML(typ="safe", pure=True)  # typ="unsafe", pure=True)
-            data = yaml.load(text)
-        except Exception as e:
-            raise YAMLSyntaxError(
-                f"Error encountered by YAML parser in {self.current_file}"
-            ) from e
-
-        if data.get("compiler_options") is not None:
-            for name, value in data["compiler_options"].items():
-                self.handle_compiler_options(name, value)
-            self.yaml_dict["compiler_options"].update(data["compiler_options"])
-
     def parse_text(self, text: str):
         self.check_key_value_separation(text)
 
@@ -1240,7 +1299,6 @@ class Parser:
 
         valid_sections = (
             "metadata",
-            "compiler_options",
             "imports",
             "constants",
             "string_constants",
@@ -1269,7 +1327,7 @@ class Parser:
                     self.handle_import(imp)
             else:
                 raise RTMASyntaxError(
-                    f"Imports must be a list of paths in message defs file -> {self.current_file}."
+                    f"Imports must be a list of names referring to the message defs file index -> {self.current_file}."
                 )
 
         if data.get("constants") is not None:
@@ -1320,55 +1378,98 @@ class Parser:
                         f"Key-Value pairs must be separated with a ':' followed by a space. Add a space after the colon.\n{self.current_file}: line {n}\n{line}"
                     )
 
-    def parse_compiler_options(
-        self, msgdefs_file: os.PathLike
-    ) -> Dict[str, CompilerOptions]:
+    def parse_compiler_file(self, defs_file: os.PathLike):
+        self.defs_path = pathlib.Path(defs_file)
+        self.logger.info(f"Parsing Compiler Defs File-> {self.defs_path.absolute()}")
+
+        with open(self.defs_path, "rt") as f:
+            text = f.read()
+
+        self.check_key_value_separation(text)
+
+        # Parse the yaml file
+        try:
+            yaml = YAML(typ="safe")  # typ="unsafe", pure=True)
+            data = yaml.load(text)
+        except Exception as e:
+            raise YAMLSyntaxError(
+                f"Error encountered by YAML parser in {self.current_file}"
+            ) from e
+
+        valid_sections = (
+            "compiler_options",
+            "index",
+        )
+
+        # Check file format
+        for section in data.keys():
+            if section not in valid_sections:
+                raise RTMASyntaxError(
+                    f"Invalid top-level section '{section}' in compiler defs file -> {self.defs_path}."
+                )
+
+        if data.get("compiler_options") is not None:
+            for name, value in data["compiler_options"].items():
+                self.handle_compiler_options(name, value)
+
+        if data.get("index") is not None:
+            for name, value in data["index"].items():
+                self.handle_index(name, value)
+
+    def handle_index(self, name: str, value: str):
+        if name in self.index:
+            raise DuplicateNameError(
+                f"Duplicate entry for {name} in compiler defs file -> {self.defs_path}."
+            )
+
+        expanded = expand_env_variables(value)
+
+        msgdefs_path = pathlib.Path(expanded)
+        if not msgdefs_path.is_absolute():
+            msgdefs_path = self.defs_path.parent.absolute() / msgdefs_path
+
+        if not msgdefs_path.is_file() or not msgdefs_path.exists():
+            raise FileNotFoundError(
+                f"Message definition file for entry: '{name}' not found at: {msgdefs_path}"
+            )
+
+        for other in self.index.values():
+            if other.file == msgdefs_path:
+                raise DuplicateNameError(
+                    f"Duplicate message definition file in compiler defs file for {name} and {other.name}-> {msgdefs_path}."
+                )
+
+        self.index[name] = MsgDefsFile(name, value, msgdefs_path)
+
+    def parse(self, defs_file: os.PathLike):
         # Get the current pwd
         cwd = pathlib.Path.cwd()
+
+        # Extract the paths to the message definitions
+        self.parse_compiler_file(defs_file)
+
+        if self.import_coredefs:
+            pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
+            core_defs = pkg_dir / "core_defs/rtma.defs"
+            if "core" in self.index:
+                raise RTMASyntaxError("The name 'core' is reserved for internal use")
+            self.index["core"] = MsgDefsFile("core", str(core_defs), core_defs)
+
         try:
-            # first parse compiler options
-            defs_path = pathlib.Path(msgdefs_file)
-            self.root_path = defs_path.parent.resolve()
-            self.parse_options(defs_path)
+            for msgdefs in self.index.values():
+                self.parse_file(msgdefs.file)
         except Exception as e:
             self.clear()
             raise
         finally:
             os.chdir(str(cwd.absolute()))
-        return self.compiler_options
 
-    def parse(self, msgdefs_file: os.PathLike):
-        # Get the current pwd
-        cwd = pathlib.Path.cwd()
-        try:
-            if self.import_coredefs:
-                # Parse the core_defs.yaml file first
-                pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
-                core_defs = pkg_dir / "core_defs/core_defs.yaml"
-                self.root_path = pkg_dir
-                self.parse_file(core_defs.absolute())
-
-            defs_path = pathlib.Path(msgdefs_file)
-            self.root_path = defs_path.parent.resolve()
-            self.parse_file(defs_path)
-        except Exception as e:
-            self.clear()
-            raise
-        finally:
-            os.chdir(str(cwd.absolute()))
-
-    def parse_file(self, msgdefs_file: pathlib.Path):
-        # Change the working directory
-        cwd = pathlib.Path.cwd()
-        msgdefs_path = (cwd / msgdefs_file).resolve()
-        os.chdir(str(msgdefs_path.parent.absolute()))
-
+    def parse_file(self, msgdefs_path: pathlib.Path):
         # check previously included files
         if any((msgdefs_path == f for f in self.included_files)):
             self.logger.debug(
                 f"Skipping -> {msgdefs_path.absolute()} already parsed..."
             )
-            os.chdir(str(cwd.absolute()))
             return
 
         self.logger.info(f"Parsing -> {msgdefs_path.absolute()}")
@@ -1391,36 +1492,6 @@ class Parser:
 
         self.parse_text(text)
         self.current_file = prev_file
-
-        os.chdir(str(cwd.absolute()))
-
-    def parse_options(self, msgdefs_file: pathlib.Path):
-        # Change the working directory
-        cwd = pathlib.Path.cwd()
-        msgdefs_path = (cwd / msgdefs_file).resolve()
-        os.chdir(str(msgdefs_path.parent.absolute()))
-
-        self.logger.info(f"Parsing Compiler Options-> {msgdefs_path.absolute()}")
-        prev_file = self.current_file
-        self.current_file = msgdefs_path.absolute()
-
-        try:
-            with open(msgdefs_path, "rt") as f:
-                text = f.read()
-        except FileNotFoundError as e:
-            alt_ext = ".yaml" if msgdefs_path.suffix == ".yml" else ".yml"
-            alt_path = msgdefs_path.parent / (msgdefs_path.stem + alt_ext)
-            if alt_path.is_file() and alt_path.exists():
-                detail = f"\n\nCheck file extension -> Did you mean {alt_path}?"
-            else:
-                detail = ""
-            e.args = tuple([*e.args, msgdefs_path.absolute(), detail])
-            raise e
-
-        self.parse_options_text(text)
-        self.current_file = prev_file
-
-        os.chdir(str(cwd.absolute()))
 
     def trim_root(self, p: pathlib.Path) -> pathlib.Path:
         return pathlib.Path(os.path.relpath(p, self.root_path))
