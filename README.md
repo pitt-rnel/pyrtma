@@ -137,14 +137,31 @@ message_defs:
         id: [1000, 1002 - 1008, 1009 to 1012]
 ```
 
-Run the following command to compile the yaml file into Python, C, Matlab, or Javascript files. This will output a message.(py|h|m|js) file.
+### Compile Message Definitions
+
+Create a compiler file as input to the rtma compiler.  
+
+The format is `yaml`, but the `.defs` ext can be used to differentiate from message definition files if desired. There are special compiler options that can be set here for advanced usage. The `compiler_options` table can be skipped for default and recommended behavior.  You must create an `index` table.  This index maps a name to the location of a message definitions file on your system. The names given in the index can be referenced in the `import` table of message definition files if there are dependencies between files.  Environment variables can be used to specify the message definitions path using the `${VAR}` syntax.  If the given path is not absolute, it will be considered relative to the compiler file root directory.
+
+```yaml
+compiler_options:
+  import_coredefs: True         # Auto-import of rtma.defs
+  validate_alignment: true      # 64-bit alignment validation
+  auto_pad: true                # 64-bit alignment auto-padding
+
+# Index of message defs files to include in your system
+index: 
+  example: example_messages.yaml
+```
+
+Run the following command to compile your definitions into Python, C, Matlab, or Javascript files. This will output a message.(py|h|m|js) file.
 
 ```shell
-python -m pyrtma.compile -i examples/msg_defs/message.yaml --py --c --mat --js
+python -m pyrtma.compile -i examples/msg_defs/example.defs --py --c --mat --js
 ```
 or
 ```shell
-rtma_compiler -i examples/msg_defs/message.yaml --py --c --mat --js
+rtma_compiler -i examples/msg_defs/example.defs --py --c --mat --js
 ```
 
 The msg_defs directory should now have message def files created for each language.
@@ -161,7 +178,7 @@ See [`/examples/example.py`](https://github.com/pitt-rnel/pyrtma/blob/master/exa
 Compile the example message defintions:
 
 ```shell
-python -m pyrtma.compile -i ./examples/msg_defs/message.yaml --py
+python -m pyrtma.compile -i ./examples/msg_defs/example.defs --py
 ```
 
 Start the demo MessageManager server
