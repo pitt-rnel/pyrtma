@@ -57,13 +57,13 @@ def compile(
             "V1 message def .h compiler is deprecated and has been replaced by the V2 yaml compiler.",
             FutureWarning,
         )
-    elif file1_ext.lower() in [".defs", "yml", "yaml"]:
+    elif file1_ext.lower().endswith((".defs", ".yml", ".yaml")):
         compiler_version = 2
         if len(defs_files) > 1:
             raise FileFormatError("defs_file must be a single .defs file")
     else:
         raise FileFormatError(
-            "Unexpected file type. Compiler defs_file must be a (.defs, yaml, yml) file."
+            "Unexpected file type. Compiler defs_file must be a (.defs, .yaml, .yml) file."
         )
 
     if compiler_version == 1:
