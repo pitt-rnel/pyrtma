@@ -1405,7 +1405,7 @@ class Parser:
             data = yaml.load(text)
         except Exception as e:
             raise YAMLSyntaxError(
-                f"Error encountered by YAML parser in {self.current_file}"
+                f"Error encountered by YAML parser in {self.defs_path}"
             ) from e
 
         valid_sections = (
