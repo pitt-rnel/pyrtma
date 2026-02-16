@@ -1,8 +1,4 @@
-# core_defs.yaml
-
-imports:
-  - data_logger
-  - quick_logger
+# rtma_core.yaml
 
 constants:
   MAX_MODULES: 200
