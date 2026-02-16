@@ -56,18 +56,18 @@ MAX_MESSAGE_SIZE: int = 65535
 MAX_DATASETS: int = 6
 DATASET_NAME_LEN: int = 32
 MAX_LOGGER_FILENAME_LENGTH: int = 256
-SZ_A: int = 4
-SZ_B: int = 8
+STR_SIZE: int = 32
+LONG_STRING: int = 64
 
 # String Constants
-DEFAULT_MM_IP: str = "localhost:7111"
+default_msg: str = "hello_world"
 
 # Type Aliases
 MODULE_ID = ctypes.c_int16
 HOST_ID = ctypes.c_int16
 MSG_TYPE = ctypes.c_int32
 MSG_COUNT = ctypes.c_int32
-TIMESTAMP_TYPE = ctypes.c_uint32
+AGE_TYPE = ctypes.c_int32
 
 # Host IDs
 LOCAL_HOST: int = 0
@@ -77,10 +77,8 @@ ALL_HOSTS: int = 32767
 MID_MESSAGE_MANAGER: int = 0
 MID_DATA_LOGGER: int = 4
 MID_QUICK_LOGGER: int = 5
-MID_TEST_MODULE: int = 10
-MID_DATA_MODULE: int = 11
-MID_LOG_MODULE: int = 12
-MID_CONFIG_MODULE: int = 13
+MID_PERSON_PUBLISHER: int = 213
+MID_PERSON_SUBSCRIBER: int = 214
 
 # Message Type IDs
 MT_EXIT: int = 0
@@ -137,44 +135,23 @@ MT_RESET_MESSAGE_LOG: int = 60
 MT_DUMP_MESSAGE_LOG: int = 61
 MT_DEBUG_TEXT: int = 91
 MT_LM_READY: int = 96
-MT_RESERVED_004300: int = 4300
-MT_RESERVED_004360: int = 4360
-MT_RESERVED_004361: int = 4361
-MT_RESERVED_004362: int = 4362
-MT_RESERVED_004363: int = 4363
-MT_RESERVED_004364: int = 4364
-MT_RESERVED_004365: int = 4365
-MT_RESERVED_004366: int = 4366
-MT_RESERVED_004367: int = 4367
-MT_RESERVED_004368: int = 4368
-MT_RESERVED_004369: int = 4369
-MT_RESERVED_004370: int = 4370
-MT_RESERVED_004371: int = 4371
-MT_RESERVED_004372: int = 4372
-MT_RESERVED_004373: int = 4373
-MT_RESERVED_004374: int = 4374
-MT_RESERVED_004375: int = 4375
-MT_RESERVED_004376: int = 4376
-MT_RESERVED_004377: int = 4377
-MT_RESERVED_004378: int = 4378
-MT_VALIDATOR_A: int = 5000
-MT_VALIDATOR_B: int = 5001
-MT_TEST_MSG_128: int = 5002
-MT_TEST_MSG_256: int = 5003
-MT_TEST_MSG_512: int = 5004
-MT_TEST_MSG_1024: int = 5005
-MT_TEST_MSG_2048: int = 5006
-MT_TEST_MSG_4096: int = 5007
-MT_TEST_MSG_8192: int = 5008
-MT_SUBSCRIBER_READY: int = 5009
-MT_PUBLISHER_READY: int = 5010
-MT_SUBSCRIBER_DONE: int = 5011
-MT_PUBLISHER_DONE: int = 5012
-MT_ARRAY_OF_ONE: int = 5013
-MT_ALIAS_TEST: int = 6000
-MT_TEST_START: int = 6001
-MT_TEST_END: int = 6002
-MT_TEST_METADATA: int = 1904
+MT_PERSON_MESSAGE: int = 1234
+MT_ANOTHER_EXAMPLE: int = 5678
+MT_USER_SIGNAL: int = 2468
+MT_PERSON_LIST: int = 1357
+MT_EMPLOYEES: int = 1368
+MT_RESERVED_001000: int = 1000
+MT_RESERVED_001002: int = 1002
+MT_RESERVED_001003: int = 1003
+MT_RESERVED_001004: int = 1004
+MT_RESERVED_001005: int = 1005
+MT_RESERVED_001006: int = 1006
+MT_RESERVED_001007: int = 1007
+MT_RESERVED_001008: int = 1008
+MT_RESERVED_001009: int = 1009
+MT_RESERVED_001010: int = 1010
+MT_RESERVED_001011: int = 1011
+MT_RESERVED_001012: int = 1012
 
 
 # Struct Definitions
@@ -218,43 +195,17 @@ class DATASET(MessageBase, metaclass=MessageMeta):
     msg_types: IntArray[Int32] = IntArray(Int32, 64)
 
 
-class VALIDATOR_STRUCT(MessageBase, metaclass=MessageMeta):
-    type_name: ClassVar[str] = "VALIDATOR_STRUCT"
-    type_hash: ClassVar[int] = 0xEDECB7D1
-    type_size: ClassVar[int] = 232
-    type_source: ClassVar[str] = "test_defs_1"
+class TEST_STRUCT(MessageBase, metaclass=MessageMeta):
+    type_name: ClassVar[str] = "TEST_STRUCT"
+    type_hash: ClassVar[int] = 0x025479D2
+    type_size: ClassVar[int] = 36
+    type_source: ClassVar[str] = "example"
     type_def: ClassVar[str] = (
-        "'VALIDATOR_STRUCT:\n  fields:\n    char_: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[4]\n    int16_arr: int16[4]\n    int32_arr: int32[4]\n    int64_arr: int64[4]\n    uint8_arr: uint8[4]\n    uint16_arr: uint16[4]\n    uint32_arr: uint32[4]\n    uint64_arr: uint64[4]\n    byte_: byte\n    byte_arr: byte[4]\n    string: char[4]\n    float_: float\n    double_: double\n    float_arr: float[4]\n    double_arr: double[4]'"
+        "'TEST_STRUCT:\n  fields:\n    value_str: char[STR_SIZE]\n    value_int: int'"
     )
 
-    char_: Char = Char()
-    int8: Int8 = Int8()
-    int16: Int16 = Int16()
-    int32: Int32 = Int32()
-    int64: Int64 = Int64()
-    uint8: Uint8 = Uint8()
-    padding_0_: ByteArray = ByteArray(1)
-    uint16: Uint16 = Uint16()
-    uint32: Uint32 = Uint32()
-    uint64: Uint64 = Uint64()
-    int8_arr: IntArray[Int8] = IntArray(Int8, 4)
-    int16_arr: IntArray[Int16] = IntArray(Int16, 4)
-    int32_arr: IntArray[Int32] = IntArray(Int32, 4)
-    padding_1_: ByteArray = ByteArray(4)
-    int64_arr: IntArray[Int64] = IntArray(Int64, 4)
-    uint8_arr: IntArray[Uint8] = IntArray(Uint8, 4)
-    uint16_arr: IntArray[Uint16] = IntArray(Uint16, 4)
-    uint32_arr: IntArray[Uint32] = IntArray(Uint32, 4)
-    padding_2_: ByteArray = ByteArray(4)
-    uint64_arr: IntArray[Uint64] = IntArray(Uint64, 4)
-    byte_: Byte = Byte()
-    byte_arr: ByteArray = ByteArray(4)
-    string: String = String(4)
-    padding_3_: ByteArray = ByteArray(3)
-    float_: Float = Float()
-    double_: Double = Double()
-    float_arr: FloatArray[Float] = FloatArray(Float, 4)
-    double_arr: FloatArray[Double] = FloatArray(Double, 4)
+    value_str: String = String(32)
+    value_int: Int32 = Int32()
 
 
 # Message Definitions
@@ -1037,512 +988,192 @@ class MDF_LM_READY(MessageData, metaclass=MessageMeta):
 
 
 @pyrtma.message_def
-class MDF_RESERVED_004300(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4300
-    type_name: ClassVar[str] = "RESERVED_004300"
-    type_hash: ClassVar[int] = 0x2FB5544D
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004300:\n  id: 4300\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004360(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4360
-    type_name: ClassVar[str] = "RESERVED_004360"
-    type_hash: ClassVar[int] = 0x323B7BC7
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004360:\n  id: 4360\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004361(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4361
-    type_name: ClassVar[str] = "RESERVED_004361"
-    type_hash: ClassVar[int] = 0xCEA6EA95
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004361:\n  id: 4361\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004362(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4362
-    type_name: ClassVar[str] = "RESERVED_004362"
-    type_hash: ClassVar[int] = 0x02A36526
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004362:\n  id: 4362\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004363(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4363
-    type_name: ClassVar[str] = "RESERVED_004363"
-    type_hash: ClassVar[int] = 0xECC4954A
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004363:\n  id: 4363\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004364(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4364
-    type_name: ClassVar[str] = "RESERVED_004364"
-    type_hash: ClassVar[int] = 0x7910FD63
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004364:\n  id: 4364\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004365(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4365
-    type_name: ClassVar[str] = "RESERVED_004365"
-    type_hash: ClassVar[int] = 0x935F393E
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004365:\n  id: 4365\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004366(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4366
-    type_name: ClassVar[str] = "RESERVED_004366"
-    type_hash: ClassVar[int] = 0xD519DA6B
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004366:\n  id: 4366\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004367(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4367
-    type_name: ClassVar[str] = "RESERVED_004367"
-    type_hash: ClassVar[int] = 0x08E1386F
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004367:\n  id: 4367\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004368(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4368
-    type_name: ClassVar[str] = "RESERVED_004368"
-    type_hash: ClassVar[int] = 0x99F64A37
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004368:\n  id: 4368\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004369(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4369
-    type_name: ClassVar[str] = "RESERVED_004369"
-    type_hash: ClassVar[int] = 0xF4B70AB4
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004369:\n  id: 4369\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004370(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4370
-    type_name: ClassVar[str] = "RESERVED_004370"
-    type_hash: ClassVar[int] = 0xE46A53AF
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004370:\n  id: 4370\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004371(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4371
-    type_name: ClassVar[str] = "RESERVED_004371"
-    type_hash: ClassVar[int] = 0x177FBC2F
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004371:\n  id: 4371\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004372(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4372
-    type_name: ClassVar[str] = "RESERVED_004372"
-    type_hash: ClassVar[int] = 0x01736936
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004372:\n  id: 4372\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004373(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4373
-    type_name: ClassVar[str] = "RESERVED_004373"
-    type_hash: ClassVar[int] = 0x72CF2D3F
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004373:\n  id: 4373\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004374(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4374
-    type_name: ClassVar[str] = "RESERVED_004374"
-    type_hash: ClassVar[int] = 0xEC101B55
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004374:\n  id: 4374\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004375(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4375
-    type_name: ClassVar[str] = "RESERVED_004375"
-    type_hash: ClassVar[int] = 0xB41F9FC1
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004375:\n  id: 4375\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004376(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4376
-    type_name: ClassVar[str] = "RESERVED_004376"
-    type_hash: ClassVar[int] = 0xEBC7B874
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004376:\n  id: 4376\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004377(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4377
-    type_name: ClassVar[str] = "RESERVED_004377"
-    type_hash: ClassVar[int] = 0x4DCCD750
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004377:\n  id: 4377\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_RESERVED_004378(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 4378
-    type_name: ClassVar[str] = "RESERVED_004378"
-    type_hash: ClassVar[int] = 0x75FB28B0
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004378:\n  id: 4378\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_VALIDATOR_A(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5000
-    type_name: ClassVar[str] = "VALIDATOR_A"
-    type_hash: ClassVar[int] = 0x5BEB6C99
-    type_size: ClassVar[int] = 1392
-    type_source: ClassVar[str] = "test_defs_1"
+class MDF_PERSON_MESSAGE(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1234
+    type_name: ClassVar[str] = "PERSON_MESSAGE"
+    type_hash: ClassVar[int] = 0x3A9C5C31
+    type_size: ClassVar[int] = 36
+    type_source: ClassVar[str] = "example"
     type_def: ClassVar[str] = (
-        "'VALIDATOR_A:\n  id: 5000\n  fields:\n    char_: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[SZ_A]\n    int16_arr: int16[SZ_A]\n    int32_arr: int32[SZ_A]\n    int64_arr: int64[SZ_A]\n    uint8_arr: uint8[SZ_A]\n    uint16_arr: uint16[SZ_A]\n    uint32_arr: uint32[SZ_A]\n    uint64_arr: uint64[SZ_A]\n    byte_: byte\n    byte_arr: byte[SZ_A]\n    string: char[SZ_A]\n    float_: float\n    double_: double\n    float_arr: float[SZ_A]\n    double_arr: double[SZ_A]\n    struct_: VALIDATOR_STRUCT\n    struct_arr: VALIDATOR_STRUCT[SZ_A]'"
+        "'PERSON_MESSAGE:\n  id: 1234\n  fields:\n    name: char[STR_SIZE]\n    age: AGE_TYPE'"
     )
 
-    char_: Char = Char()
-    int8: Int8 = Int8()
-    int16: Int16 = Int16()
-    int32: Int32 = Int32()
-    int64: Int64 = Int64()
-    uint8: Uint8 = Uint8()
-    padding_0_: ByteArray = ByteArray(1)
-    uint16: Uint16 = Uint16()
-    uint32: Uint32 = Uint32()
-    uint64: Uint64 = Uint64()
-    int8_arr: IntArray[Int8] = IntArray(Int8, 4)
-    int16_arr: IntArray[Int16] = IntArray(Int16, 4)
-    int32_arr: IntArray[Int32] = IntArray(Int32, 4)
-    padding_1_: ByteArray = ByteArray(4)
-    int64_arr: IntArray[Int64] = IntArray(Int64, 4)
-    uint8_arr: IntArray[Uint8] = IntArray(Uint8, 4)
-    uint16_arr: IntArray[Uint16] = IntArray(Uint16, 4)
-    uint32_arr: IntArray[Uint32] = IntArray(Uint32, 4)
-    padding_2_: ByteArray = ByteArray(4)
-    uint64_arr: IntArray[Uint64] = IntArray(Uint64, 4)
-    byte_: Byte = Byte()
-    byte_arr: ByteArray = ByteArray(4)
-    string: String = String(4)
-    padding_3_: ByteArray = ByteArray(3)
-    float_: Float = Float()
-    double_: Double = Double()
-    float_arr: FloatArray[Float] = FloatArray(Float, 4)
-    double_arr: FloatArray[Double] = FloatArray(Double, 4)
-    struct_: Struct[VALIDATOR_STRUCT] = Struct(VALIDATOR_STRUCT)
-    struct_arr: StructArray[VALIDATOR_STRUCT] = StructArray(VALIDATOR_STRUCT, 4)
+    name: String = String(32)
+    age: Int32 = Int32()
 
 
 @pyrtma.message_def
-class MDF_VALIDATOR_B(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5001
-    type_name: ClassVar[str] = "VALIDATOR_B"
-    type_hash: ClassVar[int] = 0x05ECEA08
-    type_size: ClassVar[int] = 2488
-    type_source: ClassVar[str] = "test_defs_1"
+class MDF_ANOTHER_EXAMPLE(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 5678
+    type_name: ClassVar[str] = "ANOTHER_EXAMPLE"
+    type_hash: ClassVar[int] = 0x76C035B3
+    type_size: ClassVar[int] = 48
+    type_source: ClassVar[str] = "example"
     type_def: ClassVar[str] = (
-        "'VALIDATOR_B:\n  id: 5001\n  fields:\n    char_: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[SZ_B]\n    int16_arr: int16[SZ_B]\n    int32_arr: int32[SZ_B]\n    int64_arr: int64[SZ_B]\n    uint8_arr: uint8[SZ_B]\n    uint16_arr: uint16[SZ_B]\n    uint32_arr: uint32[SZ_B]\n    uint64_arr: uint64[SZ_B]\n    byte_: byte\n    byte_arr: byte[SZ_B]\n    string: char[SZ_B]\n    float_: float\n    double_: double\n    float_arr: float[SZ_B]\n    double_arr: double[SZ_B]\n    struct_: VALIDATOR_STRUCT\n    struct_arr: VALIDATOR_STRUCT[SZ_B]'"
+        "'ANOTHER_EXAMPLE:\n  id: 5678\n  fields:\n    value_struct: TEST_STRUCT\n    value_float: float\n    value_double: double'"
     )
 
-    char_: Char = Char()
-    int8: Int8 = Int8()
-    int16: Int16 = Int16()
-    int32: Int32 = Int32()
-    int64: Int64 = Int64()
-    uint8: Uint8 = Uint8()
-    padding_0_: ByteArray = ByteArray(1)
-    uint16: Uint16 = Uint16()
-    uint32: Uint32 = Uint32()
-    uint64: Uint64 = Uint64()
-    int8_arr: IntArray[Int8] = IntArray(Int8, 8)
-    int16_arr: IntArray[Int16] = IntArray(Int16, 8)
-    int32_arr: IntArray[Int32] = IntArray(Int32, 8)
-    int64_arr: IntArray[Int64] = IntArray(Int64, 8)
-    uint8_arr: IntArray[Uint8] = IntArray(Uint8, 8)
-    uint16_arr: IntArray[Uint16] = IntArray(Uint16, 8)
-    uint32_arr: IntArray[Uint32] = IntArray(Uint32, 8)
-    uint64_arr: IntArray[Uint64] = IntArray(Uint64, 8)
-    byte_: Byte = Byte()
-    byte_arr: ByteArray = ByteArray(8)
-    string: String = String(8)
-    padding_1_: ByteArray = ByteArray(3)
-    float_: Float = Float()
-    double_: Double = Double()
-    float_arr: FloatArray[Float] = FloatArray(Float, 8)
-    double_arr: FloatArray[Double] = FloatArray(Double, 8)
-    struct_: Struct[VALIDATOR_STRUCT] = Struct(VALIDATOR_STRUCT)
-    struct_arr: StructArray[VALIDATOR_STRUCT] = StructArray(VALIDATOR_STRUCT, 8)
+    value_struct: Struct[TEST_STRUCT] = Struct(TEST_STRUCT)
+    value_float: Float = Float()
+    value_double: Double = Double()
 
 
 @pyrtma.message_def
-class MDF_TEST_MSG_128(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5002
-    type_name: ClassVar[str] = "TEST_MSG_128"
-    type_hash: ClassVar[int] = 0xB24F5939
-    type_size: ClassVar[int] = 128
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = (
-        "'TEST_MSG_128:\n  id: 5002\n  fields:\n    blob: uint8[128]'"
-    )
-
-    blob: IntArray[Uint8] = IntArray(Uint8, 128)
-
-
-@pyrtma.message_def
-class MDF_TEST_MSG_256(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5003
-    type_name: ClassVar[str] = "TEST_MSG_256"
-    type_hash: ClassVar[int] = 0x70F60E44
-    type_size: ClassVar[int] = 256
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = (
-        "'TEST_MSG_256:\n  id: 5003\n  fields:\n    blob: uint8[256]'"
-    )
-
-    blob: IntArray[Uint8] = IntArray(Uint8, 256)
-
-
-@pyrtma.message_def
-class MDF_TEST_MSG_512(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5004
-    type_name: ClassVar[str] = "TEST_MSG_512"
-    type_hash: ClassVar[int] = 0xFAD40B76
-    type_size: ClassVar[int] = 512
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = (
-        "'TEST_MSG_512:\n  id: 5004\n  fields:\n    blob: uint8[512]'"
-    )
-
-    blob: IntArray[Uint8] = IntArray(Uint8, 512)
-
-
-@pyrtma.message_def
-class MDF_TEST_MSG_1024(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5005
-    type_name: ClassVar[str] = "TEST_MSG_1024"
-    type_hash: ClassVar[int] = 0x63CFD715
-    type_size: ClassVar[int] = 1024
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = (
-        "'TEST_MSG_1024:\n  id: 5005\n  fields:\n    blob: uint8[1024]'"
-    )
-
-    blob: IntArray[Uint8] = IntArray(Uint8, 1024)
-
-
-@pyrtma.message_def
-class MDF_TEST_MSG_2048(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5006
-    type_name: ClassVar[str] = "TEST_MSG_2048"
-    type_hash: ClassVar[int] = 0xB723027A
-    type_size: ClassVar[int] = 2048
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = (
-        "'TEST_MSG_2048:\n  id: 5006\n  fields:\n    blob: uint8[2048]'"
-    )
-
-    blob: IntArray[Uint8] = IntArray(Uint8, 2048)
-
-
-@pyrtma.message_def
-class MDF_TEST_MSG_4096(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5007
-    type_name: ClassVar[str] = "TEST_MSG_4096"
-    type_hash: ClassVar[int] = 0x1A7BE210
-    type_size: ClassVar[int] = 4096
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = (
-        "'TEST_MSG_4096:\n  id: 5007\n  fields:\n    blob: uint8[4096]'"
-    )
-
-    blob: IntArray[Uint8] = IntArray(Uint8, 4096)
-
-
-@pyrtma.message_def
-class MDF_TEST_MSG_8192(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5008
-    type_name: ClassVar[str] = "TEST_MSG_8192"
-    type_hash: ClassVar[int] = 0x5EAC39D1
-    type_size: ClassVar[int] = 8192
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = (
-        "'TEST_MSG_8192:\n  id: 5008\n  fields:\n    blob: uint8[8192]'"
-    )
-
-    blob: IntArray[Uint8] = IntArray(Uint8, 8192)
-
-
-@pyrtma.message_def
-class MDF_SUBSCRIBER_READY(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5009
-    type_name: ClassVar[str] = "SUBSCRIBER_READY"
-    type_hash: ClassVar[int] = 0x0434D478
+class MDF_USER_SIGNAL(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 2468
+    type_name: ClassVar[str] = "USER_SIGNAL"
+    type_hash: ClassVar[int] = 0xD79169AA
     type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'SUBSCRIBER_READY:\n  id: 5009\n  fields: null'"
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'USER_SIGNAL:\n  id: 2468\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF_PUBLISHER_READY(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5010
-    type_name: ClassVar[str] = "PUBLISHER_READY"
-    type_hash: ClassVar[int] = 0xFF322781
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'PUBLISHER_READY:\n  id: 5010\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_SUBSCRIBER_DONE(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5011
-    type_name: ClassVar[str] = "SUBSCRIBER_DONE"
-    type_hash: ClassVar[int] = 0xB0A085C1
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'SUBSCRIBER_DONE:\n  id: 5011\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_PUBLISHER_DONE(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5012
-    type_name: ClassVar[str] = "PUBLISHER_DONE"
-    type_hash: ClassVar[int] = 0xF53323C6
-    type_size: ClassVar[int] = 0
-    type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'PUBLISHER_DONE:\n  id: 5012\n  fields: null'"
-
-
-@pyrtma.message_def
-class MDF_ARRAY_OF_ONE(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 5013
-    type_name: ClassVar[str] = "ARRAY_OF_ONE"
-    type_hash: ClassVar[int] = 0x1BE0A085
-    type_size: ClassVar[int] = 288
-    type_source: ClassVar[str] = "test_defs_1"
+class MDF_PERSON_LIST(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1357
+    type_name: ClassVar[str] = "PERSON_LIST"
+    type_hash: ClassVar[int] = 0x8F180975
+    type_size: ClassVar[int] = 1152
+    type_source: ClassVar[str] = "example"
     type_def: ClassVar[str] = (
-        "'ARRAY_OF_ONE:\n  id: 5013\n  fields:\n    u8: uint8[1]\n    u16: uint16[1]\n    u32: uint32[1]\n    u64: uint64[1]\n    i8: int8[1]\n    i16: int16[1]\n    i32: int32[1]\n    i64: int64[1]\n    f32: float[1]\n    f64: double[1]\n    c: char\n    c1: char[1]\n    s2: char[2]\n    b: byte\n    ba: byte[1]\n    sa: VALIDATOR_STRUCT[1]'"
+        "'PERSON_LIST:\n  id: 1357\n  fields:\n    person: PERSON_MESSAGE[32]'"
     )
 
-    u8: IntArray[Uint8] = IntArray(Uint8, 1)
-    padding_0_: ByteArray = ByteArray(1)
-    u16: IntArray[Uint16] = IntArray(Uint16, 1)
-    u32: IntArray[Uint32] = IntArray(Uint32, 1)
-    u64: IntArray[Uint64] = IntArray(Uint64, 1)
-    i8: IntArray[Int8] = IntArray(Int8, 1)
-    padding_1_: ByteArray = ByteArray(1)
-    i16: IntArray[Int16] = IntArray(Int16, 1)
-    i32: IntArray[Int32] = IntArray(Int32, 1)
-    i64: IntArray[Int64] = IntArray(Int64, 1)
-    f32: FloatArray[Float] = FloatArray(Float, 1)
-    padding_2_: ByteArray = ByteArray(4)
-    f64: FloatArray[Double] = FloatArray(Double, 1)
-    c: Char = Char()
-    c1: Char = Char()
-    s2: String = String(2)
-    b: Byte = Byte()
-    ba: ByteArray = ByteArray(1)
-    padding_3_: ByteArray = ByteArray(2)
-    sa: StructArray[VALIDATOR_STRUCT] = StructArray(VALIDATOR_STRUCT, 1)
+    person: StructArray[MDF_PERSON_MESSAGE] = StructArray(MDF_PERSON_MESSAGE, 32)
 
 
 @pyrtma.message_def
-class MDF_ALIAS_TEST(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 6000
-    type_name: ClassVar[str] = "ALIAS_TEST"
-    type_hash: ClassVar[int] = 0x51637556
-    type_size: ClassVar[int] = 132
-    type_source: ClassVar[str] = "test_defs_2"
+class MDF_EMPLOYEES(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1368
+    type_name: ClassVar[str] = "EMPLOYEES"
+    type_hash: ClassVar[int] = 0x40C66A09
+    type_size: ClassVar[int] = 1152
+    type_source: ClassVar[str] = "example"
     type_def: ClassVar[str] = (
-        "'ALIAS_TEST:\n  id: 6000\n  fields:\n    timestamp: TIMESTAMP_TYPE\n    times: TIMESTAMP_TYPE[32]'"
+        "'EMPLOYEES:\n  id: 1368\n  fields:\n    fields: PERSON_LIST'"
     )
 
-    timestamp: Uint32 = Uint32()
-    times: IntArray[Uint32] = IntArray(Uint32, 32)
+    person: StructArray[MDF_PERSON_MESSAGE] = StructArray(MDF_PERSON_MESSAGE, 32)
 
 
 @pyrtma.message_def
-class MDF_TEST_START(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 6001
-    type_name: ClassVar[str] = "TEST_START"
-    type_hash: ClassVar[int] = 0x29D1BF0F
-    type_size: ClassVar[int] = 4
-    type_source: ClassVar[str] = "test_defs_2"
-    type_def: ClassVar[str] = "'TEST_START:\n  id: 6001\n  fields:\n    id: int32'"
-
-    id: Int32 = Int32()
+class MDF_RESERVED_001000(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1000
+    type_name: ClassVar[str] = "RESERVED_001000"
+    type_hash: ClassVar[int] = 0x1051EF7A
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'RESERVED_001000:\n  id: 1000\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF_TEST_END(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 6002
-    type_name: ClassVar[str] = "TEST_END"
-    type_hash: ClassVar[int] = 0x0573591A
-    type_size: ClassVar[int] = 4
-    type_source: ClassVar[str] = "test_defs_2"
-    type_def: ClassVar[str] = "'TEST_END:\n  id: 6002\n  fields:\n    id: int32'"
-
-    id: Int32 = Int32()
+class MDF_RESERVED_001002(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1002
+    type_name: ClassVar[str] = "RESERVED_001002"
+    type_hash: ClassVar[int] = 0x84516E0B
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'RESERVED_001002:\n  id: 1002\n  fields: null'"
 
 
 @pyrtma.message_def
-class MDF_TEST_METADATA(MessageData, metaclass=MessageMeta):
-    type_id: ClassVar[int] = 1904
-    type_name: ClassVar[str] = "TEST_METADATA"
-    type_hash: ClassVar[int] = 0x3BE3D73A
-    type_size: ClassVar[int] = 132
-    type_source: ClassVar[str] = "test_defs_2"
-    type_def: ClassVar[str] = (
-        "'TEST_METADATA:\n  id: 1904\n  fields:\n    id: int32\n    note: char[128]'"
-    )
+class MDF_RESERVED_001003(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1003
+    type_name: ClassVar[str] = "RESERVED_001003"
+    type_hash: ClassVar[int] = 0x5E10A6F1
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'RESERVED_001003:\n  id: 1003\n  fields: null'"
 
-    id: Int32 = Int32()
-    note: String = String(128)
+
+@pyrtma.message_def
+class MDF_RESERVED_001004(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1004
+    type_name: ClassVar[str] = "RESERVED_001004"
+    type_hash: ClassVar[int] = 0xB9939617
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'RESERVED_001004:\n  id: 1004\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_RESERVED_001005(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1005
+    type_name: ClassVar[str] = "RESERVED_001005"
+    type_hash: ClassVar[int] = 0x1F98FFC2
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'RESERVED_001005:\n  id: 1005\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_RESERVED_001006(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1006
+    type_name: ClassVar[str] = "RESERVED_001006"
+    type_hash: ClassVar[int] = 0x4469E520
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'RESERVED_001006:\n  id: 1006\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_RESERVED_001007(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1007
+    type_name: ClassVar[str] = "RESERVED_001007"
+    type_hash: ClassVar[int] = 0x919F2CC2
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'RESERVED_001007:\n  id: 1007\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_RESERVED_001008(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1008
+    type_name: ClassVar[str] = "RESERVED_001008"
+    type_hash: ClassVar[int] = 0xC646C82F
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'RESERVED_001008:\n  id: 1008\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_RESERVED_001009(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1009
+    type_name: ClassVar[str] = "RESERVED_001009"
+    type_hash: ClassVar[int] = 0x3B070968
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'RESERVED_001009:\n  id: 1009\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_RESERVED_001010(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1010
+    type_name: ClassVar[str] = "RESERVED_001010"
+    type_hash: ClassVar[int] = 0x0E33BEA9
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'RESERVED_001010:\n  id: 1010\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_RESERVED_001011(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1011
+    type_name: ClassVar[str] = "RESERVED_001011"
+    type_hash: ClassVar[int] = 0xE761D26D
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'RESERVED_001011:\n  id: 1011\n  fields: null'"
+
+
+@pyrtma.message_def
+class MDF_RESERVED_001012(MessageData, metaclass=MessageMeta):
+    type_id: ClassVar[int] = 1012
+    type_name: ClassVar[str] = "RESERVED_001012"
+    type_hash: ClassVar[int] = 0xDB571F77
+    type_size: ClassVar[int] = 0
+    type_source: ClassVar[str] = "example"
+    type_def: ClassVar[str] = "'RESERVED_001012:\n  id: 1012\n  fields: null'"
 
 
 # User Context

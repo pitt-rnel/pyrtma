@@ -1,8 +1,5 @@
 # Message defs file in yaml format
 
-imports:
-  - ./test_defs_2.yaml
-
 string_constants:
   DEFAULT_MM_IP: "localhost:7111"
 

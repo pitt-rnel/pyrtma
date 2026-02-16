@@ -1,0 +1,4 @@
+# Index of message defs files to include in your system
+index: 
+  test_defs_1: test_defs_1.yaml
+  test_defs_2: test_defs_2.yaml
