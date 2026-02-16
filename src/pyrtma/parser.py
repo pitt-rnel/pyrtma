@@ -1391,9 +1391,13 @@ class Parser:
                         f"Key-Value pairs must be separated with a ':' followed by a space. Add a space after the colon.\n{self.current_file}: line {n}\n{line}"
                     )
 
-    def parse_compiler_file(self, defs_file: os.PathLike):
+    def parse_compiler_file(self, defs_file: os.PathLike, quiet: bool = False):
         self.defs_path = pathlib.Path(defs_file)
-        self.logger.info(f"Parsing Compiler Defs File-> {self.defs_path.absolute()}")
+        if not quiet:
+            self.logger.info(
+                f"Parsing Compiler Defs File-> {self.defs_path.absolute()}"
+            )
+
         with open(self.defs_path, "rt") as f:
             text = f.read()
 
@@ -1555,3 +1559,9 @@ class CustomEncoder(json.JSONEncoder):
         if isinstance(o, pathlib.Path):
             return str(o.absolute())
         return super().default(o)
+
+
+def read_compiler_index(compiler_file: str | pathlib.Path) -> dict[str, pathlib.Path]:
+    parser = Parser()
+    parser.parse_compiler_file(pathlib.Path(compiler_file), quiet=True)
+    return {m.name: m.file for m in parser.index.values()}
