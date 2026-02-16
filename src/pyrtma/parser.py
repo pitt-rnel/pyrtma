@@ -416,7 +416,6 @@ class Parser:
         """
         self.included_files: List[MsgDefIndex] = []
         self.current_index = MsgDefIndex("", "", pathlib.Path())
-        self.root_path = pathlib.Path()
         self.debug = debug
         Parser._instance_count += 1
 
