@@ -10,16 +10,14 @@
 # add these directories to sys.path here.
 import pathlib
 
-# import sys
-import os
-from codecs import open
-
 about = {}
-here = pathlib.Path(__file__)  # os.path.abspath(os.path.dirname(__file__))
+here = pathlib.Path(__file__)
+version_path = here.parents[2] / "src" / "pyrtma" / "__version__.py"
+version_file = version_path.resolve().as_posix()
 with open(
     (here.parents[2] / "src" / "pyrtma" / "__version__.py").resolve().as_posix(),
-    "r",
-    "utf-8",
+    mode="r",
+    encoding="utf-8",
 ) as f:
     exec(f.read(), about)
 
@@ -73,9 +71,6 @@ epub_show_urls = "footnote"
 autodoc_typehints = "description"  # document types in description
 autoclass_content = "both"  # Add __init__ doc (ie. params) to class summaries
 set_type_checking_flag = True  # Enable 'expensive' imports for sphinx_autodoc_typehints
-# autoapi_dirs = ['../../br_stimpy']
-# autoapi_add_toctree_entry = False
-# autoapi_template_dir = 'autoapi_templates'
 
 # autosummary
 autosummary_generate = True  # Turn on sphinx.ext.autosummary
