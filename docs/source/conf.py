@@ -74,7 +74,7 @@ set_type_checking_flag = True  # Enable 'expensive' imports for sphinx_autodoc_t
 
 # autosummary
 autosummary_generate = True  # Turn on sphinx.ext.autosummary
-autosummary_imported_members = True
+autosummary_imported_members = False
 add_module_names = False  # Remove namespaces from class/method signatures
 
 
