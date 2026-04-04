@@ -3,7 +3,7 @@
 import pathlib
 import re
 import sys
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Optional
 
 from .parser import Parser, ParserError, FileFormatError
 from rich.traceback import install
@@ -29,9 +29,6 @@ def compile(
     info: bool = False,
     combined: bool = False,
     debug: bool = False,
-    validate_alignment: bool = True,
-    auto_pad: bool = True,
-    import_coredefs: bool = True,
 ):
     """compile message defs
 
@@ -45,9 +42,6 @@ def compile(
         info (bool, optional): Output info .txt file. Defaults to False.
         combined (bool, optional): Output combined YAML file. Defaults to False.
         debug (bool, optional): Debug mode. Defaults to False.
-        validate_alignment(bool, optional): Validate message 64-bit alignment. Defaults to True.
-        auto_pad(bool, optional): Automatically pad messages failing 64-bit alignment validation. Defaults to True. Has no effect if validate_alignment is False.
-        import_coredefs(bool, optional): Automatically import pyrtma.core_defs. Defaults to True.
 
 
     Raises:
@@ -63,12 +57,14 @@ def compile(
             "V1 message def .h compiler is deprecated and has been replaced by the V2 yaml compiler.",
             FutureWarning,
         )
-    elif file1_ext.lower() in [".yaml", ".yml"]:
+    elif file1_ext.lower().endswith((".defs", ".yml", ".yaml")):
         compiler_version = 2
         if len(defs_files) > 1:
-            raise FileFormatError("defs_file must be a single .yaml file")
+            raise FileFormatError("defs_file must be a single .defs file")
     else:
-        raise FileFormatError("Unexpected file type. defs_file must be a .yaml file.")
+        raise FileFormatError(
+            "Unexpected file type. Compiler defs_file must be a (.defs, .yaml, .yml) file."
+        )
 
     if compiler_version == 1:
         from pyrtma.compilers.python_v1 import python_v1_compile
@@ -82,9 +78,6 @@ def compile(
     defs_file = defs_files[0]
     parser = Parser(
         debug=debug,
-        validate_alignment=validate_alignment,
-        auto_pad=auto_pad,
-        import_coredefs=import_coredefs,
     )
     parser.parse(pathlib.Path(defs_file))
 
@@ -187,7 +180,7 @@ def main() -> None:
         "--defs",
         nargs="*",  # for backwards compatibility with v1 compiler. Remove in future version along with v1 compiler.
         dest="defs_files",
-        help="YAML message defintion file to parse. C header file(s) will use v1 python compiler (deprecated)",
+        help="Compiler YAML file to parse. C header file(s) will use v1 python compiler (deprecated)",
     )
 
     # full arg parser
@@ -265,70 +258,6 @@ def main() -> None:
         dest="debug",
         action="store_true",
         help="Debug compiler",
-    )
-
-    # parse input file first to parse compiler opts in yaml file
-    args_temp, _ = argparser1.parse_known_args()
-
-    # Default compiler options
-    COMPILER_OPTS: Dict[str, Union[int, float, bool, str]] = {
-        "IMPORT_COREDEFS": True,
-        "VALIDATE_ALIGNMENT": True,
-        "AUTO_PAD": True,
-    }
-    # parse yaml compiler_options and replace defaults prior to parsing command line args
-    try:
-        defs_files = args_temp.defs_files
-        if (
-            defs_files
-            and len(defs_files) == 1
-            and pathlib.Path(defs_files[0]).suffix.lower()
-            in [
-                ".yaml",
-                ".yml",
-            ]
-        ):
-            defs_file = defs_files[0]
-            parser = Parser()
-            compiler_options = parser.parse_compiler_options(pathlib.Path(defs_file))
-            for key, value in compiler_options.items():
-                COMPILER_OPTS[key] = value.value
-    except (ParserError, FileNotFoundError) as e:
-        print()
-        msg = " ".join(str(arg) for arg in e.args)
-        print(f"{e.__class__.__name__}: {msg}")
-        print()
-        if e.__cause__:
-            print("Details:")
-            msg = " ".join(str(arg) for arg in e.__cause__.args)
-            print(f"\t{e.__cause__.__class__.__name__}: {msg}")
-        sys.exit(1)
-    except Exception:
-        raise
-
-    # defualt compiler opts to values from yaml
-    argparser.add_argument(
-        "--no_val_align",
-        dest="validate_alignment",
-        action="store_false",
-        default=COMPILER_OPTS["VALIDATE_ALIGNMENT"],
-        help="Disable 64-bit alignment validation",
-    )
-
-    argparser.add_argument(
-        "--no_auto_pad",
-        dest="auto_pad",
-        action="store_false",
-        default=COMPILER_OPTS["AUTO_PAD"],
-        help="Disable 64-bit alignment auto-padding",
-    )
-
-    argparser.add_argument(
-        "--no_core_import",
-        dest="import_coredefs",
-        action="store_false",
-        default=COMPILER_OPTS["IMPORT_COREDEFS"],
-        help="Disable auto-import of pyrtma.core_defs",
     )
 
     # parse all options

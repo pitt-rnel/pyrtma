@@ -1,0 +1,10 @@
+compiler_options:
+  import_coredefs: false        # Disable auto-import of rtma.defs
+  validate_alignment: true      # Disable 64-bit alignment validation
+  auto_pad: true                # Disable 64-bit alignment auto-padding
+
+# Index of message defs files to include in your system
+index: 
+  rtma_core: rtma_core.yaml
+  data_logger: data_logger.yaml
+  quick_logger: quick_logger.yaml

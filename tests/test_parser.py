@@ -14,21 +14,41 @@ import unittest
 
 class TempDefFile:
     def __init__(self):
-        self.file = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False)
-        self.file.close()
-        self.path = pathlib.Path(self.file.name)
+        self.compiler_file = tempfile.NamedTemporaryFile(
+            "w", suffix=".defs", delete=False
+        )
+        self.compiler_file.close()
+        self.compiler_path = pathlib.Path(self.compiler_file.name)
+
+        self.msg_file = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False)
+        self.msg_file.close()
+        self.msg_path = pathlib.Path(self.msg_file.name)
+
+    @property
+    def path(self) -> pathlib.Path:
+        return self.compiler_path
 
     def __del__(self):
-        if not self.file.closed:
-            self.file.close()
+        if not self.compiler_file.closed:
+            self.compiler_file.close()
+        self.compiler_path.unlink()
 
-        self.path.unlink()
+        if not self.msg_file.closed:
+            self.msg_file.close()
+        self.msg_path.unlink()
 
     def write(self, text: str):
-        if not self.file.closed:
-            self.file.close()
+        if not self.compiler_file.closed:
+            self.compiler_file.close()
 
-        with open(self.path, "w") as f:
+        if not self.msg_file.closed:
+            self.msg_file.close()
+
+        with open(self.compiler_path, "w") as f:
+            f.write("index:\n")
+            f.write(f"  test: {self.msg_path.absolute()}\n")
+
+        with open(self.msg_path, "w") as f:
             f.write(text)
 
 
