@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0", "packaging"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quicklogger_tools"
+# version defined in ql_utils.__version__.py
+authors = [
+  { name="David Weir", email="dmw109@pitt.edu" },
+  { name="Jeff Weiss", email="jmw182@pitt.edu" },
+]
+description = "Python utilities for parsing quicklogger binary files"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dynamic = ["version"]
+
+dependencies = [
+  "rich",
+  "black",
+  "packaging",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "quicklogger_tools.__version__.__version__"}
+
+[tool.setuptools.package-data]
+
+[project.urls]
+"Homepage" = "https://github.com/pitt-rnel/pyrtma"
+"Bug Tracker" = "https://github.com/pitt-rnel/pyrtma/issues"
+
+[project.scripts]

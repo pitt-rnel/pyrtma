@@ -1,0 +1,8 @@
+__title__ = "quicklogger_tools"
+__description__ = "Python utilities for parsing quicklogger binary files"
+__url__ = "https://github.com/pitt-rnel/pyrtma/utils/quickloger_tools"
+__version__ = "1.0.0"
+__author__ = "RNEL"
+__author_email__ = ""
+__license__ = "MIT"
+__copyright__ = "University of Pittsburgh Rehab Neural Engineering Labs, 2025"
