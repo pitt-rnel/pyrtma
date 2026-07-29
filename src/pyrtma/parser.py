@@ -500,6 +500,7 @@ class Parser:
         )
         self.compiler_options = CompilerOptions()
         self.index = {}
+        self.deps = []
 
         self.included_files = []
         self.metadata = {}
