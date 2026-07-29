@@ -1472,9 +1472,7 @@ class Parser:
         # Always reserve certain names for internal use
         for name in ("rtma_core", "data_logger", "quick_logger"):
             if name in self.index:
-                raise RTMASyntaxError(
-                    f"The name '{name}' is reserved for internal use"
-                )
+                raise RTMASyntaxError(f"The name '{name}' is reserved for internal use")
 
         # Add builtin core message definitions
         if self.import_coredefs:
