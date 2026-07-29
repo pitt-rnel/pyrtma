@@ -31,11 +31,13 @@ class TempDefFile:
     def __del__(self):
         if not self.compiler_file.closed:
             self.compiler_file.close()
-        self.compiler_path.unlink()
+        if self.compiler_path.exists():
+            self.compiler_path.unlink()
 
         if not self.msg_file.closed:
             self.msg_file.close()
-        self.msg_path.unlink()
+        if self.msg_path.exists():
+            self.msg_path.unlink()
 
     def write(self, text: str):
         if not self.compiler_file.closed:
