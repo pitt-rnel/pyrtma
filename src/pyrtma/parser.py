@@ -1464,14 +1464,15 @@ class Parser:
         # Extract the paths to the message definitions
         self.parse_compiler_file(defs_file)
 
+        # Always reserve certain names for internal use
+        for name in ("rtma_core", "data_logger", "quick_logger"):
+            if name in self.index:
+                raise RTMASyntaxError(
+                    f"The name '{name}' is reserved for internal use"
+                )
+
         # Add builtin core message definitions
         if self.import_coredefs:
-            for name in ("rtma_core", "data_logger", "quick_logger"):
-                if name in self.index:
-                    raise RTMASyntaxError(
-                        "The name '{name}' is reserved for internal use"
-                    )
-
             pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
             core_path = pkg_dir / "core_defs"
             core = {}
