@@ -16,7 +16,6 @@ from ..message import Message, MessageHeader, MessageData
 from ..message_base import MessageBase, MessageMeta
 from ..exceptions import VersionMismatchWarning
 
-
 _unknown: Dict[int, Type[MessageData]] = {}
 
 

@@ -56,7 +56,9 @@ class DatasetWriter:
 
         self.formatter_name = formatter
         if formatter_cls is None:
-            raise InvalidFormatter(self.name, f"No DataFormatter class named {formatter}")
+            raise InvalidFormatter(
+                self.name, f"No DataFormatter class named {formatter}"
+            )
         else:
             self.formatter_cls = formatter_cls
 

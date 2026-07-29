@@ -11,7 +11,6 @@ from pyrtma.exceptions import UnknownMessageType
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Dict, Any, ClassVar, cast
 
-
 if TYPE_CHECKING:
     from _typeshed import StrPath
 
@@ -78,8 +77,10 @@ class Dataset:
         if self._managed_client and self._client:
             self._client.disconnect()
 
+
 def __del__(self):
     self.close()
+
     def __str__(self) -> str:
         s = f"""\
         name         = {self.name}

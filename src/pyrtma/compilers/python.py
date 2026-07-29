@@ -18,7 +18,6 @@ import sys
 import os
 from pyrtma.__version__ import __version__
 
-
 # Field type name to ctypes
 type_map = {
     "char": "ctypes.c_char",
