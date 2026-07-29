@@ -75,11 +75,11 @@ def expand_env_variables(input_string: str) -> str:
         value = os.environ.get(var_name)
 
         if value is None:
-            raise ValueError(f"Environment variable '{var_name}' not found")
+            raise RTMASyntaxError(f"Environment variable '{var_name}' not found")
 
         # Verify it's a string
         if not isinstance(value, str):
-            raise ValueError(
+            raise RTMASyntaxError(
                 f"Environment variable '{var_name}' is not a string, "
                 f"got {type(value).__name__}"
             )
