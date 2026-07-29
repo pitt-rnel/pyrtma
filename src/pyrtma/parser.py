@@ -1411,6 +1411,10 @@ class Parser:
             raise YAMLSyntaxError(
                 f"Error encountered by YAML parser in {self.defs_path}"
             ) from e
+        if not isinstance(data, dict):
+            raise RTMASyntaxError(
+                f"Compiler defs file must contain a mapping at top level -> {self.defs_path}."
+            )
 
         valid_sections = (
             "compiler_options",
