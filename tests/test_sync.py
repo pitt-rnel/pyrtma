@@ -26,7 +26,6 @@ class TestSync(unittest.TestCase):
             timecode=False,
             log_level=logging.ERROR,
             debug=False,
-            send_msg_timing=True,
         )
         self.manager_thread = threading.Thread(
             target=self.manager.run,
