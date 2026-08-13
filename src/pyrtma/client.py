@@ -585,7 +585,7 @@ class Client(ClientLike):
             InvalidDestinationHost: Specified destination host is invalid
         """
         # Verify that the module & host ids are valid
-        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULES:
+        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULE_ID:
             raise InvalidDestinationModule(f"Invalid dest_mod_id of [{dest_mod_id}]")
 
         if dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS:
