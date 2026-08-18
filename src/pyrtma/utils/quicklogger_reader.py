@@ -3,7 +3,6 @@ import ctypes
 import os
 import warnings
 import pyrtma
-import pyrtma.core_defs
 
 from typing import List, Union, Generator, Dict, Any, Optional, Type
 
@@ -87,9 +86,7 @@ class QLReader:
         self.offsets: List[int] = []
         self.data: List[MessageData] = []
         self.messages: List[Message] = []
-        self.definitions: MessageDefinitions = (
-            pyrtma.core_defs.get_message_definitions()
-        )
+        self.definitions: Optional[MessageDefinitions] = None
         self.skipped = 0
 
     def clear(self):
@@ -99,7 +96,7 @@ class QLReader:
         self.headers.clear()
         self.offsets.clear()
         self.data.clear()
-        self.definitions = pyrtma.core_defs.get_message_definitions()
+        self.definitions = None
         self.messages.clear()
         self.skipped = 0
 
@@ -113,6 +110,7 @@ class QLReader:
         self.defs_path = pathlib.Path(msgdefs)
         self.file_path = pathlib.Path(binfile)
 
+        self.definitions = pyrtma.load_message_definitions(self.defs_path)
         mt_to_mdf_global = self.definitions.msg_defs
 
         with warnings.catch_warnings():
