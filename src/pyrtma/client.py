@@ -150,12 +150,7 @@ class Client(ClientLike):
 
         # Auto-assign a name if module-id is defined
         if name == "" and module_id != 0:
-            for k, v in self._definitions.MID.items():
-                if v == module_id:
-                    self._name = k
-                    break
-            else:
-                self._name = name
+            self._name = self._definitions.module_name_from_id(module_id) or ""
         else:
             self._name = name
 
