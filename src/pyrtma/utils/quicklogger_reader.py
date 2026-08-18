@@ -1,16 +1,13 @@
 import pathlib
 import ctypes
 import os
-import sys
-import importlib
 import warnings
 import pyrtma
-import pyrtma.message
-import pyrtma.context
+import pyrtma.core_defs
 
 from typing import List, Union, Generator, Dict, Any, Optional, Type
 
-from ..context import RTMAContext
+from ..definitions import MessageDefinitions
 from ..validators import ByteArray, Uint32, String
 from ..message import Message, MessageHeader, MessageData
 from ..message_base import MessageBase, MessageMeta
@@ -90,7 +87,9 @@ class QLReader:
         self.offsets: List[int] = []
         self.data: List[MessageData] = []
         self.messages: List[Message] = []
-        self.context: RTMAContext = RTMAContext()
+        self.definitions: MessageDefinitions = (
+            pyrtma.core_defs.get_message_definitions()
+        )
         self.skipped = 0
 
     def clear(self):
@@ -100,7 +99,7 @@ class QLReader:
         self.headers.clear()
         self.offsets.clear()
         self.data.clear()
-        self.context = RTMAContext()
+        self.definitions = pyrtma.core_defs.get_message_definitions()
         self.messages.clear()
         self.skipped = 0
 
@@ -114,99 +113,69 @@ class QLReader:
         self.defs_path = pathlib.Path(msgdefs)
         self.file_path = pathlib.Path(binfile)
 
-        # Import the message definitions
-        base = self.defs_path.absolute().parent
-        fname = self.defs_path.stem
+        mt_to_mdf_global = self.definitions.msg_defs
 
-        # Copy the current message def context before importing
-        defs = pyrtma.message._get_msg_defs()
-        ctx = pyrtma.context.get_context()
-
-        # Load global message defs
-        mt_to_mdf_global = {v.type_id: v for v in self.context.MDF.values()}
-
-        sys.path.insert(0, (str(base.absolute())))
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", VersionMismatchWarning)
-            if fname in sys.modules:
-                mod = importlib.reload(sys.modules[fname])
-            else:
-                mod = importlib.import_module(fname)
+            session_defs = pyrtma.load_message_definitions(self.defs_path)
+        mt_to_mdf_session = session_defs.msg_defs
 
-        # Load local message defs
-        ctx2 = mod.get_context()  ####_create_context() (older version)
-        if isinstance(ctx2, dict):
-            mt_to_mdf_session = {
-                ctx2["mt"][mtn]: ctx2["mdf"][mtn] for mtn in ctx2["mdf"]
-            }
-        elif hasattr(ctx2, "MT"):
-            mt_to_mdf_session = {ctx2.MT[mtn]: ctx2.MDF[mtn] for mtn in ctx2.MDF.keys()}
-        else:
-            print("Warning no local message defs loaded.")
+        messages = []
+        headers = []
+        data = []
 
-        try:
-            messages = []
-            headers = []
-            data = []
+        with open(self.file_path, "rb") as f:
+            # Parse binary file header
+            file_header = QLFileHeader.from_buffer_copy(
+                f.read(ctypes.sizeof(QLFileHeader))
+            )
+            msg_header_size = file_header.message_header_size
 
-            with open(self.file_path, "rb") as f:
-                # Parse binary file header
-                file_header = QLFileHeader.from_buffer_copy(
-                    f.read(ctypes.sizeof(QLFileHeader))
-                )
-                msg_header_size = file_header.message_header_size
+            # Extract the message headers
+            for _ in range(file_header.num_messages):
+                raw = f.read(msg_header_size)
+                headers.append(MessageHeader.from_buffer_copy(raw))
 
-                # Extract the message headers
-                for _ in range(file_header.num_messages):
-                    raw = f.read(msg_header_size)
-                    headers.append(MessageHeader.from_buffer_copy(raw))
+            # Extract the message data offsets for each message
+            offset_size = file_header.data_block_offset_size
+            offsets = (ctypes.c_uint32 * file_header.num_messages).from_buffer_copy(
+                f.read(offset_size * file_header.num_messages)
+            )
+            self.offsets = list(map(int, offsets))
 
-                # Extract the message data offsets for each message
-                offset_size = file_header.data_block_offset_size
-                offsets = (ctypes.c_uint32 * file_header.num_messages).from_buffer_copy(
-                    f.read(offset_size * file_header.num_messages)
-                )
-                self.offsets = list(map(int, offsets))
+            # Read the entire data block remaining
+            d_bytes = f.read()
 
-                # Read the entire data block remaining
-                d_bytes = f.read()
+            unknown: List[int] = []
+            # Extract the message data for each message
+            for n, offset in enumerate(offsets):
+                header = headers[n]
 
-                unknown: List[int] = []
-                # Extract the message data for each message
-                for n, offset in enumerate(offsets):
-                    header = headers[n]
+                # Look for message def by searching mt in local first, then bundled core defs.
+                msg_cls = None
+                if header.msg_type in mt_to_mdf_session:
+                    msg_cls = mt_to_mdf_session[header.msg_type]
+                elif header.msg_type in mt_to_mdf_global:
+                    msg_cls = mt_to_mdf_global[header.msg_type]
 
-                    # Look for message def by searching mt in local first, then global
-                    msg_cls = None
-                    if header.msg_type in mt_to_mdf_session:
-                        msg_cls = mt_to_mdf_session[header.msg_type]
-                    elif header.msg_type in mt_to_mdf_global:
-                        msg_cls = mt_to_mdf_global[header.msg_type]
+                raw_bytes = d_bytes[offset : offset + header.num_data_bytes]
 
-                    raw_bytes = d_bytes[offset : offset + header.num_data_bytes]
+                if msg_cls is None:
+                    msg_data = create_unknown(header, raw_bytes)
+                    unknown.append(n)
 
-                    if msg_cls is None:
-                        # print(f"Unknown message definition: MT={header.msg_type}")
-                        msg_data = create_unknown(header, raw_bytes)
-                        unknown.append(n)
+                elif msg_cls.type_size != header.num_data_bytes:
+                    print(
+                        f"Warning: Message header indicates a message data size ({header.num_data_bytes}) that does not match the expected size of message type {msg_cls.type_name} "
+                        f"({msg_cls.type_size}). Message definitions may be out of sync."
+                    )
+                    msg_data = create_unknown(header, raw_bytes)
+                    unknown.append(n)
+                else:
+                    msg_data = msg_cls.from_buffer_copy(raw_bytes)
 
-                    elif msg_cls.type_size != header.num_data_bytes:
-                        print(
-                            f"Warning: Message header indicates a message data size ({header.num_data_bytes}) that does not match the expected size of message type {msg_cls.type_name} "
-                            f"({msg_cls.type_size}). Message definitions may be out of sync."
-                        )
-                        msg_data = create_unknown(header, raw_bytes)
-                        unknown.append(n)
-                    else:
-                        msg_data = msg_cls.from_buffer_copy(raw_bytes)
-
-                    data.append(msg_data)
-                    messages.append(Message(header, msg_data))
-
-        finally:
-            # Restore the orignal message def context
-            pyrtma.message._set_msg_defs(defs)
-            pyrtma.context._set_context(ctx)
+                data.append(msg_data)
+                messages.append(Message(header, msg_data))
 
         # Store the results in the object
         self.file_header = file_header
