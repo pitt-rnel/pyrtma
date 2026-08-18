@@ -9,6 +9,7 @@ import time
 import os
 import ctypes
 import logging
+import sys
 
 from contextlib import contextmanager
 
@@ -79,6 +80,21 @@ def requires_connection(func: F) -> F:
     return cast(F, wrapper)
 
 
+def auto_detect_definitions() -> MessageDefinitions:
+    """Attempt to auto-detect message definitions from the current module"""
+    auto_defs = cd.get_message_definitions()
+    for name, mod in sys.modules.items():
+        if "pyrtma" in name:
+            continue
+
+        f = getattr(mod, "get_message_definitions", None)
+        if f is not None:
+            print(f"Found message definitions in {mod.__name__}")
+            auto_defs = f()
+            break
+    return auto_defs
+
+
 class Client(ClientLike):
     """RTMA Client interface
 
@@ -88,6 +104,12 @@ class Client(ClientLike):
         host_id (optional): Host ID. Defaults to 0.
         timecode (optional): Add additional timecode fields to message
             header, used by some projects at RNEL. Defaults to False.
+        name (optional): Name of module. Defaults to "".
+        definitions (optional): MessageDefinitions object. Defaults to None, which will auto-detect
+            message definitions from the current module or use core_defs if not found.
+        auto_detect (optional): If True, will attempt to auto-detect message definitions
+            from the current module. If False, will use core_defs. Defaults to True.
+
     """
 
     def __init__(
@@ -97,6 +119,7 @@ class Client(ClientLike):
         timecode: bool = False,
         name: str = "",
         definitions: Optional[MessageDefinitions] = None,
+        auto_detect: bool = True,
     ):
         if module_id >= cd.DYN_MOD_ID_START or module_id < 0:
             raise ValueError(f"Module ID must be >= 0 and < {cd.DYN_MOD_ID_START}")
@@ -113,14 +136,21 @@ class Client(ClientLike):
         self._paused_types: Set[int] = set()
         self._dynamic_id: bool = module_id == 0
         self._sock = socket.socket()
-        self._definitions = (
-            definitions if definitions is not None else cd.get_message_definitions()
-        )
+        self._name = name
+
+        if definitions is None:
+            if auto_detect:
+                self._definitions = auto_detect_definitions()
+            else:
+                self._definitions = cd.get_message_definitions()
+        elif isinstance(definitions, MessageDefinitions):
+            self._definitions = definitions
+        else:
+            self._definitions = cd.get_message_definitions()
 
         # Auto-assign a name if module-id is defined
-        ctx = self._definitions
         if name == "" and module_id != 0:
-            for k, v in ctx.MID.items():
+            for k, v in self._definitions.MID.items():
                 if v == module_id:
                     self._name = k
                     break
