@@ -5,15 +5,11 @@ import time
 import logging
 
 import pyrtma
-import pyrtma.message
 import pyrtma.manager
-import pyrtma.context
+from .test_msg_defs import test_defs as td
 
 from pyrtma.client import client_context
 from pyrtma.manager import MessageManager
-
-# Import message defs to add to pyrtma.msg_defs map
-from .test_msg_defs.test_defs import *
 
 
 class TestEncoding(unittest.TestCase):
@@ -42,12 +38,12 @@ class TestEncoding(unittest.TestCase):
         self.manager_thread.join()
 
     def test_message_encoding(self):
-        with client_context(server_name=self.addr) as publisher:
-            with client_context(server_name=self.addr) as subscriber:
+        defs = td.get_message_definitions()
+        with client_context(server_name=self.addr, definitions=defs) as publisher:
+            with client_context(server_name=self.addr, definitions=defs) as subscriber:
                 time.sleep(0.250)
 
-                ctx = pyrtma.context.get_context()
-                for mdf in ctx.MDF.values():
+                for mdf in defs.MDF.values():
                     if mdf.type_id > 1000:
                         # Subscribe from message type
                         with subscriber.subscription_context([mdf.type_id]):

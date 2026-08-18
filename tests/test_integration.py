@@ -5,7 +5,8 @@ import unittest
 import logging
 
 import pyrtma
-from pyrtma import message_def
+from pyrtma.core_defs import *
+from pyrtma.definitions import MessageDefinitions, build_message_definitions
 from pyrtma.message_base import MessageMeta
 from pyrtma.client import Client, client_context
 from pyrtma.manager import MessageManager
@@ -21,7 +22,6 @@ MT_TEST_MESSAGE = 123
 MT_TEST_MESSAGE2 = 456
 
 
-@message_def
 class TEST_MESSAGE(pyrtma.MessageData, metaclass=MessageMeta):
     type_id: int = MT_TEST_MESSAGE
     type_name: str = "TEST_MESSAGE"
@@ -34,7 +34,6 @@ class TEST_MESSAGE(pyrtma.MessageData, metaclass=MessageMeta):
     arr = IntArray(Int32, 8)
 
 
-@message_def
 class TEST_MESSAGE2(pyrtma.MessageData, metaclass=MessageMeta):
     type_id: int = MT_TEST_MESSAGE2
     type_name: str = "TEST_MESSAGE2"
@@ -43,6 +42,9 @@ class TEST_MESSAGE2(pyrtma.MessageData, metaclass=MessageMeta):
     type_def = ""
     type_hash = int("e3b0c442", 16)
     val = Double()
+
+
+TEST_DEFINITIONS: MessageDefinitions = build_message_definitions(__name__)
 
 
 def wait_for_message():
@@ -61,7 +63,12 @@ class TestSingleClient(unittest.TestCase):
         self.port = random.randint(1000, 10000)  # random port
         self.addr = f"127.0.0.1:{self.port}"
         self.module_id = 11
-        self.client = Client(module_id=self.module_id, host_id=0, timecode=False)
+        self.client = Client(
+            module_id=self.module_id,
+            host_id=0,
+            timecode=False,
+            definitions=TEST_DEFINITIONS,
+        )
 
         self.manager = MessageManager(
             ip_address="127.0.0.1",
