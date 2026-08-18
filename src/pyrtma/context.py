@@ -1,5 +1,6 @@
 import sys
 import copy
+import warnings
 
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -88,6 +89,11 @@ def _set_context(ctx: RTMAContext):
 
 
 def get_context() -> RTMAContext:
+    warnings.warn(
+        "pyrtma.get_context() global context access is deprecated; use MessageDefinitions via Client(definitions=...) instead.",
+        DeprecationWarning,
+        stacklevel=1,
+    )
     return _ctx_copy
 
 
@@ -115,6 +121,11 @@ def message_name_from_id(message_id: int) -> Union[str, None]:
     Returns:
         Union[str, None]: Message name, or None if ID does not exist
     """
+    warnings.warn(
+        "pyrtma.message_name_from_id() global lookup is deprecated; use MessageDefinitions or Client helpers instead.",
+        DeprecationWarning,
+        stacklevel=1,
+    )
     return _ctx.MTN.get(message_id)
 
 
@@ -127,6 +138,11 @@ def message_id_from_name(message_name: str) -> Union[int, None]:
     Returns:
         Union[int, None]: Message ID number, or None if name does not exist
     """
+    warnings.warn(
+        "pyrtma.message_id_from_name() global lookup is deprecated; use MessageDefinitions or Client helpers instead.",
+        DeprecationWarning,
+        stacklevel=1,
+    )
     return _ctx.MT.get(message_name)
 
 
@@ -139,6 +155,11 @@ def module_name_from_id(module_id: int) -> Union[str, None]:
     Returns:
         Union[str, None]: Module name, or None if ID does not exist
     """
+    warnings.warn(
+        "pyrtma.module_name_from_id() global lookup is deprecated; use MessageDefinitions or Client helpers instead.",
+        DeprecationWarning,
+        stacklevel=1,
+    )
     return _ctx.MON.get(module_id)
 
 
@@ -151,4 +172,9 @@ def module_id_from_name(module_name: str) -> Union[int, None]:
     Returns:
         Union[int, None]: Module ID number, or None if name does not exist
     """
+    warnings.warn(
+        "pyrtma.module_id_from_name() global lookup is deprecated; use MessageDefinitions or Client helpers instead.",
+        DeprecationWarning,
+        stacklevel=1,
+    )
     return _ctx.MID.get(module_name)

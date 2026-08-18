@@ -227,8 +227,9 @@ class PyDefCompiler:
 
         import pyrtma
         from pyrtma.__version__ import check_compiled_version, __version__
+        from pyrtma.definitions import MessageDefinitions, build_message_definitions
         from packaging.version import parse as _ver_parse
-        from typing import ClassVar
+        from typing import Any, ClassVar
 
         from pyrtma.message_base import MessageBase, MessageMeta
         from pyrtma.message_data import MessageData
@@ -236,6 +237,9 @@ class PyDefCompiler:
         
         if _ver_parse(__version__) >= _ver_parse("2.3.0"):
             from pyrtma.context import _update_context, get_context
+        else:
+            def _update_context(module_name: str) -> Any:
+                return None
 
         """
         return dedent(s)
@@ -244,6 +248,12 @@ class PyDefCompiler:
         s = """\
         if _ver_parse(__version__) >= _ver_parse("2.3.0"):
             _update_context(__name__)
+
+        _MESSAGE_DEFINITIONS: MessageDefinitions = build_message_definitions(__name__)
+
+
+        def get_message_definitions() -> MessageDefinitions:
+            return _MESSAGE_DEFINITIONS
         """
         return dedent(s)
 

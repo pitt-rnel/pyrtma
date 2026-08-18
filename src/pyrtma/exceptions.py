@@ -28,6 +28,24 @@ class VersionMismatchWarning(UserWarning):
     pass
 
 
+class MessageDefinitionsError(Exception):
+    """Base exception for MessageDefinitions loading and contract errors."""
+
+    pass
+
+
+class MessageDefinitionsLoadError(MessageDefinitionsError):
+    """Raised when a MessageDefinitions module file cannot be loaded."""
+
+    pass
+
+
+class MessageDefinitionsContractError(MessageDefinitionsError):
+    """Raised when a loaded module does not match MessageDefinitions contract."""
+
+    pass
+
+
 class ClientError(Exception):
     """Base exception for all Client Errors."""
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import copy
+import warnings
 
 from typing import Type, Dict, Any, TypeVar
 
@@ -31,6 +32,11 @@ _MD = TypeVar("_MD", bound=MessageData)  # Parent
 
 def message_def(msg_cls: Type[_MD], *args, **kwargs) -> Type[_MD]:
     """Decorator to add user message definitions."""
+    warnings.warn(
+        "pyrtma.message_def() global registration is deprecated; use MessageDefinitions and Client(definitions=...) instead.",
+        DeprecationWarning,
+        stacklevel=1,
+    )
     _msg_defs[msg_cls.type_id] = msg_cls
     return msg_cls
 
@@ -68,6 +74,11 @@ def get_msg_cls(id: int) -> Type[MessageData]:
     Returns:
         Type[MessageData]: Message class
     """
+    warnings.warn(
+        "pyrtma.get_msg_cls() global lookup is deprecated; use MessageDefinitions.get_msg_cls() or Client.get_msg_cls() instead.",
+        DeprecationWarning,
+        stacklevel=1,
+    )
     try:
         return _msg_defs[id]
     except KeyError as e:

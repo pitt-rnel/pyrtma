@@ -12,11 +12,11 @@ import logging
 
 from contextlib import contextmanager
 
-from .context import get_context
-from .message import Message, get_msg_cls
+from .message import Message
 from .message_data import MessageData
 from .header import MessageHeader, get_header_cls
 from .core_defs import ALL_MESSAGE_TYPES
+from .definitions import MessageDefinitions
 from .validators import disable_message_validation
 from .client_logging import RTMALogger, ClientLike
 from .exceptions import (
@@ -48,7 +48,6 @@ from typing import (
     Any,
     TypeVar,
     cast,
-    Union,
 )
 from warnings import warn
 
@@ -97,6 +96,7 @@ class Client(ClientLike):
         host_id: int = 0,
         timecode: bool = False,
         name: str = "",
+        definitions: Optional[MessageDefinitions] = None,
     ):
         if module_id >= cd.DYN_MOD_ID_START or module_id < 0:
             raise ValueError(f"Module ID must be >= 0 and < {cd.DYN_MOD_ID_START}")
@@ -113,9 +113,12 @@ class Client(ClientLike):
         self._paused_types: Set[int] = set()
         self._dynamic_id: bool = module_id == 0
         self._sock = socket.socket()
+        self._definitions = (
+            definitions if definitions is not None else cd.get_message_definitions()
+        )
 
         # Auto-assign a name if module-id is defined
-        ctx = get_context()
+        ctx = self._definitions
         if name == "" and module_id != 0:
             for k, v in ctx.MID.items():
                 if v == module_id:
@@ -141,6 +144,25 @@ class Client(ClientLike):
     @property
     def logger(self) -> RTMALogger:
         return self._logger
+
+    @property
+    def definitions(self) -> MessageDefinitions:
+        return self._definitions
+
+    def get_msg_cls(self, msg_type: int) -> Type[MessageData]:
+        return self._definitions.get_msg_cls(msg_type)
+
+    def message_name_from_id(self, message_id: int) -> Optional[str]:
+        return self._definitions.message_name_from_id(message_id)
+
+    def message_id_from_name(self, message_name: str) -> Optional[int]:
+        return self._definitions.message_id_from_name(message_name)
+
+    def module_name_from_id(self, module_id: int) -> Optional[str]:
+        return self._definitions.module_name_from_id(module_id)
+
+    def module_id_from_name(self, module_name: str) -> Optional[int]:
+        return self._definitions.module_id_from_name(module_name)
 
     def __del__(self):
         if self._connected:
@@ -770,7 +792,7 @@ class Client(ClientLike):
         # Read Data Section
 
         try:
-            data = get_msg_cls(header.msg_type)()
+            data = self._definitions.get_msg_cls(header.msg_type)()
         except UnknownMessageType as e:
             mt = header.msg_type
             raw = self._sock.recv(header.num_data_bytes, socket.MSG_WAITALL)
@@ -905,6 +927,7 @@ def client_context(
     logger_status: bool = False,
     allow_multiple: bool = False,
     name: str = "",
+    definitions: Optional[MessageDefinitions] = None,
 ):
     """Context manager function to simplify initializing a pyrtma Client
 
@@ -926,11 +949,12 @@ def client_context(
             Defaults to False.
         allow_multiple (optional): Flag to declare client can have multiple instances. Defaults to False.
         name (optional): Name of module
+        definitions (optional): MessageDefinitions instance for decode/name lookup.
 
     Yields:
         Client: initialized pyrtma Client object
     """
-    c = Client(module_id, host_id, timecode, name=name)
+    c = Client(module_id, host_id, timecode, name=name, definitions=definitions)
     c.connect(server_name, logger_status, allow_multiple)
     if msg_list:
         c.subscribe(msg_list)
