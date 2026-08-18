@@ -1,7 +1,6 @@
 from .message import *
 from .client import *
 from .client_logging import RTMALogger as RTMALogger
-from .context import *
 from .definitions import MessageDefinitions
 from .loader import load_message_definitions
 

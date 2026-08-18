@@ -10,7 +10,7 @@ import json
 import time
 from rich.logging import RichHandler
 
-from pyrtma import Client, Message, MessageHeader, get_msg_cls, ClientError
+from pyrtma import Client, Message, MessageHeader, ClientError
 from pyrtma.exceptions import RTMAMessageError
 import pyrtma.core_defs as cd
 
@@ -111,14 +111,14 @@ class RTMAWebSocketHandler(WebSocketHandler):
                     # Pass message thru websocket as json
                     if self.ws_ready_to_send:
                         logger.debug(
-                            f"Forwarding message type {get_msg_cls(msg.header.msg_type).type_name} to ws"
+                            f"Forwarding message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} to ws"
                         )
                         self.send_message(msg.to_json(minify=True))
                     else:
                         if self.proxy.connected:
                             self.send_failed_message(msg.header, time.perf_counter())
                         logger.warning(
-                            f"Failed to foward message type {get_msg_cls(msg.header.msg_type).type_name} to ws. Mod ID = {self.proxy.module_id}"
+                            f"Failed to foward message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} to ws. Mod ID = {self.proxy.module_id}"
                         )
 
     def pong_received(self, msg: str):
@@ -191,7 +191,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
             return
 
         try:
-            msg = Message.from_json(message)
+            msg = Message.from_json(message, self.proxy.definitions)
 
             if msg.header.msg_type == cd.MT_DISCONNECT:
                 self.proxy.disconnect()
@@ -200,25 +200,25 @@ class RTMAWebSocketHandler(WebSocketHandler):
                 msg.data = cast(cd.MDF_SUBSCRIBE, msg.data)
                 self.proxy.subscribe([msg.data.msg_type])
                 logger.info(
-                    f"Received SUBSCRIBE: {get_msg_cls(msg.data.msg_type).type_name}"
+                    f"Received SUBSCRIBE: {self.proxy.get_msg_cls(msg.data.msg_type).type_name}"
                 )
             elif msg.header.msg_type == cd.MT_UNSUBSCRIBE:
                 msg.data = cast(cd.MDF_UNSUBSCRIBE, msg.data)
                 self.proxy.unsubscribe([msg.data.msg_type])
                 logger.info(
-                    f"Received UNSUBSCRIBE: {get_msg_cls(msg.data.msg_type).type_name}"
+                    f"Received UNSUBSCRIBE: {self.proxy.get_msg_cls(msg.data.msg_type).type_name}"
                 )
             elif msg.header.msg_type == cd.MT_PAUSE_SUBSCRIPTION:
                 msg.data = cast(cd.MDF_PAUSE_SUBSCRIPTION, msg.data)
                 self.proxy.pause_subscription([msg.data.msg_type])
                 logger.info(
-                    f"Received PAUSE_SUBSCRIPTION: {get_msg_cls(msg.data.msg_type).type_name}"
+                    f"Received PAUSE_SUBSCRIPTION: {self.proxy.get_msg_cls(msg.data.msg_type).type_name}"
                 )
             elif msg.header.msg_type == cd.MT_RESUME_SUBSCRIPTION:
                 msg.data = cast(cd.MDF_RESUME_SUBSCRIPTION, msg.data)
                 self.proxy.resume_subscription([msg.data.msg_type])
                 logger.info(
-                    f"Received RESUME_SUBSCRIPTION: {get_msg_cls(msg.data.msg_type).type_name}"
+                    f"Received RESUME_SUBSCRIPTION: {self.proxy.get_msg_cls(msg.data.msg_type).type_name}"
                 )
             elif msg.header.msg_type == cd.MT_CONNECT:
                 self.handle_connect(msg)
@@ -233,7 +233,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
             else:
                 self.proxy.forward_message(msg.header, msg.data or None)
                 logger.debug(
-                    f"Forwarded message type {get_msg_cls(msg.header.msg_type).type_name} from ws"
+                    f"Forwarded message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} from ws"
                 )
         except (RTMAMessageError, ClientError) as e:
             if self.ws_ready_to_send:
