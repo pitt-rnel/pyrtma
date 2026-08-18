@@ -87,11 +87,12 @@ def auto_detect_definitions() -> MessageDefinitions:
         if "pyrtma" in name:
             continue
 
-        f = getattr(mod, "get_message_definitions", None)
-        if f is not None:
-            print(f"Found message definitions in {mod.__name__}")
-            auto_defs = f()
-            break
+        if hasattr(mod, "COMPILED_PYRTMA_VERSION"):
+            f = getattr(mod, "get_message_definitions", None)
+            if f is not None:
+                print(f"Found message definitions in {mod.__name__}")
+                auto_defs = f()
+                break
     return auto_defs
 
 
