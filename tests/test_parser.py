@@ -45,11 +45,13 @@ class TestParser(unittest.TestCase):
         del self.tmp2
 
     def test_host_id_conflicts(self):
-        dup_host_id = textwrap.dedent("""
+        dup_host_id = textwrap.dedent(
+            """
             host_ids:
                 A: 10
                 B: 10
-            """)
+            """
+        )
 
         self.tmp.write(dup_host_id)
 
@@ -57,11 +59,13 @@ class TestParser(unittest.TestCase):
             self.parser.parse(self.tmp.path)
 
     def test_module_id_conflicts(self):
-        dup_mod_id = textwrap.dedent("""
+        dup_mod_id = textwrap.dedent(
+            """
             module_ids:
                 A: 10
                 B: 10
-            """)
+            """
+        )
 
         self.tmp.write(dup_mod_id)
 
@@ -70,7 +74,8 @@ class TestParser(unittest.TestCase):
 
     def test_signal_id_conflicts(self):
         # Duplicate Signal
-        dup_msg_id = textwrap.dedent("""
+        dup_msg_id = textwrap.dedent(
+            """
             message_defs:
                 A:
                     id: 100
@@ -78,7 +83,8 @@ class TestParser(unittest.TestCase):
                 B:
                     id: 100
                     fields: null
-            """)
+            """
+        )
 
         self.tmp.write(dup_msg_id)
 
@@ -87,7 +93,8 @@ class TestParser(unittest.TestCase):
 
     def test_message_id_conflicts(self):
         # Duplicate Message
-        dup_msg_id = textwrap.dedent("""
+        dup_msg_id = textwrap.dedent(
+            """
             message_defs:
                 A:
                     id: 100
@@ -97,7 +104,8 @@ class TestParser(unittest.TestCase):
                     id: 100
                     fields:
                         i: int
-            """)
+            """
+        )
 
         self.tmp.write(dup_msg_id)
 
@@ -105,13 +113,15 @@ class TestParser(unittest.TestCase):
             self.parser.parse(self.tmp.path)
 
     def test_duplicate_message(self):
-        dup_msg = textwrap.dedent("""
+        dup_msg = textwrap.dedent(
+            """
             message_defs:
                 A:
                     id: 100
                     fields:
                         i: int
-            """)
+            """
+        )
 
         self.tmp.write(dup_msg)
         self.parser.parse(self.tmp.path)
@@ -121,10 +131,12 @@ class TestParser(unittest.TestCase):
             self.parser.parse(self.tmp2.path)
 
     def test_duplicate_module(self):
-        dup_msg = textwrap.dedent("""
+        dup_msg = textwrap.dedent(
+            """
             module_ids:
                 A: 1000
-            """)
+            """
+        )
 
         self.tmp.write(dup_msg)
         self.parser.parse(self.tmp.path)
@@ -134,10 +146,12 @@ class TestParser(unittest.TestCase):
             self.parser.parse(self.tmp2.path)
 
     def test_duplicate_host(self):
-        dup_msg = textwrap.dedent("""
+        dup_msg = textwrap.dedent(
+            """
             host_ids:
                 A: 80
-            """)
+            """
+        )
 
         self.tmp.write(dup_msg)
         self.parser.parse(self.tmp.path)
@@ -147,10 +161,12 @@ class TestParser(unittest.TestCase):
             self.parser.parse(self.tmp2.path)
 
     def test_duplicate_constant(self):
-        dup_msg = textwrap.dedent("""
+        dup_msg = textwrap.dedent(
+            """
             constants:
                 A: 80
-            """)
+            """
+        )
 
         self.tmp.write(dup_msg)
         self.parser.parse(self.tmp.path)
@@ -160,188 +176,221 @@ class TestParser(unittest.TestCase):
             self.parser.parse(self.tmp2.path)
 
     def test_constant_name_conflicts(self):
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             constants:
                 A: 80
             string_constants:
                 A: "abc"
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             constants:
                 A: 80
             string_constants:
                 A: "abc"
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             constants:
                 A: 80
             aliases:
                 A: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             constants:
                 A: 80
             struct_defs:
                 A:
                     id: 1000
                     fields: null
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             constants:
                 A: 80
             message_defs:
                 A:
                     id: 1000
                     fields: null
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
     def test_string_constant_name_conflicts(self):
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             constants:
                 A: 80
             string_constants:
                 A: "abc"
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             string_constants:
                 A: "abc"
             aliases:
                 A: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             string_constants:
                 A: "abc"
             struct_defs:
                 A:
                     id: 1000
                     fields: null
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             string_constants:
                 A: "abc"
             message_defs:
                 A:
                     id: 1000
                     fields: null
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
     def test_alias_name_conflicts(self):
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             constants:
                 A: 80
             aliases:
                 A: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             string_constants:
                 A: "abc"
             aliases:
                 A: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             aliases:
                 A: int
             struct_defs:
                 A:
                     fields:
                         i: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             aliases:
                 A: int
             message_defs:
                 A:
                     id: 1000
                     fields: null
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
     def test_struct_name_conflicts(self):
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             constants:
                 A: 80
             struct_defs:
                 A:
                     fields:
                         i: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             string_constants:
                 A: "abc"
             struct_defs:
                 A:
                     fields:
                         i: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             aliases:
                 A: int
             struct_defs:
                 A:
                     fields:
                         i: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             struct_defs:
                 A:
                     fields:
@@ -350,14 +399,16 @@ class TestParser(unittest.TestCase):
                 A:
                     id: 1000
                     fields: null
-            """)
+            """
+        )
 
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
     def test_message_name_conflicts(self):
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             constants:
                 A: 80
             message_defs:
@@ -365,12 +416,14 @@ class TestParser(unittest.TestCase):
                     id: 1000
                     fields:
                         i: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             string_constants:
                 A: "abc"
             message_defs:
@@ -378,12 +431,14 @@ class TestParser(unittest.TestCase):
                     id: 1000
                     fields:
                         i: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             aliases:
                 A: int
             message_defs:
@@ -391,12 +446,14 @@ class TestParser(unittest.TestCase):
                     id: 1000
                     fields:
                         i: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             struct_defs:
                 A:
                     fields:
@@ -405,14 +462,16 @@ class TestParser(unittest.TestCase):
                 A:
                     id: 1000
                     fields: null
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.DuplicateNameError):
             self.parser.parse(self.tmp.path)
 
     def test_yaml_syntax(self):
         # Duplicate Key
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             struct_defs:
                 A:
                     fields:
@@ -421,80 +480,95 @@ class TestParser(unittest.TestCase):
                 A:
                     fields:
                         i: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.YAMLSyntaxError):
             self.parser.parse(self.tmp.path)
 
     def test_rtma_syntax(self):
         # Bad Name
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             struct_defs:
                 _A:
                     fields:
                         i: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
         # Bad Name
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             message_defs:
                 _A:
                     fields:
                         i: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
         # Bad Name
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             constants:
                 _A: 10
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
         # Bad Name
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             aliases:
                 _A: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
         # Illegal field name
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             message_defs:
                 A:
                     id:  1000
                     fields:
                         type_name: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
         # Bad Indentation
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             struct_defs:
             A:
                 fields:
                     i: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
         # Wrong Type for imports
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             imports:
                 A: abc
-            """)
+            """
+        )
 
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
@@ -502,47 +576,57 @@ class TestParser(unittest.TestCase):
 
     def test_type_error(self):
         # Wrong Type for host_id
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             host_ids:
                 A: abc
-            """)
+            """
+        )
 
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.InvalidTypeError):
             self.parser.parse(self.tmp.path)
 
         # Wrong Type for module_id
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             module_ids:
                 A: abc
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.InvalidTypeError):
             self.parser.parse(self.tmp.path)
 
     def test_reserve_syntax(self):
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             message_defs:
                 _RESERVED_:
                     fields:
                         i: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             message_defs:
                 _RESERVED_: 1
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.InvalidTypeError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             message_defs:
                 _RESERVED_: [1:2:10]
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(
             (pyrtma.parser.YAMLSyntaxError, pyrtma.parser.InvalidTypeError)
@@ -551,25 +635,30 @@ class TestParser(unittest.TestCase):
             # InvalidTypeError will happen if not caught by yaml loader
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             message_defs:
                 _RESERVED_: [1-2-10]
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.InvalidTypeError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             message_defs:
                 _RESERVED_:
                     id: 1
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.InvalidTypeError):
             self.parser.parse(self.tmp.path)
 
     def test_auto_padding(self):
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             message_defs:
                 A:
                     id: 1001
@@ -603,49 +692,58 @@ class TestParser(unittest.TestCase):
                         c: C
                         d: D
 
-            """)
+            """
+        )
 
         self.tmp.write(text)
         self.parser.parse(self.tmp.path)
 
     def test_reserved_fields(self):
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             message_defs:
                 _RESERVED_:
                     fields:
                         auto: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
     def test_prefix_fields(self):
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             message_defs:
                 A:
                     id: 1001
                     fields:
                         _bad_prefix: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             message_defs:
                 A:
                     id: 1001
                     fields:
                         9bad_prefix: int
-            """)
+            """
+        )
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
 
-        text = textwrap.dedent("""
+        text = textwrap.dedent(
+            """
             constants:
                 _bad_prefix: 10
-            """)
+            """
+        )
 
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
