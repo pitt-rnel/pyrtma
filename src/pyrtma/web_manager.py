@@ -8,14 +8,21 @@ import pathlib
 import sys
 import json
 import time
+import socket
+import pyrtma.core_defs as cd
 from rich.logging import RichHandler
 
-from pyrtma import Client, Message, MessageHeader, ClientError
+from pyrtma import (
+    Client,
+    Message,
+    MessageHeader,
+    ClientError,
+    MessageDefinitions,
+    load_message_definitions,
+)
 from pyrtma.exceptions import RTMAMessageError
-import pyrtma.core_defs as cd
 
 from socket import error as SocketError
-import socket
 from socketserver import TCPServer
 from websocket_server import (  # type: ignore
     WebsocketServer,
@@ -57,7 +64,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         """
         # Initialize RTMA Proxy connection
         self.mm_ip = server.mm_ip
-        self.proxy = Client()
+        self.proxy = Client(definitions=server.definitions)
 
         WebSocketHandler.__init__(self, socket, addr, server)
 
@@ -344,6 +351,7 @@ class WebMessageManager(WebsocketServer):
         loglevel: int = logging.WARNING,
         key=None,
         cert=None,
+        definitions: Optional[MessageDefinitions] = None,
     ):
         """WebMessageManager class
 
@@ -354,7 +362,9 @@ class WebMessageManager(WebsocketServer):
             loglevel (int, optional): Loging level. Defaults to logging.WARNING.
             key (optional): Path to SSL key. Defaults to None.
             cert (optional): Path to SSL cert. Defaults to None.
+            definitions (Optional[MessageDefinitions], optional): MessageDefinitions object. Defaults to None.
         """
+        self.definitions = definitions
 
         logger.setLevel(loglevel)
         TCPServer.__init__(self, (host, port), RTMAWebSocketHandler)
@@ -462,15 +472,18 @@ def main():
         sys.exit(1)
     args = parser.parse_args()
 
+    base = pathlib.Path(args.defs_file).absolute().parent
+    fname = pathlib.Path(args.defs_file).stem
+
+    defs = load_message_definitions(args.defs_file)
+
     websocket_server = WebMessageManager(
         host=args.host,
         port=args.port,
         loglevel=logging.INFO,
         mm_ip=args.mm_ip,
+        definitions=defs,
     )
-
-    base = pathlib.Path(args.defs_file).absolute().parent
-    fname = pathlib.Path(args.defs_file).stem
 
     sys.path.insert(0, (str(base.absolute())))
     importlib.import_module(fname)
