@@ -182,6 +182,18 @@ defs = pyrtma.load_message_definitions("./msg_defs/my_project_defs.py")
 client = pyrtma.Client(name="MY_MODULE", definitions=defs)
 ```
 
+The same definitions object also carries the common lookup helpers that used to be global:
+
+```python
+msg_cls = client.get_msg_cls(1234)
+msg_name = defs.message_name_from_id(1234)
+msg_id = defs.message_id_from_name("MY_MESSAGE")
+module_name = client.module_name_from_id(212)
+module_id = defs.module_id_from_name("MY_MODULE")
+```
+
+Use `Client` when you already have a running client and want lookups tied to its active schema. Use `MessageDefinitions` when you only need schema access.
+
 ### How Client Auto-Detect Works
 
 If `definitions` is not passed, `Client` uses auto-detect by default.
