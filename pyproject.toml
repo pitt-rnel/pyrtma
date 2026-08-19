@@ -38,6 +38,9 @@ version = {attr = "pyrtma.__version__.__version__"}
 [tool.setuptools.package-data]
 pyrtma = ["py.typed", "*.yaml"]
 
+[tool.black]
+target-version = ["py310"]
+
 [project.urls]
 "Homepage" = "https://github.com/pitt-rnel/pyrtma"
 "Bug Tracker" = "https://github.com/pitt-rnel/pyrtma/issues"
