@@ -13,7 +13,8 @@ from typing import cast
 
 def publisher(server="127.0.0.1:7111", timecode=False):
     # Setup Client
-    mod = pyrtma.Client(timecode=timecode)
+    defs = md.get_message_definitions()
+    mod = pyrtma.Client(timecode=timecode, definitions=defs)
     mod.connect(server_name=server)
 
     # Build a packet to send
@@ -37,7 +38,8 @@ def publisher(server="127.0.0.1:7111", timecode=False):
 
 def subscriber(server="127.0.0.1:7111", timecode=False):
     # Setup Client
-    mod = pyrtma.Client(timecode=timecode)
+    defs = md.get_message_definitions()
+    mod = pyrtma.Client(timecode=timecode, definitions=defs)
     mod.connect(server_name=server)
 
     # Select the messages to receive
