@@ -151,6 +151,54 @@ The msg_defs directory should now have message def files created for each langua
 
 The rtma objects are compiled into objects suitable for each language.
 
+### Message Definitions in Clients
+
+`pyrtma.Client` decodes messages using a `MessageDefinitions` instance.
+
+A simple mental model:
+
+1. Compile your YAML schema into a Python defs file.
+2. Load that defs file in your application.
+3. Pass the loaded definitions into each `Client` you create.
+
+For predictable behavior, pass definitions explicitly.
+
+Example: import from compiled defs module
+
+```python
+import pyrtma
+import my_project_defs
+
+defs = my_project_defs.get_message_definitions()
+client = pyrtma.Client(name="MY_MODULE", definitions=defs)
+```
+
+Example: load from a defs file path
+
+```python
+import pyrtma
+
+defs = pyrtma.load_message_definitions("./msg_defs/my_project_defs.py")
+client = pyrtma.Client(name="MY_MODULE", definitions=defs)
+```
+
+### How Client Auto-Detect Works
+
+If `definitions` is not passed, `Client` uses auto-detect by default.
+
+Auto-detect flow:
+
+1. Start from bundled core definitions.
+2. Scan already-imported non-`pyrtma` modules in the current process.
+3. Use the first module that looks like compiled pyrtma defs (it has `COMPILED_PYRTMA_VERSION` and `get_message_definitions()`).
+4. If none is found, keep using bundled core definitions.
+
+Guidance:
+
+- Use explicit `definitions=` in production applications.
+- Auto-detect is convenient for quick scripts.
+- Set `auto_detect=False` to skip scanning and use core definitions unless you pass `definitions` explicitly.
+
 >[!NOTE]
 >The pyrtma message compiler requires python 3.10+. Messages compiled for python in python 3.10+ may continue to work with pyrtma clients in older versions of python, but those versions are being phased out.
 
