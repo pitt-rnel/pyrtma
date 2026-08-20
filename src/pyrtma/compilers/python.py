@@ -224,7 +224,6 @@ class PyDefCompiler:
         s = """\
         import ctypes
 
-        import pyrtma
         from pyrtma.__version__ import check_compiled_version, __version__
         from pyrtma.definitions import MessageDefinitions, build_message_definitions
         from typing import ClassVar
