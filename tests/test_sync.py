@@ -5,6 +5,7 @@ import time
 import logging
 
 import pyrtma
+import pyrtma.exceptions
 from .test_msg_defs import test_defs as td
 import time
 from pyrtma.client import client_context
@@ -56,7 +57,7 @@ class TestSync(unittest.TestCase):
 
                 publisher.forward_message(header, td.MDF_TEST_START())
 
-                with self.assertRaises(pyrtma.message.InvalidMessageDefinition):
+                with self.assertRaises(pyrtma.exceptions.InvalidMessageDefinition):
                     msg = subscriber.read_message(timeout=0.100, sync_check=True)
 
     def test_size_mismatch(self):
@@ -77,7 +78,7 @@ class TestSync(unittest.TestCase):
 
                 publisher.forward_message(header, data)
 
-                with self.assertRaises(pyrtma.message.InvalidMessageDefinition):
+                with self.assertRaises(pyrtma.exceptions.InvalidMessageDefinition):
                     msg = subscriber.read_message(timeout=0.100, sync_check=True)
 
         time.sleep(0.5)
