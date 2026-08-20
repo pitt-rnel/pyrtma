@@ -3,6 +3,7 @@
 Includes :py:class:`~Client` class and associated exception classes
 """
 
+from shlex import split
 import socket
 import select
 import time
@@ -32,6 +33,7 @@ from .exceptions import (
     InvalidDestinationModule,
     InvalidDestinationHost,
     InvalidSubscription,
+    MessageDefinitionsLoadError,
 )
 from . import core_defs as cd
 
@@ -50,6 +52,8 @@ from typing import (
     TypeVar,
     cast,
 )
+from types import ModuleType
+
 from warnings import warn
 
 __all__ = [
@@ -80,20 +84,103 @@ def requires_connection(func: F) -> F:
     return cast(F, wrapper)
 
 
+def is_message_definitions_module(module: ModuleType) -> bool:
+    """Check if a module has message definitions"""
+    try:
+        module.COMPILED_PYRTMA_VERSION
+        module.get_message_definitions
+        return True
+    except AttributeError:
+        return False
+
+
+def get_message_definitions_from_module(module: ModuleType) -> MessageDefinitions:
+    """Get message definitions from a module"""
+    try:
+        defs = module.get_message_definitions()
+        if isinstance(defs, MessageDefinitions):
+            return defs
+        else:
+            raise MessageDefinitionsLoadError(
+                f"Module {module.__name__} does not contain a MessageDefinitions instance"
+            )
+    except Exception as e:
+        raise MessageDefinitionsLoadError(
+            f"Failed to load message definitions from module {module.__name__}"
+        ) from e
+
+
 def auto_detect_definitions() -> MessageDefinitions:
-    """Attempt to auto-detect message definitions from the current module"""
+    """Attempt to auto-detect message definitions from loaded modules"""
     auto_defs = cd.get_message_definitions()
-    for name, mod in sys.modules.items():
-        if "pyrtma" in name:
+
+    # Prune the modules to only those that are not built-in or standard library modules
+    mod_names = sys.modules.keys() - (
+        set(sys.builtin_module_names) | sys.stdlib_module_names
+    )
+
+    for name in mod_names:
+        if name.startswith("pyrtma"):
             continue
 
-        if hasattr(mod, "COMPILED_PYRTMA_VERSION"):
-            f = getattr(mod, "get_message_definitions", None)
-            if f is not None:
-                # print(f"Found message definitions in {mod.__name__}")
-                auto_defs = f()
-                break
+        if name.startswith("_"):
+            continue
+
+        mod = sys.modules[name]
+
+        if is_message_definitions_module(mod):
+            auto_defs = get_message_definitions_from_module(mod)
+            break
     return auto_defs
+
+
+def get_definitions(
+    definitions: Optional[MessageDefinitions | ModuleType], auto_detect: bool
+) -> MessageDefinitions:
+    """Determine which message definitions to use"""
+    if isinstance(definitions, MessageDefinitions):
+        return definitions
+    elif isinstance(definitions, ModuleType):
+        if is_message_definitions_module(definitions):
+            # print(f"Using message definitions from module {definitions.__name__}")
+            return get_message_definitions_from_module(definitions)
+        else:
+            raise MessageDefinitionsLoadError(
+                f"Module {definitions.__name__} does not have message definitions"
+            )
+    elif definitions is None:
+        # Check for message definitions in PYRTMA_MSGDEF_MODULES environment variable
+        # Allows for multiple modules to be specified, separated by semicolons
+        # example: PYRTMA_MSGDEF_MODULES=module1;module2;module3
+        # First module that has message definitions will be used. If none found, will fall back to auto-detect or core_defs.
+        success = False
+        if mod_names := os.getenv("PYRTMA_MSGDEF_MODULES"):
+            mod_list = mod_names.removesuffix(";").split(";")
+            # Find the first module that has message definitions
+            for mod_name in mod_list:
+                mod = sys.modules.get(mod_name)
+                if mod is not None:
+                    if is_message_definitions_module(mod):
+                        # print(f"Using message definitions from module {mod_name}")
+                        success = True
+                        return get_message_definitions_from_module(mod)
+            else:
+                print(
+                    "Warning: No message definitions found in PYRTMA_MSGDEF_MODULES list, Falling back to auto-detect or core_defs."
+                )
+
+        if not success:
+            if auto_detect:
+                return auto_detect_definitions()
+            else:
+                print("Warning: No message definitions provided, using core_defs only!")
+
+        return cd.get_message_definitions()
+
+    else:
+        raise TypeError(
+            f"Invalid type for definitions: {type(definitions)}. Must be MessageDefinitions or ModuleType."
+        )
 
 
 class Client(ClientLike):
@@ -106,7 +193,7 @@ class Client(ClientLike):
         timecode (optional): Add additional timecode fields to message
             header, used by some projects at RNEL. Defaults to False.
         name (optional): Name of module. Defaults to "".
-        definitions (optional): MessageDefinitions object. Defaults to None, which will auto-detect
+        definitions (optional): MessageDefinitions object or Module containing MessageDefinitions. Defaults to None, which will auto-detect
             message definitions from the current module or use core_defs if not found.
         auto_detect (optional): If True, will attempt to auto-detect message definitions
             from the current module. If False, will use core_defs. Defaults to True.
@@ -119,12 +206,13 @@ class Client(ClientLike):
         host_id: int = 0,
         timecode: bool = False,
         name: str = "",
-        definitions: Optional[MessageDefinitions] = None,
+        definitions: Optional[MessageDefinitions | ModuleType] = None,
         auto_detect: bool = True,
     ):
         if module_id >= cd.DYN_MOD_ID_START or module_id < 0:
             raise ValueError(f"Module ID must be >= 0 and < {cd.DYN_MOD_ID_START}")
 
+        print(globals().keys())
         self._module_id = module_id
         self._host_id = host_id
         self._msg_count = 0
@@ -139,19 +227,11 @@ class Client(ClientLike):
         self._sock = socket.socket()
         self._name = name
 
-        if definitions is None:
-            if auto_detect:
-                self._definitions = auto_detect_definitions()
-            else:
-                self._definitions = cd.get_message_definitions()
-        elif isinstance(definitions, MessageDefinitions):
-            self._definitions = definitions
-        else:
-            self._definitions = cd.get_message_definitions()
+        self._definitions = get_definitions(definitions, auto_detect)
 
         # Auto-assign a name if module-id is defined
         if name == "" and module_id != 0:
-            self._name = self._definitions.module_name_from_id(module_id) or ""
+            self._name = self.module_name_from_id(module_id) or ""
         else:
             self._name = name
 
