@@ -130,6 +130,7 @@ def auto_detect_definitions() -> MessageDefinitions:
 
         if is_message_definitions_module(mod):
             auto_defs = get_message_definitions_from_module(mod)
+            #print(f"Auto-detected message definitions from module: {name}")
             break
     return auto_defs
 

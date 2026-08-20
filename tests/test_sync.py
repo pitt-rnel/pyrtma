@@ -10,7 +10,6 @@ from .test_msg_defs import test_defs as td
 import time
 from pyrtma.client import client_context
 from pyrtma.message import *
-import pyrtma.manager
 from pyrtma.manager import MessageManager
 
 
@@ -20,6 +19,7 @@ class TestSync(unittest.TestCase):
     def setUp(self):
         self.port = random.randint(1000, 10000)  # random port
         self.addr = f"127.0.0.1:{self.port}"
+        self.defs = td.get_message_definitions()
 
         self.manager = MessageManager(
             ip_address="127.0.0.1",
@@ -40,9 +40,9 @@ class TestSync(unittest.TestCase):
         self.manager_thread.join()
 
     def test_version_mismatch(self):
-        with client_context(server_name=self.addr) as publisher:
+        with client_context(server_name=self.addr, definitions=self.defs) as publisher:
             with client_context(
-                server_name=self.addr, msg_list=[td.MT_TEST_START]
+                server_name=self.addr, msg_list=[td.MT_TEST_START], definitions=self.defs
             ) as subscriber:
                 time.sleep(0.250)
 
@@ -61,9 +61,9 @@ class TestSync(unittest.TestCase):
                     msg = subscriber.read_message(timeout=0.100, sync_check=True)
 
     def test_size_mismatch(self):
-        with client_context(server_name=self.addr) as publisher:
+        with client_context(server_name=self.addr, definitions=self.defs) as publisher:
             with client_context(
-                server_name=self.addr, msg_list=[td.MT_TEST_START]
+                server_name=self.addr, msg_list=[td.MT_TEST_START], definitions=self.defs
             ) as subscriber:
                 time.sleep(0.250)
 
