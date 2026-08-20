@@ -212,7 +212,6 @@ class Client(ClientLike):
         if module_id >= cd.DYN_MOD_ID_START or module_id < 0:
             raise ValueError(f"Module ID must be >= 0 and < {cd.DYN_MOD_ID_START}")
 
-        print(globals().keys())
         self._module_id = module_id
         self._host_id = host_id
         self._msg_count = 0
