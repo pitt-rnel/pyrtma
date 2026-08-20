@@ -4,8 +4,6 @@ import threading
 import time
 import logging
 
-import pyrtma
-import pyrtma.manager
 from .test_msg_defs import test_defs as td
 
 from pyrtma.client import client_context

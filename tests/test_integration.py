@@ -538,7 +538,9 @@ class TestSingleContextClient(unittest.TestCase):
 
         # Act
         with client_context(
-            module_id=self.context_module_id, server_name=self.addr
+            module_id=self.context_module_id,
+            server_name=self.addr,
+            definitions=TEST_DEFINITIONS,
         ) as client:
             wait_for_message()
 
@@ -555,7 +557,9 @@ class TestSingleContextClient(unittest.TestCase):
 
         # Act
         with client_context(
-            module_id=self.context_module_id, server_name=self.addr
+            module_id=self.context_module_id,
+            server_name=self.addr,
+            definitions=TEST_DEFINITIONS,
         ) as client:
 
             # Assert
@@ -575,6 +579,7 @@ class TestSingleContextClient(unittest.TestCase):
             module_id=self.context_module_id,
             server_name=self.addr,
             msg_list=[MT_TEST_MESSAGE],
+            definitions=TEST_DEFINITIONS,
         ) as client:
             wait_for_message()
 
@@ -599,6 +604,7 @@ class TestSingleContextClient(unittest.TestCase):
             module_id=self.context_module_id,
             server_name=self.addr,
             msg_list=[MT_TEST_MESSAGE, MT_TEST_MESSAGE2],
+            definitions=TEST_DEFINITIONS,
         ) as client:
             wait_for_message()
 
@@ -622,7 +628,9 @@ class TestSingleContextClient(unittest.TestCase):
         """
         # Arrange
         with client_context(
-            module_id=self.context_module_id, server_name=self.addr
+            module_id=self.context_module_id,
+            server_name=self.addr,
+            definitions=TEST_DEFINITIONS,
         ) as client:
             wait_for_message()
             with client.subscription_context([MT_TEST_MESSAGE]):
@@ -648,7 +656,9 @@ class TestSingleContextClient(unittest.TestCase):
         """
         # Arrange
         with client_context(
-            module_id=self.context_module_id, server_name=self.addr
+            module_id=self.context_module_id,
+            server_name=self.addr,
+            definitions=TEST_DEFINITIONS,
         ) as client:
             wait_for_message()
             with client.subscription_context([MT_TEST_MESSAGE, MT_TEST_MESSAGE2]):
@@ -679,6 +689,7 @@ class TestSingleContextClient(unittest.TestCase):
             module_id=self.context_module_id,
             server_name=self.addr,
             msg_list=[MT_TEST_MESSAGE],
+            definitions=TEST_DEFINITIONS,
         ) as client:
             wait_for_message()
 
@@ -703,6 +714,7 @@ class TestSingleContextClient(unittest.TestCase):
             module_id=self.context_module_id,
             server_name=self.addr,
             msg_list=[MT_TEST_MESSAGE, MT_TEST_MESSAGE2],
+            definitions=TEST_DEFINITIONS,
         ) as client:
             wait_for_message()
 
@@ -736,6 +748,7 @@ class TestSingleContextClient(unittest.TestCase):
             module_id=self.context_module_id,
             server_name=self.addr,
             msg_list=[MT_TEST_MESSAGE],
+            definitions=TEST_DEFINITIONS,
         ) as client:
             wait_for_message()
             with client.paused_subscription_context([MT_TEST_MESSAGE]):
@@ -762,6 +775,7 @@ class TestSingleContextClient(unittest.TestCase):
             module_id=self.context_module_id,
             server_name=self.addr,
             msg_list=[MT_TEST_MESSAGE, MT_TEST_MESSAGE2],
+            definitions=TEST_DEFINITIONS,
         ) as client:
             wait_for_message()
             with client.paused_subscription_context(

@@ -42,7 +42,9 @@ class TestSync(unittest.TestCase):
     def test_version_mismatch(self):
         with client_context(server_name=self.addr, definitions=self.defs) as publisher:
             with client_context(
-                server_name=self.addr, msg_list=[td.MT_TEST_START], definitions=self.defs
+                server_name=self.addr,
+                msg_list=[td.MT_TEST_START],
+                definitions=self.defs,
             ) as subscriber:
                 time.sleep(0.250)
 
@@ -63,7 +65,9 @@ class TestSync(unittest.TestCase):
     def test_size_mismatch(self):
         with client_context(server_name=self.addr, definitions=self.defs) as publisher:
             with client_context(
-                server_name=self.addr, msg_list=[td.MT_TEST_START], definitions=self.defs
+                server_name=self.addr,
+                msg_list=[td.MT_TEST_START],
+                definitions=self.defs,
             ) as subscriber:
                 time.sleep(0.250)
 

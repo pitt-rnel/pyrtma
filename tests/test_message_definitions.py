@@ -1,7 +1,6 @@
 import pathlib
 import unittest
 
-import pyrtma
 import pyrtma.core_defs as cd
 from pyrtma.data_logger.dataset import Dataset
 from pyrtma.definitions import MessageDefinitions
