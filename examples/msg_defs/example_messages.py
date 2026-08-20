@@ -30,7 +30,6 @@ from pyrtma.validators import (
     ByteArray,
 )
 
-
 COMPILED_PYRTMA_VERSION: str = "3.0.2"
 check_compiled_version(COMPILED_PYRTMA_VERSION)
 
