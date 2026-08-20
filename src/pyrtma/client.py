@@ -1032,7 +1032,8 @@ def client_context(
     logger_status: bool = False,
     allow_multiple: bool = False,
     name: str = "",
-    definitions: Optional[MessageDefinitions] = None,
+    definitions: Optional[MessageDefinitions | ModuleType] = None,
+    auto_detect: bool = True,
 ):
     """Context manager function to simplify initializing a pyrtma Client
 
@@ -1054,7 +1055,10 @@ def client_context(
             Defaults to False.
         allow_multiple (optional): Flag to declare client can have multiple instances. Defaults to False.
         name (optional): Name of module
-        definitions (optional): MessageDefinitions instance for decode/name lookup.
+        definitions (optional): MessageDefinitions object or Module containing MessageDefinitions. Defaults to None, which will auto-detect
+            message definitions from the current module or use core_defs if not found.
+        auto_detect (optional): If True, will attempt to auto-detect message definitions
+            from the current module. If False, will use core_defs. Defaults to True.
 
     Yields:
         Client: initialized pyrtma Client object
