@@ -98,11 +98,11 @@ def get_message_definitions_from_module(module: ModuleType) -> MessageDefinition
     """Get message definitions from a module"""
     try:
         defs = module.get_message_definitions()
-    except Exception as e: # could maybe be more specific i.e. AttributeError
+    except Exception as e:  # could maybe be more specific i.e. AttributeError
         raise MessageDefinitionsLoadError(
             f"Failed to load message definitions from module {module.__name__}"
         ) from e
-        
+
     if isinstance(defs, MessageDefinitions):
         return defs
     else:
@@ -113,8 +113,6 @@ def get_message_definitions_from_module(module: ModuleType) -> MessageDefinition
 
 def auto_detect_definitions() -> MessageDefinitions:
     """Attempt to auto-detect message definitions from loaded modules"""
-    auto_defs = cd.get_message_definitions()
-
     # Prune the modules to only those that are not built-in or standard library modules
     mod_names = sys.modules.keys() - (
         set(sys.builtin_module_names) | sys.stdlib_module_names
@@ -130,10 +128,12 @@ def auto_detect_definitions() -> MessageDefinitions:
         mod = sys.modules[name]
 
         if is_message_definitions_module(mod):
-            auto_defs = get_message_definitions_from_module(mod)
             # print(f"Auto-detected message definitions from module: {name}")
-            break
-    return auto_defs
+            return get_message_definitions_from_module(mod)
+
+    # Return core_defs if no other message definitions found
+    # print("No message definitions found in loaded modules, using core_defs")
+    return cd.get_message_definitions()
 
 
 def get_definitions(
