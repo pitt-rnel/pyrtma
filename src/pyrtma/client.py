@@ -98,16 +98,17 @@ def get_message_definitions_from_module(module: ModuleType) -> MessageDefinition
     """Get message definitions from a module"""
     try:
         defs = module.get_message_definitions()
-        if isinstance(defs, MessageDefinitions):
-            return defs
-        else:
-            raise MessageDefinitionsLoadError(
-                f"Module {module.__name__} does not contain a MessageDefinitions instance"
-            )
-    except Exception as e:
+    except Exception as e: # could maybe be more specific i.e. AttributeError
         raise MessageDefinitionsLoadError(
             f"Failed to load message definitions from module {module.__name__}"
         ) from e
+        
+    if isinstance(defs, MessageDefinitions):
+        return defs
+    else:
+        raise MessageDefinitionsLoadError(
+            f"Module {module.__name__} does not contain a MessageDefinitions instance"
+        )
 
 
 def auto_detect_definitions() -> MessageDefinitions:
