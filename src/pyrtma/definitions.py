@@ -10,33 +10,6 @@ from .message_base import MessageBase
 from .message_data import MessageData
 
 
-def is_message_definitions_module(module: ModuleType) -> bool:
-    """Check if a module has message definitions"""
-    try:
-        module.COMPILED_PYRTMA_VERSION
-        module.get_message_definitions
-        return True
-    except AttributeError:
-        return False
-
-
-def get_message_definitions_from_module(module: ModuleType) -> MessageDefinitions:
-    """Get message definitions from a module"""
-    try:
-        defs = module.get_message_definitions()
-    except Exception as e:  # could maybe be more specific i.e. AttributeError
-        raise MessageDefinitionsLoadError(
-            f"Failed to load message definitions from module {module.__name__}"
-        ) from e
-
-    if isinstance(defs, MessageDefinitions):
-        return defs
-    else:
-        raise MessageDefinitionsLoadError(
-            f"Module {module.__name__} does not contain a MessageDefinitions instance"
-        )
-
-
 @dataclass(frozen=True)
 class MessageDefinitions:
     """Immutable container for compiled message definitions and related context maps."""

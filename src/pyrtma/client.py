@@ -18,8 +18,8 @@ from .message import Message
 from .message_data import MessageData
 from .header import MessageHeader, get_header_cls
 from .core_defs import ALL_MESSAGE_TYPES
-from .definitions import (
-    MessageDefinitions,
+from .definitions import MessageDefinitions
+from .loader import (
     is_message_definitions_module,
     get_message_definitions_from_module,
 )
