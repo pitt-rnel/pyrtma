@@ -111,80 +111,6 @@ def get_message_definitions_from_module(module: ModuleType) -> MessageDefinition
         )
 
 
-def auto_detect_definitions() -> MessageDefinitions:
-    """Attempt to auto-detect message definitions from loaded modules"""
-    # Prune the modules to only those that are not built-in or standard library modules
-    mod_names = sys.modules.keys() - (
-        set(sys.builtin_module_names) | sys.stdlib_module_names
-    )
-
-    for name in mod_names:
-        if name == "pyrtma" or name.startswith("pyrtma."):
-            continue
-
-        if name.startswith("_"):
-            continue
-
-        mod = sys.modules[name]
-
-        if is_message_definitions_module(mod):
-            # print(f"Auto-detected message definitions from module: {name}")
-            return get_message_definitions_from_module(mod)
-
-    # Return core_defs if no other message definitions found
-    # print("No message definitions found in loaded modules, using core_defs")
-    return cd.get_message_definitions()
-
-
-def get_definitions(
-    definitions: Optional[MessageDefinitions | ModuleType], auto_detect: bool
-) -> MessageDefinitions:
-    """Determine which message definitions to use"""
-    if isinstance(definitions, MessageDefinitions):
-        return definitions
-    elif isinstance(definitions, ModuleType):
-        if is_message_definitions_module(definitions):
-            # print(f"Using message definitions from module {definitions.__name__}")
-            return get_message_definitions_from_module(definitions)
-        else:
-            raise MessageDefinitionsLoadError(
-                f"Module {definitions.__name__} does not have message definitions"
-            )
-    elif definitions is None:
-        # Check for message definitions in PYRTMA_MSGDEF_MODULES environment variable
-        # Allows for multiple modules to be specified, separated by semicolons
-        # example: PYRTMA_MSGDEF_MODULES=module1;module2;module3
-        # First module that has message definitions will be used. If none found, will fall back to auto-detect or core_defs.
-        success = False
-        if mod_names := os.getenv("PYRTMA_MSGDEF_MODULES"):
-            mod_list = mod_names.removesuffix(";").split(";")
-            # Find the first module that has message definitions
-            for mod_name in mod_list:
-                mod = sys.modules.get(mod_name)
-                if mod is not None:
-                    if is_message_definitions_module(mod):
-                        # print(f"Using message definitions from module {mod_name}")
-                        success = True
-                        return get_message_definitions_from_module(mod)
-            else:
-                print(
-                    "Warning: No message definitions found in PYRTMA_MSGDEF_MODULES list, Falling back to auto-detect or core_defs."
-                )
-
-        if not success:
-            if auto_detect:
-                return auto_detect_definitions()
-            else:
-                print("Warning: No message definitions provided, using core_defs only!")
-
-        return cd.get_message_definitions()
-
-    else:
-        raise TypeError(
-            f"Invalid type for definitions: {type(definitions)}. Must be MessageDefinitions or ModuleType."
-        )
-
-
 class Client(ClientLike):
     """RTMA Client interface
 
@@ -226,18 +152,12 @@ class Client(ClientLike):
         self._paused_types: Set[int] = set()
         self._dynamic_id: bool = module_id == 0
         self._sock = socket.socket()
-
-        self._definitions = get_definitions(definitions, auto_detect)
-
-        # Auto-assign a name if module-id is defined
-        if name == "" and module_id != 0:
-            self._name = self.module_name_from_id(module_id) or ""
-        else:
-            self._name = name
+        self._name = name
 
         self._logger = RTMALogger(
             self._name or f"Module {module_id}", self, logging.INFO
         )
+
         # alias logger methods
         self.debug = self._logger.debug
         self.info = self._logger.info
@@ -246,6 +166,93 @@ class Client(ClientLike):
         self.error = self._logger.error
         self.exception = self._logger.exception
         self.critical = self._logger.critical
+
+        # Determine which message definitions to use
+        self._definitions = self._get_definitions(definitions, auto_detect)
+
+        # Auto-assign a name if module-id is defined
+        if name == "" and module_id != 0:
+            self._name = self.module_name_from_id(module_id) or ""
+        else:
+            self._name = name
+
+    def _auto_detect_definitions(self) -> MessageDefinitions:
+        """Attempt to auto-detect message definitions from loaded modules"""
+        # Prune the modules to only those that are not built-in or standard library modules
+        mod_names = sys.modules.keys() - (
+            set(sys.builtin_module_names) | sys.stdlib_module_names
+        )
+
+        for name in mod_names:
+            if name == "pyrtma" or name.startswith("pyrtma."):
+                continue
+
+            if name.startswith("_"):
+                continue
+
+            mod = sys.modules[name]
+
+            if is_message_definitions_module(mod):
+                self.debug(f"Auto-detected message definitions from module: {name}")
+                return get_message_definitions_from_module(mod)
+
+        # Return core_defs if no other message definitions found
+        self.debug("No message definitions found in loaded modules, using core_defs")
+        return cd.get_message_definitions()
+
+    def _get_definitions(
+        self, definitions: Optional[MessageDefinitions | ModuleType], auto_detect: bool
+    ) -> MessageDefinitions:
+        """Determine which message definitions to use"""
+        if isinstance(definitions, MessageDefinitions):
+            return definitions
+        elif isinstance(definitions, ModuleType):
+            if is_message_definitions_module(definitions):
+                self.debug(
+                    f"Using message definitions from module {definitions.__name__}"
+                )
+                return get_message_definitions_from_module(definitions)
+            else:
+                raise MessageDefinitionsLoadError(
+                    f"Module {definitions.__name__} does not have message definitions"
+                )
+        elif definitions is None:
+            # Check for message definitions in PYRTMA_MSGDEF_MODULES environment variable
+            # Allows for multiple modules to be specified, separated by semicolons
+            # example: PYRTMA_MSGDEF_MODULES=module1;module2;module3
+            # First module that has message definitions will be used. If none found, will fall back to auto-detect or core_defs.
+            success = False
+            if mod_names := os.getenv("PYRTMA_MSGDEF_MODULES"):
+                mod_list = mod_names.removesuffix(";").split(";")
+                # Find the first module that has message definitions
+                for mod_name in mod_list:
+                    mod = sys.modules.get(mod_name)
+                    if mod is not None:
+                        if is_message_definitions_module(mod):
+                            self.debug(
+                                f"Using message definitions from module {mod_name}"
+                            )
+                            success = True
+                            return get_message_definitions_from_module(mod)
+                else:
+                    self.warning(
+                        "Warning: No message definitions found in PYRTMA_MSGDEF_MODULES list, Falling back to auto-detect or core_defs."
+                    )
+
+            if not success:
+                if auto_detect:
+                    return self._auto_detect_definitions()
+                else:
+                    self.warning(
+                        "Warning: No message definitions provided, using core_defs only!"
+                    )
+
+            return cd.get_message_definitions()
+
+        else:
+            raise TypeError(
+                f"Invalid type for definitions: {type(definitions)}. Must be MessageDefinitions or ModuleType."
+            )
 
     @property
     def logger(self) -> RTMALogger:
