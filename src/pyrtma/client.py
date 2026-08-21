@@ -120,7 +120,7 @@ def auto_detect_definitions() -> MessageDefinitions:
     )
 
     for name in mod_names:
-        if name.startswith("pyrtma"):
+        if name == "pyrtma" or name.startswith("pyrtma."):
             continue
 
         if name.startswith("_"):
