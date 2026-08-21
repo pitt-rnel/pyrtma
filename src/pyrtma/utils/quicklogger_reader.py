@@ -7,6 +7,7 @@ import pyrtma
 from typing import List, Union, Generator, Dict, Any, Optional, Type
 
 from ..definitions import MessageDefinitions
+from ..loader import load_message_definitions
 from ..validators import ByteArray, Uint32, String
 from ..message import Message, MessageHeader, MessageData
 from ..message_base import MessageBase, MessageMeta
@@ -110,12 +111,12 @@ class QLReader:
         self.defs_path = pathlib.Path(msgdefs)
         self.file_path = pathlib.Path(binfile)
 
-        self.definitions = pyrtma.load_message_definitions(self.defs_path)
+        self.definitions = load_message_definitions(self.defs_path)
         mt_to_mdf_global = self.definitions.msg_defs
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", VersionMismatchWarning)
-            session_defs = pyrtma.load_message_definitions(self.defs_path)
+            session_defs = load_message_definitions(self.defs_path)
         mt_to_mdf_session = session_defs.msg_defs
 
         messages = []
