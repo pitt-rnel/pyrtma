@@ -226,7 +226,6 @@ class Client(ClientLike):
         self._paused_types: Set[int] = set()
         self._dynamic_id: bool = module_id == 0
         self._sock = socket.socket()
-        self._name = name
 
         self._definitions = get_definitions(definitions, auto_detect)
 
