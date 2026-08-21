@@ -1,19 +1,15 @@
 import pathlib
 import ctypes
 import os
-
 import time
+
+from concurrent.futures import ThreadPoolExecutor
+from typing import Generator, Any, Iterable
+from tkinter import filedialog
 
 from pyrtma.header import MessageHeader
 from pyrtma.message import Message
 from pyrtma.exceptions import UnknownMessageType, MessageDefinitionsError
-
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
-from typing import Generator, Any, Iterable
-
-from tkinter import filedialog
-
 from pyrtma.definitions import MessageDefinitions
 from pyrtma.loader import load_message_definitions
 
