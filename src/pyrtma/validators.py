@@ -53,16 +53,17 @@ _VALIDATION_ENABLED: ContextVar[bool] = ContextVar("_VALIDATION_ENABLED", defaul
 @contextmanager
 def disable_message_validation(ignore=False):
     """Context manager function to temporarily disable message field validation
-    Use with `with` keyword:
-    `with disable_message_validation():`
+
+    Use with ``with`` keyword:
 
     Optionally pass in ignore=True to do nothing, e.g. for debugging:
 
-    ```
-    DEBUG = True
-    with disable_message_validation(ignore=DEBUG):
-        ... # disable validation unless DEBUG is True
-    ```
+    .. code-block:: python
+
+        DEBUG = True
+        with disable_message_validation(ignore=DEBUG):
+            ... # disable validation unless DEBUG is True
+
     """
     if not ignore:
         token = _VALIDATION_ENABLED.set(False)
