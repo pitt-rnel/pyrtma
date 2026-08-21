@@ -12,7 +12,7 @@ class InfoCompiler:
 
     def generate(self, out_filepath: pathlib.Path):
         with open(out_filepath, mode="w") as f:
-            src = "/".join(self.parser.trim_root(out_filepath).parts[1:])
+            src = out_filepath.name
             f.write(f"# {src}\n")
             f.write("# DO NOT EDIT BY HAND. FILE IS AUTO-GENERATED.\n")
             f.write(
@@ -26,7 +26,7 @@ class InfoCompiler:
             f.write("module_ids\n")
             obj: Union[MID, MT]
             for obj in mids:
-                src = "/".join(obj.src.parts[-2:])
+                src = obj.src.name
                 f.write(f"{obj.value:4d}: {obj.name:<32} # {src}\n")
             f.write("\n\n")
 
@@ -34,6 +34,6 @@ class InfoCompiler:
             msg_ids.sort(key=lambda x: x.value)
             f.write("message_ids\n")
             for obj in msg_ids:
-                src = "/".join(obj.src.parts[-2:])
+                src = obj.src.name
                 f.write(f"{obj.value:4d}: {obj.name:<32} # {src}\n")
             f.write("\n\n")
