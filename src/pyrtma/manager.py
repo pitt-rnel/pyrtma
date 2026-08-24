@@ -19,7 +19,6 @@ from .validators import disable_message_validation
 from .message import Message
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
-from .context import _get_core_defs
 from .core_defs import ALL_MESSAGE_TYPES
 from . import core_defs as cd
 
@@ -782,7 +781,7 @@ class MessageManager(ClientLike):
     def decode_core_message(
         self, src_module: Module, hdr: MessageHeader
     ) -> Union[Message, None]:
-        data_cls = _get_core_defs().get(hdr.msg_type)
+        data_cls = cd.get_message_definitions().msg_defs.get(hdr.msg_type)
         if data_cls:
             data = data_cls.from_buffer(self.data_buffer)
             return Message(hdr, data)

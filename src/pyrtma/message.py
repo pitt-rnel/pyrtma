@@ -3,77 +3,37 @@
 from __future__ import annotations
 
 import json
-import copy
 
-from typing import Type, Dict, Any, TypeVar
+from typing import TYPE_CHECKING, Type, Dict, Any, TypeVar
 
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
 from .message_base import RTMAJSONEncoder
 from .exceptions import InvalidMessageDefinition, UnknownMessageType
 
+if TYPE_CHECKING:
+    from .definitions import MessageDefinitions
+
 __all__ = [
     "Message",
     "MessageHeader",
     "MessageData",
     "get_header_cls",
-    "get_msg_cls",
     "message_def",
-    "msg_def",  # deprecated
+    "msg_def",
 ]
 
-# Main Map of all internal message types
-_msg_defs: Dict[int, Type[MessageData]] = {}
 
-
-_MD = TypeVar("_MD", bound=MessageData)  # Parent
+_MD = TypeVar("_MD", bound=MessageData)
 
 
 def message_def(msg_cls: Type[_MD], *args, **kwargs) -> Type[_MD]:
-    """Decorator to add user message definitions."""
-    _msg_defs[msg_cls.type_id] = msg_cls
+    """Compatibility decorator for compiled or user-defined message classes."""
+
     return msg_cls
 
 
-# backwards compatibility: deprecated name
 msg_def = message_def
-
-
-def _set_msg_defs(defs: Dict[int, Type[MessageData]]):
-    _msg_defs.clear()
-    _msg_defs.update(defs)
-
-
-def _get_msg_defs() -> Dict[int, Type[MessageData]]:
-    return copy.deepcopy(_msg_defs)
-
-
-def _update_msg_defs(defs: Dict[int, Type[MessageData]]):
-    _msg_defs.update(defs)
-
-
-def _clear_msg_defs():
-    _msg_defs.clear()
-
-
-def get_msg_cls(id: int) -> Type[MessageData]:
-    """get msg class for a given message type ID
-
-    Args:
-        id (int): Message Type ID
-
-    Raises:
-        UnknownMessageType: Message type is undefined
-
-    Returns:
-        Type[MessageData]: Message class
-    """
-    try:
-        return _msg_defs[id]
-    except KeyError as e:
-        raise UnknownMessageType(
-            f"There is no message definition associated with id: {id}"
-        ) from e
 
 
 class Message:
@@ -139,11 +99,12 @@ class Message:
             return json.dumps(d, cls=RTMAJSONEncoder, indent=2, **kwargs)
 
     @classmethod
-    def from_json(cls, s: str) -> Message:
+    def from_json(cls, s: str, definitions: MessageDefinitions) -> Message:
         """Create message object from JSON string
 
         Args:
             s (str): JSON message string
+            definitions (MessageDefinitions): Message definitions used to decode msg_type
 
         Raises:
             InvalidMessageDefinition: JSON data does not match expected message defintion
@@ -159,7 +120,12 @@ class Message:
         hdr = hdr_cls.from_dict(d["header"])
 
         # Decode message data segment
-        msg_cls = get_msg_cls(hdr.msg_type)
+        try:
+            msg_cls = definitions.get_msg_cls(hdr.msg_type)
+        except UnknownMessageType as e:
+            raise UnknownMessageType(
+                f"There is no message definition associated with id: {hdr.msg_type}"
+            ) from e
 
         # Note: Ignore the sync check if header.version is not filled in
         # This can removed once all clients support this field.
