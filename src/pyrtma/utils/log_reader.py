@@ -92,6 +92,8 @@ class LogReader:
         else:
             self.definitions = self._load_definitions(definitions)
 
+        self.log = MessageLog()
+
     def _load_definitions(
         self, msg_defs: str | pathlib.Path | None = None
     ) -> MessageDefinitions:
@@ -127,7 +129,6 @@ class LogReader:
 
         binfiles = [pathlib.Path(p) for p in binfiles]
 
-        log = MessageLog()
         for binfile_path in binfiles:
             if not binfile_path.exists():
                 raise FileNotFoundError(f"{binfile_path.absolute()}")
@@ -147,9 +148,9 @@ class LogReader:
 
             for future in futures:
                 msgs = future.result()
-                log.add(msgs)
+                self.log.add(msgs)
 
-        return log
+        return self.log
 
     def _parse_ql_file(
         self,
