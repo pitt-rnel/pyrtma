@@ -126,13 +126,13 @@ message_defs:
   PING:
     id: 29
     fields:
-      uid: int32
+      dest_id: MODULE_ID
 
   # Test Response
   PONG:
     id: 30
     fields:
-      uid: int32
+      src_id: MODULE_ID
 
   # MM will send HELLO message for each connected 
   # client to the module requesting the introduction
@@ -144,7 +144,6 @@ message_defs:
   HELLO:
     id: 32
     fields:
-      uid: int32
       pid: int32
       mod_id: MODULE_ID
       port: uint16
@@ -155,7 +154,6 @@ message_defs:
   GOODBYE:
     id: 33
     fields:
-      uid: int32
       pid: int32
       mod_id: MODULE_ID
       port: uint16

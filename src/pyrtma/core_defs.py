@@ -693,24 +693,24 @@ class MDF_MODULE_READY(MessageData, metaclass=MessageMeta):
 class MDF_PING(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 29
     type_name: ClassVar[str] = "PING"
-    type_hash: ClassVar[int] = 0x43014E6F
-    type_size: ClassVar[int] = 4
+    type_hash: ClassVar[int] = 0xCF05CA16
+    type_size: ClassVar[int] = 2
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[str] = "'PING:\n  id: 29\n  fields:\n    uid: int32'"
+    type_def: ClassVar[str] = "'PING:\n  id: 29\n  fields:\n    dest_id: MODULE_ID'"
 
-    uid: Int32 = Int32()
+    dest_id: Int16 = Int16()
 
 
 @pyrtma.message_def
 class MDF_PONG(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 30
     type_name: ClassVar[str] = "PONG"
-    type_hash: ClassVar[int] = 0xDAC22B06
-    type_size: ClassVar[int] = 4
+    type_hash: ClassVar[int] = 0xD07B7A7E
+    type_size: ClassVar[int] = 2
     type_source: ClassVar[str] = "core_defs.yaml"
-    type_def: ClassVar[str] = "'PONG:\n  id: 30\n  fields:\n    uid: int32'"
+    type_def: ClassVar[str] = "'PONG:\n  id: 30\n  fields:\n    src_id: MODULE_ID'"
 
-    uid: Int32 = Int32()
+    src_id: Int16 = Int16()
 
 
 @pyrtma.message_def
@@ -727,14 +727,13 @@ class MDF_INTRODUCE(MessageData, metaclass=MessageMeta):
 class MDF_HELLO(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 32
     type_name: ClassVar[str] = "HELLO"
-    type_hash: ClassVar[int] = 0xF393D643
-    type_size: ClassVar[int] = 76
+    type_hash: ClassVar[int] = 0x90236E8F
+    type_size: ClassVar[int] = 72
     type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
-        "'HELLO:\n  id: 32\n  fields:\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    port: uint16\n    addr: char[MAX_NAME_LEN]\n    name: char[MAX_NAME_LEN]'"
+        "'HELLO:\n  id: 32\n  fields:\n    pid: int32\n    mod_id: MODULE_ID\n    port: uint16\n    addr: char[MAX_NAME_LEN]\n    name: char[MAX_NAME_LEN]'"
     )
 
-    uid: Int32 = Int32()
     pid: Int32 = Int32()
     mod_id: Int16 = Int16()
     port: Uint16 = Uint16()
@@ -746,14 +745,13 @@ class MDF_HELLO(MessageData, metaclass=MessageMeta):
 class MDF_GOODBYE(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 33
     type_name: ClassVar[str] = "GOODBYE"
-    type_hash: ClassVar[int] = 0x1EC8D03F
-    type_size: ClassVar[int] = 76
+    type_hash: ClassVar[int] = 0xF666B83B
+    type_size: ClassVar[int] = 72
     type_source: ClassVar[str] = "core_defs.yaml"
     type_def: ClassVar[str] = (
-        "'GOODBYE:\n  id: 33\n  fields:\n    uid: int32\n    pid: int32\n    mod_id: MODULE_ID\n    port: uint16\n    addr: char[MAX_NAME_LEN]\n    name: char[MAX_NAME_LEN]'"
+        "'GOODBYE:\n  id: 33\n  fields:\n    pid: int32\n    mod_id: MODULE_ID\n    port: uint16\n    addr: char[MAX_NAME_LEN]\n    name: char[MAX_NAME_LEN]'"
     )
 
-    uid: Int32 = Int32()
     pid: Int32 = Int32()
     mod_id: Int16 = Int16()
     port: Uint16 = Uint16()

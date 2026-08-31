@@ -38,7 +38,6 @@ class Module:
     Used internally by MessageManager to manage connections to each client module.
     """
 
-    uid: int
     conn: socket.socket
     address: Tuple[str, int]
     header_cls: Type[MessageHeader]
@@ -173,12 +172,10 @@ class MessageManager(ClientLike):
             socket.getprotobyname("tcp"), socket.TCP_NODELAY, 1
         )
 
-        self._uid = 0
         self.wlist: List[socket.socket] = []
 
         # Add message manager to its module list
         self.mm_module = Module(
-            uid=0,
             conn=self.listen_socket,
             address=(ip_address, port),
             header_cls=self.header_cls,
@@ -207,10 +204,6 @@ class MessageManager(ClientLike):
     @property
     def logger(self) -> RTMALogger:
         return self._logger
-
-    def generate_uid(self) -> int:
-        self._uid += 1
-        return self._uid
 
     def assign_module_id(self) -> int:
         """Assign module ID dynamically to connecting module
@@ -698,7 +691,6 @@ class MessageManager(ClientLike):
         """
         self.logger.debug("GOODBYE")
         msg = cd.MDF_GOODBYE()
-        msg.uid = module.uid
         msg.pid = module.pid
         msg.mod_id = module.mod_id
         msg.port = module.port
@@ -714,7 +706,6 @@ class MessageManager(ClientLike):
         """
         self.logger.debug("HELLO")
         msg = cd.MDF_HELLO()
-        msg.uid = module.uid
         msg.pid = module.pid
         msg.mod_id = module.mod_id
         msg.port = module.port
@@ -834,9 +825,7 @@ class MessageManager(ClientLike):
                             )
 
                             self.sockets.append(conn)
-                            self.modules[conn] = Module(
-                                self.generate_uid(), conn, address, self.header_cls
-                            )
+                            self.modules[conn] = Module(conn, address, self.header_cls)
                         except ValueError:
                             pass
 
