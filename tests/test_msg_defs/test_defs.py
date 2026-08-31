@@ -1099,16 +1099,16 @@ class MDF_ACKNOWLEDGE(MessageData, metaclass=MessageMeta):
 class MDF_CONNECT_V2(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 4
     type_name: ClassVar[str] = "CONNECT_V2"
-    type_hash: ClassVar[int] = 0x5CF13682
+    type_hash: ClassVar[int] = 0x9C8FAFED
     type_size: ClassVar[int] = 44
     type_source: ClassVar[str] = "core_defs/core_defs.yaml"
     type_def: ClassVar[str] = (
-        "'CONNECT_V2:\n  id: 4\n  fields:\n    logger_status: int16\n    daemon_status: int16\n    allow_multiple: int16\n    mod_id: MODULE_ID\n    pid: int32\n    name: char[MAX_NAME_LEN]'"
+        "'CONNECT_V2:\n  id: 4\n  fields:\n    logger_status: int16\n    reserved: int16\n    reserved1: int16\n    mod_id: MODULE_ID\n    pid: int32\n    name: char[MAX_NAME_LEN]'"
     )
 
     logger_status: Int16 = Int16()
-    daemon_status: Int16 = Int16()
-    allow_multiple: Int16 = Int16()
+    reserved: Int16 = Int16()
+    reserved1: Int16 = Int16()
     mod_id: Int16 = Int16()
     pid: Int32 = Int32()
     name: String = String(32)

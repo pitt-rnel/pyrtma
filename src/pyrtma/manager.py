@@ -11,7 +11,6 @@ import time
 import random
 import ctypes
 import os
-import typing
 
 
 from .client_logging import RTMALogger, ClientLike
@@ -26,9 +25,7 @@ from . import core_defs as cd
 from typing import Dict, List, Tuple, Set, Type, Union, Optional
 from itertools import chain
 from dataclasses import dataclass, field
-from collections import defaultdict, Counter
-from contextlib import contextmanager
-from contextvars import ContextVar
+from collections import defaultdict
 
 
 @dataclass
@@ -48,7 +45,6 @@ class Module:
     connected: bool = False
     is_logger: bool = False
     is_daemon: bool = False
-    unique: bool = True
     drops: int = 0
     msg_count: int = 0
 
@@ -247,7 +243,6 @@ class MessageManager(ClientLike):
 
         if isinstance(msg.data, cd.MDF_CONNECT_V2):
             module.mod_id = msg.data.mod_id
-            module.unique = msg.data.allow_multiple == 0
             module.pid = msg.data.pid
             module.name = msg.data.name
         elif isinstance(msg.data, cd.MDF_CONNECT):
@@ -259,9 +254,10 @@ class MessageManager(ClientLike):
 
         # fields common to v1 and v2
         module.is_logger = msg.data.logger_status == 1
-        module.is_daemon = msg.data.daemon_status == 1
 
-        if module.mod_id != 0:
+        if module.mod_id == 0:
+            module.mod_id = self.assign_module_id()
+        else:
             if module.mod_id < 1 or module.mod_id > cd.DYN_MOD_ID_START:
                 self.logger.error(
                     f"Invalid Module id specified: {module.mod_id}. User assigned ids must be in range or 1 - {cd.DYN_MOD_ID_START}"
@@ -274,34 +270,11 @@ class MessageManager(ClientLike):
                     continue
 
                 if m.mod_id == module.mod_id:
-                    if m.unique:
-                        self.logger.error(
-                            f"SET_ID - {module.ipaddr} - ID({module.mod_id}) - ID already in use. Closing connection."
-                        )
-                        self.remove_module(module)
-                        return False
-
-                    if module.unique:
-                        self.logger.error(
-                            f"SET_ID - {module.ipaddr} - ID({module.mod_id}) - ID already in use. Closing connection."
-                        )
-                        self.remove_module(module)
-                        return False
-
-                if module.name:
-                    if (m.unique or module.unique) and (m.name == module.name):
-                        self.logger.error(
-                            f"SET_NAME - {module.ipaddr} - ID({module.mod_id}) - {module.name} - Name already in use."
-                        )
-                        self.remove_module(module)
-                        return False
-
-                    self.logger.debug(
-                        f"SET_NAME - {module.ipaddr} - ID({module.mod_id}) - {module.name}"
+                    self.logger.error(
+                        f"SET_ID - {module.ipaddr} - ID({module.mod_id}) - ID already in use. Closing connection."
                     )
-
-        else:
-            module.mod_id = self.assign_module_id()
+                    self.remove_module(module)
+                    return False
 
         module.connected = True
 
