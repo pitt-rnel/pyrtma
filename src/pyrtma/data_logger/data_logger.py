@@ -65,6 +65,7 @@ class DataLogger:
             elif ds.error_event.is_set():
                 self.client.send_message(ds.error)
                 self.client.error(ds.error)
+                ds.error_event.clear()
 
         # Remove the dataset after stoppping
         for name in dead:
