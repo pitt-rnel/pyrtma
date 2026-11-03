@@ -78,8 +78,8 @@ class Dataset:
             self._client.disconnect()
 
 
-def __del__(self):
-    self.close()
+    def __del__(self):
+        self.close()
 
     def __str__(self) -> str:
         s = f"""\
