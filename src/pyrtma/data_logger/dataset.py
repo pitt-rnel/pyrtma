@@ -77,7 +77,6 @@ class Dataset:
         if self._managed_client and self._client:
             self._client.disconnect()
 
-
     def __del__(self):
         self.close()
 
