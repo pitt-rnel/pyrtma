@@ -153,11 +153,11 @@ class Dataset:
 
     @property
     def added(self) -> bool:
-        return self._started
+        return self._added
 
     @property
     def removed(self) -> bool:
-        return self._started
+        return self._removed
 
     @property
     def started(self) -> bool:
