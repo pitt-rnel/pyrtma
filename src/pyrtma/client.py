@@ -296,9 +296,7 @@ class Client(ClientLike):
             self._sock.close()
             raise SocketOptionError from e
 
-    def _connect_helper(
-        self, logger_status: bool, daemon_status: bool, allow_multiple: bool
-    ) -> Message:
+    def _connect_helper(self, logger_status: bool) -> Message:
         """Called internally after _socket_connect
 
         Note that this is also used by web_manager
@@ -310,18 +308,15 @@ class Client(ClientLike):
 
         msg = cd.MDF_CONNECT()
         msg.logger_status = int(logger_status)
-        msg.daemon_status = int(daemon_status)
 
         msg2 = cd.MDF_CONNECT_V2()
         msg2.logger_status = int(logger_status)
-        msg2.daemon_status = int(daemon_status)
-        msg2.allow_multiple = int(allow_multiple)
         msg2.pid = os.getpid()
         msg2.mod_id = self.module_id
         msg2.name = self.name
 
         self.send_message(msg2)
-        self.send_message(msg)
+        # self.send_message(msg)
         ack_msg = self._wait_for_acknowledgement()
 
         # save own module ID from ACK if asked to be assigned dynamic ID
@@ -353,8 +348,6 @@ class Client(ClientLike):
         self,
         server_name: str = "localhost:7111",
         logger_status: bool = False,
-        daemon_status: bool = False,
-        allow_multiple: bool = False,
     ):
         """Connect to message manager server
 
@@ -364,7 +357,6 @@ class Client(ClientLike):
             logger_status (optional): Flag to declare client as a logger module.
                 Logger modules are automatically subscribed to all message types.
                 Defaults to False.
-            allow_multiple (optional): Flag to declare client can have multiple instances. Defaults to False.
 
         Raises:
             MessageManagerNotFound: Unable to connect to message manager
@@ -376,10 +368,7 @@ class Client(ClientLike):
         # Setup the underlying socket connection
         self._socket_connect(server_name)
 
-        ack = self._connect_helper(logger_status, daemon_status, allow_multiple)
-
-        # Send client pid
-        self.send_module_ready()
+        ack = self._connect_helper(logger_status)
 
     def disconnect(self):
         """Disconnect from message manager server"""
@@ -701,7 +690,7 @@ class Client(ClientLike):
             InvalidDestinationHost: Specified destination host is invalid
         """
         # Verify that the module & host ids are valid
-        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULES:
+        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULE_ID:
             raise InvalidDestinationModule(f"Invalid dest_mod_id of [{dest_mod_id}]")
 
         if dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS:
@@ -1016,7 +1005,6 @@ def client_context(
     host_id: int = 0,
     timecode: bool = False,
     logger_status: bool = False,
-    allow_multiple: bool = False,
     name: str = "",
     definitions: Optional[MessageDefinitions | ModuleType] = None,
     auto_detect: bool = True,
@@ -1039,7 +1027,6 @@ def client_context(
         logger_status (optional): Flag to declare client as a logger module.
             Logger modules are automatically subscribed to all message types.
             Defaults to False.
-        allow_multiple (optional): Flag to declare client can have multiple instances. Defaults to False.
         name (optional): Name of module
         definitions (optional): MessageDefinitions object or Module containing MessageDefinitions. Defaults to None, which will auto-detect
             message definitions from the current module or use core_defs if not found.
@@ -1050,7 +1037,7 @@ def client_context(
         Client: initialized pyrtma Client object
     """
     c = Client(module_id, host_id, timecode, name=name, definitions=definitions)
-    c.connect(server_name, logger_status, allow_multiple)
+    c.connect(server_name, logger_status)
     if msg_list:
         c.subscribe(msg_list)
     c.send_module_ready()

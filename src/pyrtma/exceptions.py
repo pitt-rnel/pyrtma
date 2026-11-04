@@ -100,7 +100,7 @@ class InvalidSubscription(ClientError):
     pass
 
 
-class LoggingConfigurationError(BaseException):
+class LoggingConfigurationError(ClientError):
     """Raised when an attempt to configure a client logger is invalid"""
 
     pass

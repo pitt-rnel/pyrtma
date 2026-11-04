@@ -82,7 +82,7 @@ class Dataset:
             self._client.disconnect()
 
     def __del__(self):
-        self.close
+        self.close()
 
     def __str__(self) -> str:
         s = f"""\
@@ -161,11 +161,11 @@ class Dataset:
 
     @property
     def added(self) -> bool:
-        return self._started
+        return self._added
 
     @property
     def removed(self) -> bool:
-        return self._started
+        return self._removed
 
     @property
     def started(self) -> bool:
