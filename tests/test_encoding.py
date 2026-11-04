@@ -29,7 +29,6 @@ class TestEncoding(unittest.TestCase):
             timecode=False,
             debug=False,
             log_level=logging.ERROR,
-            send_msg_timing=True,
         )
         self.manager_thread = threading.Thread(
             target=self.manager.run,
