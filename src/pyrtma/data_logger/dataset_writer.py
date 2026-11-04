@@ -55,6 +55,7 @@ class DatasetWriter:
         self.save_path = pathlib.Path(save_path)
 
         self.formatter_name = formatter
+        formatter_cls: Optional[Type[DataFormatter]] = get_formatter(formatter)
         if formatter_cls is None:
             raise InvalidFormatter(
                 self.name, f"No DataFormatter class named {formatter}"
