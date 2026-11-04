@@ -390,7 +390,8 @@ class WebMessageManager(WebsocketServer):
 def ws_client_connect(client: Dict[str, Any], server: WebMessageManager):
     """Websocket client connect
 
-        Called for every client connecting (after handshake)
+    Called for every client connecting (after handshake)
+
     Args:
         client (Dict[str, Any]): Client dictionary
         server: WebMessageManager Server object
@@ -404,7 +405,8 @@ def ws_client_connect(client: Dict[str, Any], server: WebMessageManager):
 def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
     """Websocket client disconnect
 
-        Called for every client disconnecting
+    Called for every client disconnecting
+
     Args:
         client (Dict[str, Any]): Client dictionary
         server: WebMessageManager Server object
