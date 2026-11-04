@@ -4,10 +4,9 @@
 def main():
     """Main function for starting base Data Logger"""
     import argparse
-    import pathlib
     import sys
-    import importlib
     import logging
+    import pyrtma
     from ..exceptions import ConnectionLost, MessageManagerNotFound
     from .data_logger import DataLogger
 
@@ -27,6 +26,7 @@ def main():
         "--defs",
         dest="defs_file",
         type=str,
+        required=True,
         help="Path to python message definitions file. Required argument.",
     )
 
@@ -52,14 +52,9 @@ def main():
         print("Unknown log level. Using INFO instead")
         level = logging.INFO
 
-    if args.defs_file:
-        base = pathlib.Path(args.defs_file).absolute().parent
-        fname = pathlib.Path(args.defs_file).stem
+    definitions = pyrtma.load_message_definitions(args.defs_file)
 
-        sys.path.insert(0, (str(base.absolute())))
-        importlib.import_module(fname)
-
-    d = DataLogger(args.mm_ip, log_level=level)
+    d = DataLogger(args.mm_ip, log_level=level, definitions=definitions)
 
     try:
         d.run()

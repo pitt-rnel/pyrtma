@@ -7,6 +7,7 @@ import textwrap
 import pyrtma
 import pyrtma.core_defs as cd
 from pyrtma.data_logger.exceptions import NoClientError
+from pyrtma.definitions import MessageDefinitions
 from pyrtma.exceptions import UnknownMessageType
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Dict, Any, ClassVar, cast
@@ -40,16 +41,19 @@ class Dataset:
         mm_ip: str = "127.0.0.1:7111",
         status_interval: float = 5.0,
         create_client: bool = True,
+        definitions: MessageDefinitions | None = None,
     ):
+        self._definitions = definitions or cd.get_message_definitions()
 
         if create_client:
-            self._client = pyrtma.Client(0, name=name)
+            self._client = pyrtma.Client(0, name=name, definitions=self._definitions)
             self._client.connect(mm_ip)
             self._client.subscribe(Dataset.DATALOGGER_TYPES)
             self._managed_client = True
         else:
             # User needs to register a client
             self._client = None
+            self._managed_client = False
 
         self._name = name
         self._save_path = Path(save_path)
@@ -106,6 +110,7 @@ class Dataset:
         if self._managed_client and self._client:
             self._client.disconnect()
         self._client = client
+        self._definitions = client.definitions
         self._managed_client = False
 
     def unregister_client(self):
@@ -139,6 +144,9 @@ class Dataset:
     @property
     def msg_names(self) -> tuple[str, ...]:
         names = []
+        definitions = (
+            self._client.definitions if self._client is not None else self._definitions
+        )
         for msg_type in self.msg_types:
             if msg_type < 1:
                 continue
@@ -146,7 +154,7 @@ class Dataset:
                 names.append("ALL_MESSAGE_TYPES")
             else:
                 try:
-                    names.append(pyrtma.get_msg_cls(msg_type).type_name)
+                    names.append(definitions.get_msg_cls(msg_type).type_name)
                 except UnknownMessageType:
                     names.append(msg_type)
         return tuple(names)
@@ -232,8 +240,14 @@ class Dataset:
             case cd.MT_DATA_LOGGER_ERROR:
                 return cast(cd.MDF_DATA_LOGGER_ERROR, msg.data)
             case cd.MT_DATA_LOGGER_CONFIG:
+                definitions = (
+                    self._client.definitions
+                    if self._client is not None
+                    else self._definitions
+                )
                 self.datalogger_config = self.process_data_logger_config_msg(
-                    cast(cd.MDF_DATA_LOGGER_CONFIG, msg.data)
+                    cast(cd.MDF_DATA_LOGGER_CONFIG, msg.data),
+                    definitions=definitions,
                 )
 
     def add(self) -> cd.MDF_DATASET_ADD:
@@ -336,32 +350,3 @@ class Dataset:
             self._client.send_signal(cd.MT_DATA_LOGGER_RESET)
         else:
             raise NoClientError
-
-    @staticmethod
-    def process_data_logger_config_msg(
-        msg_data: cd.MDF_DATA_LOGGER_CONFIG,
-    ) -> Dict[str, Any]:
-        """Process a data_logger config message
-
-        Args:
-            msg_data (cd.MDF_DATA_LOGGER_CONFIG): unprocessed message data
-
-        Returns:
-            Dict[str, Any]: data_logger config dict
-        """
-        d = msg_data.to_dict()
-        for ds in d["datasets"]:
-            names = []
-            for msg_type in ds["msg_types"]:
-                if msg_type < 1:
-                    continue
-                if msg_type == cd.ALL_MESSAGE_TYPES:
-                    names.append("ALL_MESSAGE_TYPES")
-                else:
-                    try:
-                        names.append(pyrtma.get_msg_cls(msg_type).type_name)
-                    except UnknownMessageType:
-                        names.append(msg_type)
-            ds["msg_types"] = names
-        d["datasets"] = d["datasets"][: d["num_datasets"]]
-        return d
