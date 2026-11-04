@@ -39,9 +39,14 @@ class MessageLog:
         """Returns the message headers in the log"""
         return [item.header for item in self._log]
 
-    def add(self, other: list[Message]):
+    def add(self, other: list[Message], sort: bool = True):
         """Add messages to the log and sort by receive time"""
         self._log.extend(other)
+        if sort:
+            self._log.sort(key=lambda x: x.header.recv_time)
+
+    def sort(self):
+        """Sort the log by receive time"""
         self._log.sort(key=lambda x: x.header.recv_time)
 
     def export_json(self, save_file: str | os.PathLike):
@@ -148,7 +153,9 @@ class LogReader:
 
             for future in futures:
                 msgs = future.result()
-                self.log.add(msgs)
+                self.log.add(msgs, sort=False)
+
+            self.log.sort()
 
         return self.log
 
