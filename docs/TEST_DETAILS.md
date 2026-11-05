@@ -169,3 +169,14 @@ Uses the `VALIDATOR_A` and `VALIDATOR_B` messages from the test definitions, whi
 | `test_header_matches_snapshot` | Test infrastructure: the message header's size and field layout, with and without timecode, are unchanged. | Parametrized over `timecode`; compares `get_header_cls()` with the snapshot. |
 | `test_core_definitions_match_snapshot` | Test infrastructure: every core struct and message keeps its ID, type hash, size, and layout, and the core module and host IDs are unchanged; none are added or removed. | Parametrized over the snapshot's sections; lists each entry that differs. |
 | `test_layout_names_types_by_size` | Test infrastructure: layout descriptions don't depend on which ctypes alias a platform uses. | A structure with `c_int64` and `c_longlong` fields, a char array, and a double array. |
+
+## test_random_fields.py — values from `from_random()` (needs: none)
+
+Each test fills a structure with one scalar field and one 8-element array field of the given type, 50 times, and checks every value drawn.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_int64_values_use_full_range` | Test helpers: int64 fields get negative values and values beyond 32 bits, on every platform. | Parametrized over `c_int64` and `c_longlong`, which are different aliases on Linux and Windows. |
+| `test_uint64_values_use_full_range` | Test helpers: uint64 fields get values beyond 32 bits. | Parametrized over `c_uint64` and `c_ulonglong`. |
+| `test_int_values_stay_in_range` | Test helpers: every integer type gets values inside its own range, reaching its upper half. | Parametrized over each ctypes integer type and alias. |
+| `test_float_values_include_negatives_and_large_values` | Test helpers: float and double fields get finite values, including negative ones and ones above 1. | Parametrized over `c_float` and `c_double`. |
