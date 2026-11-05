@@ -1474,7 +1474,9 @@ class Parser:
             # Reserve certain names for internal use
             for name in ("rtma_core", "data_logger", "quick_logger"):
                 if name in self.index:
-                    raise RTMASyntaxError(f"The name '{name}' is reserved for internal use")
+                    raise RTMASyntaxError(
+                        f"The name '{name}' is reserved for internal use"
+                    )
 
             pkg_dir = pathlib.Path(os.path.realpath(__file__)).parent
             core_path = pkg_dir / "core_defs"
