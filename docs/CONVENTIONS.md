@@ -8,6 +8,7 @@
 - Type annotations on every function, method, and module-level constant. Pyright runs in strict mode on `src/` and `tests/`.
 - Format with Black (default settings, 88 columns).
 - Files use LF line endings, including in patches. Tests that need CRLF write it explicitly as bytes.
+- Use comments to explain complex code areas.
 - Google-style docstrings on all public modules, classes, and functions. Include `Args`, `Returns`, `Raises`, and `Yields` sections where they apply. Test functions don't need docstrings.
 
 ## Design rules
