@@ -1,0 +1,183 @@
+# Message defs file in yaml format
+
+string_constants:
+  DEFAULT_MM_IP: "localhost:7111"
+
+constants:
+  SZ_A: 4
+  SZ_B: 8
+
+host_ids: null
+
+module_ids:
+  TEST_MODULE: 10
+  DATA_MODULE: 11
+  LOG_MODULE: 12
+
+aliases: null
+
+# Non-message structured data (no id field)
+struct_defs:
+  VALIDATOR_STRUCT:
+    fields:
+      char_: char
+      int8: int8
+      int16: int16
+      int32: int32
+      int64: int64
+      uint8: uint8
+      uint16: uint16
+      uint32: uint32
+      uint64: uint64
+      int8_arr: int8[4]
+      int16_arr: int16[4]
+      int32_arr: int32[4]
+      int64_arr: int64[4]
+      uint8_arr: uint8[4]
+      uint16_arr: uint16[4]
+      uint32_arr: uint32[4]
+      uint64_arr: uint64[4]
+      byte_: byte
+      byte_arr: byte[4]
+      string: char[4]
+      float_: float
+      double_: double
+      float_arr: float[4]
+      double_arr: double[4]
+
+# Message Definitions
+message_defs:
+
+  _RESERVED_:
+    id: [4300, 4360 to 4370, 4371 - 4375, 4376 to 4378]
+
+  VALIDATOR_A:
+    id: 5000
+    fields:
+      char_: char
+      int8: int8
+      int16: int16
+      int32: int32
+      int64: int64
+      uint8: uint8
+      uint16: uint16
+      uint32: uint32
+      uint64: uint64
+      int8_arr: int8[SZ_A]
+      int16_arr: int16[SZ_A]
+      int32_arr: int32[SZ_A]
+      int64_arr: int64[SZ_A]
+      uint8_arr: uint8[SZ_A]
+      uint16_arr: uint16[SZ_A]
+      uint32_arr: uint32[SZ_A]
+      uint64_arr: uint64[SZ_A]
+      byte_: byte
+      byte_arr: byte[SZ_A]
+      string: char[SZ_A]
+      float_: float
+      double_: double
+      float_arr: float[SZ_A]
+      double_arr: double[SZ_A]
+      struct_: VALIDATOR_STRUCT 
+      struct_arr: VALIDATOR_STRUCT[SZ_A]
+
+  VALIDATOR_B:
+    id: 5001
+    fields:
+      char_: char
+      int8: int8
+      int16: int16
+      int32: int32
+      int64: int64
+      uint8: uint8
+      uint16: uint16
+      uint32: uint32
+      uint64: uint64
+      int8_arr: int8[SZ_B]
+      int16_arr: int16[SZ_B]
+      int32_arr: int32[SZ_B]
+      int64_arr: int64[SZ_B]
+      uint8_arr: uint8[SZ_B]
+      uint16_arr: uint16[SZ_B]
+      uint32_arr: uint32[SZ_B]
+      uint64_arr: uint64[SZ_B]
+      byte_: byte
+      byte_arr: byte[SZ_B]
+      string: char[SZ_B]
+      float_: float
+      double_: double
+      float_arr: float[SZ_B]
+      double_arr: double[SZ_B]
+      struct_: VALIDATOR_STRUCT 
+      struct_arr: VALIDATOR_STRUCT[SZ_B]
+
+  TEST_MSG_128:
+    id: 5002
+    fields:
+      blob: uint8[128]
+
+  TEST_MSG_256:
+    id: 5003
+    fields:
+      blob: uint8[256]
+
+  TEST_MSG_512:
+    id: 5004
+    fields:
+      blob: uint8[512]
+
+  TEST_MSG_1024:
+    id: 5005
+    fields:
+      blob: uint8[1024]
+
+  TEST_MSG_2048:
+    id: 5006
+    fields:
+      blob: uint8[2048]
+
+  TEST_MSG_4096:
+    id: 5007
+    fields:
+      blob: uint8[4096]
+
+  TEST_MSG_8192:
+    id: 5008
+    fields:
+      blob: uint8[8192]
+
+  SUBSCRIBER_READY:
+    id: 5009
+    fields: null
+
+  PUBLISHER_READY:
+    id: 5010
+    fields: null
+
+  SUBSCRIBER_DONE:
+    id: 5011
+    fields: null
+
+  PUBLISHER_DONE:
+    id: 5012
+    fields: null
+
+  ARRAY_OF_ONE:
+    id: 5013
+    fields: 
+      u8: uint8[1]
+      u16: uint16[1]
+      u32: uint32[1]
+      u64: uint64[1]
+      i8: int8[1]
+      i16: int16[1]
+      i32: int32[1]
+      i64: int64[1]
+      f32: float[1]
+      f64: double[1]
+      c: char
+      c1: char[1]
+      s2: char[2]
+      b: byte
+      ba: byte[1]
+      sa: VALIDATOR_STRUCT[1]

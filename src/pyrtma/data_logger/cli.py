@@ -150,9 +150,8 @@ def main():
                         rich.print(f"{msg.data.type_name}:")
                         rich.print(msg.data.to_json())
                     elif isinstance(msg.data, cd.MDF_DATA_LOGGER_CONFIG):
-                        d = Dataset.process_data_logger_config_msg(msg.data)
                         rich.print(f"{msg.data.type_name}:")
-                        rich.print(json.dumps(d, indent=2))
+                        rich.print(json.dumps(msg.data.to_dict(), indent=2))
                 else:
                     break
 

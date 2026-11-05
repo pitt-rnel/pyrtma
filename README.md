@@ -137,19 +137,111 @@ message_defs:
         id: [1000, 1002 - 1008, 1009 to 1012]
 ```
 
-Run the following command to compile the yaml file into Python, C, Matlab, or Javascript files. This will output a message.(py|h|m|js) file.
+### Compile Message Definitions
+
+Create a compiler file as input to the rtma compiler.  
+
+The format is `yaml`, but the `.defs` ext can be used to differentiate from message definition files if desired. There are special compiler options that can be set here for advanced usage. The `compiler_options` table can be skipped for default and recommended behavior.  You must create an `index` table.  This index maps a name to the location of a message definitions file on your system. The names given in the index can be referenced in the `import` table of message definition files if there are dependencies between files.  Environment variables can be used to specify the message definitions path using the `${VAR}` syntax.  If the given path is not absolute, it will be considered relative to the compiler file root directory.
+
+```yaml
+compiler_options:
+  import_coredefs: True         # Auto-import of rtma.defs
+  validate_alignment: true      # 64-bit alignment validation
+  auto_pad: true                # 64-bit alignment auto-padding
+
+# Index of message defs files to include in your system
+index: 
+  example: example_messages.yaml
+```
+
+Run the following command to compile your definitions into Python, C, Matlab, or Javascript files. This will output a message.(py|h|m|js) file.
 
 ```shell
-python -m pyrtma.compile -i examples/msg_defs/message.yaml --py --c --mat --js
+python -m pyrtma.compile -i examples/msg_defs/example.defs --py --c --mat --js
 ```
 or
 ```shell
-rtma_compiler -i examples/msg_defs/message.yaml --py --c --mat --js
+rtma_compiler -i examples/msg_defs/example.defs --py --c --mat --js
 ```
 
 The msg_defs directory should now have message def files created for each language.
 
 The rtma objects are compiled into objects suitable for each language.
+
+### Message Definitions in Clients
+
+`pyrtma.Client` decodes messages using a `MessageDefinitions` instance.
+
+A simple mental model:
+
+1. Compile your YAML schema into a Python defs file.
+2. Load that defs file in your application.
+3. Pass the loaded definitions into each `Client` you create.
+
+For predictable behavior, pass definitions explicitly.
+
+Example: import from compiled defs module
+
+```python
+import pyrtma
+import my_project_defs
+
+client = pyrtma.Client(name="MY_MODULE", definitions=my_project_defs)
+```
+or 
+
+```
+defs = my_project_defs.get_message_definitions()
+client = pyrtma.Client(name="MY_MODULE", definitions=defs)
+```
+
+Example: load from a standalone defs object from a file path
+
+```python
+import pyrtma
+
+defs = pyrtma.load_message_definitions("./msg_defs/my_project_defs.py")
+```
+
+The same definitions object also carries the common lookup helpers:
+
+```python
+msg_cls = client.get_msg_cls(1234)
+msg_name = defs.message_name_from_id(1234)
+msg_id = defs.message_id_from_name("MY_MESSAGE")
+module_name = client.module_name_from_id(212)
+module_id = defs.module_id_from_name("MY_MODULE")
+```
+
+Use `Client` when you already have a running client and want lookups tied to its active schema. Use `MessageDefinitions` when you only need schema access.
+
+### How Client Definition Detection Works
+
+When `definitions` is not passed, `Client` resolves the schema in a priority order.
+
+Definition resolution flow:
+
+1. If you passed a `MessageDefinitions` object or a module object with compiled definitions, that wins immediately.
+2. If `definitions=None`, `Client` checks the `PYRTMA_MSGDEF_MODULES` environment variable first.
+   - This value is a semicolon-separated list of module names, for example: `PYRTMA_MSGDEF_MODULES=my_project_defs;other_defs`
+   - It checks each named module only if it is already loaded in `sys.modules`.
+   - The first loaded module that looks like compiled pyrtma defs (it has `COMPILED_PYRTMA_VERSION` and `get_message_definitions()`) is used.
+   - If none are found, it emits a warning and falls back to the next step below.
+3. If the environment variable is unset or no matching module is found, `Client` optionally auto-detects from the current process.
+   - It starts from the bundled core definitions and scans already-imported non-`pyrtma` modules.
+   - It uses the first one that exposes the compiled pyrtma definition API.
+4. If auto-detect is disabled or nothing is found, it falls back to the bundled core definitions.
+
+This means the precedence is:
+
+`explicit definitions` > `PYRTMA_MSGDEF_MODULES` > `auto-detect` > `core_defs`
+
+Guidance:
+
+- Use explicit `definitions=` in production applications.
+- Set `PYRTMA_MSGDEF_MODULES` when you want a predictable, process-wide default without passing the schema every time.
+- Auto-detect is convenient for quick development and local scripting.
+- Set `auto_detect=False` to skip the scan and use core definitions unless you pass `definitions` explicitly.
 
 >[!NOTE]
 >The pyrtma message compiler requires python 3.10+. Messages compiled for python in python 3.10+ may continue to work with pyrtma clients in older versions of python, but those versions are being phased out.
@@ -161,7 +253,7 @@ See [`/examples/example.py`](https://github.com/pitt-rnel/pyrtma/blob/master/exa
 Compile the example message defintions:
 
 ```shell
-python -m pyrtma.compile -i ./examples/msg_defs/message.yaml --py
+python -m pyrtma.compile -i ./examples/msg_defs/example.defs --py
 ```
 
 Start the demo MessageManager server

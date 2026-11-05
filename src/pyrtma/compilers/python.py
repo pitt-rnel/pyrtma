@@ -164,7 +164,7 @@ class PyDefCompiler:
             desc = self.get_descriptor(field.type_name, field.length or 0)
             dstr += f"{'    ' * 3}{field.name}{desc}\n"
 
-        msg_src = sdf.src.as_posix()
+        msg_src = sdf.src.name
         type_def_str = repr(sdf.raw)
         type_def_rhs = 'type_def: ClassVar[str] = "'
         type_def_end = '"'
@@ -193,7 +193,7 @@ class PyDefCompiler:
             dstr += f"{'    ' * 3}{field.name}{desc}\n"
 
         msg_id = mdf.type_id
-        msg_src = mdf.src.as_posix()
+        msg_src = mdf.src.name
         type_def_str = repr(mdf.raw)
         type_def_rhs = 'type_def: ClassVar[str] = "'
         type_def_end = '"'
@@ -204,7 +204,6 @@ class PyDefCompiler:
             type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
 
         template = f"""\
-        @pyrtma.message_def
         class MDF_{mdf.name}(MessageData, metaclass=MessageMeta):
             type_id: ClassVar[int] = {msg_id}
             type_name: ClassVar[str] = \"{mdf.name}\"
@@ -225,25 +224,24 @@ class PyDefCompiler:
         s = """\
         import ctypes
 
-        import pyrtma
-        from pyrtma.__version__ import check_compiled_version, __version__
-        from packaging.version import parse as _ver_parse
+        from pyrtma.__version__ import check_compiled_version
+        from pyrtma.definitions import MessageDefinitions, build_message_definitions
         from typing import ClassVar
 
         from pyrtma.message_base import MessageBase, MessageMeta
         from pyrtma.message_data import MessageData
         from pyrtma.validators import Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float, Double, Struct, IntArray, FloatArray, StructArray, Char, String, Byte, ByteArray
-        
-        if _ver_parse(__version__) >= _ver_parse("2.3.0"):
-            from pyrtma.context import _update_context, get_context
 
         """
         return dedent(s)
 
     def generate_context(self):
         s = """\
-        if _ver_parse(__version__) >= _ver_parse("2.3.0"):
-            _update_context(__name__)
+        _MESSAGE_DEFINITIONS: MessageDefinitions = build_message_definitions(__name__)
+
+
+        def get_message_definitions() -> MessageDefinitions:
+            return _MESSAGE_DEFINITIONS
         """
         return dedent(s)
 

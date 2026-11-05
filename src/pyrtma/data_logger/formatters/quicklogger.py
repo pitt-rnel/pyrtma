@@ -6,7 +6,7 @@ import sys
 import shutil
 import tempfile
 
-from pyrtma.utils.quicklogger_reader import QLFileHeader
+from pyrtma.utils.log_reader import BinFileHeader
 from ..data_formatter import DataFormatter
 from typing import ClassVar, IO, List
 
@@ -19,7 +19,7 @@ class QLFormatter(DataFormatter):
     def __init__(self, fd: IO[bytes]):
         # Initialize the quicklogger file header
         hdr = pyrtma.get_header_cls()
-        self.ql_header = QLFileHeader()
+        self.ql_header = BinFileHeader()
         self.ql_header.format_version = 1
         self.ql_header.num_messages = 0
         self.ql_header.message_header_size = hdr().size

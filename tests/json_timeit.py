@@ -1,16 +1,14 @@
 import pyrtma
-from pyrtma.context import get_context
 import timeit
 import statistics
 
-# Import message defs to add to pyrtma.msg_defs map
-from .test_msg_defs.test_defs import *
+from .test_msg_defs import test_defs as td
 
 
 def convert_to_json(n=1000):
     stats = {}
-    ctx = get_context()
-    for mdf in ctx.MDF.values():
+    defs = td.get_message_definitions()
+    for mdf in defs.MDF.values():
         # Fill the message with random data
         hdr = pyrtma.MessageHeader()
         hdr.msg_type = mdf.type_id
@@ -29,8 +27,8 @@ def convert_to_json(n=1000):
 
 def convert_from_json(n=1000):
     stats = {}
-    ctx = get_context()
-    for mdf in ctx.MDF.values():
+    defs = td.get_message_definitions()
+    for mdf in defs.MDF.values():
         # Fill the message with random data
         hdr = pyrtma.MessageHeader()
         hdr.msg_type = mdf.type_id
@@ -40,9 +38,9 @@ def convert_from_json(n=1000):
 
         # Convert to json string
         stats[mdf.type_name] = timeit.timeit(
-            "msg = pyrtma.Message.from_json(json_msg)",
+            "msg = pyrtma.Message.from_json(json_msg, defs)",
             number=n,
-            globals={"pyrtma": pyrtma, "json_msg": json_msg},
+            globals={"pyrtma": pyrtma, "json_msg": json_msg, "defs": defs},
         )
 
     return stats

@@ -3,20 +3,26 @@
 Includes :py:class:`~Client` class and associated exception classes
 """
 
+from shlex import split
 import socket
 import select
 import time
 import os
 import ctypes
 import logging
+import sys
 
 from contextlib import contextmanager
 
-from .context import get_context
-from .message import Message, get_msg_cls
+from .message import Message
 from .message_data import MessageData
 from .header import MessageHeader, get_header_cls
 from .core_defs import ALL_MESSAGE_TYPES
+from .definitions import MessageDefinitions
+from .loader import (
+    is_message_definitions_module,
+    get_message_definitions_from_module,
+)
 from .validators import disable_message_validation
 from .client_logging import RTMALogger, ClientLike
 from .exceptions import (
@@ -31,7 +37,9 @@ from .exceptions import (
     InvalidDestinationModule,
     InvalidDestinationHost,
     InvalidSubscription,
+    MessageDefinitionsLoadError,
 )
+
 from . import core_defs as cd
 
 from functools import wraps
@@ -48,8 +56,9 @@ from typing import (
     Any,
     TypeVar,
     cast,
-    Union,
 )
+from types import ModuleType
+
 from warnings import warn
 
 __all__ = [
@@ -89,6 +98,12 @@ class Client(ClientLike):
         host_id (optional): Host ID. Defaults to 0.
         timecode (optional): Add additional timecode fields to message
             header, used by some projects at RNEL. Defaults to False.
+        name (optional): Name of module. Defaults to "".
+        definitions (optional): MessageDefinitions object or Module containing MessageDefinitions. Defaults to None, which will auto-detect
+            message definitions from the current module or use core_defs if not found.
+        auto_detect (optional): If True, will attempt to auto-detect message definitions
+            from the current module. If False, will use core_defs. Defaults to True.
+
     """
 
     def __init__(
@@ -97,6 +112,8 @@ class Client(ClientLike):
         host_id: int = 0,
         timecode: bool = False,
         name: str = "",
+        definitions: Optional[MessageDefinitions | ModuleType] = None,
+        auto_detect: bool = True,
     ):
         if module_id >= cd.DYN_MOD_ID_START or module_id < 0:
             raise ValueError(f"Module ID must be >= 0 and < {cd.DYN_MOD_ID_START}")
@@ -113,22 +130,12 @@ class Client(ClientLike):
         self._paused_types: Set[int] = set()
         self._dynamic_id: bool = module_id == 0
         self._sock = socket.socket()
-
-        # Auto-assign a name if module-id is defined
-        ctx = get_context()
-        if name == "" and module_id != 0:
-            for k, v in ctx.MID.items():
-                if v == module_id:
-                    self._name = k
-                    break
-            else:
-                self._name = name
-        else:
-            self._name = name
+        self._name = name
 
         self._logger = RTMALogger(
             self._name or f"Module {module_id}", self, logging.INFO
         )
+
         # alias logger methods
         self.debug = self._logger.debug
         self.info = self._logger.info
@@ -138,9 +145,115 @@ class Client(ClientLike):
         self.exception = self._logger.exception
         self.critical = self._logger.critical
 
+        # Determine which message definitions to use
+        self._definitions = self._get_definitions(definitions, auto_detect)
+
+        # Auto-assign a name if module-id is defined
+        if name == "" and module_id != 0:
+            self._name = self.module_name_from_id(module_id) or ""
+        else:
+            self._name = name
+
+    def _auto_detect_definitions(self) -> MessageDefinitions:
+        """Attempt to auto-detect message definitions from loaded modules"""
+        # Prune the modules to only those that are not built-in or standard library modules
+        mod_names = sys.modules.keys() - (
+            set(sys.builtin_module_names) | sys.stdlib_module_names
+        )
+
+        for name in mod_names:
+            if name == "pyrtma" or name.startswith("pyrtma."):
+                continue
+
+            if name.startswith("_"):
+                continue
+
+            mod = sys.modules[name]
+
+            if is_message_definitions_module(mod):
+                self.debug(f"Auto-detected message definitions from module: {name}")
+                return get_message_definitions_from_module(mod)
+
+        # Return core_defs if no other message definitions found
+        self.debug("No message definitions found in loaded modules, using core_defs")
+        return cd.get_message_definitions()
+
+    def _get_definitions(
+        self, definitions: Optional[MessageDefinitions | ModuleType], auto_detect: bool
+    ) -> MessageDefinitions:
+        """Determine which message definitions to use"""
+        if isinstance(definitions, MessageDefinitions):
+            return definitions
+        elif isinstance(definitions, ModuleType):
+            if is_message_definitions_module(definitions):
+                self.debug(
+                    f"Using message definitions from module {definitions.__name__}"
+                )
+                return get_message_definitions_from_module(definitions)
+            else:
+                raise MessageDefinitionsLoadError(
+                    f"Module {definitions.__name__} does not have message definitions"
+                )
+        elif definitions is None:
+            # Check for message definitions in PYRTMA_MSGDEF_MODULES environment variable
+            # Allows for multiple modules to be specified, separated by semicolons
+            # example: PYRTMA_MSGDEF_MODULES=module1;module2;module3
+            # First module that has message definitions will be used. If none found, will fall back to auto-detect or core_defs.
+            success = False
+            if mod_names := os.getenv("PYRTMA_MSGDEF_MODULES"):
+                mod_list = mod_names.removesuffix(";").split(";")
+                # Find the first module that has message definitions
+                for mod_name in mod_list:
+                    mod = sys.modules.get(mod_name)
+                    if mod is not None:
+                        if is_message_definitions_module(mod):
+                            self.debug(
+                                f"Using message definitions from module {mod_name}"
+                            )
+                            success = True
+                            return get_message_definitions_from_module(mod)
+                else:
+                    self.warning(
+                        "Warning: No message definitions found in PYRTMA_MSGDEF_MODULES list, Falling back to auto-detect or core_defs."
+                    )
+
+            if not success:
+                if auto_detect:
+                    return self._auto_detect_definitions()
+                else:
+                    self.warning(
+                        "Warning: No message definitions provided, using core_defs only!"
+                    )
+
+            return cd.get_message_definitions()
+
+        else:
+            raise TypeError(
+                f"Invalid type for definitions: {type(definitions)}. Must be MessageDefinitions or ModuleType."
+            )
+
     @property
     def logger(self) -> RTMALogger:
         return self._logger
+
+    @property
+    def definitions(self) -> MessageDefinitions:
+        return self._definitions
+
+    def get_msg_cls(self, msg_type: int) -> Type[MessageData]:
+        return self._definitions.get_msg_cls(msg_type)
+
+    def message_name_from_id(self, message_id: int) -> Optional[str]:
+        return self._definitions.message_name_from_id(message_id)
+
+    def message_id_from_name(self, message_name: str) -> Optional[int]:
+        return self._definitions.message_id_from_name(message_name)
+
+    def module_name_from_id(self, module_id: int) -> Optional[str]:
+        return self._definitions.module_name_from_id(module_id)
+
+    def module_id_from_name(self, module_name: str) -> Optional[int]:
+        return self._definitions.module_id_from_name(module_name)
 
     def __del__(self):
         if self._connected:
@@ -183,9 +296,7 @@ class Client(ClientLike):
             self._sock.close()
             raise SocketOptionError from e
 
-    def _connect_helper(
-        self, logger_status: bool, daemon_status: bool, allow_multiple: bool
-    ) -> Message:
+    def _connect_helper(self, logger_status: bool) -> Message:
         """Called internally after _socket_connect
 
         Note that this is also used by web_manager
@@ -197,18 +308,15 @@ class Client(ClientLike):
 
         msg = cd.MDF_CONNECT()
         msg.logger_status = int(logger_status)
-        msg.daemon_status = int(daemon_status)
 
         msg2 = cd.MDF_CONNECT_V2()
         msg2.logger_status = int(logger_status)
-        msg2.daemon_status = int(daemon_status)
-        msg2.allow_multiple = int(allow_multiple)
         msg2.pid = os.getpid()
         msg2.mod_id = self.module_id
         msg2.name = self.name
 
         self.send_message(msg2)
-        self.send_message(msg)
+        # self.send_message(msg)
         ack_msg = self._wait_for_acknowledgement()
 
         # save own module ID from ACK if asked to be assigned dynamic ID
@@ -240,8 +348,6 @@ class Client(ClientLike):
         self,
         server_name: str = "localhost:7111",
         logger_status: bool = False,
-        daemon_status: bool = False,
-        allow_multiple: bool = False,
     ):
         """Connect to message manager server
 
@@ -251,7 +357,6 @@ class Client(ClientLike):
             logger_status (optional): Flag to declare client as a logger module.
                 Logger modules are automatically subscribed to all message types.
                 Defaults to False.
-            allow_multiple (optional): Flag to declare client can have multiple instances. Defaults to False.
 
         Raises:
             MessageManagerNotFound: Unable to connect to message manager
@@ -263,10 +368,7 @@ class Client(ClientLike):
         # Setup the underlying socket connection
         self._socket_connect(server_name)
 
-        ack = self._connect_helper(logger_status, daemon_status, allow_multiple)
-
-        # Send client pid
-        self.send_module_ready()
+        ack = self._connect_helper(logger_status)
 
     def disconnect(self):
         """Disconnect from message manager server"""
@@ -588,7 +690,7 @@ class Client(ClientLike):
             InvalidDestinationHost: Specified destination host is invalid
         """
         # Verify that the module & host ids are valid
-        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULES:
+        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULE_ID:
             raise InvalidDestinationModule(f"Invalid dest_mod_id of [{dest_mod_id}]")
 
         if dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS:
@@ -770,7 +872,7 @@ class Client(ClientLike):
         # Read Data Section
 
         try:
-            data = get_msg_cls(header.msg_type)()
+            data = self._definitions.get_msg_cls(header.msg_type)()
         except UnknownMessageType as e:
             mt = header.msg_type
             raw = self._sock.recv(header.num_data_bytes, socket.MSG_WAITALL)
@@ -903,8 +1005,9 @@ def client_context(
     host_id: int = 0,
     timecode: bool = False,
     logger_status: bool = False,
-    allow_multiple: bool = False,
     name: str = "",
+    definitions: Optional[MessageDefinitions | ModuleType] = None,
+    auto_detect: bool = True,
 ):
     """Context manager function to simplify initializing a pyrtma Client
 
@@ -924,14 +1027,17 @@ def client_context(
         logger_status (optional): Flag to declare client as a logger module.
             Logger modules are automatically subscribed to all message types.
             Defaults to False.
-        allow_multiple (optional): Flag to declare client can have multiple instances. Defaults to False.
         name (optional): Name of module
+        definitions (optional): MessageDefinitions object or Module containing MessageDefinitions. Defaults to None, which will auto-detect
+            message definitions from the current module or use core_defs if not found.
+        auto_detect (optional): If True, will attempt to auto-detect message definitions
+            from the current module. If False, will use core_defs. Defaults to True.
 
     Yields:
         Client: initialized pyrtma Client object
     """
-    c = Client(module_id, host_id, timecode, name=name)
-    c.connect(server_name, logger_status, allow_multiple)
+    c = Client(module_id, host_id, timecode, name=name, definitions=definitions)
+    c.connect(server_name, logger_status)
     if msg_list:
         c.subscribe(msg_list)
     c.send_module_ready()

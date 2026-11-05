@@ -8,6 +8,7 @@ import time
 import pyrtma
 import pyrtma.core_defs as cd
 
+from pyrtma.definitions import MessageDefinitions
 from pyrtma.exceptions import UnknownMessageType
 
 from .dataset_writer import DatasetWriter
@@ -20,10 +21,20 @@ class DataLogger:
     MAX_DATASETS = 6
     ALL_SETS = ("*", "all")
 
-    def __init__(self, rtma_server_ip: str, log_level: int):
+    def __init__(
+        self,
+        rtma_server_ip: str,
+        log_level: int,
+        definitions: MessageDefinitions,
+    ):
         self.mm_ip = rtma_server_ip
+        self.definitions = definitions
 
-        self.client = pyrtma.Client(module_id=cd.MID_DATA_LOGGER, name="data_logger")
+        self.client = pyrtma.Client(
+            module_id=cd.MID_DATA_LOGGER,
+            name="data_logger",
+            definitions=definitions,
+        )
         self.client.logger.set_all_levels(log_level)
         self.client.connect(rtma_server_ip, logger_status=True)
         self.logger = self.client.logger
@@ -65,6 +76,7 @@ class DataLogger:
             elif ds.error_event.is_set():
                 self.client.send_message(ds.error)
                 self.client.error(ds.error)
+                ds.error_event.clear()
 
         # Remove the dataset after stoppping
         for name in dead:
