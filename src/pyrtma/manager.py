@@ -63,12 +63,14 @@ class Module:
     def sub_all(self) -> bool:
         return ALL_MESSAGE_TYPES in self.subs
 
-    def send_message(self, header: MessageHeader, payload: Union[bytes, MessageData]):
+    def send_message(
+        self, header: MessageHeader, payload: Union[bytes, memoryview, MessageData]
+    ):
         """Send a message
 
         Args:
             header (MessageHeader): Message header
-            payload (Union[bytes, MessageData]): Message data
+            payload (Union[bytes, memoryview, MessageData]): Message data
         """
         self.msg_count += 1
         header.msg_count = self.msg_count
@@ -454,7 +456,7 @@ class MessageManager(ClientLike):
         self,
         src_module: Module,
         header: MessageHeader,
-        data: Union[bytes, MessageData],
+        data: Union[bytes, memoryview, MessageData],
     ):
         """Forward a message from other modules
 

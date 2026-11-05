@@ -245,7 +245,8 @@ class Dataset:
                     if self._client is not None
                     else self._definitions
                 )
-                self.datalogger_config = self.process_data_logger_config_msg(
+                # Known bug, fixed in Phase 6: this method doesn't exist.
+                self.datalogger_config = self.process_data_logger_config_msg(  # pyright: ignore[reportAttributeAccessIssue]
                     cast(cd.MDF_DATA_LOGGER_CONFIG, msg.data),
                     definitions=definitions,
                 )

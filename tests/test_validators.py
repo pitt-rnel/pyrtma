@@ -1,3 +1,5 @@
+# These tests assign values of the wrong type on purpose, to check they're rejected.
+# pyright: reportAttributeAccessIssue=false
 import unittest
 
 # Import message defs to add to pyrtma.msg_defs map

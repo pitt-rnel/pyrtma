@@ -40,7 +40,10 @@ class RTMA_UnifiedLog(object):
         if self.server is None:
             self.server = "127.0.0.1:7111"
         self.mod.info(f"Attempting connection to RTMA @ {self.server}")
-        self.mod.connect(self.server, allow_multiple=True)
+        # Known bug, fixed in Phase 3 (C4): connect() has no allow_multiple.
+        self.mod.connect(
+            self.server, allow_multiple=True  # pyright: ignore[reportCallIssue]
+        )
 
         self.mod.info("Successfully connected to RTMA")
         self.rtma_subscribe()
@@ -176,7 +179,11 @@ if __name__ == "__main__":
 
     server_name = f"{args.addr}:{args.port}"
 
-    log_level = logging.getLevelNamesMapping().get(args.log_level) or logging.INFO
+    # Known bug, fixed in Phase 3: getLevelNamesMapping() needs Python 3.11.
+    names = (
+        logging.getLevelNamesMapping()  # pyright: ignore[reportAttributeAccessIssue]
+    )
+    log_level = names.get(args.log_level) or logging.INFO
 
     RL = RTMA_UnifiedLog(log_level=log_level, server=server_name)
     RL.start()

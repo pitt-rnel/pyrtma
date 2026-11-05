@@ -142,9 +142,10 @@ class RTMAWebSocketHandler(WebSocketHandler):
         # self.proxy._module_id = msg.header.src_mod_id
         # self.proxy._host_id = msg.header.src_host_id
         msg.data = cast(cd.MDF_CONNECT, msg.data)
+        # Known bug, fixed in Phase 3 (C4): _connect_helper() takes one argument.
         ack_msg = self.proxy._connect_helper(
             bool(msg.data.logger_status),
-            bool(msg.data.daemon_status),
+            bool(msg.data.daemon_status),  # pyright: ignore[reportCallIssue]
             allow_multiple=False,
         )
         # forward ack
@@ -167,9 +168,10 @@ class RTMAWebSocketHandler(WebSocketHandler):
         # self.proxy._host_id = msg.header.src_host_id
         msg.data = cast(cd.MDF_CONNECT_V2, msg.data)
         self.proxy._name = msg.data.name
+        # Known bug, fixed in Phase 3 (C4): _connect_helper() takes one argument.
         ack_msg = self.proxy._connect_helper(
             bool(msg.data.logger_status),
-            bool(msg.data.daemon_status),
+            bool(msg.data.daemon_status),  # pyright: ignore[reportCallIssue]
             bool(msg.data.allow_multiple),  # TODO add CONNECT_V2 support to rtma-js
         )
         # forward ack
