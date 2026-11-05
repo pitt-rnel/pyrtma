@@ -13,15 +13,33 @@ import threading
 import time
 import traceback
 from dataclasses import dataclass
-from typing import Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from pyrtma.client import Client
 from pyrtma.manager import MessageManager
 from pyrtma.message import Message
 from pyrtma.message_data import MessageData
 
+if TYPE_CHECKING:
+    import pytest
+
 LOOPBACK: str = "127.0.0.1"
 DEFAULT_TIMEOUT: float = 5.0
+
+
+def manager_options(request: pytest.FixtureRequest) -> dict[str, Any]:
+    """Return the ``MessageManager`` options a test asks for.
+
+    A test sets them with ``@pytest.mark.manager_options(stall_timeout=0.3)``.
+
+    Args:
+        request: The requesting test's fixture request.
+
+    Returns:
+        The marker's keyword arguments, or an empty dict without the marker.
+    """
+    marker = request.node.get_closest_marker("manager_options")
+    return dict(marker.kwargs) if marker is not None else {}
 
 
 class HarnessError(Exception):
@@ -225,17 +243,20 @@ class ManagerHarness:
         address: The ``host:port`` string clients connect to.
     """
 
-    def __init__(self, *, log_level: int = logging.ERROR) -> None:
+    def __init__(self, *, log_level: int = logging.ERROR, **options: Any) -> None:
         """Construct the manager and bind its port.
 
         Args:
             log_level: The manager's logging level.
+            options: Other ``MessageManager`` keyword arguments, such as
+                ``stall_timeout``.
         """
         self.manager = MessageManager(
             ip_address=LOOPBACK,
             port=0,
             log_level=log_level,
             debug=False,
+            **options,
         )
         self.port = bound_port(self.manager)
         self.address = f"{LOOPBACK}:{self.port}"

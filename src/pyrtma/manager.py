@@ -11,6 +11,7 @@ import time
 import random
 import ctypes
 import os
+import struct
 from contextlib import contextmanager
 
 
@@ -22,14 +23,27 @@ from .message_data import MessageData
 from .core_defs import ALL_MESSAGE_TYPES
 from . import core_defs as cd
 
-from typing import Dict, Iterator, List, Tuple, Set, Type, Union, Optional
+from typing import Deque, Dict, Iterator, List, Tuple, Set, Type, Union, Optional
+from typing import Sequence
 from itertools import chain
 from dataclasses import dataclass, field
-from collections import defaultdict
+from collections import defaultdict, deque
 
 # Message types below this are core types, defined in core_defs. The manager
 # checks their size and acts on some of them; it forwards other types as is.
 _FIRST_USER_MSG_TYPE: int = cd.MAX_RTMA_MSG_TYPE + 1
+
+#: Seconds a client may stall partway through sending a message before the
+#: manager drops it.
+DEFAULT_STALL_TIMEOUT: float = 5.0
+
+# The header's num_data_bytes field, read straight from received bytes. The
+# read loop needs it for every message, and reading it through a header
+# object costs several times more, because MessageBase routes every field
+# access through Python code.
+_NUM_DATA_BYTES = struct.Struct("i")
+_NUM_DATA_BYTES_OFFSET: int = MessageHeader._num_data_bytes.offset  # type: ignore[attr-defined]
+assert ctypes.sizeof(ctypes.c_int) == _NUM_DATA_BYTES.size
 
 
 @dataclass
@@ -52,6 +66,30 @@ class Module:
     drops: int = 0
     msg_count: int = 0
 
+    # Receive state. The manager reads a message a piece at a time, as its
+    # bytes arrive, into _rx: first the header, then the payload after it.
+    # _rx_have counts the bytes received, _rx_need the bytes the current
+    # section ends at, and _rx_last is when the last bytes arrived.
+    _rx: bytearray = field(init=False, repr=False, compare=False)
+    _rx_view: memoryview = field(init=False, repr=False, compare=False)
+    _rx_have: int = field(default=0, init=False, repr=False, compare=False)
+    _rx_need: int = field(init=False, repr=False, compare=False)
+    _rx_header_size: int = field(init=False, repr=False, compare=False)
+    _rx_header_done: bool = field(default=False, init=False, repr=False, compare=False)
+    _rx_last: float = field(default=0.0, init=False, repr=False, compare=False)
+
+    # Send state: bytes the kernel hasn't accepted yet, oldest first. The
+    # first entry may be the rest of a message that was partly sent.
+    _outbox: Deque[memoryview] = field(
+        default_factory=deque, init=False, repr=False, compare=False
+    )
+
+    def __post_init__(self) -> None:
+        self._rx_header_size = ctypes.sizeof(self.header_cls)
+        self._rx = bytearray(self._rx_header_size)
+        self._rx_view = memoryview(self._rx)
+        self._rx_need = self._rx_header_size
+
     @property
     def ipaddr(self) -> str:
         return f"{self.address[0]}:{self.address[1]}"
@@ -68,12 +106,19 @@ class Module:
     def sub_all(self) -> bool:
         return ALL_MESSAGE_TYPES in self.subs
 
+    @property
+    def has_pending(self) -> bool:
+        """Whether bytes are waiting to be sent to this module."""
+        return bool(self._outbox)
+
     def send_message(
         self, header: MessageHeader, payload: Union[bytes, memoryview, MessageData]
     ):
-        """Send a message
+        """Send a message, queueing what the connection can't take yet.
 
-        The header is sent unchanged, so the recipient sees the sender's
+        The message is never dropped: bytes the kernel doesn't accept now are
+        kept and sent by :meth:`flush`, after anything already queued. The
+        header is sent unchanged, so the recipient sees the sender's
         ``msg_count``. ``Module.msg_count`` counts the messages sent to this
         module, for tracking only; it is not written into the header, which the
         manager shares between all recipients of a message.
@@ -81,14 +126,18 @@ class Module:
         Args:
             header (MessageHeader): Message header
             payload (Union[bytes, memoryview, MessageData]): Message data
-        """
-        self.msg_count += 1
 
-        self.conn.sendall(header)
-        self.conn.sendall(payload)
+        Raises:
+            OSError: The connection failed.
+        """
+        self.enqueue(b"".join((header, payload)))
 
     def send_ack(self):
-        """Send ACKNOWLEDGE signal header"""
+        """Send ACKNOWLEDGE signal header, queueing it if needed.
+
+        Raises:
+            OSError: The connection failed.
+        """
         # Just send a header
         header = self.header_cls()
         header.msg_type = cd.MT_ACKNOWLEDGE
@@ -98,9 +147,101 @@ class Module:
         header.num_data_bytes = 0
         header.msg_count = 0  # messages from the manager carry no count
 
-        self.msg_count += 1
+        self.enqueue(bytes(header))
 
-        self.conn.sendall(header)
+    def try_send(self, data: bytes) -> bool:
+        """Start sending a whole message now, or not at all.
+
+        Used for forwarded messages, which are dropped rather than delayed
+        when a module can't take them. Queued bytes go first; if they can't
+        all be sent, nothing new is started. Once the kernel accepts any of
+        the message, the rest is queued, so a message is never cut short on
+        the wire.
+
+        Args:
+            data: The message's header and payload, in one buffer.
+
+        Returns:
+            True if the message was sent or queued; False if none of it was,
+            because the connection is full or still has queued bytes.
+
+        Raises:
+            OSError: The connection failed.
+        """
+        if self._outbox and not self.flush():
+            return False
+        try:
+            sent = self.conn.send(data)
+        except BlockingIOError:
+            return False
+        self.msg_count += 1
+        if sent < len(data):
+            self._outbox.append(memoryview(data)[sent:])
+        return True
+
+    def enqueue(self, data: bytes) -> None:
+        """Send a message, queueing whatever the connection can't take yet.
+
+        Args:
+            data: The message's header and payload, in one buffer.
+
+        Raises:
+            OSError: The connection failed.
+        """
+        self.msg_count += 1
+        if self._outbox and not self.flush():
+            self._outbox.append(memoryview(data))
+            return
+        try:
+            sent = self.conn.send(data)
+        except BlockingIOError:
+            sent = 0
+        if sent < len(data):
+            self._outbox.append(memoryview(data)[sent:])
+
+    def flush(self) -> bool:
+        """Send queued bytes until they're gone or the connection is full.
+
+        Returns:
+            True if nothing is left queued.
+
+        Raises:
+            OSError: The connection failed.
+        """
+        while self._outbox:
+            chunk = self._outbox[0]
+            try:
+                sent = self.conn.send(chunk)
+            except BlockingIOError:
+                return False
+            if sent < len(chunk):
+                self._outbox[0] = chunk[sent:]
+                return False
+            self._outbox.popleft()
+        return True
+
+    def _rx_reserve(self, size: int) -> None:
+        """Make the receive buffer hold at least ``size`` bytes.
+
+        Bytes already received are kept. The buffer is replaced rather than
+        resized, because a bytearray with a memoryview on it can't be resized.
+
+        Args:
+            size: The number of bytes needed.
+        """
+        if len(self._rx) >= size:
+            return
+        grown = bytearray(size)
+        grown[: self._rx_have] = self._rx_view[: self._rx_have]
+        self._rx_view.release()
+        self._rx = grown
+        self._rx_view = memoryview(grown)
+
+    def _rx_reset(self) -> None:
+        """Get ready to receive the next message's header."""
+        self._rx_have = 0
+        self._rx_need = self._rx_header_size
+        self._rx_header_done = False
 
     def close(self):
         """Close connection"""
@@ -129,6 +270,8 @@ class MessageManager(ClientLike):
         *,
         log_level=logging.INFO,
         debug=False,
+        stall_timeout: Optional[float] = DEFAULT_STALL_TIMEOUT,
+        logger_timeout: Optional[float] = None,
     ):
         """MessageManager class
 
@@ -140,7 +283,26 @@ class MessageManager(ClientLike):
                 after it are keyword-only.
             log_level (int, optional): logging level, defaults to logging.INFO.
             debug (bool, optional): Flag for debug mode. Defaults to False.
+            stall_timeout: Seconds a client may go without sending more bytes
+                while partway through a message before it is dropped, or None
+                to never drop it. A stalled client doesn't hold up the others
+                either way. Defaults to 5 seconds.
+            logger_timeout: Seconds to wait for a logger module that can't take
+                a message, before dropping it, or None to wait as long as it
+                takes. Other modules are never waited for. Defaults to None.
+
+        Raises:
+            ValueError: A timeout is zero or negative.
         """
+        for name, value in (
+            ("stall_timeout", stall_timeout),
+            ("logger_timeout", logger_timeout),
+        ):
+            if value is not None and value <= 0:
+                raise ValueError(f"{name} must be positive or None, not {value}.")
+        self.stall_timeout = stall_timeout
+        self.logger_timeout = logger_timeout
+
         self._keep_running = False
         self.ip_address = ip_address
         self.port = port
@@ -150,8 +312,11 @@ class MessageManager(ClientLike):
         self.header_buffer = bytearray(self.header_size)
         self.header_view = memoryview(self.header_buffer)
 
+        # How long run() waits in select(). It also bounds how late the stall
+        # check can run.
         self.read_timeout = 0.200
-        self.write_timeout = 0  # c++ message manager uses timeout = 0 for all modules except logger modules, which uses -1 (blocking)
+        # Unused since sends became non-blocking; kept for compatibility.
+        self.write_timeout = 0
         self._debug = debug
 
         self._logger = RTMALogger(f"message_manager", self, logging.INFO)
@@ -178,6 +343,7 @@ class MessageManager(ClientLike):
             socket.getprotobyname("tcp"), socket.TCP_NODELAY, 1
         )
 
+        # Unused since sends became non-blocking; kept for compatibility.
         self.wlist: List[socket.socket] = []
 
         # Add message manager to its module list
@@ -381,21 +547,112 @@ class MessageManager(ClientLike):
         self._finish_removals()
 
     def _drop_after_send_error(
-        self, module: Module, header: MessageHeader, err: OSError
+        self, module: Module, header: Optional[MessageHeader], err: OSError
     ) -> None:
         """Remove a module whose send failed, and report the failure.
 
         Args:
             module: The module the send was for.
-            header: Header of the message that wasn't delivered.
+            header: Header of the message that wasn't delivered, or None when
+                the failure was in sending queued bytes, which aren't
+                reported with ``FAILED_MESSAGE``.
             err: The error the send raised.
         """
         self.remove_module(module)
         self.logger.error(f"Connection Error on write to {module!s} - {err!s}")
         print("x", end="", flush=True)
-        # This could recurse: send_failed_message returns early when the
-        # failed message is itself a FAILED_MESSAGE or a log message.
+        if header is not None:
+            # This could recurse: send_failed_message returns early when the
+            # failed message is itself a FAILED_MESSAGE or a log message.
+            self.send_failed_message(module, header, time.perf_counter())
+
+    def _wait_writable(self, module: Module, timeout: Optional[float]) -> bool:
+        """Wait until a module's connection can take more bytes.
+
+        Args:
+            module: The module to wait for.
+            timeout: Seconds to wait, or None to wait as long as it takes.
+
+        Returns:
+            True if the connection is writable, False if the wait timed out.
+        """
+        _, writable, _ = select.select([], [module.conn], [], timeout)
+        return bool(writable)
+
+    def _drain_logger(self, module: Module) -> bool:
+        """Wait until a logger module has taken every queued byte.
+
+        Loggers are waited for, so that recordings are complete. The wait is
+        bounded by ``logger_timeout`` when it is set.
+
+        Args:
+            module: The logger module.
+
+        Returns:
+            True when everything was sent; False if ``logger_timeout`` passed
+            first.
+
+        Raises:
+            OSError: The connection failed.
+        """
+        deadline = (
+            None
+            if self.logger_timeout is None
+            else time.monotonic() + self.logger_timeout
+        )
+        while not module.flush():
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                return False
+            if not self._wait_writable(module, remaining):
+                return False
+        return True
+
+    def _send_to_logger(
+        self, module: Module, header: MessageHeader, wire: bytes
+    ) -> None:
+        """Send a message to a logger module, waiting for it if needed.
+
+        Args:
+            module: The logger module.
+            header: The message's header, for reporting a failure.
+            wire: The message's header and payload, in one buffer.
+        """
+        try:
+            module.enqueue(wire)
+            drained = self._drain_logger(module)
+        except OSError as err:
+            self._drop_after_send_error(module, header, err)
+            return
+        if drained:
+            module.drops = 0
+            return
+        # Removed before logging: the log message is forwarded to loggers too,
+        # and would otherwise wait for this one again. Its GOODBYE still comes
+        # after the log record, when the forward finishes.
+        self.remove_module(module)
+        self.logger.error(
+            f"DROPPING - {module!s} - Logger module did not accept data within {self.logger_timeout} s."
+        )
         self.send_failed_message(module, header, time.perf_counter())
+
+    def _flush_module(self, module: Module) -> None:
+        """Send a module's queued bytes, as far as its connection takes them.
+
+        A failure drops the module, and doesn't stop the manager.
+
+        Args:
+            module: The module, whose connection is writable.
+        """
+        try:
+            module.flush()
+        except OSError as err:
+            self._drop_after_send_error(module, None, err)
+        except Exception:
+            self.logger.exception(
+                f"DROPPING - {module!s} - Unexpected error while sending to it."
+            )
+            self.remove_module(module)
 
     def disconnect_module(self, src_module: Module):
         """Disconnect module
@@ -500,54 +757,80 @@ class MessageManager(ClientLike):
         )
 
     def read_message(self, sock: socket.socket) -> Optional[MessageHeader]:
-        """Read an incoming message
+        """Read whatever has arrived of a client's message, without blocking.
+
+        Each client's bytes go into its own buffer, a section at a time: a
+        read never asks for more than the rest of the current header or
+        payload, so the next message's bytes stay in the kernel's buffer. A
+        message that is still incomplete waits there while other clients are
+        served, and is picked up when more bytes arrive.
 
         A client is dropped if its header announces a negative or oversized
-        payload, which is checked before the payload is read, or if it sends a
-        core message whose size doesn't match its core definition.
+        payload, which is checked once the header is complete; if it sends a
+        core message whose size doesn't match its core definition, checked
+        once the whole message is in; or if it closes its connection.
 
         Args:
             sock (socket.socket): socket to read from
 
         Returns:
-            MessageHeader: message header of incoming message, or None if the
-            client was dropped
+            MessageHeader: header of the message this read completed, with its
+            payload in ``data_buffer``, or None if no message was completed or
+            the client was dropped
+
+        Raises:
+            ConnectionError: The connection was reset.
         """
-        # Read RTMA Header Section
-        nbytes = sock.recv_into(
-            self.header_buffer, self.header_size, socket.MSG_WAITALL
-        )
-
-        # Module that sent the message
         mod = self.modules[sock]
+        header_size = self.header_size
+        while True:
+            have = mod._rx_have
+            need = mod._rx_need
+            try:
+                nbytes = sock.recv_into(mod._rx_view[have:need], need - have)
+            except BlockingIOError:
+                # Nothing to read after all: readiness is only a hint.
+                return None
 
-        if nbytes != self.header_size:
-            self.remove_module(mod)
-            self.logger.warning(
-                f"DROPPING - {mod!s} - Wrong number of header bytes returned from sock.recv_into. Got ({nbytes})."
-            )
-            return
+            if nbytes == 0:
+                self._drop_closed(mod)
+                return None
 
-        header = self.decode_header()
+            have += nbytes
+            mod._rx_have = have
+            mod._rx_last = time.monotonic()
+            if have < need:
+                # The rest hasn't arrived; wait for select() to report more.
+                return None
 
-        # Read Data Section into Internal Buffer
-        data_size = header.num_data_bytes
-        if data_size < 0 or data_size > len(self.data_buffer):
-            self.logger.error(
-                f"DROPPING - {mod!s} - Invalid num_data_bytes ({data_size}) for MT={header.msg_type}; it must be 0 to {len(self.data_buffer)}. Header may be corrupted."
-            )
-            self.remove_module(mod)
-            return None
+            if mod._rx_header_done:
+                break
 
-        if data_size:
-            nbytes = sock.recv_into(self.data_buffer, data_size, socket.MSG_WAITALL)
-
-            if nbytes != data_size:
-                self.logger.warning(
-                    f"DROPPING - {mod!s} - Wrong number of data bytes returned from sock.recv_into. Got ({nbytes})"
+            (data_size,) = _NUM_DATA_BYTES.unpack_from(mod._rx, _NUM_DATA_BYTES_OFFSET)
+            if data_size < 0 or data_size > len(self.data_buffer):
+                msg_type = self.header_cls.from_buffer_copy(
+                    mod._rx_view[:header_size]
+                ).msg_type
+                self.logger.error(
+                    f"DROPPING - {mod!s} - Invalid num_data_bytes ({data_size}) for MT={msg_type}; it must be 0 to {len(self.data_buffer)}. Header may be corrupted."
                 )
                 self.remove_module(mod)
-                return
+                return None
+            mod._rx_header_done = True
+            if not data_size:
+                break
+            mod._rx_reserve(header_size + data_size)
+            mod._rx_need = header_size + data_size
+            # Go round again: the payload has often arrived too.
+
+        # The whole message is in. Copy it to the shared buffers that the
+        # processing code reads, and get ready for the next one.
+        size = mod._rx_need
+        self.header_view[:] = mod._rx_view[:header_size]
+        if size > header_size:
+            self.data_view[: size - header_size] = mod._rx_view[header_size:size]
+        mod._rx_reset()
+        header = self.decode_header()
 
         # Checked after the payload is read, so that a dropped client's socket
         # closes with nothing left unread, which ends the connection cleanly
@@ -556,6 +839,62 @@ class MessageManager(ClientLike):
             return None
 
         return header
+
+    def _drop_quietly(self, module: Module, message: str) -> None:
+        """Drop a module and log why, without sending it the log message.
+
+        The module is removed first, so the log message isn't forwarded to
+        it: a closed connection would fail the send, and a stalled logger
+        could be waited for. Removing it inside ``_routing()`` defers its
+        GOODBYE until the log message has gone out.
+
+        Args:
+            module: The module to drop.
+            message: The warning to log.
+        """
+        with self._routing():
+            self.remove_module(module)
+            self.logger.warning(message)
+
+    def _drop_closed(self, mod: Module) -> None:
+        """Drop a client whose connection was closed.
+
+        Args:
+            mod: The client's module.
+        """
+        if mod._rx_have:
+            reason = f"Connection closed mid-message, after {mod._rx_have} of {mod._rx_need} bytes."
+        else:
+            reason = "Connection closed by the client."
+        self._drop_quietly(mod, f"DROPPING - {mod!s} - {reason}")
+
+    def _drop_stalled(self, now: float) -> None:
+        """Drop clients that stalled partway through sending a message.
+
+        A client is stalled when it has sent part of a message and nothing
+        more for ``stall_timeout`` seconds. Does nothing when ``stall_timeout``
+        is None.
+
+        Args:
+            now: The current ``time.monotonic()`` reading.
+        """
+        if self.stall_timeout is None:
+            return
+        for module in list(self.modules.values()):
+            if not module._rx_have or not self._is_routed(module):
+                continue
+            idle = now - module._rx_last
+            if idle < self.stall_timeout:
+                continue
+            try:
+                self._drop_quietly(
+                    module,
+                    f"DROPPING - {module!s} - Stalled mid-message for {idle:.1f} s, after {module._rx_have} of {module._rx_need} bytes.",
+                )
+            except Exception:
+                self.logger.exception(
+                    f"Unexpected error while dropping stalled module {module!s}."
+                )
 
     def _core_size_matches(self, mod: Module, header: MessageHeader) -> bool:
         """Check a core message's size against its core definition.
@@ -642,6 +981,10 @@ class MessageManager(ClientLike):
                 )
             )
 
+            # Header and payload in one buffer, built once and shared by every
+            # recipient: one send per recipient instead of two.
+            wire: Optional[bytes] = None
+
             for module in subscribers:
                 if not self._is_routed(module):
                     continue
@@ -653,21 +996,29 @@ class MessageManager(ClientLike):
                 ):
                     continue
 
-                if module.conn not in self.wlist:
-                    if module.is_logger:
-                        # Block until logger is ready
-                        select.select([], [module.conn], [], None)
-                    else:
-                        module.drops += 1
-                        print("x", end="", flush=True)
-                        self.send_failed_message(module, header, time.perf_counter())
-                        continue
+                if wire is None:
+                    # join() copies each part once; bytes() + bytes() would
+                    # copy them twice more.
+                    wire = b"".join((header, data))
+
+                if module.is_logger:
+                    self._send_to_logger(module, header, wire)
+                    continue
 
                 try:
-                    module.send_message(header, data)
-                    module.drops = 0
+                    sent = module.try_send(wire)
                 except OSError as err:
                     self._drop_after_send_error(module, header, err)
+                    continue
+
+                if sent:
+                    module.drops = 0
+                else:
+                    # A module that can't take the message now misses it; it
+                    # isn't waited for and isn't dropped.
+                    module.drops += 1
+                    print("x", end="", flush=True)
+                    self.send_failed_message(module, header, time.perf_counter())
 
     def send_to_loggers(
         self,
@@ -681,18 +1032,12 @@ class MessageManager(ClientLike):
             payload (Union[bytes, MessageData]): Message data to send
         """
         with self._routing():
+            wire = b"".join((header, payload))
             # A snapshot, because a failed send removes the logger from the set.
             for module in list(self.logger_modules):
                 if not self._is_routed(module):
                     continue
-                if module.conn not in self.wlist:
-                    # Block until logger is ready
-                    select.select([], [module.conn], [], None)
-                try:
-                    module.send_message(header, payload)
-                    module.drops = 0
-                except OSError as err:
-                    self._drop_after_send_error(module, header, err)
+                self._send_to_logger(module, header, wire)
 
     def send_message(
         self,
@@ -734,6 +1079,8 @@ class MessageManager(ClientLike):
         header.num_data_bytes = 0
         header.msg_count = 0  # messages from the manager carry no count
 
+        # Queued behind anything not yet sent rather than dropped: the client
+        # is waiting for it.
         try:
             src_module.send_message(header, b"")
         except OSError as err:
@@ -918,6 +1265,9 @@ class MessageManager(ClientLike):
         try:
             # Disable Nagle Algorithm
             conn.setsockopt(socket.getprotobyname("tcp"), socket.TCP_NODELAY, 1)
+            # Set explicitly: whether an accepted socket inherits the listening
+            # socket's mode differs between operating systems.
+            conn.setblocking(False)
         except OSError as err:
             self.logger.warning(
                 f"Closing new connection from {address[0]}:{address[1]} - {err!s}"
@@ -961,14 +1311,23 @@ class MessageManager(ClientLike):
         caused by one client drops that client and doesn't stop the loop.
         """
         self._keep_running = True
+        next_stall_check = 0.0
         try:
             with disable_message_validation():
                 while self._keep_running:
-                    rlist, _, _ = select.select(
-                        self.modules.keys(), [], [], self.read_timeout
+                    # Wait for data to read, and for room in the connections
+                    # that have bytes queued. The read list always holds the
+                    # listening socket, which matters on Windows, where
+                    # select() rejects three empty lists.
+                    pending = [m.conn for m in self.modules.values() if m._outbox]
+                    rlist, wlist, _ = select.select(
+                        self.modules.keys(), pending, [], self.read_timeout
                     )
-                    if not rlist:
-                        continue
+
+                    for client_socket in wlist:
+                        module = self.modules.get(client_socket)
+                        if module is not None:
+                            self._flush_module(module)
 
                     # Check for an incoming connection request
                     if self.listen_socket in rlist:
@@ -978,18 +1337,18 @@ class MessageManager(ClientLike):
                     # Randomly select the order of sockets with data.
                     random.shuffle(rlist)
 
-                    # Check whichs clients are ready to receive data
-                    self.wlist.clear()
-                    if rlist:
-                        _, self.wlist, _ = select.select(
-                            [], self.modules.keys(), [], self.write_timeout
-                        )
-
                     for client_socket in rlist:
                         # Check that module is still active
                         src = self.modules.get(client_socket)
                         if src is not None:
                             self._handle_client(client_socket, src)
+
+                    # Once per read_timeout, traffic or not: select() wakes
+                    # at least that often.
+                    now = time.monotonic()
+                    if now >= next_stall_check:
+                        self._drop_stalled(now)
+                        next_stall_check = now + self.read_timeout
 
         except KeyboardInterrupt:
             self.logger.info("Stopping Message Manager")
@@ -1000,7 +1359,37 @@ class MessageManager(ClientLike):
                 module.close()
 
 
-def main():
+def _positive_seconds(text: str) -> float:
+    """Parse a command-line duration that must be positive.
+
+    Args:
+        text: The argument as given.
+
+    Returns:
+        The number of seconds.
+
+    Raises:
+        argparse.ArgumentTypeError: It isn't a positive number.
+    """
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a number: {text!r}") from None
+    if not value > 0:
+        raise argparse.ArgumentTypeError(f"must be positive: {text!r}")
+    return value
+
+
+def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    """Parse the manager's command line.
+
+    Args:
+        argv: The arguments, without the program name. Defaults to
+            ``sys.argv[1:]``.
+
+    Returns:
+        The parsed arguments.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-a",
@@ -1020,8 +1409,33 @@ def main():
         default="INFO",
         help="Logging Level",
     )
+    stall = parser.add_mutually_exclusive_group()
+    stall.add_argument(
+        "--stall-timeout",
+        type=_positive_seconds,
+        default=DEFAULT_STALL_TIMEOUT,
+        metavar="SECONDS",
+        help=f"Drop a client that stops partway through sending a message for this long. Default is {DEFAULT_STALL_TIMEOUT:g}.",
+    )
+    stall.add_argument(
+        "--no-stall-timeout",
+        dest="stall_timeout",
+        action="store_const",
+        const=None,
+        help="Never drop a client that stops partway through a message, for example at a debugger breakpoint.",
+    )
+    parser.add_argument(
+        "--logger-timeout",
+        type=_positive_seconds,
+        default=None,
+        metavar="SECONDS",
+        help="Drop a logger module that can't take a message for this long. By default the manager waits as long as it takes.",
+    )
+    return parser.parse_args(argv)
 
-    args = parser.parse_args()
+
+def main():
+    args = _parse_args()
 
     if args.addr:  # a non-empty host address was passed in.
         ip_addr = args.addr
@@ -1046,6 +1460,8 @@ def main():
             port=args.port,
             log_level=level,
             debug=args.debug,
+            stall_timeout=args.stall_timeout,
+            logger_timeout=args.logger_timeout,
         )
 
         msg_mgr.run()

@@ -12,6 +12,7 @@ import ctypes
 import errno
 import logging
 import socket
+import time
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any, cast
 
@@ -20,10 +21,18 @@ import pytest
 from pyrtma import core_defs as cd
 from pyrtma.client import Client
 from pyrtma.header import MessageHeader
-from pyrtma.manager import MessageManager, Module
+from pyrtma.core_defs import ALL_MESSAGE_TYPES
+from pyrtma.manager import DEFAULT_STALL_TIMEOUT, MessageManager, Module, _parse_args
 from pyrtma.message import Message
 
-from .helpers import DEFAULT_TIMEOUT, LOOPBACK, ManagerHarness, deliver, wait_for
+from .helpers import (
+    DEFAULT_TIMEOUT,
+    LOOPBACK,
+    ManagerHarness,
+    deliver,
+    manager_options,
+    wait_for,
+)
 from .test_msg_defs import test_defs as td
 
 pytestmark = pytest.mark.integration
@@ -32,26 +41,71 @@ pytestmark = pytest.mark.integration
 # can be told apart from the clients' own.
 RAW_SRC_MOD_ID = 123
 
+# A user message type: the manager forwards it without checking its size.
+USER_MSG_TYPE = 5000
+
 
 class FakeConnection:
-    """Stands in for a client socket that the manager writes to.
+    """Stands in for a client socket in non-blocking mode.
 
-    A healthy connection records what is sent. A failing one raises
-    ``ConnectionResetError``, as a socket does after the peer resets, and any
-    connection raises ``OSError(EBADF)`` once it's closed, as a real one does.
+    Sending: a healthy connection records each ``send()`` call's bytes in
+    ``sent``. ``accept`` limits how many more bytes it takes, so a send can be
+    partial; a connection that is full, or not ``writable``, raises
+    ``BlockingIOError`` as a non-blocking socket does. A failing one raises
+    ``ConnectionResetError``, as a socket does after the peer resets.
+
+    Receiving: ``feed()`` queues chunks. ``recv_into`` returns at most the bytes
+    asked for from the first chunk and keeps the rest, as the kernel's buffer
+    does. An empty chunk reads as the peer closing, and with nothing queued it
+    raises ``BlockingIOError``.
+
+    Any connection raises ``OSError(EBADF)`` once it's closed, as a real one
+    does. There is no ``sendall``: the manager must not block on a client.
     """
 
-    def __init__(self, *, fail: bool = False) -> None:
+    def __init__(
+        self, *, fail: bool = False, writable: bool = True, accept: int | None = None
+    ) -> None:
         self.fail = fail
+        self.writable = writable
+        self.accept = accept
         self.sent: list[bytes] = []
+        self.incoming: list[bytes] = []
         self.close_count = 0
 
-    def sendall(self, data: Any) -> None:
+    def _check_open(self) -> None:
         if self.close_count:
             raise OSError(errno.EBADF, "Bad file descriptor")
+
+    def send(self, data: Any) -> int:
+        self._check_open()
         if self.fail:
             raise ConnectionResetError(errno.ECONNRESET, "Connection reset by peer")
-        self.sent.append(bytes(data))
+        room = len(data) if self.accept is None else min(len(data), self.accept)
+        if not self.writable or room == 0:
+            raise BlockingIOError(errno.EAGAIN, "Resource temporarily unavailable")
+        self.sent.append(bytes(data[:room]))
+        if self.accept is not None:
+            self.accept -= room
+        return room
+
+    def feed(self, *chunks: bytes) -> None:
+        self.incoming.extend(chunks)
+
+    def recv_into(self, buffer: Any, nbytes: int = 0) -> int:
+        self._check_open()
+        if not self.incoming:
+            raise BlockingIOError(errno.EAGAIN, "Resource temporarily unavailable")
+        chunk = self.incoming[0]
+        if not chunk:
+            return 0  # the peer closed; later reads see that too
+        count = min(nbytes or len(buffer), len(chunk))
+        buffer[:count] = chunk[:count]
+        if count < len(chunk):
+            self.incoming[0] = chunk[count:]
+        else:
+            self.incoming.pop(0)
+        return count
 
     def close(self) -> None:
         self.close_count += 1
@@ -109,13 +163,20 @@ def goodbye_ids(module: Module) -> list[int]:
 
 
 @pytest.fixture
-def bare_manager() -> Iterator[MessageManager]:
+def bare_manager(request: pytest.FixtureRequest) -> Iterator[MessageManager]:
     """A manager that is constructed but never run, for driving its methods.
+
+    Options come from the test's ``manager_options`` marker, as for ``manager``.
+
+    Args:
+        request: The requesting test's fixture request.
 
     Yields:
         The manager. Its listening socket is closed at teardown.
     """
-    manager = MessageManager(ip_address=LOOPBACK, port=0, log_level=logging.ERROR)
+    options: dict[str, Any] = {"log_level": logging.ERROR}
+    options.update(manager_options(request))
+    manager = MessageManager(ip_address=LOOPBACK, port=0, **options)
     try:
         yield manager
     finally:
@@ -129,6 +190,7 @@ def add_fake_module(
     subs: Iterable[int] = (),
     fail: bool = False,
     writable: bool = True,
+    accept: int | None = None,
     is_logger: bool = False,
 ) -> Module:
     """Register a connected module on a fake connection, as ``run()`` would.
@@ -138,14 +200,19 @@ def add_fake_module(
         mod_id: The module's ID.
         subs: Message types it subscribes to.
         fail: Whether sends to it raise ``ConnectionResetError``.
-        writable: Whether it is in the manager's writable list.
+        writable: Whether its connection takes any bytes at all.
+        accept: How many bytes its connection takes before it is full, or None
+            for no limit.
         is_logger: Whether it registered as a logger.
 
     Returns:
         The new module.
     """
-    # The manager only calls sendall() and close(), so the fake can stand in.
-    conn = cast(socket.socket, FakeConnection(fail=fail))
+    # The manager only calls send(), recv_into() and close() on a client's
+    # connection, so the fake can stand in.
+    conn = cast(
+        socket.socket, FakeConnection(fail=fail, writable=writable, accept=accept)
+    )
     module = Module(
         conn,
         (LOOPBACK, 20000 + mod_id),
@@ -162,8 +229,6 @@ def add_fake_module(
         module.subs.add(msg_type)
     if is_logger:
         manager.logger_modules.add(module)
-    if writable:
-        manager.wlist.append(conn)
     return module
 
 
@@ -259,6 +324,76 @@ def raw_header(msg_type: int, num_data_bytes: int) -> bytes:
     return bytes(header)
 
 
+def raw_message(msg_type: int, payload: bytes = b"") -> bytes:
+    """Build the bytes of a whole message as a raw client would send it.
+
+    Args:
+        msg_type: The message type.
+        payload: The message data.
+
+    Returns:
+        The header bytes followed by the payload.
+    """
+    return raw_header(msg_type, len(payload)) + payload
+
+
+def read_once(
+    manager: MessageManager, module: Module
+) -> tuple[MessageHeader, bytes] | None:
+    """Give a module one read turn, as ``run()`` does when its socket is readable.
+
+    Args:
+        manager: A manager that isn't running.
+        module: The module whose connection to read.
+
+    Returns:
+        A copy of the header and payload of the message the turn completed, or
+        None if it didn't complete one.
+    """
+    header = manager.read_message(module.conn)
+    if header is None:
+        return None
+    return (
+        MessageHeader.from_buffer_copy(bytes(header)),
+        bytes(manager.data_view[: header.num_data_bytes]),
+    )
+
+
+def read_until_done(
+    manager: MessageManager, module: Module
+) -> list[tuple[MessageHeader, bytes] | None]:
+    """Give a fake module read turns until its queued bytes are used up.
+
+    Turns also stop when the module is dropped. A queued close is never used
+    up, so a manager that doesn't drop the module fails the turn limit.
+
+    Args:
+        manager: A manager that isn't running.
+        module: A module made by ``add_fake_module``, with bytes fed to it.
+
+    Returns:
+        The result of each turn, as ``read_once`` returns it.
+    """
+    results: list[tuple[MessageHeader, bytes] | None] = []
+    while fake_conn(module).incoming and is_routed(manager, module):
+        assert len(results) < 10_000, "the queued bytes were never used up"
+        results.append(read_once(manager, module))
+    return results
+
+
+def is_routed(manager: MessageManager, module: Module) -> bool:
+    """Report whether a module is still registered with a manager.
+
+    Args:
+        manager: The manager.
+        module: The module.
+
+    Returns:
+        True until the module is removed.
+    """
+    return manager.modules.get(module.conn) is module
+
+
 def is_goodbye_for_port(port: int) -> Callable[[Message], bool]:
     """Match the ``GOODBYE`` the manager sends when a connection is dropped.
 
@@ -315,6 +450,18 @@ class TestConstructor:
         kwargs: dict[str, Any] = {"timecode": True}
 
         with pytest.raises(TypeError, match="timecode"):
+            MessageManager(ip_address=LOOPBACK, port=0, **kwargs)
+
+    def test_default_timeouts(self, bare_manager: MessageManager) -> None:
+        assert bare_manager.stall_timeout == DEFAULT_STALL_TIMEOUT == 5.0
+        assert bare_manager.logger_timeout is None
+
+    @pytest.mark.parametrize("option", ["stall_timeout", "logger_timeout"])
+    @pytest.mark.parametrize("value", [0, -1.0])
+    def test_timeouts_must_be_positive(self, option: str, value: float) -> None:
+        kwargs: dict[str, Any] = {option: value}
+
+        with pytest.raises(ValueError, match=option):
             MessageManager(ip_address=LOOPBACK, port=0, **kwargs)
 
 
@@ -620,3 +767,498 @@ class TestRunLoop:
                 for r in caplog.records
             )
         )
+
+
+class TestReceiveBuffering:
+    def test_message_split_at_every_byte_is_reassembled(
+        self, bare_manager: MessageManager
+    ) -> None:
+        module = add_fake_module(bare_manager, 101)
+        payload = bytes(range(24))
+        data = raw_message(USER_MSG_TYPE, payload)
+        fake_conn(module).feed(*(data[i : i + 1] for i in range(len(data))))
+
+        results = read_until_done(bare_manager, module)
+
+        assert results[:-1] == [None] * (len(results) - 1)
+        last = results[-1]
+        assert last is not None
+        header, received = last
+        assert header.msg_type == USER_MSG_TYPE
+        assert header.num_data_bytes == len(payload)
+        assert received == payload
+        assert is_routed(bare_manager, module)
+
+    def test_back_to_back_messages_are_split_at_the_boundary(
+        self, bare_manager: MessageManager
+    ) -> None:
+        module = add_fake_module(bare_manager, 101)
+        first = raw_message(USER_MSG_TYPE, b"first")
+        second = raw_message(USER_MSG_TYPE + 1, b"second message")
+        fake_conn(module).feed(first + second)
+
+        one = read_once(bare_manager, module)
+        left_after_one = sum(len(c) for c in fake_conn(module).incoming)
+        two = read_once(bare_manager, module)
+
+        assert one is not None and two is not None
+        assert (one[0].msg_type, one[1]) == (USER_MSG_TYPE, b"first")
+        assert left_after_one == len(second)
+        assert (two[0].msg_type, two[1]) == (USER_MSG_TYPE + 1, b"second message")
+
+    def test_interleaved_partial_messages_stay_separate(
+        self, bare_manager: MessageManager
+    ) -> None:
+        a = add_fake_module(bare_manager, 101)
+        b = add_fake_module(bare_manager, 102)
+        msg_a = raw_message(USER_MSG_TYPE, b"A" * 40)
+        msg_b = raw_message(USER_MSG_TYPE, b"B" * 40)
+
+        fake_conn(a).feed(msg_a[:30])
+        fake_conn(b).feed(msg_b[:30])
+        turns = [read_once(bare_manager, a), read_once(bare_manager, b)]
+        fake_conn(a).feed(msg_a[30:70])
+        turns.append(read_once(bare_manager, a))
+        fake_conn(b).feed(msg_b[30:])
+        done_b = read_once(bare_manager, b)
+        fake_conn(a).feed(msg_a[70:])
+        done_a = read_once(bare_manager, a)
+
+        assert turns == [None, None, None]
+        assert done_b is not None and done_b[1] == b"B" * 40
+        assert done_a is not None and done_a[1] == b"A" * 40
+
+    @pytest.mark.manager_options(log_level=logging.WARNING)
+    def test_spurious_readiness_keeps_client(
+        self, bare_manager: MessageManager, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        module = add_fake_module(bare_manager, 101)
+
+        result = read_once(bare_manager, module)
+
+        assert result is None
+        assert is_routed(bare_manager, module)
+        assert caplog.records == []
+
+    @pytest.mark.parametrize(
+        ("sent", "expected"),
+        [(0, "closed by the client"), (20, "after 20 of 48 bytes")],
+        ids=["at a boundary", "mid-message"],
+    )
+    @pytest.mark.manager_options(log_level=logging.WARNING)
+    def test_closed_connection_drops_client(
+        self,
+        bare_manager: MessageManager,
+        caplog: pytest.LogCaptureFixture,
+        sent: int,
+        expected: str,
+    ) -> None:
+        module = add_fake_module(bare_manager, 101)
+        observer = add_fake_module(bare_manager, 102, subs=[cd.MT_GOODBYE])
+        fake_conn(module).feed(raw_header(USER_MSG_TYPE, 0)[:sent], b"")
+
+        read_until_done(bare_manager, module)
+
+        assert not is_routed(bare_manager, module)
+        assert goodbye_ids(observer) == [101]
+        assert any(expected in r.getMessage() for r in caplog.records)
+
+
+HALF_HEADER = raw_header(USER_MSG_TYPE, 0)[:10]
+HEADER_WITHOUT_PAYLOAD = raw_header(USER_MSG_TYPE, 16)
+
+
+class TestStalls:
+    @pytest.mark.parametrize(
+        "partial",
+        [HALF_HEADER, HEADER_WITHOUT_PAYLOAD],
+        ids=["half a header", "header without payload"],
+    )
+    def test_partial_message_does_not_block_other_clients(
+        self,
+        manager: ManagerHarness,
+        client_factory: Callable[..., Client],
+        raw_connection: socket.socket,
+        partial: bytes,
+    ) -> None:
+        raw_connection.sendall(partial)
+
+        sender, observer = watcher(client_factory)
+
+        assert_still_routes(sender, observer)
+
+    @pytest.mark.manager_options(stall_timeout=0.3, log_level=logging.WARNING)
+    def test_stalled_client_is_dropped_after_stall_timeout(
+        self,
+        manager: ManagerHarness,
+        client_factory: Callable[..., Client],
+        raw_connection: socket.socket,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        sender, observer = watcher(client_factory)
+        raw_port = raw_connection.getsockname()[1]
+        start = time.monotonic()
+
+        raw_connection.sendall(HEADER_WITHOUT_PAYLOAD)
+        seen = read_until(observer, is_goodbye_for_port(raw_port))
+        elapsed = time.monotonic() - start
+
+        assert seen is not None
+        assert elapsed >= 0.3
+        assert_closed_by_manager(raw_connection)
+        assert wait_for(
+            lambda: any(
+                "Stalled" in r.getMessage() and "48 of 64 bytes" in r.getMessage()
+                for r in caplog.records
+            )
+        )
+        assert_still_routes(sender, observer)
+
+    @pytest.mark.manager_options(stall_timeout=2.0)
+    def test_stall_sweep_drops_only_past_the_limit(
+        self, bare_manager: MessageManager
+    ) -> None:
+        stalled = add_fake_module(bare_manager, 101)
+        idle = add_fake_module(bare_manager, 102)
+        observer = add_fake_module(bare_manager, 103, subs=[cd.MT_GOODBYE])
+        fake_conn(stalled).feed(HALF_HEADER)
+        before = time.monotonic()
+        assert read_once(bare_manager, stalled) is None
+        after = time.monotonic()
+
+        bare_manager._drop_stalled(before + 1.9)
+        kept = is_routed(bare_manager, stalled)
+        bare_manager._drop_stalled(after + 2.0)
+
+        assert kept
+        assert not is_routed(bare_manager, stalled)
+        assert is_routed(bare_manager, idle)
+        assert goodbye_ids(observer) == [101]
+
+    @pytest.mark.manager_options(stall_timeout=None)
+    def test_no_stall_timeout_keeps_stalled_client(
+        self, bare_manager: MessageManager
+    ) -> None:
+        stalled = add_fake_module(bare_manager, 101)
+        fake_conn(stalled).feed(HALF_HEADER)
+        assert read_once(bare_manager, stalled) is None
+
+        bare_manager._drop_stalled(time.monotonic() + 1e6)
+
+        assert is_routed(bare_manager, stalled)
+
+
+def message_with_payload(
+    manager: MessageManager, payload: bytes, msg_type: int = USER_MSG_TYPE
+) -> tuple[MessageHeader, bytes]:
+    """Build a header for a payload, and the bytes a recipient should get.
+
+    Args:
+        manager: The manager, for its header class.
+        payload: The message data.
+        msg_type: The message type.
+
+    Returns:
+        The header, and the header bytes followed by the payload.
+    """
+    header = make_header(manager, msg_type)
+    header.num_data_bytes = len(payload)
+    return header, bytes(header) + payload
+
+
+class TestSending:
+    def test_message_is_sent_as_one_buffer(self, bare_manager: MessageManager) -> None:
+        src = add_fake_module(bare_manager, 101)
+        dest = add_fake_module(bare_manager, 102, subs=[USER_MSG_TYPE])
+        payload = bytes(range(16))
+        header, expected = message_with_payload(bare_manager, payload)
+
+        bare_manager.forward_message(src, header, payload)
+
+        assert fake_conn(dest).sent == [expected]
+
+    def test_partial_send_is_finished_before_anything_else(
+        self, bare_manager: MessageManager
+    ) -> None:
+        src = add_fake_module(bare_manager, 101)
+        dest = add_fake_module(bare_manager, 102, subs=[USER_MSG_TYPE], accept=60)
+        observer = add_fake_module(bare_manager, 104, subs=[cd.MT_FAILED_MESSAGE])
+        first, first_bytes = message_with_payload(bare_manager, b"\x01" * 100)
+        second, _ = message_with_payload(bare_manager, b"\x02" * 100)
+
+        bare_manager.forward_message(src, first, b"\x01" * 100)
+        pending_after_first = dest.has_pending
+        bare_manager.forward_message(src, second, b"\x02" * 100)
+        fake_conn(dest).accept = None
+        bare_manager._flush_module(dest)
+
+        assert pending_after_first
+        assert not dest.has_pending
+        assert b"".join(fake_conn(dest).sent) == first_bytes
+        assert dest.drops == 1
+        failed = sent_messages(observer)
+        assert [h.msg_type for h, _ in failed] == [cd.MT_FAILED_MESSAGE]
+        assert is_routed(bare_manager, dest)
+
+    def test_remainder_is_finished_before_the_next_message(
+        self, bare_manager: MessageManager
+    ) -> None:
+        src = add_fake_module(bare_manager, 101)
+        dest = add_fake_module(bare_manager, 102, subs=[USER_MSG_TYPE], accept=60)
+        first, first_bytes = message_with_payload(bare_manager, b"\x01" * 100)
+        second, second_bytes = message_with_payload(bare_manager, b"\x02" * 100)
+
+        bare_manager.forward_message(src, first, b"\x01" * 100)
+        fake_conn(dest).accept = None
+        bare_manager.forward_message(src, second, b"\x02" * 100)
+
+        assert b"".join(fake_conn(dest).sent) == first_bytes + second_bytes
+        assert dest.drops == 0
+        assert not dest.has_pending
+
+    def test_ack_waits_behind_a_remainder(self, bare_manager: MessageManager) -> None:
+        src = add_fake_module(bare_manager, 101)
+        dest = add_fake_module(bare_manager, 102, subs=[USER_MSG_TYPE], accept=60)
+        first, _ = message_with_payload(bare_manager, b"\x01" * 100)
+
+        bare_manager.forward_message(src, first, b"\x01" * 100)
+        bare_manager.send_ack(dest)
+        fake_conn(dest).accept = None
+        bare_manager._flush_module(dest)
+
+        received = sent_messages(dest)
+        assert [h.msg_type for h, _ in received] == [USER_MSG_TYPE, cd.MT_ACKNOWLEDGE]
+        assert dest.drops == 0
+
+    def test_send_error_while_flushing_drops_module(
+        self, bare_manager: MessageManager
+    ) -> None:
+        src = add_fake_module(bare_manager, 101)
+        dest = add_fake_module(bare_manager, 102, subs=[USER_MSG_TYPE], accept=60)
+        observer = add_fake_module(bare_manager, 103, subs=[cd.MT_GOODBYE])
+        first, _ = message_with_payload(bare_manager, b"\x01" * 100)
+        bare_manager.forward_message(src, first, b"\x01" * 100)
+
+        fake_conn(dest).fail = True
+        bare_manager._flush_module(dest)
+
+        assert not is_routed(bare_manager, dest)
+        assert fake_conn(dest).close_count == 1
+        assert goodbye_ids(observer) == [102]
+
+    def test_slow_consumer_is_not_dropped(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        sender, observer = watcher(client_factory, cd.MT_FAILED_MESSAGE)
+        slow = client_factory()
+        slow.subscribe([td.MT_TEST_MSG_8192])
+        big = td.MDF_TEST_MSG_8192()
+
+        # Flood the slow consumer, which doesn't read, until the manager
+        # reports a message it couldn't deliver to it.
+        seen: list[Message] = []
+
+        def failed_for_slow() -> bool:
+            sender.send_message(big)
+            msg = observer.read_message(timeout=0)
+            while msg is not None:
+                seen.append(msg)
+                if (
+                    msg.type_id == cd.MT_FAILED_MESSAGE
+                    and msg.data.dest_mod_id == slow.module_id
+                ):
+                    return True
+                msg = observer.read_message(timeout=0)
+            return False
+
+        assert wait_for(failed_for_slow, timeout=30, interval=0)
+        assert not any(
+            m.type_id == cd.MT_GOODBYE and m.data.mod_id == slow.module_id for m in seen
+        )
+        assert_still_routes(sender, observer)
+        # Its stream is intact: it reads every queued message whole, then gets
+        # a new one.
+        while slow.read_message(timeout=0.5) is not None:
+            pass
+        marked = td.MDF_TEST_MSG_8192()
+        marked.blob[0] = 7
+        received = deliver(sender, slow, marked, match=lambda m: m.data.blob[0] == 7)
+        assert received is not None
+
+
+class TestLoggers:
+    def test_logger_gets_whole_message_after_waiting(
+        self, bare_manager: MessageManager, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        src = add_fake_module(bare_manager, 101)
+        logger = add_fake_module(
+            bare_manager, 103, subs=[ALL_MESSAGE_TYPES], is_logger=True, accept=10
+        )
+        waits: list[float | None] = []
+
+        def wait(module: Module, timeout: float | None) -> bool:
+            waits.append(timeout)
+            fake_conn(module).accept = None
+            return True
+
+        monkeypatch.setattr(bare_manager, "_wait_writable", wait)
+        header, expected = message_with_payload(bare_manager, b"\x05" * 100)
+
+        bare_manager.forward_message(src, header, b"\x05" * 100)
+
+        assert waits == [None]
+        assert b"".join(fake_conn(logger).sent) == expected
+        assert is_routed(bare_manager, logger)
+
+    @pytest.mark.manager_options(logger_timeout=0.25)
+    def test_logger_timeout_drops_hung_logger(
+        self,
+        bare_manager: MessageManager,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        src = add_fake_module(bare_manager, 101)
+        dest = add_fake_module(bare_manager, 102, subs=[USER_MSG_TYPE])
+        logger = add_fake_module(
+            bare_manager,
+            103,
+            subs=[ALL_MESSAGE_TYPES],
+            is_logger=True,
+            writable=False,
+        )
+        observer = add_fake_module(
+            bare_manager, 104, subs=[cd.MT_GOODBYE, cd.MT_FAILED_MESSAGE]
+        )
+        waits: list[float | None] = []
+
+        def wait(module: Module, timeout: float | None) -> bool:
+            waits.append(timeout)
+            return False
+
+        monkeypatch.setattr(bare_manager, "_wait_writable", wait)
+        header, _ = message_with_payload(bare_manager, b"\x05" * 100)
+
+        bare_manager.forward_message(src, header, b"\x05" * 100)
+
+        assert len(waits) == 1
+        timeout = waits[0]
+        assert timeout is not None and 0 < timeout <= 0.25
+        assert not is_routed(bare_manager, logger)
+        assert fake_conn(logger).close_count == 1
+        assert len(sent_messages(dest)) == 1
+        reported = sent_messages(observer)
+        assert [h.msg_type for h, _ in reported] == [
+            cd.MT_FAILED_MESSAGE,
+            cd.MT_GOODBYE,
+        ]
+        assert any("did not accept" in r.getMessage() for r in caplog.records)
+
+    @pytest.mark.manager_options(logger_timeout=0.5)
+    def test_hung_logger_is_dropped_after_logger_timeout(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        sender, observer = watcher(client_factory)
+        hung = client_factory(logger_status=True)
+        hung.subscribe([ALL_MESSAGE_TYPES])
+        big = td.MDF_TEST_MSG_8192()
+
+        def hung_dropped() -> bool:
+            sender.send_message(big)
+            msg = observer.read_message(timeout=0)
+            while msg is not None:
+                if msg.type_id == cd.MT_GOODBYE and msg.data.mod_id == hung.module_id:
+                    return True
+                msg = observer.read_message(timeout=0)
+            return False
+
+        assert wait_for(hung_dropped, timeout=30, interval=0)
+        assert_still_routes(sender, observer)
+
+
+class TestAccept:
+    def test_accepted_connections_are_non_blocking(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+
+        def client_conn() -> socket.socket | None:
+            for module in list(manager.manager.modules.values()):
+                if module.mod_id == client.module_id:
+                    return module.conn
+            return None
+
+        assert wait_for(lambda: client_conn() is not None)
+        conn = client_conn()
+        assert conn is not None
+        assert conn.getblocking() is False
+
+
+class TestCommandLine:
+    @pytest.mark.parametrize(
+        ("argv", "stall_timeout"),
+        [
+            ([], DEFAULT_STALL_TIMEOUT),
+            (["--stall-timeout", "2.5"], 2.5),
+            (["--no-stall-timeout"], None),
+        ],
+        ids=["default", "set", "disabled"],
+    )
+    def test_stall_timeout_options(
+        self, argv: list[str], stall_timeout: float | None
+    ) -> None:
+        args = _parse_args(argv)
+
+        assert args.stall_timeout == stall_timeout
+
+    @pytest.mark.parametrize(
+        ("argv", "logger_timeout"),
+        [([], None), (["--logger-timeout", "3"], 3.0)],
+        ids=["default", "set"],
+    )
+    def test_logger_timeout_option(
+        self, argv: list[str], logger_timeout: float | None
+    ) -> None:
+        args = _parse_args(argv)
+
+        assert args.logger_timeout == logger_timeout
+
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["--stall-timeout", "2", "--no-stall-timeout"],
+            ["--stall-timeout", "0"],
+            ["--logger-timeout", "-1"],
+            ["--stall-timeout", "soon"],
+        ],
+        ids=["both stall options", "zero stall", "negative logger", "not a number"],
+    )
+    def test_invalid_timeout_options_are_rejected(self, argv: list[str]) -> None:
+        with pytest.raises(SystemExit):
+            _parse_args(argv)
+
+
+class TestDropLogging:
+    @pytest.mark.parametrize("cause", ["closed", "stalled"])
+    @pytest.mark.manager_options(log_level=logging.WARNING)
+    def test_dropped_client_is_not_sent_its_drop_warning(
+        self, bare_manager: MessageManager, cause: str
+    ) -> None:
+        dropped = add_fake_module(bare_manager, 101, subs=[cd.MT_RTMA_LOG_WARNING])
+        observer = add_fake_module(
+            bare_manager, 102, subs=[cd.MT_RTMA_LOG_WARNING, cd.MT_GOODBYE]
+        )
+
+        if cause == "closed":
+            fake_conn(dropped).feed(b"")
+            read_once(bare_manager, dropped)
+        else:
+            fake_conn(dropped).feed(HALF_HEADER)
+            read_once(bare_manager, dropped)
+            bare_manager._drop_stalled(time.monotonic() + 1e6)
+
+        assert not is_routed(bare_manager, dropped)
+        assert sent_messages(dropped) == []
+        assert [h.msg_type for h, _ in sent_messages(observer)] == [
+            cd.MT_RTMA_LOG_WARNING,
+            cd.MT_GOODBYE,
+        ]

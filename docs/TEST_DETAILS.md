@@ -32,7 +32,7 @@ The layout:
 
 ## test_manager.py — the message manager (needs: integration)
 
-Tests that route real messages use the `manager` fixture, a raw socket from `raw_connection` whose headers carry `src_mod_id` 123, and `watcher()`. `watcher()` connects a sender and an observer that subscribes to `GOODBYE`, then to `TEST_START`. It then resends `TEST_START` with `deliver()` until it arrives, which shows the earlier subscriptions are in place. Tests that need conditions real sockets can't produce on demand drive a constructed, never-run manager (`bare_manager`) with `FakeConnection` stand-ins. A fake records what it is sent, or raises `ConnectionResetError` like a reset peer, and raises `OSError(EBADF)` after it's closed, like a real socket.
+Tests that route real messages use the `manager` fixture, a raw socket from `raw_connection` whose headers carry `src_mod_id` 123, and `watcher()`. `watcher()` connects a sender and an observer that subscribes to `GOODBYE`, then to `TEST_START`. It then resends `TEST_START` with `deliver()` until it arrives, which shows the earlier subscriptions are in place. Tests that need conditions real sockets can't produce on demand drive a constructed, never-run manager (`bare_manager`) with `FakeConnection` stand-ins, which behave like non-blocking sockets. A fake records what each `send()` call takes; `accept` limits how many more bytes it takes, so a send can be partial, and a full or unwritable fake raises `BlockingIOError`. A failing fake raises `ConnectionResetError` like a reset peer. Bytes given to `feed()` are returned by `recv_into` no more than asked for at a time, an empty chunk reads as the peer closing, and with nothing fed it raises `BlockingIOError`. Every fake raises `OSError(EBADF)` after it's closed, like a real socket, and none has `sendall`, so the manager can't block on one. `read_once()` gives a fake module one read turn, as `run()` does when its socket is readable. The `manager_options` marker passes options such as `stall_timeout` to both `manager` and `bare_manager`.
 
 ### TestConstructor
 
@@ -40,6 +40,8 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 |---|---|---|
 | `test_options_after_port_are_keyword_only` | Timecode removal: `MessageManager` arguments after `port` are keyword-only, so an old positional call that passed `timecode` fails instead of shifting `log_level`. | Passes a log level as the third positional argument. |
 | `test_timecode_argument_is_rejected` | Timecode removal: `MessageManager` no longer accepts `timecode`. | Passes `timecode=True` and expects a `TypeError` naming it. |
+| `test_default_timeouts` | C1: by default a client stalled mid-message is dropped after 5 s, and logger modules are waited for without a limit. | Reads both settings from a default manager. |
+| `test_timeouts_must_be_positive` | C1: a stall or logger timeout of zero or less is rejected, with an error naming the option. | Parametrized over both options and 0 and -1. |
 
 ### TestHeaderValidation
 
@@ -78,6 +80,64 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_unexpected_error_drops_only_that_client` | C2: an unexpected exception while handling one client's message is logged with its traceback and drops that client, and `run()` keeps going. | Patches the manager's `register_module_ready` to raise; a client sends `MODULE_READY`; the observer sees its `GOODBYE` and still gets `TEST_START`. |
+
+### TestReceiveBuffering
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_message_split_at_every_byte_is_reassembled` | C1: a message that arrives a byte at a time is put back together, header and payload, without a turn ever completing it early. | Feeds a 24-byte message in 1-byte chunks; every turn but the last completes nothing. |
+| `test_back_to_back_messages_are_split_at_the_boundary` | C1: a read never takes more than the current message, so the next message's bytes stay unread and route to its own header and payload. | Two messages in one chunk; after the first turn, exactly the second message's bytes are left. |
+| `test_interleaved_partial_messages_stay_separate` | C1: two clients' partial messages, read in alternation, each keep their own bytes. | Feeds two fakes their messages in pieces, alternating turns between them. |
+| `test_spurious_readiness_keeps_client` | C1: a turn that finds nothing to read, as when `select()` reported readiness wrongly, ends quietly and keeps the client. | A fake with nothing fed. |
+| `test_closed_connection_drops_client` | C1: a client that closes its connection is dropped with a warning and a `GOODBYE`, which says how many bytes had arrived when it closed mid-message. | Parametrized over a close at a message boundary and one 20 bytes into a header. |
+
+### TestStalls
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_partial_message_does_not_block_other_clients` | C1: a client that stops partway through a message doesn't stop other clients from connecting and exchanging messages. | Parametrized over half a header, and a header without its payload, sent by a raw socket before the other clients connect. |
+| `test_stalled_client_is_dropped_after_stall_timeout` | C1: a client stalled mid-message is dropped, no sooner than the stall timeout, with a warning giving the bytes received, and the manager keeps routing. | A 0.3 s timeout; a raw header announcing 16 bytes that never come; times the `GOODBYE` for the raw socket's port. |
+| `test_stall_sweep_drops_only_past_the_limit` | C1: the stall check drops a client only once the timeout has passed since its last bytes, and never drops one that isn't mid-message. | A 2 s timeout; runs the check with clock readings just under and just over it, with an idle module alongside. |
+| `test_no_stall_timeout_keeps_stalled_client` | C1: with no stall timeout, a stalled client is never dropped. | Runs the check with a clock reading far in the future. |
+
+### TestSending
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_message_is_sent_as_one_buffer` | P2: a forwarded message's header and payload go out in one send, and the bytes are the same as before. | Compares the fake's list of sends with the header bytes followed by the payload. |
+| `test_partial_send_is_finished_before_anything_else` | Manager routing: when a connection takes only part of a message, the rest is sent first and nothing is interleaved, and a message forwarded meanwhile is counted as a drop with `FAILED_MESSAGE` instead. The module stays connected. | A fake that takes 60 bytes of a 148-byte message, then a second message, then room. |
+| `test_remainder_is_finished_before_the_next_message` | Manager routing: once a connection has room again, the next forward finishes the queued remainder and then sends, with no drop. | As above, but the room comes before the second message. |
+| `test_ack_waits_behind_a_remainder` | Manager routing: an ACK to a module with a remainder queued is sent after it instead of being dropped. | A partial message, then `send_ack`, then room. |
+| `test_send_error_while_flushing_drops_module` | Manager routing: a connection that fails while its queued bytes are sent is dropped with a `GOODBYE`, and nothing escapes. | A partial message, then a fake that resets. |
+| `test_slow_consumer_is_not_dropped` | Manager routing: a client that stops reading misses messages, reported with `FAILED_MESSAGE`, but stays connected; the manager keeps routing for others; and once the client reads again, its stream is whole. | Floods a non-reading subscriber with `TEST_MSG_8192` until a `FAILED_MESSAGE` names it, then drains it and delivers a marked message. |
+
+### TestLoggers
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_logger_gets_whole_message_after_waiting` | Manager routing: by default the manager waits for a logger module that can't take a message, with no limit, and the logger gets the whole message. | A logger fake that takes 10 bytes; the patched wait records its timeout and makes room. |
+| `test_logger_timeout_drops_hung_logger` | Manager routing: with a logger timeout, a logger that can't take a message within it is dropped with an error, a `FAILED_MESSAGE` and then a `GOODBYE`, and other modules still get the message. | A 0.25 s timeout; an unwritable logger fake; the patched wait times out. |
+| `test_hung_logger_is_dropped_after_logger_timeout` | Manager routing: a real logger client that stops reading is dropped after the logger timeout, and the manager keeps routing. | A 0.5 s timeout; floods `TEST_MSG_8192` until the `GOODBYE` for the logger arrives. |
+
+### TestAccept
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_accepted_connections_are_non_blocking` | C1: the manager makes every accepted connection non-blocking itself, rather than relying on what the operating system passes on from the listening socket. | Finds a connected client's socket in the manager's modules. |
+
+### TestCommandLine
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_stall_timeout_options` | C1: `--stall-timeout` sets the stall timeout, `--no-stall-timeout` turns it off, and it defaults to 5 s. | Parametrized over no option, `--stall-timeout 2.5` and `--no-stall-timeout`. |
+| `test_logger_timeout_option` | Manager routing: `--logger-timeout` sets the logger timeout, which defaults to none. | Parametrized over no option and `--logger-timeout 3`. |
+| `test_invalid_timeout_options_are_rejected` | C1: the two stall options together, a timeout of zero or less, and a value that isn't a number are rejected. | Parametrized; each exits with a usage error. |
+
+### TestDropLogging
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_dropped_client_is_not_sent_its_drop_warning` | C1: a client dropped for closing its connection or stalling isn't sent the warning about its own drop, and other modules get the warning before the `GOODBYE`. | Parametrized over both causes; the dropped fake and the observer subscribe to `RTMA_LOG_WARNING`. |
 
 ## test_client.py — the client's constructor and context manager (needs: none)
 

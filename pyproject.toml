@@ -52,6 +52,7 @@ addopts = "--strict-markers"
 markers = [
   "integration: starts a message manager or opens sockets",
   "toolchain: needs gcc or node on PATH; skipped when they are missing",
+  "manager_options(**kwargs): MessageManager keyword arguments for the manager and bare_manager fixtures",
 ]
 
 [tool.pyright]

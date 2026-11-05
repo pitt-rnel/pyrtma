@@ -20,6 +20,7 @@ from .helpers import (
     ManagerHarness,
     ThreadExceptionCollector,
     free_port as find_free_port,
+    manager_options,
 )
 from .test_msg_defs import test_defs as td
 
@@ -61,15 +62,20 @@ def free_port() -> int:
 
 
 @pytest.fixture
-def manager() -> Iterator[ManagerHarness]:
+def manager(request: pytest.FixtureRequest) -> Iterator[ManagerHarness]:
     """A message manager running on loopback for the duration of the test.
 
     Teardown fails the test if the manager thread raised or didn't stop.
+    ``MessageManager`` options come from the test's ``manager_options``
+    marker, if it has one.
+
+    Args:
+        request: The requesting test's fixture request.
 
     Yields:
         The running harness; connect clients to its ``address``.
     """
-    harness = ManagerHarness()
+    harness = ManagerHarness(**manager_options(request))
     harness.start()
     try:
         yield harness
@@ -83,8 +89,7 @@ def client_factory(manager: ManagerHarness) -> Iterator[Callable[..., Client]]:
 
     The factory takes ``Client`` keyword arguments, plus ``logger_status`` for
     ``connect()``. Clients use the compiled test definitions unless told
-    otherwise. All clients are disconnected at
-    teardown.
+    otherwise. All clients are disconnected at teardown.
 
     Yields:
         The factory.
