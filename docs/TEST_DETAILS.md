@@ -29,6 +29,48 @@ The layout:
 | `test_collector_catches_thread_exception` | Test infrastructure: an exception escaping a thread is collected with its thread name, type, and traceback. | A thread that raises `RuntimeError`; the test takes the exception from the `thread_exceptions` fixture so teardown doesn't fail. |
 | `test_manager_harness_reports_dead_thread` | Test infrastructure: a manager thread that dies is reported when the harness stops. | Sets an invalid `select()` timeout on a running manager, waits for the thread to die, and expects `HarnessError` naming `TypeError`. |
 
+## test_manager.py — the message manager (needs: integration)
+
+Tests that route real messages use the `manager` fixture, a raw socket from `raw_connection` whose headers carry `src_mod_id` 123, and `watcher()`. `watcher()` connects a sender and an observer that subscribes to `GOODBYE`, then to `TEST_START`. It then resends `TEST_START` with `deliver()` until it arrives, which shows the earlier subscriptions are in place. Tests that need conditions real sockets can't produce on demand drive a constructed, never-run manager (`bare_manager`) with `FakeConnection` stand-ins. A fake records what it is sent, or raises `ConnectionResetError` like a reset peer, and raises `OSError(EBADF)` after it's closed, like a real socket.
+
+### TestHeaderValidation
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_invalid_data_size_drops_only_that_client` | C2: a header announcing a negative or oversized payload drops that client with an error naming the size and a `GOODBYE`, and the manager keeps routing for the others. | Parametrized over -1 and 1 MiB + 1; a raw header, then the `GOODBYE` for the raw socket's port, the closed socket, a fresh `TEST_START`, and the log record. |
+| `test_core_message_with_wrong_size_drops_client` | C2: a core message whose `num_data_bytes` doesn't match its core definition drops the client with an error naming the type, isn't forwarded, and leaves the manager routing. | Parametrized over `SUBSCRIBE` with 0 bytes, `CONNECT_V2` with 4, and `DATASET_START` with 31; the observer also subscribes to the type and must not see it from the raw socket before its `GOODBYE`. |
+| `test_core_message_with_right_size_is_forwarded` | C2: the core size check doesn't reject a correctly sized core message that the manager only forwards. | A raw `DATASET_START` of 32 bytes reaches the observer, with no `GOODBYE` before it. |
+
+### TestRemoval
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_simultaneous_subscriber_resets_remove_each_once` | C3: two subscribers whose connections reset during one forward are each closed once and announced by one `GOODBYE`, without a send to a closed socket escaping. | Two failing fakes subscribed to `ALL_MESSAGE_TYPES` and a healthy observer; one `forward_message` call. |
+| `test_simultaneous_logger_resets_remove_each_once` | C3: two logger modules whose connections reset while being sent an ACK are each removed once, without the logger set changing under its own loop. | Two failing logger fakes; one `send_ack` call to a healthy module. |
+| `test_remove_module_twice_is_harmless` | C3: removing a module twice raises nothing, closes it once, sends one `GOODBYE`, and leaves it in no routing table. | Calls `remove_module` twice on a fake. |
+| `test_disconnected_client_leaves_sockets_list` | Low: the manager's `sockets` list drops a module's socket when it disconnects. | A factory client connects, then disconnects; waits until only the listening socket is left. |
+
+### TestRouting
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_non_destination_module_is_not_counted_as_drop` | Manager routing: a subscriber that isn't the destination of a directed message gets no drop and causes no `FAILED_MESSAGE`, even when it isn't writable. | A directed message to one writable fake, with an unwritable bystander and a `FAILED_MESSAGE` observer. |
+| `test_unwritable_destination_is_counted_as_drop` | Manager routing: an unwritable destination is still counted as a drop and reported with `FAILED_MESSAGE`. | A directed message to an unwritable fake; decodes the observer's `FAILED_MESSAGE`. |
+
+### TestMsgCount
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_forwarded_message_keeps_sender_msg_count` | Manager routing: forwarded messages carry the sender's `msg_count`, not one per recipient. | Two `TEST_END` sends; compares the received counts with the sender's `msg_count` before each send. |
+| `test_manager_messages_have_zero_msg_count` | Manager routing: messages that originate from the manager carry `msg_count` 0, while `Module.msg_count` still counts what each module was sent. | A fake with a count of 5 is sent an ACK, a `HELLO`, and a `FAILED_MESSAGE`. |
+| `test_failed_message_reports_sender_msg_count` | Manager routing: `FAILED_MESSAGE` reports the sender's `msg_count`, not the count of a module sent the message before the failure. | An ordered list of subscribers in place of the set: a writable fake with a count of 40, then an unwritable one. |
+
+### TestRunLoop
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_unexpected_error_drops_only_that_client` | C2: an unexpected exception while handling one client's message is logged with its traceback and drops that client, and `run()` keeps going. | Patches the manager's `register_module_ready` to raise; a client sends `MODULE_READY`; the observer sees its `GOODBYE` and still gets `TEST_START`. |
+
 ## test_integration.py — client and manager interaction (needs: loopback sockets; not yet marked)
 
 Each test starts a `MessageManager` on an unused loopback port in `setUp` and connects one client with module ID 11 or 12. `wait_for_message()` is a fixed short sleep. Two message types defined in the file, `TEST_MESSAGE` and `TEST_MESSAGE2`, are used for subscriptions.

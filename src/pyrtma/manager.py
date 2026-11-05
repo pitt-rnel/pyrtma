@@ -11,6 +11,7 @@ import time
 import random
 import ctypes
 import os
+from contextlib import contextmanager
 
 
 from .client_logging import RTMALogger, ClientLike
@@ -21,10 +22,14 @@ from .message_data import MessageData
 from .core_defs import ALL_MESSAGE_TYPES
 from . import core_defs as cd
 
-from typing import Dict, List, Tuple, Set, Type, Union, Optional
+from typing import Dict, Iterator, List, Tuple, Set, Type, Union, Optional
 from itertools import chain
 from dataclasses import dataclass, field
 from collections import defaultdict
+
+# Message types below this are core types, defined in core_defs. The manager
+# checks their size and acts on some of them; it forwards other types as is.
+_FIRST_USER_MSG_TYPE: int = cd.MAX_RTMA_MSG_TYPE + 1
 
 
 @dataclass
@@ -68,12 +73,16 @@ class Module:
     ):
         """Send a message
 
+        The header is sent unchanged, so the recipient sees the sender's
+        ``msg_count``. ``Module.msg_count`` counts the messages sent to this
+        module, for tracking only; it is not written into the header, which the
+        manager shares between all recipients of a message.
+
         Args:
             header (MessageHeader): Message header
             payload (Union[bytes, memoryview, MessageData]): Message data
         """
         self.msg_count += 1
-        header.msg_count = self.msg_count
 
         self.conn.sendall(header)
         self.conn.sendall(payload)
@@ -87,9 +96,9 @@ class Module:
         header.src_mod_id = cd.MID_MESSAGE_MANAGER
         header.dest_mod_id = self.mod_id
         header.num_data_bytes = 0
+        header.msg_count = 0  # messages from the manager carry no count
 
         self.msg_count += 1
-        header.msg_count = self.msg_count
 
         self.conn.sendall(header)
 
@@ -187,6 +196,16 @@ class MessageManager(ClientLike):
 
         self.data_buffer = bytearray(1024**2)
         self.data_view = memoryview(self.data_buffer)
+
+        self._core_defs = cd.get_message_definitions().msg_defs
+
+        # Removal bookkeeping. A removed module leaves the routing tables at
+        # once, but its socket is closed and its GOODBYE sent only when no
+        # forward is in progress, so a loop over subscribers never meets a
+        # closed socket. See remove_module() and _routing().
+        self._forward_depth = 0
+        self._closing: List[Module] = []
+        self._finishing_removals = False
 
         # Address Reuse allowed for testing
         if debug:
@@ -287,9 +306,18 @@ class MessageManager(ClientLike):
     def remove_module(self, module: Module):
         """Remove connected module
 
+        The module leaves the routing tables at once, so no later message is
+        sent to it. Its socket is closed and its GOODBYE sent straight away,
+        or, when this is called while a message is being forwarded, as soon as
+        the outermost forward finishes. Removing a module that was already
+        removed does nothing.
+
         Args:
             module (Module): Module object to remove
         """
+        if not self._is_routed(module):
+            return
+
         # Drop all subscriptions for this module
         for msg_type in module.subs:
             self.subscriptions[msg_type].discard(module)
@@ -297,11 +325,77 @@ class MessageManager(ClientLike):
         # Discard from logger module set if needed
         self.logger_modules.discard(module)
 
-        # Drop from our module mapping
-        module.close()
-
-        self.send_goodbye(module)
+        # Drop from our module mapping and socket list
         del self.modules[module.conn]
+        if module.conn in self.sockets:
+            self.sockets.remove(module.conn)
+
+        self._closing.append(module)
+        self._finish_removals()
+
+    def _is_routed(self, module: Module) -> bool:
+        """Report whether a module is still registered with the manager.
+
+        Args:
+            module: The module to check.
+
+        Returns:
+            True until the module is removed.
+        """
+        return self.modules.get(module.conn) is module
+
+    def _finish_removals(self) -> None:
+        """Close removed modules' sockets and send their GOODBYEs.
+
+        Does nothing while a message is being forwarded, or while this is
+        already running further up the stack. Sending a GOODBYE can remove
+        more modules; they join the queue and are finished by the same loop,
+        rather than by recursion.
+        """
+        if self._forward_depth or self._finishing_removals:
+            return
+        self._finishing_removals = True
+        try:
+            while self._closing:
+                module = self._closing.pop(0)
+                module.close()
+                self.send_goodbye(module)
+        finally:
+            self._finishing_removals = False
+
+    @contextmanager
+    def _routing(self) -> Iterator[None]:
+        """Mark a forward in progress, and finish removals when it ends.
+
+        Forwards nest: a send failure logs an error and sends FAILED_MESSAGE,
+        and both are forwarded too. Removals wait until the outermost one ends.
+
+        Yields:
+            Nothing; the body sends the message.
+        """
+        self._forward_depth += 1
+        try:
+            yield
+        finally:
+            self._forward_depth -= 1
+        self._finish_removals()
+
+    def _drop_after_send_error(
+        self, module: Module, header: MessageHeader, err: OSError
+    ) -> None:
+        """Remove a module whose send failed, and report the failure.
+
+        Args:
+            module: The module the send was for.
+            header: Header of the message that wasn't delivered.
+            err: The error the send raised.
+        """
+        self.remove_module(module)
+        self.logger.error(f"Connection Error on write to {module!s} - {err!s}")
+        print("x", end="", flush=True)
+        # This could recurse: send_failed_message returns early when the
+        # failed message is itself a FAILED_MESSAGE or a log message.
+        self.send_failed_message(module, header, time.perf_counter())
 
     def disconnect_module(self, src_module: Module):
         """Disconnect module
@@ -408,11 +502,16 @@ class MessageManager(ClientLike):
     def read_message(self, sock: socket.socket) -> Optional[MessageHeader]:
         """Read an incoming message
 
+        A client is dropped if its header announces a negative or oversized
+        payload, which is checked before the payload is read, or if it sends a
+        core message whose size doesn't match its core definition.
+
         Args:
             sock (socket.socket): socket to read from
 
         Returns:
-            MessageHeader: message header of incoming message
+            MessageHeader: message header of incoming message, or None if the
+            client was dropped
         """
         # Read RTMA Header Section
         nbytes = sock.recv_into(
@@ -433,14 +532,14 @@ class MessageManager(ClientLike):
 
         # Read Data Section into Internal Buffer
         data_size = header.num_data_bytes
-        if data_size:
-            if data_size > len(self.data_buffer):
-                self.logger.warning(
-                    "Message Data size (data_size) exceeds buffer size. Header may be corrupted."
-                )
-                self.remove_module(mod)
-                return
+        if data_size < 0 or data_size > len(self.data_buffer):
+            self.logger.error(
+                f"DROPPING - {mod!s} - Invalid num_data_bytes ({data_size}) for MT={header.msg_type}; it must be 0 to {len(self.data_buffer)}. Header may be corrupted."
+            )
+            self.remove_module(mod)
+            return None
 
+        if data_size:
             nbytes = sock.recv_into(self.data_buffer, data_size, socket.MSG_WAITALL)
 
             if nbytes != data_size:
@@ -450,7 +549,50 @@ class MessageManager(ClientLike):
                 self.remove_module(mod)
                 return
 
+        # Checked after the payload is read, so that a dropped client's socket
+        # closes with nothing left unread, which ends the connection cleanly
+        # rather than with a reset.
+        if not self._core_size_matches(mod, header):
+            return None
+
         return header
+
+    def _core_size_matches(self, mod: Module, header: MessageHeader) -> bool:
+        """Check a core message's size against its core definition.
+
+        User message types pass unchecked: the manager doesn't know their
+        definitions and forwards them as they are. Core types must match, and
+        a client that sends an unknown core type or a mismatched size is
+        dropped, because its core definitions don't match the manager's.
+
+        Args:
+            mod: The module that sent the message.
+            header: The message's header.
+
+        Returns:
+            True if the message may be processed, False if the client was
+            dropped.
+        """
+        msg_type = header.msg_type
+        if msg_type >= _FIRST_USER_MSG_TYPE:
+            return True
+
+        data_cls = self._core_defs.get(msg_type)
+        if data_cls is None:
+            self.logger.critical(
+                f"DROPPING - {mod!s} - Unknown core_def MT={msg_type} received."
+            )
+            self.remove_module(mod)
+            return False
+
+        if header.num_data_bytes != data_cls.type_size:
+            self.logger.error(
+                f"DROPPING - {mod!s} - {data_cls.type_name} (MT={msg_type}) announced {header.num_data_bytes} data bytes, but its core definition has {data_cls.type_size}. The client's core definitions don't match the manager's."
+            )
+            self.remove_module(mod)
+            return False
+
+        return True
 
     def forward_message(
         self,
@@ -490,54 +632,42 @@ class MessageManager(ClientLike):
             )
             return
 
-        # Subscriber set for this message type
-        subscribers = list(
-            chain(
-                self.subscriptions[header.msg_type],
-                self.subscriptions[ALL_MESSAGE_TYPES],
+        with self._routing():
+            # Subscriber list for this message type. It's a snapshot: modules
+            # removed while it's in use are skipped below.
+            subscribers = list(
+                chain(
+                    self.subscriptions[header.msg_type],
+                    self.subscriptions[ALL_MESSAGE_TYPES],
+                )
             )
-        )
 
-        for n in range(len(subscribers)):
-            module = subscribers[n]
-            if module.conn in self.wlist:
-                try:
-                    if (
-                        dest_mod_id == 0
-                        or (module.mod_id == dest_mod_id)
-                        or module.is_logger
-                    ):
-                        module.send_message(header, data)
-                        module.drops = 0
-                except ConnectionError as err:
-                    self.remove_module(module)
-                    self.logger.error(
-                        f"Connection Error on write to {module!s} - {err!s}"
-                    )
-                    print("x", end="", flush=True)
-                    self.send_failed_message(module, header, time.perf_counter())
-            elif module.is_logger:
-                # Block until logger is ready
-                select.select([], [module.conn], [], None)
+            for module in subscribers:
+                if not self._is_routed(module):
+                    continue
+
+                # Only destinations of the message take part. Other modules
+                # aren't sent it, so they can't count as drops either.
+                if not (
+                    dest_mod_id == 0 or module.mod_id == dest_mod_id or module.is_logger
+                ):
+                    continue
+
+                if module.conn not in self.wlist:
+                    if module.is_logger:
+                        # Block until logger is ready
+                        select.select([], [module.conn], [], None)
+                    else:
+                        module.drops += 1
+                        print("x", end="", flush=True)
+                        self.send_failed_message(module, header, time.perf_counter())
+                        continue
 
                 try:
                     module.send_message(header, data)
                     module.drops = 0
-                except ConnectionError as err:
-                    self.remove_module(module)
-                    self.logger.error(
-                        f"Connection Error on write to {module!s} - {err!s}"
-                    )
-                    print("x", end="", flush=True)
-                    # this could result in infinite recursion,
-                    # this is prevented by send_failed_message returning if
-                    # failed message type is failed_message.
-                    self.send_failed_message(module, header, time.perf_counter())
-
-            else:
-                module.drops += 1
-                print("x", end="", flush=True)
-                self.send_failed_message(module, header, time.perf_counter())
+                except OSError as err:
+                    self._drop_after_send_error(module, header, err)
 
     def send_to_loggers(
         self,
@@ -550,21 +680,19 @@ class MessageManager(ClientLike):
             header (MessageHeader): Message header to send
             payload (Union[bytes, MessageData]): Message data to send
         """
-        for module in self.logger_modules:
-            if module.conn not in self.wlist:
-                # Block until logger is ready
-                select.select([], [module.conn], [], None)
-            try:
-                module.send_message(header, payload)
-                module.drops = 0
-            except ConnectionError as err:
-                self.remove_module(module)
-                self.logger.error(f"Connection Error on write to {module!s} - {err!s}")
-                print("x", end="", flush=True)
-                # this could result in infinite recursion,
-                # this is prevented by send_failed_message returning if
-                # failed message type is failed_message.
-                self.send_failed_message(module, header, time.perf_counter())
+        with self._routing():
+            # A snapshot, because a failed send removes the logger from the set.
+            for module in list(self.logger_modules):
+                if not self._is_routed(module):
+                    continue
+                if module.conn not in self.wlist:
+                    # Block until logger is ready
+                    select.select([], [module.conn], [], None)
+                try:
+                    module.send_message(header, payload)
+                    module.drops = 0
+                except OSError as err:
+                    self._drop_after_send_error(module, header, err)
 
     def send_message(
         self,
@@ -588,6 +716,7 @@ class MessageManager(ClientLike):
         header.dest_mod_id = dest_mod_id
         header.dest_host_id = dest_host_id
         header.num_data_bytes = msg_data.type_size
+        header.msg_count = 0  # messages from the manager carry no count
 
         self.forward_message(self.mm_module, header, msg_data)
 
@@ -603,14 +732,12 @@ class MessageManager(ClientLike):
         header.src_mod_id = cd.MID_MESSAGE_MANAGER
         header.dest_mod_id = src_module.mod_id
         header.num_data_bytes = 0
+        header.msg_count = 0  # messages from the manager carry no count
 
         try:
             src_module.send_message(header, b"")
-        except ConnectionError as err:
-            self.remove_module(src_module)
-            self.logger.error(f"Connection Error on write to {src_module!s} - {err!s}")
-            print("x", end="", flush=True)
-            self.send_failed_message(src_module, header, time.perf_counter())
+        except OSError as err:
+            self._drop_after_send_error(src_module, header, err)
 
         # Always forward to logger modules
         self.send_to_loggers(header, b"")
@@ -646,6 +773,7 @@ class MessageManager(ClientLike):
         out_header.send_time = time.perf_counter()
         out_header.src_mod_id = cd.MID_MESSAGE_MANAGER
         out_header.num_data_bytes = ctypes.sizeof(data)
+        out_header.msg_count = 0  # messages from the manager carry no count
 
         data.dest_mod_id = dest_module.mod_id
         data.time_of_failure = time_of_failure
@@ -695,7 +823,7 @@ class MessageManager(ClientLike):
     def decode_core_message(
         self, src_module: Module, hdr: MessageHeader
     ) -> Union[Message, None]:
-        data_cls = cd.get_message_definitions().msg_defs.get(hdr.msg_type)
+        data_cls = self._core_defs.get(hdr.msg_type)
         if data_cls:
             data = data_cls.from_buffer(self.data_buffer)
             return Message(hdr, data)
@@ -714,7 +842,7 @@ class MessageManager(ClientLike):
             header (MessageHeader): Message header of the incoming message
         """
         msg_type = header.msg_type
-        if msg_type >= 100:
+        if msg_type >= _FIRST_USER_MSG_TYPE:
             return
 
         core_msg = self.decode_core_message(src_module, header)
@@ -773,8 +901,65 @@ class MessageManager(ClientLike):
         """Close manager server"""
         self._keep_running = False
 
+    def _accept_connection(self) -> None:
+        """Accept a pending connection and register it as a module.
+
+        A connection that fails while being accepted or set up is logged and
+        discarded; the manager keeps running.
+        """
+        try:
+            conn, address = self.listen_socket.accept()
+        except OSError as err:
+            self.logger.warning(f"Failed to accept a new connection - {err!s}")
+            return
+
+        self.logger.info(f"New connection accepted from {address[0]}:{address[1]}")
+
+        try:
+            # Disable Nagle Algorithm
+            conn.setsockopt(socket.getprotobyname("tcp"), socket.TCP_NODELAY, 1)
+        except OSError as err:
+            self.logger.warning(
+                f"Closing new connection from {address[0]}:{address[1]} - {err!s}"
+            )
+            conn.close()
+            return
+
+        self.sockets.append(conn)
+        self.modules[conn] = Module(conn, address, self.header_cls)
+
+    def _handle_client(self, client_socket: socket.socket, src: Module) -> None:
+        """Read and process one message from a client.
+
+        This is the boundary for failures caused by one client. A connection
+        error disconnects it, and any other exception is logged with its
+        traceback and drops it, so the manager keeps serving the others.
+
+        Args:
+            client_socket: The client's socket, which has data to read.
+            src: The client's module.
+        """
+        try:
+            msg_hdr = self.read_message(client_socket)
+            if msg_hdr is not None:
+                self.process_message(src, msg_hdr)
+        except ConnectionError as err:
+            self.disconnect_module(src)
+            self.logger.error(
+                f"Connection Error on read, disconnecting  {src!s} - {err!s}"
+            )
+        except Exception:
+            self.logger.exception(
+                f"DROPPING - {src!s} - Unexpected error while handling its message."
+            )
+            self.remove_module(src)
+
     def run(self):
-        """Start the message manager server"""
+        """Start the message manager server
+
+        Runs until :meth:`close` is called or ``KeyboardInterrupt``. A failure
+        caused by one client drops that client and doesn't stop the loop.
+        """
         self._keep_running = True
         try:
             with disable_message_validation():
@@ -782,57 +967,37 @@ class MessageManager(ClientLike):
                     rlist, _, _ = select.select(
                         self.modules.keys(), [], [], self.read_timeout
                     )
+                    if not rlist:
+                        continue
 
                     # Check for an incoming connection request
-                    if len(rlist) > 0:
-                        try:
-                            rlist.remove(self.listen_socket)
-                            conn, address = self.listen_socket.accept()
-                            self.logger.info(
-                                f"New connection accepted from {address[0]}:{address[1]}"
-                            )
+                    if self.listen_socket in rlist:
+                        rlist.remove(self.listen_socket)
+                        self._accept_connection()
 
-                            # Disable Nagle Algorithm
-                            conn.setsockopt(
-                                socket.getprotobyname("tcp"), socket.TCP_NODELAY, 1
-                            )
+                    # Randomly select the order of sockets with data.
+                    random.shuffle(rlist)
 
-                            self.sockets.append(conn)
-                            self.modules[conn] = Module(conn, address, self.header_cls)
-                        except ValueError:
-                            pass
+                    # Check whichs clients are ready to receive data
+                    self.wlist.clear()
+                    if rlist:
+                        _, self.wlist, _ = select.select(
+                            [], self.modules.keys(), [], self.write_timeout
+                        )
 
-                        # Randomly select the order of sockets with data.
-                        random.shuffle(rlist)
-
-                        # Check whichs clients are ready to receive data
-                        self.wlist.clear()
-                        if rlist:
-                            _, self.wlist, _ = select.select(
-                                [], self.modules.keys(), [], self.write_timeout
-                            )
-
-                        for client_socket in rlist:
-                            # Check that module is still active
-                            src = self.modules.get(client_socket)
-                            if src:
-                                try:
-                                    msg_hdr = self.read_message(client_socket)
-                                except ConnectionError as err:
-                                    self.disconnect_module(src)
-                                    self.logger.error(
-                                        f"Connection Error on read, disconnecting  {src!s} - {err!s}"
-                                    )
-                                    continue
-
-                                if msg_hdr:
-                                    self.process_message(src, msg_hdr)
+                    for client_socket in rlist:
+                        # Check that module is still active
+                        src = self.modules.get(client_socket)
+                        if src is not None:
+                            self._handle_client(client_socket, src)
 
         except KeyboardInterrupt:
             self.logger.info("Stopping Message Manager")
         finally:
-            for mod in self.modules:
-                mod.close()
+            for sock in list(self.modules):
+                sock.close()
+            for module in self._closing:
+                module.close()
 
 
 def main():
