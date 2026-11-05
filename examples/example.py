@@ -11,10 +11,10 @@ import msg_defs.example_messages as md
 from typing import cast
 
 
-def publisher(server="127.0.0.1:7111", timecode=False):
+def publisher(server="127.0.0.1:7111"):
     # Setup Client
     defs = md.get_message_definitions()
-    mod = pyrtma.Client(timecode=timecode, definitions=defs)
+    mod = pyrtma.Client(definitions=defs)
     mod.connect(server_name=server)
 
     # Build a packet to send
@@ -36,10 +36,10 @@ def publisher(server="127.0.0.1:7111", timecode=False):
             break
 
 
-def subscriber(server="127.0.0.1:7111", timecode=False):
+def subscriber(server="127.0.0.1:7111"):
     # Setup Client
     defs = md.get_message_definitions()
-    mod = pyrtma.Client(timecode=timecode, definitions=defs)
+    mod = pyrtma.Client(definitions=defs)
     mod.connect(server_name=server)
 
     # Select the messages to receive
@@ -70,9 +70,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--server", default="127.0.0.1:7111", help="RTMA Message Manager ip address."
     )
-    parser.add_argument(
-        "-t", "--timecode", action="store_true", help="Use timecode in message header"
-    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--pub", default=False, action="store_true", help="Run as publisher."
@@ -85,9 +82,9 @@ if __name__ == "__main__":
 
     if args.pub:
         print("pyrtma Publisher")
-        publisher(args.server, timecode=args.timecode)
+        publisher(args.server)
     elif args.sub:
         print("pyrtma Subscriber")
-        subscriber(args.server, timecode=args.timecode)
+        subscriber(args.server)
     else:
         print("Unknown input")

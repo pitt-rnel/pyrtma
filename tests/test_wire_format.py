@@ -21,7 +21,7 @@ from typing import Any
 import pytest
 
 import pyrtma.core_defs as cd
-from pyrtma.header import get_header_cls
+from pyrtma.header import MessageHeader, get_header_cls
 
 SNAPSHOT_PATH = Path(__file__).with_name("wire_format_snapshot.json")
 HOST_ID_NAMES = ("LOCAL_HOST", "ALL_HOSTS")
@@ -112,13 +112,12 @@ def current_wire_format() -> dict[str, Any]:
         A dictionary with the same shape as the snapshot file.
     """
     defs = cd.get_message_definitions()
-    headers: dict[str, Any] = {}
-    for timecode in (False, True):
-        header_cls = get_header_cls(timecode)
-        headers[header_cls.__name__] = {
-            "size": ctypes.sizeof(header_cls),
-            "layout": layout(header_cls),
+    headers: dict[str, Any] = {
+        MessageHeader.__name__: {
+            "size": ctypes.sizeof(MessageHeader),
+            "layout": layout(MessageHeader),
         }
+    }
     structs = {
         name: {
             "hash": type_hash(cls),
@@ -201,13 +200,14 @@ def current() -> dict[str, Any]:
     return current_wire_format()
 
 
-@pytest.mark.parametrize("timecode", [False, True])
-def test_header_matches_snapshot(
-    snapshot: dict[str, Any], current: dict[str, Any], timecode: bool
-) -> None:
-    name = get_header_cls(timecode).__name__
+def test_get_header_cls_returns_the_only_header() -> None:
+    assert get_header_cls() is MessageHeader
 
-    assert current["headers"][name] == snapshot["headers"][name]
+
+def test_header_matches_snapshot(
+    snapshot: dict[str, Any], current: dict[str, Any]
+) -> None:
+    assert current["headers"] == snapshot["headers"]
 
 
 @pytest.mark.parametrize("section", ["structs", "messages", "module_ids", "host_ids"])

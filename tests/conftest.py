@@ -82,8 +82,8 @@ def client_factory(manager: ManagerHarness) -> Iterator[Callable[..., Client]]:
     """Create clients connected to the ``manager`` fixture.
 
     The factory takes ``Client`` keyword arguments, plus ``logger_status`` for
-    ``connect()``. Clients use the compiled test definitions and the manager's
-    header type unless told otherwise. All clients are disconnected at
+    ``connect()``. Clients use the compiled test definitions unless told
+    otherwise. All clients are disconnected at
     teardown.
 
     Yields:
@@ -93,7 +93,6 @@ def client_factory(manager: ManagerHarness) -> Iterator[Callable[..., Client]]:
 
     def make(*, logger_status: bool = False, **kwargs: Any) -> Client:
         kwargs.setdefault("definitions", td.get_message_definitions())
-        kwargs.setdefault("timecode", manager.timecode)
         client = Client(**kwargs)
         clients.append(client)
         client.connect(manager.address, logger_status=logger_status)

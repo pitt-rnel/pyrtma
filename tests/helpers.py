@@ -214,23 +214,17 @@ class ManagerHarness:
         manager: The manager under test.
         port: The port it listens on.
         address: The ``host:port`` string clients connect to.
-        timecode: Whether the manager uses the timecode header.
     """
 
-    def __init__(
-        self, *, timecode: bool = False, log_level: int = logging.ERROR
-    ) -> None:
+    def __init__(self, *, log_level: int = logging.ERROR) -> None:
         """Construct the manager and bind its port.
 
         Args:
-            timecode: Use the header with timecode fields.
             log_level: The manager's logging level.
         """
-        self.timecode = timecode
         self.manager = MessageManager(
             ip_address=LOOPBACK,
             port=0,
-            timecode=timecode,
             log_level=log_level,
             debug=False,
         )

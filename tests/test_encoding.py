@@ -18,7 +18,6 @@ class TestEncoding(unittest.TestCase):
         self.manager = MessageManager(
             ip_address="127.0.0.1",
             port=0,
-            timecode=False,
             debug=False,
             log_level=logging.ERROR,
         )

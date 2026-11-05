@@ -33,6 +33,13 @@ The layout:
 
 Tests that route real messages use the `manager` fixture, a raw socket from `raw_connection` whose headers carry `src_mod_id` 123, and `watcher()`. `watcher()` connects a sender and an observer that subscribes to `GOODBYE`, then to `TEST_START`. It then resends `TEST_START` with `deliver()` until it arrives, which shows the earlier subscriptions are in place. Tests that need conditions real sockets can't produce on demand drive a constructed, never-run manager (`bare_manager`) with `FakeConnection` stand-ins. A fake records what it is sent, or raises `ConnectionResetError` like a reset peer, and raises `OSError(EBADF)` after it's closed, like a real socket.
 
+### TestConstructor
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_options_after_port_are_keyword_only` | Timecode removal: `MessageManager` arguments after `port` are keyword-only, so an old positional call that passed `timecode` fails instead of shifting `log_level`. | Passes a log level as the third positional argument. |
+| `test_timecode_argument_is_rejected` | Timecode removal: `MessageManager` no longer accepts `timecode`. | Passes `timecode=True` and expects a `TypeError` naming it. |
+
 ### TestHeaderValidation
 
 | Test | Purpose | Approach |
@@ -70,6 +77,13 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_unexpected_error_drops_only_that_client` | C2: an unexpected exception while handling one client's message is logged with its traceback and drops that client, and `run()` keeps going. | Patches the manager's `register_module_ready` to raise; a client sends `MODULE_READY`; the observer sees its `GOODBYE` and still gets `TEST_START`. |
+
+## test_client.py — the client's constructor and context manager (needs: none)
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_options_after_host_id_are_keyword_only` | Timecode removal: `Client` and `client_context` arguments after `host_id` are keyword-only, so an old positional call that passed `timecode` fails instead of shifting the arguments after it. | Parametrized over both; a third positional argument for `Client`, a fifth for `client_context`. |
+| `test_timecode_argument_is_rejected` | Timecode removal: `Client` and `client_context` no longer accept `timecode`. | Parametrized over both; passes `timecode=True` and expects a `TypeError` naming it. |
 
 ## test_integration.py — client and manager interaction (needs: loopback sockets; not yet marked)
 
@@ -204,11 +218,12 @@ Uses the `VALIDATOR_A` and `VALIDATOR_B` messages from the test definitions, whi
 
 ## test_wire_format.py — the frozen wire format (needs: none)
 
-`wire_format_snapshot.json` records the 4.0.0 wire format. Layouts are written as `name:type@offset`, with types named by kind and size, such as `int64`, so the snapshot is the same on Linux and Windows. The snapshot is never edited to make a change pass.
+`wire_format_snapshot.json` records the 4.0.0 wire format, less the timecode header, which Phase 2 removed by decision. Layouts are written as `name:type@offset`, with types named by kind and size, such as `int64`, so the snapshot is the same on Linux and Windows. The snapshot is never edited to make a change pass.
 
 | Test | Purpose | Approach |
 |---|---|---|
-| `test_header_matches_snapshot` | Test infrastructure: the message header's size and field layout, with and without timecode, are unchanged. | Parametrized over `timecode`; compares `get_header_cls()` with the snapshot. |
+| `test_get_header_cls_returns_the_only_header` | Timecode removal: `get_header_cls()` takes no argument and returns `MessageHeader`, the only header class. | Calls it and compares the class. |
+| `test_header_matches_snapshot` | Test infrastructure: the message header's size and field layout are unchanged, and it is the only header. | Compares the whole `headers` section with the snapshot. |
 | `test_core_definitions_match_snapshot` | Test infrastructure: every core struct and message keeps its ID, type hash, size, and layout, and the core module and host IDs are unchanged; none are added or removed. | Parametrized over the snapshot's sections; lists each entry that differs. |
 | `test_layout_names_types_by_size` | Test infrastructure: layout descriptions don't depend on which ctypes alias a platform uses. | A structure with `c_int64` and `c_longlong` fields, a char array, and a double array. |
 

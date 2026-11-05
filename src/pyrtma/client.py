@@ -96,9 +96,8 @@ class Client(ClientLike):
         module_id (optional): Static module ID, which must be unique.
             Defaults to 0, which generates a dynamic module ID.
         host_id (optional): Host ID. Defaults to 0.
-        timecode (optional): Add additional timecode fields to message
-            header, used by some projects at RNEL. Defaults to False.
-        name (optional): Name of module. Defaults to "".
+        name (optional): Name of module. Defaults to "". This and the
+            arguments after it are keyword-only.
         definitions (optional): MessageDefinitions object or Module containing MessageDefinitions. Defaults to None, which will auto-detect
             message definitions from the current module or use core_defs if not found.
         auto_detect (optional): If True, will attempt to auto-detect message definitions
@@ -110,7 +109,7 @@ class Client(ClientLike):
         self,
         module_id: int = 0,
         host_id: int = 0,
-        timecode: bool = False,
+        *,
         name: str = "",
         definitions: Optional[MessageDefinitions | ModuleType] = None,
         auto_detect: bool = True,
@@ -123,7 +122,7 @@ class Client(ClientLike):
         self._msg_count = 0
         self._server = ("", -1)
         self._connected = False
-        self._header_cls = get_header_cls(timecode)
+        self._header_cls = get_header_cls()
         self._recv_buffer = bytearray(1024**2)
         self._sub_all = False
         self._subscribed_types: Set[int] = set()
@@ -1003,7 +1002,7 @@ def client_context(
     server_name: str = "localhost:7111",
     msg_list: Optional[Iterable[int]] = None,
     host_id: int = 0,
-    timecode: bool = False,
+    *,
     logger_status: bool = False,
     name: str = "",
     definitions: Optional[MessageDefinitions | ModuleType] = None,
@@ -1022,9 +1021,8 @@ def client_context(
                 Defaults to "localhost:7111".
         msg_list (optional): A list of numeric message IDs to subscribe to
         host_id (optional): Host ID. Defaults to 0.
-        timecode (optional): Add additional timecode fields to message
-            header, used by some projects at RNEL. Defaults to False.
         logger_status (optional): Flag to declare client as a logger module.
+            This and the arguments after it are keyword-only.
             Logger modules are automatically subscribed to all message types.
             Defaults to False.
         name (optional): Name of module
@@ -1036,7 +1034,7 @@ def client_context(
     Yields:
         Client: initialized pyrtma Client object
     """
-    c = Client(module_id, host_id, timecode, name=name, definitions=definitions)
+    c = Client(module_id, host_id, name=name, definitions=definitions)
     c.connect(server_name, logger_status)
     if msg_list:
         c.subscribe(msg_list)

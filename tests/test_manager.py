@@ -19,7 +19,7 @@ import pytest
 
 from pyrtma import core_defs as cd
 from pyrtma.client import Client
-from pyrtma.header import MessageHeader, get_header_cls
+from pyrtma.header import MessageHeader
 from pyrtma.manager import MessageManager, Module
 from pyrtma.message import Message
 
@@ -242,18 +242,17 @@ def watcher(
     return sender, observer
 
 
-def raw_header(manager: ManagerHarness, msg_type: int, num_data_bytes: int) -> bytes:
+def raw_header(msg_type: int, num_data_bytes: int) -> bytes:
     """Build the bytes of a header as a raw client would send it.
 
     Args:
-        manager: The running harness, for its header type.
         msg_type: The message type.
         num_data_bytes: The data size the header announces.
 
     Returns:
         The header bytes.
     """
-    header = get_header_cls(manager.timecode)()
+    header = MessageHeader()
     header.msg_type = msg_type
     header.src_mod_id = RAW_SRC_MOD_ID
     header.num_data_bytes = num_data_bytes
@@ -301,6 +300,20 @@ def assert_still_routes(sender: Client, observer: Client) -> None:
     assert received.data.id == 7
 
 
+class TestConstructor:
+    def test_options_after_port_are_keyword_only(self) -> None:
+        args: tuple[Any, ...] = (LOOPBACK, 0, logging.ERROR)
+
+        with pytest.raises(TypeError):
+            MessageManager(*args)
+
+    def test_timecode_argument_is_rejected(self) -> None:
+        kwargs: dict[str, Any] = {"timecode": True}
+
+        with pytest.raises(TypeError, match="timecode"):
+            MessageManager(ip_address=LOOPBACK, port=0, **kwargs)
+
+
 class TestHeaderValidation:
     @pytest.mark.parametrize("data_size", [-1, 1024**2 + 1])
     def test_invalid_data_size_drops_only_that_client(
@@ -314,7 +327,7 @@ class TestHeaderValidation:
         sender, observer = watcher(client_factory)
         raw_port = raw_connection.getsockname()[1]
 
-        raw_connection.sendall(raw_header(manager, td.MT_TEST_END, data_size))
+        raw_connection.sendall(raw_header(td.MT_TEST_END, data_size))
 
         assert read_until(observer, is_goodbye_for_port(raw_port)) is not None
         assert_closed_by_manager(raw_connection)
@@ -349,7 +362,7 @@ class TestHeaderValidation:
         sender, observer = watcher(client_factory, msg_type)
         raw_port = raw_connection.getsockname()[1]
 
-        raw_connection.sendall(raw_header(manager, msg_type, data_size))
+        raw_connection.sendall(raw_header(msg_type, data_size))
         raw_connection.sendall(bytes(data_size))
 
         seen = read_until(observer, is_goodbye_for_port(raw_port))
@@ -378,7 +391,7 @@ class TestHeaderValidation:
         sender, observer = watcher(client_factory, cd.MT_DATASET_START)
         size = cd.MDF_DATASET_START.type_size
 
-        raw_connection.sendall(raw_header(manager, cd.MT_DATASET_START, size))
+        raw_connection.sendall(raw_header(cd.MT_DATASET_START, size))
         raw_connection.sendall(bytes(size))
 
         seen = read_until(

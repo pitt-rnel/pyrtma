@@ -126,7 +126,7 @@ class MessageManager(ClientLike):
         self,
         ip_address: str = "",  # "" equivalent to socket.INADDR_ANY
         port: int = 7111,
-        timecode=False,
+        *,
         log_level=logging.INFO,
         debug=False,
     ):
@@ -136,8 +136,8 @@ class MessageManager(ClientLike):
 
         Args:
             ip_address (str, optional): server IP address. Defaults to "".
-            port (int, optional): server port. Defaults to 7111.
-            timecode (bool, optional): Flag to use message header with timecode values. Defaults to False.
+            port (int, optional): server port. Defaults to 7111. The arguments
+                after it are keyword-only.
             log_level (int, optional): logging level, defaults to logging.INFO.
             debug (bool, optional): Flag for debug mode. Defaults to False.
         """
@@ -145,7 +145,7 @@ class MessageManager(ClientLike):
         self.ip_address = ip_address
         self.port = port
 
-        self.header_cls = get_header_cls(timecode)
+        self.header_cls = get_header_cls()
         self.header_size = ctypes.sizeof(self.header_cls)
         self.header_buffer = bytearray(self.header_size)
         self.header_view = memoryview(self.header_buffer)
@@ -1020,9 +1020,6 @@ def main():
         default="INFO",
         help="Logging Level",
     )
-    parser.add_argument(
-        "-t", "--timecode", action="store_true", help="Use timecode in message header"
-    )
 
     args = parser.parse_args()
 
@@ -1047,7 +1044,6 @@ def main():
         msg_mgr = MessageManager(
             ip_address=ip_addr,
             port=args.port,
-            timecode=args.timecode,
             log_level=level,
             debug=args.debug,
         )

@@ -5,6 +5,11 @@ that makes them. The version number is chosen at release time.
 
 ## Unreleased
 
+### Removed
+
+- The timecode message header (`TimeCodeMessageHeader`) and the `timecode` argument of `Client`, `client_context` and `MessageManager`, with the manager's and the examples' `-t/--timecode` option. Only Python clients could produce that header; the C, MATLAB and JavaScript compilers never did. `get_header_cls()` takes no argument and always returns `MessageHeader`. The standard header is unchanged.
+- Positional arguments after `host_id` in `Client` and `client_context`, and after `port` in `MessageManager`. They are keyword-only now, so a call that passed `timecode` positionally raises `TypeError` instead of shifting the arguments after it.
+
 ### Changed
 
 - `from_random()` fills int64 and uint64 fields across their whole range on every platform; on Linux they previously stayed within 32 bits. Float and double fields now get finite values with random sign and magnitude, rather than values in [0, 1).
