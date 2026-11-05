@@ -37,7 +37,6 @@ from .core_defs import (
     MT_MESSAGE_LOG_SAVED,
     MT_FORCE_DISCONNECT,
     MT_MODULE_READY,
-    MT_TIMING_MESSAGE,
 )
 
 from warnings import warn

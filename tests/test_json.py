@@ -2,10 +2,7 @@ import ctypes
 import unittest
 from typing import cast
 
-from pyrtma.context import get_context
-
-# Import message defs to add to pyrtma.msg_defs map
-from .test_msg_defs.test_defs import *
+from .test_msg_defs import test_defs as td
 
 
 def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
@@ -38,8 +35,8 @@ def is_equal(obj: ctypes.Structure, other: ctypes.Structure) -> bool:
 
 class TestJSONConversion(unittest.TestCase):
     def test_dict(self):
-        ctx = get_context()
-        for mdf in ctx.MDF.values():
+        defs = td.get_message_definitions()
+        for mdf in defs.MDF.values():
             # Fill the message with random data
             in_msg = mdf.from_random()
 
@@ -58,8 +55,8 @@ class TestJSONConversion(unittest.TestCase):
             self.assertEqual(in_dict, out_dict)
 
     def test_json(self):
-        ctx = get_context()
-        for mdf in ctx.MDF.values():
+        defs = td.get_message_definitions()
+        for mdf in defs.MDF.values():
             # Fill the message with random data
             in_msg = mdf.from_random()
 
