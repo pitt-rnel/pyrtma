@@ -95,13 +95,20 @@ def deliver(
     msg: MessageData,
     timeout: float = DEFAULT_TIMEOUT,
     interval: float = 0.05,
+    *,
+    match: Callable[[Message], bool] | None = None,
 ) -> Message | None:
     """Send a message repeatedly until the receiver gets one of its type.
 
     A subscription takes effect when the manager processes it, and the manager
     doesn't order messages from different clients, so a single send right
     after subscribing can race the subscription. Resending until the message
-    arrives avoids a fixed sleep. The receiver may be left with duplicates.
+    arrives avoids a fixed sleep.
+
+    The receiver may be left with duplicates, and a duplicate can arrive well
+    after this returns: the manager may forward it after messages from other
+    clients. A later call for the same type should pass ``match``, so that it
+    doesn't mistake a stale copy for its own message.
 
     Args:
         sender: The client that sends ``msg``.
@@ -109,17 +116,19 @@ def deliver(
         msg: The message to send.
         timeout: Seconds to keep trying.
         interval: Seconds to wait for the message after each send.
+        match: Also required of a message of the same type, such as a check of
+            a field value. Messages that fail it are skipped.
 
     Returns:
-        The first message of the same type that the receiver read, or None if
-        none arrived before the deadline.
+        The first message of the same type, and accepted by ``match`` if given,
+        that the receiver read, or None if none arrived before the deadline.
     """
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         sender.send_message(msg)
         received = receiver.read_message(timeout=interval)
         while received is not None:
-            if received.type_id == msg.type_id:
+            if received.type_id == msg.type_id and (match is None or match(received)):
                 return received
             received = receiver.read_message(timeout=0)
     return None

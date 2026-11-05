@@ -25,6 +25,7 @@ The layout:
 |---|---|---|
 | `test_free_port_can_be_bound` | Test infrastructure: `free_port` returns a loopback port that can actually be bound. | Binds a socket to the port from the fixture. |
 | `test_manager_routes_between_clients` | Test infrastructure: the `manager` and `client_factory` fixtures give clients that can subscribe and receive. | Two factory clients; `deliver()` resends `TEST_START` until the subscriber reads it, then compares the payload. |
+| `test_deliver_skips_messages_that_do_not_match` | Test infrastructure: `deliver()` with `match` skips earlier messages of the same type that fail it, such as a stale resend. | Leaves a stale `TEST_START` with ID 0 queued before delivering one with ID 7. |
 | `test_raw_connection_reaches_manager` | Test infrastructure: `raw_connection` is a plain socket connected to the `manager` fixture's port. | Compares the socket's peer port with the manager's port. |
 | `test_collector_catches_thread_exception` | Test infrastructure: an exception escaping a thread is collected with its thread name, type, and traceback. | A thread that raises `RuntimeError`; the test takes the exception from the `thread_exceptions` fixture so teardown doesn't fail. |
 | `test_manager_harness_reports_dead_thread` | Test infrastructure: a manager thread that dies is reported when the harness stops. | Sets an invalid `select()` timeout on a running manager, waits for the thread to die, and expects `HarnessError` naming `TypeError`. |

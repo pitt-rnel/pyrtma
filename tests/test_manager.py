@@ -289,13 +289,17 @@ def assert_closed_by_manager(sock: socket.socket) -> None:
 def assert_still_routes(sender: Client, observer: Client) -> None:
     """Assert that the manager still forwards messages between two clients.
 
+    The message carries an ID that ``watcher()`` doesn't use, and only a copy
+    with that ID counts: a stale copy of the watcher's own ``TEST_START`` can
+    arrive after the dropped client's ``GOODBYE``.
+
     Args:
         sender: A connected client.
         observer: A client subscribed to ``TEST_START``.
     """
     msg = td.MDF_TEST_START()
     msg.id = 7
-    received = deliver(sender, observer, msg)
+    received = deliver(sender, observer, msg, match=lambda m: m.data.id == msg.id)
     assert received is not None
     assert received.data.id == 7
 

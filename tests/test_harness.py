@@ -40,6 +40,24 @@ def test_manager_routes_between_clients(client_factory: Callable[..., Client]) -
 
 
 @pytest.mark.integration
+def test_deliver_skips_messages_that_do_not_match(
+    client_factory: Callable[..., Client],
+) -> None:
+    publisher = client_factory()
+    subscriber = client_factory()
+    subscriber.subscribe([td.MT_TEST_START])
+    assert deliver(publisher, subscriber, td.MDF_TEST_START()) is not None
+    publisher.send_message(td.MDF_TEST_START())  # a stale copy, like a resend
+    msg = td.MDF_TEST_START()
+    msg.id = 7
+
+    received = deliver(publisher, subscriber, msg, match=lambda m: m.data.id == msg.id)
+
+    assert received is not None
+    assert received.data.id == 7
+
+
+@pytest.mark.integration
 def test_raw_connection_reaches_manager(
     manager: ManagerHarness, raw_connection: socket.socket
 ) -> None:
