@@ -28,6 +28,8 @@ dependencies = [
   "black",
   "packaging",
 ]
+[project.optional-dependencies]
+dev = ["pyright", "pytest"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
