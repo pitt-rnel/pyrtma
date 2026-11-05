@@ -1,9 +1,9 @@
 import unittest
-import random
 import threading
 import time
 import logging
 
+from .helpers import bound_port
 from .test_msg_defs import test_defs as td
 
 from pyrtma.client import client_context
@@ -14,16 +14,16 @@ class TestEncoding(unittest.TestCase):
     """Test sending messages through MessageManager."""
 
     def setUp(self):
-        self.port = random.randint(1000, 10000)  # random port
-        self.addr = f"127.0.0.1:{self.port}"
 
         self.manager = MessageManager(
             ip_address="127.0.0.1",
-            port=self.port,
+            port=0,
             timecode=False,
             debug=False,
             log_level=logging.ERROR,
         )
+        self.port = bound_port(self.manager)
+        self.addr = f"127.0.0.1:{self.port}"
         self.manager_thread = threading.Thread(
             target=self.manager.run,
         )

@@ -1,4 +1,3 @@
-import random
 import threading
 import time
 import unittest
@@ -16,6 +15,8 @@ from pyrtma.validators import (
     IntArray,
     ByteArray,
 )
+
+from .helpers import bound_port
 
 # Choose a unique message type id number
 MT_TEST_MESSAGE = 123
@@ -60,8 +61,6 @@ class TestSingleClient(unittest.TestCase):
     """
 
     def setUp(self):
-        self.port = random.randint(1000, 10000)  # random port
-        self.addr = f"127.0.0.1:{self.port}"
         self.module_id = 11
         self.client = Client(
             module_id=self.module_id,
@@ -72,11 +71,13 @@ class TestSingleClient(unittest.TestCase):
 
         self.manager = MessageManager(
             ip_address="127.0.0.1",
-            port=self.port,
+            port=0,
             timecode=False,
             log_level=logging.ERROR,
             debug=False,
         )
+        self.port = bound_port(self.manager)
+        self.addr = f"127.0.0.1:{self.port}"
         self.manager_thread = threading.Thread(
             target=self.manager.run,
         )
@@ -506,18 +507,18 @@ class TestSingleContextClient(unittest.TestCase):
     """
 
     def setUp(self):
-        self.port = random.randint(1000, 10000)  # random port
-        self.addr = f"127.0.0.1:{self.port}"
         self.module_id = 11
         self.context_module_id = 12
 
         self.manager = MessageManager(
             ip_address="127.0.0.1",
-            port=self.port,
+            port=0,
             timecode=False,
             log_level=logging.ERROR,
             debug=False,
         )
+        self.port = bound_port(self.manager)
+        self.addr = f"127.0.0.1:{self.port}"
         self.manager_thread = threading.Thread(
             target=self.manager.run,
         )
