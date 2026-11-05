@@ -164,7 +164,7 @@ class PyDefCompiler:
             desc = self.get_descriptor(field.type_name, field.length or 0)
             dstr += f"{'    ' * 3}{field.name}{desc}\n"
 
-        msg_src = sdf.src.as_posix()
+        msg_src = sdf.src.name
         type_def_str = repr(sdf.raw)
         type_def_rhs = 'type_def: ClassVar[str] = "'
         type_def_end = '"'
@@ -193,7 +193,7 @@ class PyDefCompiler:
             dstr += f"{'    ' * 3}{field.name}{desc}\n"
 
         msg_id = mdf.type_id
-        msg_src = mdf.src.as_posix()
+        msg_src = mdf.src.name
         type_def_str = repr(mdf.raw)
         type_def_rhs = 'type_def: ClassVar[str] = "'
         type_def_end = '"'
