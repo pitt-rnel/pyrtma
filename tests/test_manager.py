@@ -22,6 +22,7 @@ from pyrtma import core_defs as cd
 from pyrtma.client import Client
 from pyrtma.header import MessageHeader
 from pyrtma.core_defs import ALL_MESSAGE_TYPES
+from pyrtma.exceptions import ConnectionLost
 from pyrtma.manager import DEFAULT_STALL_TIMEOUT, MessageManager, Module, _parse_args
 from pyrtma.message import Message
 
@@ -192,6 +193,7 @@ def add_fake_module(
     writable: bool = True,
     accept: int | None = None,
     is_logger: bool = False,
+    connected: bool = True,
 ) -> Module:
     """Register a connected module on a fake connection, as ``run()`` would.
 
@@ -204,6 +206,7 @@ def add_fake_module(
         accept: How many bytes its connection takes before it is full, or None
             for no limit.
         is_logger: Whether it registered as a logger.
+        connected: Whether it has connected, or is only an accepted socket.
 
     Returns:
         The new module.
@@ -219,7 +222,7 @@ def add_fake_module(
         manager.header_cls,
         name=f"fake{mod_id}",
         mod_id=mod_id,
-        connected=True,
+        connected=connected,
         is_logger=is_logger,
     )
     manager.modules[conn] = module
@@ -394,16 +397,43 @@ def is_routed(manager: MessageManager, module: Module) -> bool:
     return manager.modules.get(module.conn) is module
 
 
-def is_goodbye_for_port(port: int) -> Callable[[Message], bool]:
-    """Match the ``GOODBYE`` the manager sends when a connection is dropped.
+def read_until_marker(sender: Client, observer: Client) -> list[Message]:
+    """Read everything the observer is sent up to a fresh marker message.
+
+    Messages the manager forwarded before the marker was sent arrive before
+    it, so this collects them all.
 
     Args:
-        port: The dropped connection's local port.
+        sender: A connected client.
+        observer: A client already subscribed to ``TEST_START``.
 
     Returns:
-        A predicate for ``read_until``.
+        The messages read, ending with the marker.
     """
-    return lambda msg: msg.type_id == cd.MT_GOODBYE and msg.data.port == port
+    marker = td.MDF_TEST_START()
+    marker.id = 8
+    sender.send_message(marker)
+    seen = read_until(
+        observer, lambda m: m.type_id == td.MT_TEST_START and m.data.id == 8
+    )
+    assert seen is not None
+    return seen
+
+
+def hello_ids(module: Module) -> list[int]:
+    """Return the module IDs of the HELLO messages a fake module was sent.
+
+    Args:
+        module: A module made by ``add_fake_module``.
+
+    Returns:
+        One module ID per HELLO, in the order sent.
+    """
+    return [
+        cd.MDF_HELLO.from_buffer_copy(payload).mod_id
+        for header, payload in sent_messages(module)
+        if header.msg_type == cd.MT_HELLO
+    ]
 
 
 def assert_closed_by_manager(sock: socket.socket) -> None:
@@ -476,11 +506,9 @@ class TestHeaderValidation:
         data_size: int,
     ) -> None:
         sender, observer = watcher(client_factory)
-        raw_port = raw_connection.getsockname()[1]
 
         raw_connection.sendall(raw_header(td.MT_TEST_END, data_size))
 
-        assert read_until(observer, is_goodbye_for_port(raw_port)) is not None
         assert_closed_by_manager(raw_connection)
         assert_still_routes(sender, observer)
         assert wait_for(
@@ -511,14 +539,12 @@ class TestHeaderValidation:
         data_size: int,
     ) -> None:
         sender, observer = watcher(client_factory, msg_type)
-        raw_port = raw_connection.getsockname()[1]
 
         raw_connection.sendall(raw_header(msg_type, data_size))
         raw_connection.sendall(bytes(data_size))
 
-        seen = read_until(observer, is_goodbye_for_port(raw_port))
-        assert seen is not None
         assert_closed_by_manager(raw_connection)
+        seen = read_until_marker(sender, observer)
         forwarded = [
             m
             for m in seen
@@ -542,16 +568,19 @@ class TestHeaderValidation:
         sender, observer = watcher(client_factory, cd.MT_DATASET_START)
         size = cd.MDF_DATASET_START.type_size
 
-        raw_connection.sendall(raw_header(cd.MT_DATASET_START, size))
-        raw_connection.sendall(bytes(size))
+        # Two in a row: the second arriving shows the first didn't drop the
+        # raw client.
+        for _ in range(2):
+            raw_connection.sendall(raw_header(cd.MT_DATASET_START, size))
+            raw_connection.sendall(bytes(size))
 
-        seen = read_until(
-            observer,
-            lambda m: m.type_id == cd.MT_DATASET_START
-            and m.header.src_mod_id == RAW_SRC_MOD_ID,
-        )
-        assert seen is not None
-        assert not any(m.type_id == cd.MT_GOODBYE for m in seen)
+        for _ in range(2):
+            seen = read_until(
+                observer,
+                lambda m: m.type_id == cd.MT_DATASET_START
+                and m.header.src_mod_id == RAW_SRC_MOD_ID,
+            )
+            assert seen is not None
 
 
 class TestRemoval:
@@ -896,16 +925,13 @@ class TestStalls:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         sender, observer = watcher(client_factory)
-        raw_port = raw_connection.getsockname()[1]
         start = time.monotonic()
 
         raw_connection.sendall(HEADER_WITHOUT_PAYLOAD)
-        seen = read_until(observer, is_goodbye_for_port(raw_port))
+        assert_closed_by_manager(raw_connection)
         elapsed = time.monotonic() - start
 
-        assert seen is not None
         assert elapsed >= 0.3
-        assert_closed_by_manager(raw_connection)
         assert wait_for(
             lambda: any(
                 "Stalled" in r.getMessage() and "48 of 64 bytes" in r.getMessage()
@@ -1262,3 +1288,104 @@ class TestDropLogging:
             cd.MT_RTMA_LOG_WARNING,
             cd.MT_GOODBYE,
         ]
+
+
+class TestConnect:
+    def test_rejected_module_id_sends_no_goodbye(
+        self, client_factory: Callable[..., Client]
+    ) -> None:
+        observer = client_factory()
+        observer.subscribe([cd.MT_GOODBYE])
+        first = client_factory(module_id=50)
+
+        with pytest.raises(ConnectionLost):
+            client_factory(module_id=50)
+        marker = client_factory()
+        marker_id = marker.module_id
+        marker.disconnect()
+
+        seen = read_until(
+            observer,
+            lambda m: m.type_id == cd.MT_GOODBYE and m.data.mod_id == marker_id,
+        )
+        assert seen is not None
+        assert not any(m.type_id == cd.MT_GOODBYE and m.data.mod_id == 50 for m in seen)
+        assert first.connected
+
+    @pytest.mark.parametrize(
+        "requested",
+        [50, cd.DYN_MOD_ID_START + 1],
+        ids=["already in use", "out of range"],
+    )
+    def test_rejected_module_id_is_not_kept(
+        self, bare_manager: MessageManager, requested: int
+    ) -> None:
+        add_fake_module(bare_manager, 50)
+        newcomer = add_fake_module(bare_manager, 0, connected=False)
+        observer = add_fake_module(bare_manager, 102, subs=[cd.MT_GOODBYE])
+        data = cd.MDF_CONNECT_V2()
+        data.mod_id = requested
+
+        accepted = bare_manager.connect_module(
+            newcomer, Message(make_header(bare_manager, cd.MT_CONNECT_V2), data)
+        )
+
+        assert not accepted
+        assert newcomer.mod_id == 0
+        assert not is_routed(bare_manager, newcomer)
+        assert goodbye_ids(observer) == []
+
+    def test_only_connected_modules_get_a_goodbye(
+        self, bare_manager: MessageManager
+    ) -> None:
+        accepted_only = add_fake_module(bare_manager, 0, connected=False)
+        connected = add_fake_module(bare_manager, 101)
+        observer = add_fake_module(bare_manager, 102, subs=[cd.MT_GOODBYE])
+
+        bare_manager.remove_module(accepted_only)
+        bare_manager.remove_module(connected)
+
+        assert not is_routed(bare_manager, accepted_only)
+        assert fake_conn(accepted_only).close_count == 1
+        assert goodbye_ids(observer) == [101]
+
+
+class TestIntroductions:
+    def test_introductions_list_only_connected_modules(
+        self, bare_manager: MessageManager
+    ) -> None:
+        requester = add_fake_module(bare_manager, 101, subs=[cd.MT_HELLO])
+        add_fake_module(bare_manager, 102)
+        add_fake_module(bare_manager, 0, connected=False)
+
+        bare_manager.send_introductions(requester)
+
+        assert sorted(hello_ids(requester)) == [101, 102]
+
+    def test_failed_logger_send_during_introductions(
+        self, bare_manager: MessageManager
+    ) -> None:
+        requester = add_fake_module(bare_manager, 101, subs=[cd.MT_HELLO])
+        add_fake_module(bare_manager, 102)
+        logger = add_fake_module(
+            bare_manager, 103, subs=[ALL_MESSAGE_TYPES], is_logger=True, fail=True
+        )
+
+        bare_manager.send_introductions(requester)
+
+        assert is_routed(bare_manager, requester)
+        assert not is_routed(bare_manager, logger)
+        assert sorted(hello_ids(requester)) == [101, 102]
+
+    def test_failed_requester_send_during_introductions(
+        self, bare_manager: MessageManager
+    ) -> None:
+        requester = add_fake_module(bare_manager, 101, subs=[cd.MT_HELLO], fail=True)
+        other = add_fake_module(bare_manager, 102)
+        observer = add_fake_module(bare_manager, 103, subs=[cd.MT_GOODBYE])
+
+        bare_manager.send_introductions(requester)
+
+        assert not is_routed(bare_manager, requester)
+        assert is_routed(bare_manager, other)
+        assert goodbye_ids(observer) == [101]

@@ -416,6 +416,10 @@ class MessageManager(ClientLike):
     def connect_module(self, module: Module, msg: Message) -> bool:
         """Connect module
 
+        A module that asks for an ID that is out of range or already in use is
+        refused and its connection closed. It keeps no ID, and it gets no
+        GOODBYE, since it was never introduced with a HELLO.
+
         Args:
             module (Module): Connecting module
             msg (Message): Incoming connect message
@@ -428,11 +432,11 @@ class MessageManager(ClientLike):
             return False
 
         if isinstance(msg.data, cd.MDF_CONNECT_V2):
-            module.mod_id = msg.data.mod_id
+            requested = msg.data.mod_id
             module.pid = msg.data.pid
             module.name = msg.data.name
         elif isinstance(msg.data, cd.MDF_CONNECT):
-            module.mod_id = msg.header.src_mod_id
+            requested = msg.header.src_mod_id
         else:
             raise RuntimeError(
                 f"MessageManager::connect_module: Uknown Connect message definition"
@@ -441,27 +445,28 @@ class MessageManager(ClientLike):
         # fields common to v1 and v2
         module.is_logger = msg.data.logger_status == 1
 
-        if module.mod_id == 0:
-            module.mod_id = self.assign_module_id()
+        # The ID is checked before it is given to the module, so that a
+        # refused module never carries another module's ID.
+        if requested == 0:
+            requested = self.assign_module_id()
         else:
-            if module.mod_id < 1 or module.mod_id > cd.DYN_MOD_ID_START:
+            if requested < 1 or requested > cd.DYN_MOD_ID_START:
                 self.logger.error(
-                    f"Invalid Module id specified: {module.mod_id}. User assigned ids must be in range or 1 - {cd.DYN_MOD_ID_START}"
+                    f"Invalid Module id specified: {requested}. User assigned ids must be in range or 1 - {cd.DYN_MOD_ID_START}"
                 )
                 self.remove_module(module)
                 return False
 
-            for m in self.modules.values():
-                if m is module:
-                    continue
+            if any(
+                m.mod_id == requested for m in self.modules.values() if m is not module
+            ):
+                self.logger.error(
+                    f"SET_ID - {module.ipaddr} - ID({requested}) - ID already in use. Closing connection."
+                )
+                self.remove_module(module)
+                return False
 
-                if m.mod_id == module.mod_id:
-                    self.logger.error(
-                        f"SET_ID - {module.ipaddr} - ID({module.mod_id}) - ID already in use. Closing connection."
-                    )
-                    self.remove_module(module)
-                    return False
-
+        module.mod_id = requested
         module.connected = True
 
         if module.is_logger:
@@ -513,6 +518,9 @@ class MessageManager(ClientLike):
     def _finish_removals(self) -> None:
         """Close removed modules' sockets and send their GOODBYEs.
 
+        Only a module that connected gets a GOODBYE, so each GOODBYE matches an
+        earlier HELLO; a socket that never connected is just closed.
+
         Does nothing while a message is being forwarded, or while this is
         already running further up the stack. Sending a GOODBYE can remove
         more modules; they join the queue and are finished by the same loop,
@@ -524,8 +532,11 @@ class MessageManager(ClientLike):
         try:
             while self._closing:
                 module = self._closing.pop(0)
+                # Read before close(), which clears it.
+                introduced = module.connected
                 module.close()
-                self.send_goodbye(module)
+                if introduced:
+                    self.send_goodbye(module)
         finally:
             self._finishing_removals = False
 
@@ -1163,9 +1174,28 @@ class MessageManager(ClientLike):
         self.send_message(msg, dest_mod_id=dest_mod_id)
 
     def send_introductions(self, dest_module: Module):
+        """Send a module a HELLO for every connected module, itself included.
+
+        The manager's own entry and sockets that haven't connected are left
+        out. A send that fails drops its module without stopping the rest,
+        and the introductions stop if the requester itself is dropped.
+
+        Args:
+            dest_module (Module): The module that sent INTRODUCE.
+        """
         self.logger.info(f"INTRODUCE -> {dest_module.name}")
-        for module in self.modules.values():
-            self.send_hello(module, dest_mod_id=dest_module.mod_id)
+        # One forward for all the HELLOs, so that modules dropped meanwhile
+        # are closed, and get their GOODBYE, after the last one.
+        with self._routing():
+            # A snapshot: a failed send removes a module from self.modules.
+            for module in list(self.modules.values()):
+                if not self._is_routed(dest_module):
+                    break
+                if module is self.mm_module or not module.connected:
+                    continue
+                if not self._is_routed(module):
+                    continue
+                self.send_hello(module, dest_mod_id=dest_module.mod_id)
 
     def decode_core_message(
         self, src_module: Module, hdr: MessageHeader

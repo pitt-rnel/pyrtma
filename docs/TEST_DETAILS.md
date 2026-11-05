@@ -47,9 +47,9 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 
 | Test | Purpose | Approach |
 |---|---|---|
-| `test_invalid_data_size_drops_only_that_client` | C2: a header announcing a negative or oversized payload drops that client with an error naming the size and a `GOODBYE`, and the manager keeps routing for the others. | Parametrized over -1 and 1 MiB + 1; a raw header, then the `GOODBYE` for the raw socket's port, the closed socket, a fresh `TEST_START`, and the log record. |
-| `test_core_message_with_wrong_size_drops_client` | C2: a core message whose `num_data_bytes` doesn't match its core definition drops the client with an error naming the type, isn't forwarded, and leaves the manager routing. | Parametrized over `SUBSCRIBE` with 0 bytes, `CONNECT_V2` with 4, and `DATASET_START` with 31; the observer also subscribes to the type and must not see it from the raw socket before its `GOODBYE`. |
-| `test_core_message_with_right_size_is_forwarded` | C2: the core size check doesn't reject a correctly sized core message that the manager only forwards. | A raw `DATASET_START` of 32 bytes reaches the observer, with no `GOODBYE` before it. |
+| `test_invalid_data_size_drops_only_that_client` | C2: a header announcing a negative or oversized payload drops that client with an error naming the size, and the manager keeps routing for the others. | Parametrized over -1 and 1 MiB + 1; a raw header, then the manager closing the raw socket, a fresh `TEST_START`, and the log record. |
+| `test_core_message_with_wrong_size_drops_client` | C2: a core message whose `num_data_bytes` doesn't match its core definition drops the client with an error naming the type, isn't forwarded, and leaves the manager routing. | Parametrized over `SUBSCRIBE` with 0 bytes, `CONNECT_V2` with 4, and `DATASET_START` with 31; once the manager closes the raw socket, the observer, which also subscribes to the type, reads up to a marker `TEST_START` and must not have been sent the raw socket's message. |
+| `test_core_message_with_right_size_is_forwarded` | C2: the core size check doesn't reject a correctly sized core message that the manager only forwards. | Two raw `DATASET_START`s of 32 bytes both reach the observer, so the first didn't drop the raw client. |
 
 ### TestRemoval
 
@@ -96,7 +96,7 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_partial_message_does_not_block_other_clients` | C1: a client that stops partway through a message doesn't stop other clients from connecting and exchanging messages. | Parametrized over half a header, and a header without its payload, sent by a raw socket before the other clients connect. |
-| `test_stalled_client_is_dropped_after_stall_timeout` | C1: a client stalled mid-message is dropped, no sooner than the stall timeout, with a warning giving the bytes received, and the manager keeps routing. | A 0.3 s timeout; a raw header announcing 16 bytes that never come; times the `GOODBYE` for the raw socket's port. |
+| `test_stalled_client_is_dropped_after_stall_timeout` | C1: a client stalled mid-message is dropped, no sooner than the stall timeout, with a warning giving the bytes received, and the manager keeps routing. | A 0.3 s timeout; a raw header announcing 16 bytes that never come; times the manager closing the raw socket. |
 | `test_stall_sweep_drops_only_past_the_limit` | C1: the stall check drops a client only once the timeout has passed since its last bytes, and never drops one that isn't mid-message. | A 2 s timeout; runs the check with clock readings just under and just over it, with an idle module alongside. |
 | `test_no_stall_timeout_keeps_stalled_client` | C1: with no stall timeout, a stalled client is never dropped. | Runs the check with a clock reading far in the future. |
 
@@ -138,6 +138,22 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_dropped_client_is_not_sent_its_drop_warning` | C1: a client dropped for closing its connection or stalling isn't sent the warning about its own drop, and other modules get the warning before the `GOODBYE`. | Parametrized over both causes; the dropped fake and the observer subscribe to `RTMA_LOG_WARNING`. |
+
+### TestConnect
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_rejected_module_id_sends_no_goodbye` | Manager introductions: a client refused because its static module ID is in use gets no `GOODBYE`, so nothing suggests the module already holding that ID left, and that module stays connected. | A second client asking for ID 50; then a marker client connects and disconnects, and the observer must see no `GOODBYE` for 50 before the marker's. |
+| `test_rejected_module_id_is_not_kept` | Manager introductions: a refused module doesn't keep the ID it asked for, and is removed without a `GOODBYE`. | Parametrized over an ID already in use and one out of range; drives `connect_module` with a `CONNECT_V2`. |
+| `test_only_connected_modules_get_a_goodbye` | Manager introductions: removing a socket that never connected closes it without a `GOODBYE`, while a connected module still gets one. | Removes one of each. |
+
+### TestIntroductions
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_introductions_list_only_connected_modules` | Manager introductions: the reply to `INTRODUCE` has a HELLO for each connected module, the requester included, and none for the manager itself or for sockets that haven't connected. | A requester, another module and an accepted-only socket, besides the manager's own entry. |
+| `test_failed_logger_send_during_introductions` | Manager introductions: a logger whose send fails partway through the reply is dropped, and the reply still reaches the requester in full, instead of failing with "dictionary changed size during iteration". | A logger fake that resets on its first HELLO copy. |
+| `test_failed_requester_send_during_introductions` | Manager introductions: a requester whose send fails is dropped with a `GOODBYE`, and the introductions stop without an error. | A requester fake that resets. |
 
 ## test_client.py — the client's constructor and context manager (needs: none)
 
