@@ -6,6 +6,7 @@ Includes :py:class:`~Client` class and associated exception classes
 from shlex import split
 import socket
 import select
+import struct
 import time
 import os
 import ctypes
@@ -75,6 +76,21 @@ __all__ = [
 
 F = TypeVar("F", bound=Callable[..., Any])
 
+# The largest payload the client accepts. It matches the message manager's
+# receive buffer, so anything the manager forwards is accepted. A header that
+# announces more than this, or less than zero, means the stream is corrupt.
+_MAX_DATA_BYTES: int = 1024**2
+
+# Header fields read from the raw bytes rather than through the header's
+# attribute hooks, which cost several times as much.
+_INT32 = struct.Struct("i")
+_MSG_TYPE_OFFSET: int = MessageHeader._msg_type.offset  # type: ignore[attr-defined]
+_NUM_DATA_BYTES_OFFSET: int = MessageHeader._num_data_bytes.offset  # type: ignore[attr-defined]
+
+# A deadline that has always passed: a read given it takes only what has
+# already arrived.
+_NO_WAIT: float = float("-inf")
+
 
 def requires_connection(func: F) -> F:
     """Decorator wrapper for Client methods that require a connection"""
@@ -123,7 +139,18 @@ class Client(ClientLike):
         self._server = ("", -1)
         self._connected = False
         self._header_cls = get_header_cls()
-        self._recv_buffer = bytearray(1024**2)
+        self._header_size = ctypes.sizeof(self._header_cls)
+        # The message being received, straight into the objects it is
+        # returned in: the header into a new header object, then the payload
+        # into a new message object, or into a bytearray if the message can't
+        # be decoded. _rx_target is the one being filled, _rx_size its size,
+        # and _rx_have how much has arrived. A read can end mid-message; the
+        # next one carries on.
+        self._rx_header: Optional[MessageHeader] = None
+        self._rx_payload: Union[MessageData, bytearray, None] = None
+        self._rx_target: Union[MessageHeader, MessageData, bytearray, None] = None
+        self._rx_size = 0
+        self._rx_have = 0
         self._sub_all = False
         self._subscribed_types: Set[int] = set()
         self._paused_types: Set[int] = set()
@@ -266,6 +293,7 @@ class Client(ClientLike):
         # Close the previously used socket
         self._connected = False
         self._sock.close()
+        self._reset_receive()
 
         # Get the server ip info
         addr, port = server_name.split(":")
@@ -285,6 +313,11 @@ class Client(ClientLike):
             raise MessageManagerNotFound(
                 f"No message manager server responding at {self.ip_addr}:{self.port}"
             ) from e
+
+        # Reads and writes never block in the socket itself: waiting is done
+        # in select(), which can be given a timeout. See _recv_frame and
+        # _sendall.
+        self._sock.setblocking(False)
 
         # Disable Nagle Algorithm
         try:
@@ -382,10 +415,33 @@ class Client(ClientLike):
             if hasattr(self, "_sock"):
                 self._sock.close()
             self._connected = False
+            self._reset_receive()
             # reset subscribed and paused types
             self._subscribed_types = set()
             self._paused_types = set()
             self._sub_all = False
+
+    def _connection_lost(self) -> None:
+        """Mark the client disconnected after its connection failed.
+
+        This does what :py:func:`disconnect` does, except send ``DISCONNECT``:
+        the socket is closed, and the partly received message and the local
+        subscription state are cleared, as the manager has dropped them too.
+        """
+        self._connected = False
+        self._sock.close()
+        self._reset_receive()
+        self._subscribed_types = set()
+        self._paused_types = set()
+        self._sub_all = False
+
+    def _reset_receive(self) -> None:
+        """Forget any partly received message, as for a new connection."""
+        self._rx_header = None
+        self._rx_payload = None
+        self._rx_target = None
+        self._rx_size = 0
+        self._rx_have = 0
 
     @property
     def server(self) -> Tuple[str, int]:
@@ -656,7 +712,7 @@ class Client(ClientLike):
             header.remaining_bytes = 0
             header.reserved = 0
 
-            self._sendall(header)  # type: ignore
+            self._sendall(header, self._header_size)
 
             self._msg_count += 1
 
@@ -713,7 +769,8 @@ class Client(ClientLike):
                 header.src_mod_id = self._module_id
                 header.dest_host_id = dest_host_id
                 header.dest_mod_id = dest_mod_id
-                header.num_data_bytes = ctypes.sizeof(msg_data)
+                num_data_bytes = ctypes.sizeof(msg_data)
+                header.num_data_bytes = num_data_bytes
                 header.remaining_bytes = 0
                 header.reserved = 0
 
@@ -728,9 +785,9 @@ class Client(ClientLike):
                     else:
                         raise e
 
-            self._sendall(header)  # type: ignore
-            if header.num_data_bytes > 0:
-                self._sendall(msg_data)  # type: ignore
+            self._sendall(header, self._header_size)
+            if num_data_bytes > 0:
+                self._sendall(msg_data, num_data_bytes)
 
             self._msg_count += 1
 
@@ -769,9 +826,9 @@ class Client(ClientLike):
             )  # blocking
 
         if writefds:
-            self._sendall(msg_hdr)  # type: ignore
+            self._sendall(msg_hdr, ctypes.sizeof(msg_hdr))
             if msg_data is not None:
-                self._sendall(msg_data)  # type: ignore
+                self._sendall(msg_data, ctypes.sizeof(msg_data))
 
             self._msg_count += 1
 
@@ -779,12 +836,48 @@ class Client(ClientLike):
             # Socket was not ready to write data. Drop the packet.
             print("x", end="")
 
-    def _sendall(self, buffer: bytearray):
+    def _sendall(
+        self,
+        buffer: Union[ctypes.Structure, bytes, bytearray],
+        nbytes: Optional[int] = None,
+    ):
+        """Send a whole buffer, waiting for room in the socket as long as it takes.
+
+        The socket is non-blocking, so ``socket.sendall`` would stop with
+        ``BlockingIOError`` when the socket's buffer is full. Usually one
+        ``send`` takes everything. Otherwise this waits in ``select`` until
+        there is room and sends the rest, through a view, so nothing is
+        copied.
+
+        Args:
+            buffer: The bytes to send, such as a header or a message's data.
+            nbytes: The buffer's size in bytes, which callers know already.
+                Found from the buffer when not given.
+
+        Raises:
+            ConnectionLost: The connection failed. The client is disconnected.
+        """
+        if nbytes is None:
+            nbytes = memoryview(buffer).nbytes
         try:
-            self._sock.sendall(buffer)
-        except ConnectionError as e:
-            self._connected = False
-            raise ConnectionLost from e
+            try:
+                sent = self._sock.send(buffer)
+            except BlockingIOError:
+                sent = 0
+            if sent < nbytes:
+                rest = memoryview(buffer).cast("B")[sent:]
+                while rest:
+                    select.select([], [self._sock], [])
+                    try:
+                        sent = self._sock.send(rest)
+                    except BlockingIOError:
+                        continue
+                    rest = rest[sent:]
+        except OSError as e:
+            self._connection_lost()
+            raise ConnectionLost(
+                f"Lost the connection to the message manager: {e}"
+            ) from e
 
     @requires_connection
     def read_message(
@@ -792,120 +885,275 @@ class Client(ClientLike):
     ) -> Optional[Message]:
         """Read a message
 
+        Messages the client isn't subscribed to are discarded without being
+        decoded, so they can't raise. The timeout is a deadline for the whole
+        call, including any messages discarded on the way; a message that is
+        only partly received when it passes is kept, and completed by a later
+        call.
+
         Args:
-            timeout (optional): Timeout to wait for a message to be available for reading.
-                Defaults to -1 (blocking).
+            timeout (optional): Seconds to wait for a message. A negative value
+                or None blocks until one arrives. 0 doesn't wait: it reads at
+                most one message that has already arrived, and returns None if
+                there is none or the client isn't subscribed to it. Defaults to
+                -1 (blocking).
             ack (optional): Primarily for internal use. When True, will not discard ACK messages. Defaults to False.
             sync_check (optional): Validate message definition matches header version. Defaults to False.
 
         Raises:
-            ConnectionLost: Connection error to message manager server
+            ConnectionLost: The connection to the message manager failed or
+                was closed. The client is disconnected.
+            UnknownMessageType: A message the client is subscribed to has no
+                definition.
+            InvalidMessageDefinition: A message the client is subscribed to
+                doesn't match its definition.
 
         Returns:
             Message object. If no message is read before timeout, returns None.
         """
-        t0 = time.perf_counter()
-        M = self._read_message(timeout, ack, sync_check)
+        deadline = self._deadline(timeout)
+        while True:
+            frame = self._recv_frame(deadline)
+            if frame is None:
+                return None
 
-        if self._sub_all:
-            return M
-
-        # filter out unsubscribed messages that may still be in queue
-        while M and (M.header.msg_type not in self.subscribed_types):
+            msg_type, header, payload = frame
             if (
-                ack and M.header.msg_type == cd.MT_ACKNOWLEDGE
-            ):  # ack input allows ACK to be read and not discarded
-                break
-            if timeout is None:  # blocking
-                t_rem = None  # continue blocking until subscribed message recv'd
-            elif timeout == 0:  # no timeout
-                M = None  # discard unsub'd msg and break
-                break
-            else:  # subtract time elapsed from timeout and read again
-                t_rem = max(timeout - (time.perf_counter() - t0), 0)
-            M = self._read_message(timeout, ack, sync_check)
+                self._sub_all
+                or msg_type in self._subscribed_types
+                or (ack and msg_type == cd.MT_ACKNOWLEDGE)
+            ):
+                return self._decode(header, payload, sync_check)
 
-        return M
+            # Not subscribed: a message queued before an unsubscribe, or an
+            # ACK. A poll reads at most one message; otherwise keep reading
+            # until the deadline.
+            if timeout == 0:
+                return None
 
     @requires_connection
     def _read_message(
         self, timeout: Union[int, float, None] = -1, ack=False, sync_check=False
     ) -> Optional[Message]:
-        """Read message without filtering for subscribed messages (helper called by read_message)"""
+        """Read one message without filtering for subscribed messages
 
-        if timeout is None:
-            # Skip select call
-            pass
-        elif timeout >= 0:
-            # Wait timeout amount
-            readfds, writefds, exceptfds = select.select([self._sock], [], [], timeout)
-            if len(readfds) == 0:
-                return None
-        else:
-            # Blocking
-            readfds, writefds, exceptfds = select.select([self._sock], [], [])
-            if len(readfds) == 0:
-                return None
+        Args:
+            timeout (optional): As for :py:func:`read_message`.
+            ack (optional): Ignored; every message is returned.
+            sync_check (optional): As for :py:func:`read_message`.
 
-        # Read RTMA Header Section
-        header = self._header_cls()
-        try:
-            nbytes = self._sock.recv_into(header, header.size, socket.MSG_WAITALL)
-            """
-            Note:
-            MSG_WAITALL Flag:
-            The receive request will complete only when one of the following events occurs:
-            The buffer supplied by the caller is completely full.
-            The connection has been closed.
-            The request has been canceled or an error occurred.
-            """
+        Raises:
+            ConnectionLost: As for :py:func:`read_message`.
+            UnknownMessageType: The message has no definition.
+            InvalidMessageDefinition: The message doesn't match its definition.
 
-            if nbytes != header.size:
-                self._connected = False
-                raise ConnectionLost
+        Returns:
+            The message, or None if none was complete before the timeout.
+        """
+        frame = self._recv_frame(self._deadline(timeout))
+        if frame is None:
+            return None
+        _, header, payload = frame
+        return self._decode(header, payload, sync_check)
 
+    @staticmethod
+    def _deadline(timeout: Union[int, float, None]) -> Optional[float]:
+        """Turn a read timeout into a deadline on the ``perf_counter`` clock.
+
+        Args:
+            timeout: Seconds to wait; None or a negative value blocks.
+
+        Returns:
+            The deadline, or None to block.
+        """
+        if timeout is None or timeout < 0:
+            return None
+        return time.perf_counter() + timeout
+
+    def _recv_frame(
+        self, deadline: Optional[float]
+    ) -> Optional[Tuple[int, MessageHeader, Union[MessageData, bytearray]]]:
+        """Receive the rest of the current message, until it's complete or the deadline passes.
+
+        The socket is non-blocking, so each ``recv`` returns at once with what
+        has arrived, asking for no more than the rest of the current header
+        or payload. Only when nothing has arrived does it wait, in ``select``,
+        for the time left, so the deadline holds even when only part of a
+        message has arrived. A message that has arrived in full costs two
+        ``recv`` calls and no ``select``. Nothing past the current message is
+        read, so a ``select`` on :py:attr:`sock` still shows whether a message
+        is waiting.
+
+        Bytes go straight into the objects returned, with no copies: the
+        header into a header object, and the payload into an object of its
+        message class, or into a bytearray when the type is unknown or its
+        size doesn't match the definition.
+
+        Args:
+            deadline: A ``perf_counter`` time, or None to wait as long as it
+                takes. A deadline that has passed reads only what has already
+                arrived.
+
+        Raises:
+            ConnectionLost: The connection failed, was closed, or delivered a
+                header with an impossible payload size. The client is
+                disconnected.
+
+        Returns:
+            The completed message's type, header and payload, or None if the
+            deadline passed first. An incomplete message is kept for the next
+            call.
+        """
+        while True:
+            target = self._rx_target
+            if target is None:
+                # A new message: start with its header.
+                target = self._rx_header = self._rx_target = self._header_cls()
+                self._rx_size = self._header_size
+            have = self._rx_have
+            size = self._rx_size
+            try:
+                try:
+                    if have:
+                        nbytes = self._sock.recv_into(
+                            memoryview(target).cast("B")[have:], size - have
+                        )
+                    else:
+                        nbytes = self._sock.recv_into(target, size)
+                except BlockingIOError:
+                    # Nothing more has arrived: wait for it, or the deadline.
+                    wait = None
+                    if deadline is not None:
+                        wait = max(deadline - time.perf_counter(), 0)
+                    readable, _, _ = select.select([self._sock], [], [], wait)
+                    if not readable:
+                        return None
+                    continue
+            except OSError as e:
+                self._connection_lost()
+                raise ConnectionLost(
+                    f"Lost the connection to the message manager: {e}"
+                ) from e
+
+            if nbytes == 0:
+                where = " mid-message" if have or target is not self._rx_header else ""
+                self._connection_lost()
+                raise ConnectionLost(
+                    f"The message manager closed the connection{where}"
+                )
+
+            have += nbytes
+            if have < size:
+                # Only part has arrived; go round to read or wait for the rest.
+                self._rx_have = have
+                continue
+
+            header = self._rx_header
+            assert header is not None
+            (msg_type,) = _INT32.unpack_from(header, _MSG_TYPE_OFFSET)
+            if target is header:
+                (data_size,) = _INT32.unpack_from(header, _NUM_DATA_BYTES_OFFSET)
+                if data_size < 0 or data_size > _MAX_DATA_BYTES:
+                    self._connection_lost()
+                    raise ConnectionLost(
+                        f"Received a header with num_data_bytes={data_size}, outside 0 to "
+                        f"{_MAX_DATA_BYTES}; the connection can't be read further"
+                    )
+                self._rx_payload = self._payload_for(msg_type, data_size)
+                if data_size:
+                    # Go round again: the payload has usually arrived too.
+                    self._rx_target = self._rx_payload
+                    self._rx_size = data_size
+                    self._rx_have = 0
+                    continue
+
+            payload = self._rx_payload
+            assert payload is not None
             header.recv_time = time.perf_counter()
-        except ConnectionError:
-            raise ConnectionLost
+            self._reset_receive()
+            return msg_type, header, payload
 
-        # Read Data Section
+    def _payload_for(
+        self, msg_type: int, data_size: int
+    ) -> Union[MessageData, bytearray]:
+        """Make the object a message's payload is received into.
 
+        Args:
+            msg_type: The message's type.
+            data_size: The payload size its header announces.
+
+        Returns:
+            A new object of the type's message class, or a bytearray if the
+            type has no definition or its size doesn't match the definition's.
+            :py:func:`_decode` reports either error once the message is in.
+        """
         try:
-            data = self._definitions.get_msg_cls(header.msg_type)()
-        except UnknownMessageType as e:
-            mt = header.msg_type
-            raw = self._sock.recv(header.num_data_bytes, socket.MSG_WAITALL)
-            raise UnknownMessageType(
-                f"No message definition found for MT={mt}", header, raw
-            )
+            msg_cls = self._definitions.get_msg_cls(msg_type)
+        except UnknownMessageType:
+            return bytearray(data_size)
 
-        type_size = data.type_size
+        type_size = msg_cls.type_size
         if type_size == -1:  # not defined for v1 message defs
-            type_size = data.size
+            type_size = ctypes.sizeof(msg_cls)
+        if type_size != data_size:
+            return bytearray(data_size)
+        return msg_cls()
 
-        if type_size != header.num_data_bytes:
-            _ = self._sock.recv(header.num_data_bytes, socket.MSG_WAITALL)
-            raise InvalidMessageDefinition(
-                f"Received message header indicating a message data size ({header.num_data_bytes}) that does not match the expected size ({type_size}) of message type {data.type_name}. Message definitions may be out of sync across systems."
-            )
+    def _decode(
+        self,
+        header: MessageHeader,
+        payload: Union[MessageData, bytearray],
+        sync_check: bool,
+    ) -> Message:
+        """Check a received message against the client's definitions.
+
+        The message has already been read in full, so the next read starts at
+        the next message whether or not this one is valid.
+
+        Args:
+            header: The message's header.
+            payload: Its payload: an object of its message class, or a
+                bytearray if :py:func:`_payload_for` couldn't make one.
+            sync_check: Also check the header's version against the
+                definition's hash.
+
+        Raises:
+            UnknownMessageType: The type has no definition.
+            InvalidMessageDefinition: The size, or with ``sync_check`` the
+                version, doesn't match the definition.
+
+        Returns:
+            The message.
+        """
+        data: MessageData
+        if isinstance(payload, bytearray):
+            # Find out why there was no message object.
+            try:
+                msg_cls = self._definitions.get_msg_cls(header.msg_type)
+            except UnknownMessageType as e:
+                raise UnknownMessageType(
+                    f"No message definition found for MT={header.msg_type}",
+                    header,
+                    bytes(payload),
+                ) from e
+
+            type_size = msg_cls.type_size
+            if type_size == -1:  # not defined for v1 message defs
+                type_size = ctypes.sizeof(msg_cls)
+            if type_size != header.num_data_bytes:
+                raise InvalidMessageDefinition(
+                    f"Received message header indicating a message data size ({header.num_data_bytes}) that does not match the expected size ({type_size}) of message type {msg_cls.type_name}. Message definitions may be out of sync across systems."
+                )
+            data = msg_cls.from_buffer_copy(payload)
+        else:
+            data = payload
 
         # Note: Ignore the sync check if header.version is not filled in
         # This can removed once all clients support this field.
         if sync_check and header.version != 0 and header.version != data.type_hash:
-            _ = self._sock.recv(header.num_data_bytes, socket.MSG_WAITALL)
             raise InvalidMessageDefinition(
                 f"Received message header indicating a message version that does not match the expected version of message type {data.type_name}. Message definitions may be out of sync across systems."
             )
-
-        if header.num_data_bytes:
-            try:
-                nbytes = self._sock.recv_into(data, type_size, socket.MSG_WAITALL)
-
-                if nbytes != type_size:
-                    self._connected = False
-                    raise ConnectionLost
-            except ConnectionError:
-                raise ConnectionLost
 
         return Message(header, data)
 
@@ -951,33 +1199,33 @@ class Client(ClientLike):
                 "Failed to receive Acknowlegement from MessageManager"
             )
 
+    @requires_connection
     def discard_messages(self, timeout: float = 1) -> bool:
-        """Read and discard messages in socket buffer up to timeout
+        """Read and discard the messages that have already arrived
+
+        Messages are discarded without being decoded, so neither subscriptions
+        nor unknown types stop it early. Messages still on their way from the
+        manager aren't waited for.
 
         Args:
-            timeout (optional): Maximum time in seconds to loop through message buffer.
+            timeout (optional): Maximum time in seconds to spend discarding.
                 Defaults to 1.
 
+        Raises:
+            ConnectionLost: The connection to the message manager failed or
+                was closed. The client is disconnected.
+
         Returns:
-            True if all messages have been read, False if messages remain in buffer
+            True if no complete message is left waiting, False if the timeout
+            ended the loop first. Part of a message counts as nothing waiting.
         """
-
-        """Read and discard messages in socket buffer up to timeout.
-        Returns: True if all messages available have been read.
-        """
-        start_time = time.perf_counter()
-
-        def read_and_time():
-            msg = self.read_message(0)
-            time_now = time.perf_counter()
-            time_waited = time_now - start_time
-            time_remaining = timeout - time_waited
-            return msg, time_remaining
-
-        msg, time_remaining = read_and_time()
-        while msg is not None and time_remaining > 0:
-            msg, time_remaining = read_and_time()
-        return not msg
+        deadline = time.perf_counter() + timeout
+        while True:
+            if self._recv_frame(_NO_WAIT) is None:
+                return True
+            if time.perf_counter() >= deadline:
+                readable, _, _ = select.select([self._sock], [], [], 0)
+                return not readable
 
     def reset_subscriptions(self, subscribe_list: Optional[Iterable[int]] = None):
         """Unsubscribe from all messages and empty the message buffer.

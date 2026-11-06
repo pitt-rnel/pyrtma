@@ -18,6 +18,7 @@ from .helpers import (
     DEFAULT_TIMEOUT,
     LOOPBACK,
     ManagerHarness,
+    ScriptedManager,
     ThreadExceptionCollector,
     free_port as find_free_port,
     manager_options,
@@ -123,3 +124,17 @@ def raw_connection(manager: ManagerHarness) -> Iterator[socket.socket]:
         yield sock
     finally:
         sock.close()
+
+
+@pytest.fixture
+def scripted_manager() -> Iterator[ScriptedManager]:
+    """A stand-in manager that the test scripts; see ``helpers.ScriptedManager``.
+
+    Yields:
+        The stand-in, listening, with no client connected yet.
+    """
+    stand_in = ScriptedManager()
+    try:
+        yield stand_in
+    finally:
+        stand_in.stop()

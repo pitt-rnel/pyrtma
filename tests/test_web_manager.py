@@ -170,6 +170,31 @@ class TestProxyRead:
                 peer.close()
                 proxy.disconnect()
 
+    def test_partial_message_does_not_block(self) -> None:
+        # The proxy's socket is readable once part of a message arrives; the
+        # read must return without waiting for the rest.
+        with socket.create_server((LOOPBACK, 0)) as listener:
+            proxy = Client(name="proxy", definitions=td.get_message_definitions())
+            proxy.logger.enable_console = False
+            proxy._socket_connect(f"{LOOPBACK}:{listener.getsockname()[1]}")
+            peer, _ = listener.accept()
+            try:
+                wire = raw_message(td.MT_TEST_START, td.MDF_TEST_START())
+                peer.sendall(wire[: len(wire) // 2])
+                handler = StubHandler(proxy)
+                reader = threading.Thread(
+                    target=handler.read_proxy_message, daemon=True
+                )
+
+                reader.start()
+                reader.join(DEFAULT_TIMEOUT)
+
+                assert not reader.is_alive()
+                assert handler.sent == []
+            finally:
+                peer.close()
+                proxy.disconnect()
+
 
 def connect_message(*, src_mod_id: int = 0, logger_status: int = 0) -> Message:
     """Build a CONNECT as a web client sends it, after JSON decoding.

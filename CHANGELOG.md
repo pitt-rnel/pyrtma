@@ -22,6 +22,13 @@ that makes them. The version number is chosen at release time.
 
 ### Changed
 
+- `Client.read_message` discards messages the client isn't subscribed to without decoding them, so a queued message of an unknown type, or one that doesn't match its definition, no longer raises unless the client is subscribed to it.
+- The client's socket is non-blocking once connected; waiting is done in `select()`. Code that reads or writes `Client.sock` directly sees a non-blocking socket. A `select()` on it still shows whether a message is waiting, because the client never reads past the message it is receiving.
+- A lost connection closes `Client.sock`, as `disconnect()` does, and clears the client's subscriptions; code that calls `select()` on the socket should check `Client.connected` first. A send that fails with any `OSError` raises `ConnectionLost`, not only a `ConnectionError`.
+- The client treats a header announcing a negative payload, or one over 1 MiB, the manager's limit, as a lost connection: it raises `ConnectionLost` naming the size and disconnects, since the stream can't be read further.
+- `Client.discard_messages()` returns False only if its timeout ended with a complete message still waiting.
+- A received message's `recv_time` is when the whole message had arrived, rather than when its header had.
+- A `Client` no longer allocates an unused 1 MiB receive buffer.
 - `from_random()` fills int64 and uint64 fields across their whole range on every platform; on Linux they previously stayed within 32 bits. Float and double fields now get finite values with random sign and magnitude, rather than values in [0, 1).
 - The message manager forwards each message with the sender's `msg_count` unchanged. Recipients previously saw a per-recipient counter in its place. Messages that originate from the manager, such as ACKs, `HELLO`, `GOODBYE` and `FAILED_MESSAGE`, carry a `msg_count` of 0. `Module.msg_count` still counts the messages sent to each module, but is no longer written into headers.
 - The message manager drops a client that sends a core message (type below 100) whose `num_data_bytes` doesn't match its core definition, and logs an error naming the type and both sizes. The message isn't processed or forwarded. Previously the manager acted on whatever bytes were in its buffer.
@@ -49,6 +56,10 @@ that makes them. The version number is chosen at release time.
 
 ### Fixed
 
+- `Client.read_message(timeout)` honors its timeout as one deadline for the whole call. Each message the client wasn't subscribed to, such as the ACK the manager sends for every subscription change, used to restart the full timeout, so a steady stream of them could block the read indefinitely.
+- `Client.read_message` no longer blocks past its timeout when only part of a message has arrived; a timeout of 0 never waits. The bytes received so far are kept, and a later read completes the message. The web manager's proxy no longer holds up websocket input on a partial message either.
+- `Client.discard_messages()` and `Client.reset_subscriptions()` empty the queue of messages that have arrived. They stopped after the first message the client wasn't subscribed to, so after `reset_subscriptions()` everything but one message stayed queued.
+- `ConnectionLost` always leaves the client disconnected. A reset connection used to leave `Client.connected` true.
 - One client could freeze the whole message manager (C1): a client that stopped partway through a message, such as one paused between sending its header and its payload, left the manager blocked reading from it, and every other client's connect timed out. The manager now serves the other clients meanwhile, and drops the stalled client after the stall timeout.
 - A slow consumer whose connection had some room, but not enough for a whole message, could block the manager in a send until the consumer read again.
 - `INTRODUCE` no longer fails with "dictionary changed size during iteration" when a send fails partway through the reply, which dropped the requesting module and cut the reply short. The module whose send failed is dropped and the rest of the reply goes out.

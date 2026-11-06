@@ -29,6 +29,7 @@ The layout:
 | `test_raw_connection_reaches_manager` | Test infrastructure: `raw_connection` is a plain socket connected to the `manager` fixture's port. | Compares the socket's peer port with the manager's port. |
 | `test_collector_catches_thread_exception` | Test infrastructure: an exception escaping a thread is collected with its thread name, type, and traceback. | A thread that raises `RuntimeError`; the test takes the exception from the `thread_exceptions` fixture so teardown doesn't fail. |
 | `test_manager_harness_reports_dead_thread` | Test infrastructure: a manager thread that dies is reported when the harness stops. | Sets an invalid `select()` timeout on a running manager, waits for the thread to die, and expects `HarnessError` naming `TypeError`. |
+| `test_scripted_manager_connects_and_sends` | Test infrastructure: `ScriptedManager` connects a client with a dynamic ID, delivers what the test sends, and reads back what the client sent. | Connects a client, sends it a `TEST_START`, and reads the client's `SUBSCRIBE` back from the stand-in. |
 
 ## test_manager.py — the message manager (needs: integration)
 
@@ -214,12 +215,41 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | `test_late_connect_v2_keeps_id_and_logger_status` | Manager connect messages: a late `CONNECT_V2` asking for another module ID or logger status keeps the existing ones and logs a warning about each; the name is still taken. | A `CONNECT_V2` asking for ID 77 as a logger, with the manager logging at `WARNING` and `caplog` capturing. |
 | `test_late_connect_v2_is_announced` | Manager connect messages: over a real connection, a `CONNECT` and then a `CONNECT_V2` give one ACK, then a `HELLO` with the name and process ID from the `CONNECT_V2`. | A raw socket, whose `CONNECT` asks for ID 123 through its header; an observer whose subscriptions are confirmed with `deliver()` first. |
 
-## test_client.py — the client's constructor and context manager (needs: none)
+## test_client.py — the client: signatures, receiving, sending and lost connections (needs: integration for `TestReceive` and `TestSend`)
+
+Most receive tests use `scripted_client`, a client connected to the `scripted_manager` fixture: a stand-in manager (`helpers.ScriptedManager`) that ACKs the client's connect and then sends only the bytes the test gives it, built with `helpers.frame()`. It never ACKs subscriptions, so nothing reaches the client unless the test sends it. Tests wait for sent bytes to arrive with `wait_until_arrived()`, which peeks at the client's socket. A read that could block on a partial message runs under `watchdog()`, which resets the stand-in's connection after 3 s, so that the old code fails with `ConnectionLost` instead of hanging. Timing checks allow `SLACK`, 1 s, beyond the timeout. Type 7777 stands for a type the test definitions don't define.
 
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_options_after_host_id_are_keyword_only` | Timecode removal: `Client` and `client_context` arguments after `host_id` are keyword-only, so an old positional call that passed `timecode` fails instead of shifting the arguments after it. | Parametrized over both; a third positional argument for `Client`, a fifth for `client_context`. |
 | `test_timecode_argument_is_rejected` | Timecode removal: `Client` and `client_context` no longer accept `timecode`. | Parametrized over both; passes `timecode=True` and expects a `TypeError` naming it. |
+
+### TestReceive
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_unsubscribed_stream_does_not_extend_timeout` | H2: messages the client isn't subscribed to use up the timeout rather than restarting it, so `read_message(0.3)` returns within it. | A thread has the stand-in send an ACK every 50 ms for 3 s; the client is subscribed to `TEST_START` only. |
+| `test_partial_message_does_not_block_past_timeout` | C1 (client side): with part of a message received, `read_message` returns None within its timeout, including a timeout of 0. | Parametrized over a split in the header and in the payload, and timeouts 0 and 0.2 s; the rest is never sent. |
+| `test_partial_message_completes_on_a_later_read` | C1 (client side): the bytes of a partial message are kept, and a later read returns the whole message. | Sends part of a `TEST_START`, reads with timeout 0, sends the rest, and reads again; parametrized over the same splits. |
+| `test_blocking_read_waits_for_a_message` | C1 (client side): a timeout of None or -1 blocks until a message arrives. Already right before the fix. | A timer has the stand-in send a `TEST_START` after 0.2 s. |
+| `test_poll_reads_at_most_one_message` | H2: a timeout of 0 reads at most one message and doesn't wait, as decided in the phase discussion: an ACK in front of a subscribed message gives None, and the next poll returns the message. Already right before the fix. | An ACK and a `TEST_START`, both arrived before the first read. |
+| `test_unsubscribed_message_of_unknown_type_is_skipped` | Client receive: a message of an unknown type that the client isn't subscribed to is discarded without raising. | An unknown-type message, then a `TEST_START` the client is subscribed to. |
+| `test_subscribed_message_of_unknown_type_raises` | Client receive: a subscribed message of an unknown type still raises `UnknownMessageType` with its raw payload, and the next message reads correctly. Already right before the fix. | Subscribes to the unknown type and `TEST_START`, and sends one of each. |
+| `test_subscribed_message_of_wrong_size_raises` | Client receive: a subscribed message whose size doesn't match its definition still raises `InvalidMessageDefinition`, and the next message reads correctly. Already right before the fix. | A `TEST_START` with an 8-byte payload instead of 4, then a correct one. |
+| `test_discard_messages_empties_the_queue` | H1: `discard_messages()` discards every message that has arrived, subscribed or not, of any type, and returns True. | Ten rounds of an ACK, a `TEST_START` and an unknown-type message; afterwards the socket must have nothing to read. |
+| `test_discard_messages_reports_messages_left_at_its_timeout` | H1: `discard_messages()` returns False when its timeout ends with messages still waiting, and True once they're gone. | 200 ACKs; `discard_messages(timeout=0)`, then `discard_messages()`. |
+| `test_reset_subscriptions_leaves_nothing_queued` | H1: `reset_subscriptions()` unsubscribes from everything and leaves nothing queued. | 25 rounds of an ACK and a `TEST_START`; the stand-in doesn't ACK the unsubscribes, so anything left was queued before the reset. |
+| `test_lost_connection_marks_client_disconnected` | Client: a lost connection raises `ConnectionLost`, and leaves the client disconnected, its socket closed and its subscriptions cleared. | Parametrized: the stand-in closes cleanly, resets the connection, or closes partway through a message. |
+| `test_send_after_reset_marks_client_disconnected` | Client: a send on a reset connection raises `ConnectionLost` and leaves the client disconnected with its socket closed. | Waits for the reset to reach the client's socket, then sends a `TEST_START`. |
+| `test_corrupt_header_drops_the_connection` | Client receive: a header announcing a negative payload or one over 1 MiB raises `ConnectionLost` naming the size, and leaves the client disconnected. | Parametrized over -1 and 1 MiB + 1, with no payload sent. |
+| `test_payload_limit_matches_the_manager` | Client receive: the client's 1 MiB payload limit is the manager's, so the client accepts any message the manager forwards. | Compares the tests' `MAX_DATA_BYTES` with the size of a running manager's receive buffer. |
+| `test_reconnect_discards_partial_message` | C1 (client side): a reconnect forgets a partly received message, so it can't corrupt the first messages on the new connection, including the connect's ACK. | Part of a header from one stand-in, then a connect to a second stand-in that sends a `TEST_START`. |
+
+### TestSend
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_send_waits_for_room_in_the_socket` | Client receive: with the socket non-blocking, a send that finds the socket's buffer full waits and carries on, and every byte arrives in order. | A stand-in with a 4 KiB receive buffer and a client with a 4 KiB send buffer; a thread sends 4,000 `TEST_MSG_8192` messages, about 33 MB, while the stand-in reads them all, then each header and the payload's first byte are checked. Fails with a plain `sendall`. |
 
 ## test_client_logging.py — `RTMALogger`, `RTMALogHandler` and `RichLogFormatter` (needs: integration for `TestRtmaSending`)
 
@@ -302,6 +332,7 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_unsubscribed_message_does_not_block` | Web manager: reading a message the proxy isn't subscribed to returns without waiting for another. | The real manager follows such a message with an ACK, so a listening socket stands in for it: the proxy connects to it, the peer sends one `TEST_START` and nothing more, and `read_proxy_message()` runs in a thread that must finish within 5 s. |
+| `test_partial_message_does_not_block` | C1 (client side): with half a message received, `read_proxy_message()` returns without waiting for the rest, so websocket input isn't held up. | The same listening socket; the peer sends half a `TEST_START` and nothing more, and `read_proxy_message()` must finish within 5 s. |
 
 ### TestConnect
 

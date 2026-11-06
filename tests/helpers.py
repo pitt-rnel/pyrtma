@@ -8,14 +8,19 @@ from ``conftest.py`` directly is fragile.
 from __future__ import annotations
 
 import logging
+import select
 import socket
+import struct
+import sys
 import threading
 import time
 import traceback
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
+from pyrtma import core_defs as cd
 from pyrtma.client import Client
+from pyrtma.header import MessageHeader
 from pyrtma.manager import MessageManager
 from pyrtma.message import Message
 from pyrtma.message_data import MessageData
@@ -348,3 +353,210 @@ class ManagerHarness:
             raise HarnessError(
                 f"The message manager thread raised {self._error!r}."
             ) from self._error
+
+
+HEADER_SIZE: int = MessageHeader().size
+
+
+def frame(
+    msg_type: int,
+    payload: bytes = b"",
+    *,
+    dest_mod_id: int = 0,
+    num_data_bytes: int | None = None,
+) -> bytes:
+    """Build a message as the manager sends it: the header, then the payload.
+
+    Args:
+        msg_type: The header's message type.
+        payload: The bytes that follow the header.
+        dest_mod_id: The header's destination module.
+        num_data_bytes: The payload size announced in the header. Defaults to
+            the length of ``payload``; pass another value for a corrupt header.
+
+    Returns:
+        The message's bytes.
+    """
+    header = MessageHeader()
+    header.msg_type = msg_type
+    header.src_mod_id = cd.MID_MESSAGE_MANAGER
+    header.dest_mod_id = dest_mod_id
+    header.num_data_bytes = len(payload) if num_data_bytes is None else num_data_bytes
+    return bytes(header) + payload
+
+
+def recv_exactly(sock: socket.socket, nbytes: int) -> bytes:
+    """Read exactly ``nbytes`` from a socket.
+
+    Args:
+        sock: A socket with a timeout, so that missing bytes fail the read
+            rather than hang it.
+        nbytes: How many bytes to read.
+
+    Returns:
+        The bytes.
+
+    Raises:
+        HarnessError: The peer closed the connection before sending them all.
+    """
+    data = bytearray()
+    while len(data) < nbytes:
+        chunk = sock.recv(nbytes - len(data))
+        if not chunk:
+            raise HarnessError(
+                f"Connection closed after {len(data)} of {nbytes} bytes."
+            )
+        data += chunk
+    return bytes(data)
+
+
+def bytes_waiting(sock: socket.socket, nbytes: int) -> bool:
+    """Whether at least ``nbytes`` have arrived on a socket, unread.
+
+    Nothing is taken from the socket.
+
+    Args:
+        sock: The socket to look at.
+        nbytes: How many bytes to look for.
+
+    Returns:
+        True if that many bytes could be read now without waiting.
+    """
+    readable, _, _ = select.select([sock], [], [], 0)
+    if not readable:
+        return False
+    return len(sock.recv(nbytes, socket.MSG_PEEK)) >= nbytes
+
+
+class ScriptedManager:
+    """A stand-in for the message manager that a test scripts byte by byte.
+
+    It listens on loopback and answers one client's connect message with an
+    ACK. After that it sends only what the test passes to :meth:`send`, and
+    reads nothing more from the client; the few messages a test's client
+    sends fit in the socket's buffer. It is for what the real manager can't
+    produce on demand: part of a message, a steady stream of messages the
+    client didn't subscribe to, a corrupt header, or a reset connection.
+
+    Attributes:
+        address: The ``host:port`` string to connect a client to.
+    """
+
+    def __init__(
+        self,
+        *,
+        module_id: int = cd.DYN_MOD_ID_START,
+        receive_buffer: int | None = None,
+    ) -> None:
+        """Bind an unused loopback port.
+
+        Args:
+            module_id: The ID the ACK assigns to a client that asks for a
+                dynamic one.
+            receive_buffer: A size for the connection's receive buffer, so
+                that a test can fill it; None keeps the system's default.
+        """
+        self._module_id = module_id
+        self._listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if receive_buffer is not None:
+            # Set before listening, so the accepted connection inherits it.
+            self._listener.setsockopt(
+                socket.SOL_SOCKET, socket.SO_RCVBUF, receive_buffer
+            )
+        self._listener.bind((LOOPBACK, 0))
+        self._listener.listen(1)
+        self.address = f"{LOOPBACK}:{self._listener.getsockname()[1]}"
+        self._conn: socket.socket | None = None
+        self._lock = threading.Lock()
+
+    def connect(self, client: Client, timeout: float = DEFAULT_TIMEOUT) -> None:
+        """Connect a client to this stand-in, answering its connect with an ACK.
+
+        Args:
+            client: The client to connect.
+            timeout: Seconds to wait for each step.
+
+        Raises:
+            HarnessError: The client didn't connect.
+        """
+        accepted: list[socket.socket] = []
+
+        def serve() -> None:
+            self._listener.settimeout(timeout)
+            conn, _ = self._listener.accept()
+            conn.settimeout(timeout)
+            header = MessageHeader.from_buffer_copy(recv_exactly(conn, HEADER_SIZE))
+            recv_exactly(conn, header.num_data_bytes)
+            assigned = header.src_mod_id or self._module_id
+            conn.sendall(frame(cd.MT_ACKNOWLEDGE, dest_mod_id=assigned))
+            accepted.append(conn)
+
+        server = threading.Thread(target=serve, name="scripted-manager", daemon=True)
+        server.start()
+        client.connect(self.address)
+        server.join(timeout)
+        if not accepted:
+            raise HarnessError("The client didn't connect to the scripted manager.")
+        self._conn = accepted[0]
+
+    def _connection(self) -> socket.socket:
+        """Return the connection to the client.
+
+        Returns:
+            The connected socket.
+
+        Raises:
+            HarnessError: No client has connected.
+        """
+        if self._conn is None:
+            raise HarnessError("No client has connected to the scripted manager.")
+        return self._conn
+
+    def send(self, data: bytes) -> None:
+        """Send bytes to the client. Safe to call from a timer thread.
+
+        Args:
+            data: Messages from :func:`frame`, or part of one.
+        """
+        with self._lock:
+            self._connection().sendall(data)
+
+    def receive(self, nbytes: int) -> bytes:
+        """Read what the client sent after connecting.
+
+        Args:
+            nbytes: How many bytes to read.
+
+        Returns:
+            The bytes.
+
+        Raises:
+            HarnessError: The client closed the connection first.
+        """
+        return recv_exactly(self._connection(), nbytes)
+
+    def close(self) -> None:
+        """End the connection cleanly, as a manager that exits does.
+
+        Only the sending side is shut down, so the client reads end-of-file.
+        Closing the socket would send a reset instead, because the client's
+        messages are left unread.
+        """
+        with self._lock:
+            self._connection().shutdown(socket.SHUT_WR)
+
+    def reset(self) -> None:
+        """Reset the connection, as a manager that crashes can."""
+        with self._lock:
+            conn = self._connection()
+            # With a linger time of zero, close() sends RST instead of FIN.
+            linger = struct.pack("HH" if sys.platform == "win32" else "ii", 1, 0)
+            conn.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, linger)
+            conn.close()
+
+    def stop(self) -> None:
+        """Close the connection, if there is one, and the listening socket."""
+        with self._lock:
+            if self._conn is not None:
+                self._conn.close()
+        self._listener.close()
