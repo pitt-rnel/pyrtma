@@ -252,6 +252,31 @@ Clients from `quiet_client()` are unconnected and have their console turned off,
 | `test_message_that_is_not_a_string_is_formatted` | Strings, validation and logging: a message that isn't a string is formatted rather than raising. | A record whose `msg` is 42. |
 | `test_file_handler_after_console_sees_original_text` | Strings, validation and logging: a file handler added after the console handler writes the message as logged, without escapes. | A client with the console on and a file handler in `tmp_path`; logs "a [b] c" and reads the file. |
 
+## test_unified_console_log.py — the unified console log (needs: integration for `TestConnect` and the `TestBackoff` tests that open sockets)
+
+Unified logs have their own console output turned off by `quiet()`. `stopping_sleep()` is a stand-in for the wait between connection attempts: it records each delay, returns at once, and calls `stop()` on a given call, so the loop ends without waiting in real time. `run_in_thread()` runs `start()` in a daemon thread when the test has to act while it runs.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_log_level_names_resolve` | C4: every `--log-level` choice resolves to its level number without `logging.getLevelNamesMapping()`, which Python 3.10 lacks. | Parametrized over the five choices, through `parse_args()`. |
+| `test_server_address_comes_from_options` | C4: the manager address is built from `-a` and `-p`, with the defaults when they're absent. | `parse_args()` with no options, then with both. |
+
+### TestConnect
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_init_rtma_connects_to_manager` | C4: `init_rtma()` connects with the current `Client.connect()` signature and subscribes to the log messages. | Against the `manager` fixture; checks the connection and that `RTMA_LOG_INFO` is subscribed. |
+| `test_exit_message_stops_the_loop` | C4: `start()` runs against a manager and returns, disconnected, when it receives `EXIT`. | `start()` in a thread; a client from `client_factory` sends `EXIT` until the thread ends, since the subscription can race it. |
+
+### TestBackoff
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_retries_back_off_without_manager` | C4: with no manager listening, each failed attempt waits twice as long as the last, from 0.5 s up to 5 s, instead of retrying at once. | A free port with nothing on it and `stopping_sleep()`, stopping on the sixth wait. |
+| `test_delay_resets_after_a_connection` | C4: the wait starts again from 0.5 s after a successful connection. | `init_rtma` is replaced by one that fails twice, then succeeds; the read loop then raises `NotConnectedError`, which counts as a failure. |
+| `test_lost_connection_is_retried_with_back_off` | C4: losing the manager mid-run is retried with the same back-off, starting from 0.5 s. | `start()` in a thread against a separate `ManagerHarness`, which is then stopped; the second wait stops the loop. |
+| `test_stop_interrupts_the_default_sleep` | C4: `stop()` ends the default wait between attempts at once, rather than after the delay. | A 30-second `retry_delay` and no manager; calls `stop()` after the first attempt and expects the thread to end within 5 s. |
+
 ## test_integration.py — client and manager interaction (needs: loopback sockets; not yet marked)
 
 Each test starts a `MessageManager` on an unused loopback port in `setUp` and connects one client with module ID 11 or 12. `wait_for_message()` is a fixed short sleep. Two message types defined in the file, `TEST_MESSAGE` and `TEST_MESSAGE2`, are used for subscriptions.

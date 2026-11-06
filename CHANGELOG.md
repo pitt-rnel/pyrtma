@@ -17,6 +17,7 @@ that makes them. The version number is chosen at release time.
 - The message manager allows at most `MAX_MODULES` (256) connected modules. A `CONNECT` beyond that is refused, with an error, and its connection closed.
 - The manager refuses a connection that `select()` couldn't watch, with a warning, instead of stopping: past 512 sockets on Windows, or with a descriptor numbered 1024 or higher on Linux and macOS. A manager whose listening socket would be beyond that limit raises `RuntimeError` when constructed.
 - `RTMALogger.close()` removes and closes the logger's handlers. It runs by itself when the logger's client is garbage collected.
+- `RTMA_UnifiedLog(retry_delay=..., max_retry_delay=..., sleep=...)`, keyword-only, and `RTMA_UnifiedLog.stop()`, which makes `start()` return from another thread. `pyrtma.unified_console_log` also has `parse_args()` and `main()`; `python -m pyrtma.unified_console_log` runs `main()`.
 
 ### Changed
 
@@ -40,6 +41,7 @@ that makes them. The version number is chosen at release time.
 - Each `RTMALogger` has its own `logging` logger, named `pyrtma.logger.<n>` from a counter, instead of one named after `hex(id(client))`. Code that looked a client's logger up by that name should use `client.logger.logger`.
 - `RTMALogHandler` no longer turns RTMA logging off when a send fails. A record whose send raises a `ClientError`, such as `ConnectionLost`, is dropped, and sending resumes after the client reconnects. Other errors are reported through `Handler.handleError`. `RTMALogger.enable_rtma` changes only when it is set.
 - RTMA log messages replace characters that aren't ASCII with `?`, one for one, in the message, name, path and function name. A path that is too long keeps its end, after `...`; a name or function name that is too long is cut. The wire format and field sizes are unchanged.
+- The unified console log waits between connection attempts while the message manager can't be reached. The wait starts at 0.5 seconds, doubles after each failure up to 5 seconds, and starts again from 0.5 seconds after each successful connection. It retries after any `ClientError` or `OSError` from connecting or reading, where it used to retry only after `MessageManagerNotFound` and `ConnectionLost`; failed attempts are logged at debug level.
 
 ### Fixed
 
@@ -60,3 +62,5 @@ that makes them. The version number is chosen at release time.
 - Logging text that isn't ASCII, such as "kΩ" or "µV", or from a path longer than 511 characters, no longer switches RTMA logging off for the rest of the process.
 - `RichLogFormatter` formats a copy of the record. It used to escape `record.msg` in place, so handlers after the console handler, such as the file handler, logged backslash-escaped brackets. It also escapes markup in the message's arguments, and accepts a message that isn't a string.
 - Setting `RTMALogger.enable_console` back to `True` after setting it to `False` adds the console handler again; it used to stay off.
+- The unified console log connects again; `connect()` was still passed the removed `allow_multiple` argument and raised `TypeError`. It no longer spins a CPU core and floods its log while the manager is absent, and its `--log-level` option works on Python 3.10, where `logging.getLevelNamesMapping()` doesn't exist.
+- The unified console log's remote logger shares the module's own client instead of a throwaway `Client()`, which was garbage collected at once.
