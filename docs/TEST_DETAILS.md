@@ -215,9 +215,11 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | `test_late_connect_v2_keeps_id_and_logger_status` | Manager connect messages: a late `CONNECT_V2` asking for another module ID or logger status keeps the existing ones and logs a warning about each; the name is still taken. | A `CONNECT_V2` asking for ID 77 as a logger, with the manager logging at `WARNING` and `caplog` capturing. |
 | `test_late_connect_v2_is_announced` | Manager connect messages: over a real connection, a `CONNECT` and then a `CONNECT_V2` give one ACK, then a `HELLO` with the name and process ID from the `CONNECT_V2`. | A raw socket, whose `CONNECT` asks for ID 123 through its header; an observer whose subscriptions are confirmed with `deliver()` first. |
 
-## test_client.py — the client: signatures, receiving, sending, lost connections and subscriptions (needs: integration for `TestReceive`, `TestSend` and `TestSubscriptions`)
+## test_client.py — the client: signatures, receiving, sending, connecting, lost connections and subscriptions (needs: integration for every class)
 
 Most receive tests use `scripted_client`, a client connected to the `scripted_manager` fixture: a stand-in manager (`helpers.ScriptedManager`) that ACKs the client's connect and then sends only the bytes the test gives it, built with `helpers.frame()`. It never ACKs subscriptions, so nothing reaches the client unless the test sends it. Tests wait for sent bytes to arrive with `wait_until_arrived()`, which peeks at the client's socket. A read that could block on a partial message runs under `watchdog()`, which resets the stand-in's connection after 3 s, so that the old code fails with `ConnectionLost` instead of hanging. Timing checks allow `SLACK`, 1 s, beyond the timeout. Type 7777 stands for a type the test definitions don't define.
+
+`TestConnect` uses `HandshakeStandIn`, a listening socket that reads one client's connect message and then sends the bytes the test gives it, which may be nothing, so a test controls the ACKs the client sees.
 
 `TestSubscriptions` uses the real `manager` fixture and `client_factory`, with types 7001 to 7005, of which nothing is ever sent. `manager_subscriptions()` returns the manager's own subscription set for a client, after a barrier: the client sends `CLIENT_SET_NAME` with a fresh name, and the manager handles each client's messages in order, so once the name has changed, every earlier subscription message has been handled. Each test checks the client's local state and the manager's.
 
@@ -258,6 +260,33 @@ Most receive tests use `scripted_client`, a client connected to the `scripted_ma
 | `test_sends_report_success` | Client Low (silent dropped packet): the three send methods return `True` when they send. | `send_message`, `send_signal` with `timeout=0`, and `forward_message`, on `scripted_client`. |
 | `test_unwritable_socket_reports_a_dropped_send` | Client Low (silent dropped packet): when the socket isn't writable within the timeout, each send method returns `False`, prints nothing, and the client stays connected. | A stand-in that never reads; `fill_send_buffer()` writes raw bytes to the client's socket until `select()` reports it unwritable, then each method is called with `timeout=0`. |
 | `test_send_waits_for_room_in_the_socket` | Client receive: with the socket non-blocking, a send that finds the socket's buffer full waits and carries on, and every byte arrives in order. | A stand-in with a 4 KiB receive buffer and a client with a 4 KiB send buffer; a thread sends 4,000 `TEST_MSG_8192` messages, about 33 MB, while the stand-in reads them all, then each header and the payload's first byte are checked. Fails with a plain `sendall`. |
+
+### TestConnect
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_unresolvable_host_raises_manager_not_found` | Client connection error handling: a host name that can't be resolved raises `MessageManagerNotFound`, not a raw `socket.gaierror`, and the client is left disconnected. | Connects to `no-such-host.invalid`, a name reserved never to resolve. |
+| `test_refused_connection_raises_manager_not_found` | Client connection error handling: a refused connection raises `MessageManagerNotFound` and leaves the client disconnected. | Connects to the `free_port` fixture's port, where nothing listens. |
+| `test_tcp_connect_is_bounded_by_the_timeout` | Client connection error handling: the TCP connect is given what is left of `connect()`'s timeout, and a connect that times out raises `MessageManagerNotFound`. | A `socket.socket` subclass, patched into `pyrtma.client`, whose `connect` records its socket's timeout and raises `TimeoutError`, as an unanswered connect does; loopback can't produce one. |
+| `test_ack_timeout_raises_and_leaves_client_disconnected` | Client connection error handling: with no ACK, `connect()` raises `AcknowledgementTimeout` within its timeout, reports itself disconnected, and has closed its socket. | `HandshakeStandIn` that sends nothing; `timeout=0.3`. |
+| `test_static_client_ignores_another_modules_ack` | Client ACK matching: a client with a static ID doesn't take an ACK addressed to another module, such as a copy a logger is sent. | The stand-in sends only an ACK for module 99 to a logger with ID 11; `connect()` must time out. |
+| `test_static_client_takes_its_own_ack` | Client ACK matching: the client skips the other module's ACK, takes its own, and leaves nothing unread. | The stand-in sends an ACK for module 99, then one for 11; the socket must have nothing left to read. |
+| `test_server_name_without_port_uses_the_default_port` | Client connection error handling: a server name without a port connects to `DEFAULT_PORT`, instead of failing to split. | `DEFAULT_PORT` is patched to the stand-in's port, so no fixed port is used. |
+| `test_malformed_server_name_raises_value_error` | Client connection error handling: a server name with an empty or non-numeric port, or an empty host, raises `ValueError`, and the client stays disconnected. | Parametrized over `127.0.0.1:`, `127.0.0.1:abc` and `:7111`. |
+
+### TestDisconnect
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_disconnect_waits_for_the_manager_without_sleeping` | Client Low (the disconnect sleep): `disconnect()` doesn't sleep a fixed 100 ms, and the manager still removes the module. | `time.sleep` in `pyrtma.client` is replaced by a recorder during `disconnect()`; then waits for the module to leave the manager's table. |
+| `test_disconnect_is_bounded_when_the_manager_keeps_the_socket_open` | Client Low (the disconnect sleep): when the manager doesn't close its end, `disconnect()` gives up after its short wait. | `scripted_client`, whose stand-in never closes the connection; the call must take less than `SLACK`. |
+
+### TestClientContext
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_client_context_passes_auto_detect` | H8: `client_context(auto_detect=False)` gives a client with the core definitions only, though compiled test definitions are loaded. | Looks up the name of `TEST_START`, which only the test definitions have. |
+| `test_client_context_disconnects_when_the_body_raises` | H8: when the body raises, the client is disconnected and the manager removes it. | A body that raises `RuntimeError`; then checks `connected` and the manager's table. |
 
 ### TestSubscriptions
 

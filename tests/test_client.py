@@ -15,13 +15,16 @@ from typing import Any
 
 import pytest
 
+import pyrtma.client
 from pyrtma import core_defs as cd
 from pyrtma.client import Client, client_context
 from pyrtma.exceptions import (
+    AcknowledgementTimeout,
     ConnectionLost,
     InvalidDestinationHost,
     InvalidDestinationModule,
     InvalidMessageDefinition,
+    MessageManagerNotFound,
     UnknownMessageType,
 )
 from pyrtma.header import MessageHeader
@@ -34,6 +37,7 @@ from .helpers import (
     ScriptedManager,
     bytes_waiting,
     frame,
+    recv_exactly,
     wait_for,
 )
 from .test_msg_defs import test_defs as td
@@ -616,6 +620,232 @@ def fill_send_buffer(client: Client) -> None:
             if not writable:
                 return
     pytest.fail("The socket never filled.")
+
+
+class HandshakeStandIn:
+    """A listening socket that answers one client's connect as a test scripts.
+
+    It reads the client's connect message and then sends ``reply``, which may
+    be nothing, so the test controls the ACKs the client sees. The connection
+    stays open until :meth:`stop`.
+
+    Attributes:
+        address: The ``host:port`` string to connect a client to.
+        port: The listening port.
+    """
+
+    def __init__(self, reply: bytes) -> None:
+        """Listen on an unused loopback port and start serving one client.
+
+        Args:
+            reply: What to send once the client's connect message is read.
+        """
+        self._listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._listener.bind(("127.0.0.1", 0))
+        self._listener.listen(1)
+        self.port: int = self._listener.getsockname()[1]
+        self.address = f"127.0.0.1:{self.port}"
+        self._conns: list[socket.socket] = []
+        self._thread = threading.Thread(
+            target=self._serve, args=(reply,), name="handshake", daemon=True
+        )
+        self._thread.start()
+
+    def _serve(self, reply: bytes) -> None:
+        """Accept one client, read its connect message, and send the reply.
+
+        Args:
+            reply: The bytes to send.
+        """
+        self._listener.settimeout(DEFAULT_TIMEOUT)
+        try:
+            conn, _ = self._listener.accept()
+        except OSError:
+            return
+        self._conns.append(conn)
+        conn.settimeout(DEFAULT_TIMEOUT)
+        header = MessageHeader.from_buffer_copy(recv_exactly(conn, HEADER_SIZE))
+        recv_exactly(conn, header.num_data_bytes)
+        conn.sendall(reply)
+
+    def stop(self) -> None:
+        """Close the connection and the listening socket."""
+        self._listener.close()
+        self._thread.join(DEFAULT_TIMEOUT)
+        for conn in self._conns:
+            conn.close()
+
+
+@pytest.mark.integration
+class TestConnect:
+    def test_unresolvable_host_raises_manager_not_found(self) -> None:
+        client = Client(name="lost", definitions=td.get_message_definitions())
+
+        with pytest.raises(MessageManagerNotFound):
+            client.connect("no-such-host.invalid:7111")
+
+        assert not client.connected
+
+    def test_refused_connection_raises_manager_not_found(self, free_port: int) -> None:
+        client = Client(name="refused", definitions=td.get_message_definitions())
+
+        with pytest.raises(MessageManagerNotFound):
+            client.connect(f"127.0.0.1:{free_port}")
+
+        assert not client.connected
+
+    def test_tcp_connect_is_bounded_by_the_timeout(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A real connect that never completes needs an address that drops
+        # packets, which loopback can't provide. This socket fails the way a
+        # timed-out connect does, and records the timeout it was given.
+        timeouts: list[float | None] = []
+
+        class UnansweredSocket(socket.socket):
+            def connect(self, address: Any) -> None:
+                timeouts.append(self.gettimeout())
+                raise TimeoutError("timed out")
+
+        monkeypatch.setattr(pyrtma.client.socket, "socket", UnansweredSocket)
+        client = Client(name="slow", definitions=td.get_message_definitions())
+
+        with pytest.raises(MessageManagerNotFound):
+            client.connect("127.0.0.1:9", timeout=0.5)
+
+        assert not client.connected
+        assert len(timeouts) == 1
+        assert timeouts[0] is not None and 0 < timeouts[0] <= 0.5
+
+    def test_ack_timeout_raises_and_leaves_client_disconnected(self) -> None:
+        stand_in = HandshakeStandIn(reply=b"")
+        client = Client(name="unacked", definitions=td.get_message_definitions())
+        try:
+            start = time.monotonic()
+            with pytest.raises(AcknowledgementTimeout):
+                client.connect(stand_in.address, timeout=0.3)
+            elapsed = time.monotonic() - start
+        finally:
+            stand_in.stop()
+
+        assert elapsed < 0.3 + SLACK
+        assert not client.connected
+        assert client.sock.fileno() == -1
+
+    def test_static_client_ignores_another_modules_ack(self) -> None:
+        # A logger is sent copies of other modules' ACKs. Only one addressed
+        # to this client may complete its connect.
+        stand_in = HandshakeStandIn(reply=frame(cd.MT_ACKNOWLEDGE, dest_mod_id=99))
+        client = Client(11, name="static", definitions=td.get_message_definitions())
+        try:
+            with pytest.raises(AcknowledgementTimeout):
+                client.connect(stand_in.address, logger_status=True, timeout=0.3)
+        finally:
+            stand_in.stop()
+
+        assert not client.connected
+
+    def test_static_client_takes_its_own_ack(self) -> None:
+        stand_in = HandshakeStandIn(
+            reply=frame(cd.MT_ACKNOWLEDGE, dest_mod_id=99)
+            + frame(cd.MT_ACKNOWLEDGE, dest_mod_id=11)
+        )
+        client = Client(11, name="static", definitions=td.get_message_definitions())
+        try:
+            client.connect(stand_in.address, logger_status=True)
+            connected = client.connected
+            leftover = readable(client)
+        finally:
+            client.disconnect()
+            stand_in.stop()
+
+        assert connected
+        assert not leftover
+
+    def test_server_name_without_port_uses_the_default_port(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        stand_in = HandshakeStandIn(reply=frame(cd.MT_ACKNOWLEDGE, dest_mod_id=10001))
+        monkeypatch.setattr(pyrtma.client, "DEFAULT_PORT", stand_in.port)
+        client = Client(name="default", definitions=td.get_message_definitions())
+        try:
+            client.connect("127.0.0.1")
+            server = client.server
+        finally:
+            client.disconnect()
+            stand_in.stop()
+
+        assert server == ("127.0.0.1", stand_in.port)
+
+    @pytest.mark.parametrize("server_name", ["127.0.0.1:", "127.0.0.1:abc", ":7111"])
+    def test_malformed_server_name_raises_value_error(self, server_name: str) -> None:
+        client = Client(name="typo", definitions=td.get_message_definitions())
+
+        with pytest.raises(ValueError):
+            client.connect(server_name)
+
+        assert not client.connected
+
+
+@pytest.mark.integration
+class TestDisconnect:
+    def test_disconnect_waits_for_the_manager_without_sleeping(
+        self,
+        manager: ManagerHarness,
+        client_factory: Callable[..., Client],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        client = client_factory(name="leaving")
+        module_id = client.module_id
+        sleeps: list[float] = []
+        monkeypatch.setattr(pyrtma.client.time, "sleep", sleeps.append)
+
+        client.disconnect()
+        monkeypatch.undo()
+
+        assert sleeps == []
+        assert not client.connected
+        assert wait_for(
+            lambda: all(
+                m.mod_id != module_id for m in list(manager.manager.modules.values())
+            )
+        )
+
+    def test_disconnect_is_bounded_when_the_manager_keeps_the_socket_open(
+        self, scripted_client: Client
+    ) -> None:
+        start = time.monotonic()
+        scripted_client.disconnect()
+        elapsed = time.monotonic() - start
+
+        assert elapsed < SLACK
+        assert not scripted_client.connected
+
+
+@pytest.mark.integration
+class TestClientContext:
+    def test_client_context_passes_auto_detect(self, manager: ManagerHarness) -> None:
+        with client_context(server_name=manager.address, auto_detect=False) as client:
+            name = client.message_name_from_id(td.MT_TEST_START)
+
+        assert name is None
+
+    def test_client_context_disconnects_when_the_body_raises(
+        self, manager: ManagerHarness
+    ) -> None:
+        with pytest.raises(RuntimeError):
+            with client_context(
+                server_name=manager.address, definitions=td.get_message_definitions()
+            ) as client:
+                module_id = client.module_id
+                raise RuntimeError("body failed")
+
+        assert not client.connected
+        assert wait_for(
+            lambda: all(
+                m.mod_id != module_id for m in list(manager.manager.modules.values())
+            )
+        )
 
 
 # Message types for the subscription tests. The manager forwards types it

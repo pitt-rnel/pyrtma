@@ -92,9 +92,57 @@ _NUM_DATA_BYTES_OFFSET: int = MessageHeader._num_data_bytes.offset  # type: igno
 # already arrived.
 _NO_WAIT: float = float("-inf")
 
+# The port used when a server name doesn't give one.
+DEFAULT_PORT: int = 7111
+
+# How long disconnect() waits for the manager to close its end, in seconds.
+_DISCONNECT_WAIT: float = 0.1
+
 # The module's own logger, for events that mustn't go through a client's RTMA
 # logger: logging a dropped send through it would send another message.
 _log = logging.getLogger(__name__)
+
+
+def _split_server_name(server_name: str) -> Tuple[str, int]:
+    """Split a ``host:port`` server name.
+
+    Args:
+        server_name: ``host:port``, or ``host`` alone for ``DEFAULT_PORT``.
+
+    Returns:
+        The host and the port number.
+
+    Raises:
+        ValueError: The host is empty, or the port isn't a number from 1 to
+            65535.
+    """
+    host, sep, port = server_name.rpartition(":")
+    if not sep:
+        host, number = server_name, DEFAULT_PORT
+    else:
+        try:
+            number = int(port)
+        except ValueError:
+            number = 0
+    if not host or not 0 < number < 65536:
+        raise ValueError(
+            f"Invalid server name {server_name!r}: expected host:port or host."
+        )
+    return host, number
+
+
+def _remaining(deadline: Optional[float]) -> Optional[float]:
+    """Seconds left until a ``perf_counter`` deadline.
+
+    Args:
+        deadline: The deadline, or None for no deadline.
+
+    Returns:
+        The seconds left, at least 0, or None for no deadline.
+    """
+    if deadline is None:
+        return None
+    return max(deadline - time.perf_counter(), 0.0)
 
 
 def _check_destination(dest_mod_id: int, dest_host_id: int) -> None:
@@ -311,35 +359,53 @@ class Client(ClientLike):
         # getattr: the constructor may have raised before setting _connected.
         if getattr(self, "_connected", False):
             try:
-                self.disconnect()
+                # During garbage collection, don't wait for the manager.
+                self._disconnect(wait=0.0)
             except Exception:
                 """Silently ignore any errors at this point."""
                 pass
 
-    def _socket_connect(self, server_name: str):
+    def _socket_connect(self, server_name: str, deadline: Optional[float] = None):
+        """Open the TCP connection to the message manager.
+
+        Note that this is also used by web_manager.
+
+        Args:
+            server_name: ``host:port``, or ``host`` for ``DEFAULT_PORT``.
+            deadline: A ``perf_counter`` time by which the connection must be
+                made, or None to wait as long as the system does. The name
+                lookup isn't bounded by it.
+
+        Raises:
+            ValueError: The server name is malformed.
+            MessageManagerNotFound: The host couldn't be found or reached,
+                refused the connection, or didn't answer before the deadline.
+            SocketOptionError: A socket option couldn't be set.
+        """
         # Close the previously used socket
         self._connected = False
         self._sock.close()
         self._reset_receive()
 
         # Get the server ip info
-        addr, port = server_name.split(":")
-        self._server = (addr, int(port))
+        self._server = _split_server_name(server_name)
 
         # Create the tcp socket
         self._sock = socket.socket(
             family=socket.AF_INET, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP
         )
 
-        # Connect to the message server
+        # Connect to the message server. Every failure here, a failed name
+        # lookup and a timeout included, is an OSError.
         try:
+            self._sock.settimeout(_remaining(deadline))
             self._sock.connect(self._server)
-            self._connected = True
-        except ConnectionRefusedError as e:
-            self._connected = False
+        except OSError as e:
+            self._sock.close()
             raise MessageManagerNotFound(
-                f"No message manager server responding at {self.ip_addr}:{self.port}"
+                f"No message manager server responding at {self.ip_addr}:{self.port}: {e}"
             ) from e
+        self._connected = True
 
         # Reads and writes never block in the socket itself: waiting is done
         # in select(), which can be given a timeout. See _recv_frame and
@@ -355,10 +421,23 @@ class Client(ClientLike):
             self._sock.close()
             raise SocketOptionError from e
 
-    def _connect_helper(self, logger_status: bool) -> Message:
+    def _connect_helper(
+        self, logger_status: bool, timeout: Optional[float] = 3
+    ) -> Message:
         """Called internally after _socket_connect
 
         Note that this is also used by web_manager
+
+        Args:
+            logger_status: Whether to connect as a logger module.
+            timeout: Seconds to wait for the manager's ACK; None blocks.
+
+        Raises:
+            AcknowledgementTimeout: No ACK for this client arrived in time.
+            ConnectionLost: The connection failed. The client is disconnected.
+
+        Returns:
+            The ACK.
         """
 
         # Reset the module_id to zero for dynamic assignment
@@ -376,7 +455,7 @@ class Client(ClientLike):
 
         self.send_message(msg2)
         # self.send_message(msg)
-        ack_msg = self._wait_for_acknowledgement()
+        ack_msg = self._wait_for_acknowledgement(timeout)
 
         # save own module ID from ACK if asked to be assigned dynamic ID
         if self._module_id == 0:
@@ -407,12 +486,16 @@ class Client(ClientLike):
         self,
         server_name: str = "localhost:7111",
         logger_status: bool = False,
+        *,
+        timeout: Optional[float] = 5.0,
     ):
         """Connect to message manager server
 
+        If the connection fails, the client is left disconnected.
+
         Args:
             server_name (optional): IP_addr:port_num string associated with message manager.
-                Defaults to "localhost:7111".
+                The port may be left out, for 7111. Defaults to "localhost:7111".
             logger_status (optional): Flag to declare client as a logger module.
                 A logger module is sent the messages it subscribes to even when
                 they are addressed to another module, and copies of other
@@ -421,27 +504,54 @@ class Client(ClientLike):
                 automatically: subscribe to ``ALL_MESSAGE_TYPES`` to receive
                 everything.
                 Defaults to False.
+            timeout (optional): Seconds to wait for the connection and the
+                manager's ACK together; None waits as long as it takes. Looking
+                up the host's name isn't bounded by it. Keyword-only. Defaults
+                to 5.
 
         Raises:
-            MessageManagerNotFound: Unable to connect to message manager
+            ValueError: The server name is malformed.
+            MessageManagerNotFound: Unable to connect to message manager: the
+                host couldn't be found or reached, refused the connection, or
+                didn't answer in time.
+            AcknowledgementTimeout: The manager didn't acknowledge the
+                connection in time.
+            ConnectionLost: The connection failed during the handshake.
         """
+        deadline = self._deadline(timeout)
+
         # Disconnect first
         if self.connected:
             self.disconnect()
 
-        # Setup the underlying socket connection
-        self._socket_connect(server_name)
-
-        ack = self._connect_helper(logger_status)
+        try:
+            # Setup the underlying socket connection
+            self._socket_connect(server_name, deadline)
+            self._connect_helper(logger_status, _remaining(deadline))
+        except BaseException:
+            # Leave nothing behind: no open socket, no connected flag.
+            self._connection_lost()
+            raise
 
     def disconnect(self):
-        """Disconnect from message manager server"""
+        """Disconnect from message manager server
+
+        ``DISCONNECT`` is sent, and the client waits briefly, up to 0.1 s, for
+        the manager to close its end before closing the socket.
+        """
+        self._disconnect(_DISCONNECT_WAIT)
+
+    def _disconnect(self, wait: float) -> None:
+        """Disconnect, waiting up to ``wait`` seconds for the manager.
+
+        Args:
+            wait: Seconds to wait for room to send ``DISCONNECT``, and then for
+                the manager to close its end.
+        """
         try:
             if self._connected:
-                self.send_signal(cd.MT_DISCONNECT)
-                # Allow some time for signal to reach MM
-                time.sleep(0.100)
-        except:
+                self._say_goodbye(wait)
+        except Exception:
             pass
         finally:
             if hasattr(self, "_sock"):
@@ -452,6 +562,38 @@ class Client(ClientLike):
             self._subscribed_types = set()
             self._paused_types = set()
             self._sub_all = False
+
+    def _say_goodbye(self, wait: float) -> None:
+        """Send ``DISCONNECT`` and wait for the manager to close its end.
+
+        Closing a socket that still has unread bytes sends a reset, which can
+        make the manager lose the ``DISCONNECT`` before reading it. So the
+        sending side is shut down, and what arrives is read and discarded
+        until the manager closes its end, which it does once it has handled
+        the ``DISCONNECT``, or until ``wait`` runs out.
+
+        Args:
+            wait: The longest time to spend, in seconds.
+
+        Raises:
+            ConnectionLost: The connection failed.
+        """
+        deadline = time.perf_counter() + wait
+        if not self.send_signal(cd.MT_DISCONNECT, timeout=wait):
+            return
+        self._sock.shutdown(socket.SHUT_WR)
+        while True:
+            remaining = deadline - time.perf_counter()
+            if remaining <= 0:
+                return
+            readable, _, _ = select.select([self._sock], [], [], remaining)
+            if not readable:
+                return
+            try:
+                if not self._sock.recv(65536):
+                    return
+            except BlockingIOError:
+                continue
 
     def _connection_lost(self) -> None:
         """Mark the client disconnected after its connection failed.
@@ -1248,47 +1390,41 @@ class Client(ClientLike):
 
         return Message(header, data)
 
-    def _wait_for_acknowledgement(self, timeout: float = 3) -> Message:
+    def _wait_for_acknowledgement(self, timeout: Optional[float] = 3) -> Message:
         """Wait for acknowledgement from message manager module
 
         Used internally when acknowledgement replies from message manager are expected
 
+        Only an ACK for this client counts: for a static ID, one addressed
+        to that ID, or to 0. A logger is sent copies of other modules' ACKs,
+        which are skipped. A client asking for a dynamic ID can't tell its
+        own ACK by address, and takes the first; the manager sends it first
+        on a new connection. Other messages are discarded.
+
         Args:
-            timeout (optional): Timeout in seconds to wait for ack message. Defaults to 3.
+            timeout (optional): Timeout in seconds to wait for ack message.
+                None or a negative value waits as long as it takes. Defaults
+                to 3.
 
         Raises:
             AcknowledgementTimeout: Ack not received from message manager
+            ConnectionLost: The connection failed. The client is disconnected.
 
         Returns:
             Ack message
         """
-        ret = 0
-
-        # Wait Forever
-        if timeout == -1:
-            while True:
-                msg = self.read_message(ack=True)
-                if msg is not None:
-                    if msg.header.msg_type == cd.MT_ACKNOWLEDGE:
-                        break
-            return msg
-        else:
-            # Wait up to timeout seconds
-            time_remaining = timeout
-            start_time = time.perf_counter()
-            while time_remaining > 0:
-                msg = self.read_message(timeout=time_remaining, ack=True)
-                if msg is not None:
-                    if msg.header.msg_type == cd.MT_ACKNOWLEDGE:
-                        return msg
-
-                time_now = time.perf_counter()
-                time_waited = time_now - start_time
-                time_remaining = timeout - time_waited
-
-            raise AcknowledgementTimeout(
-                "Failed to receive Acknowlegement from MessageManager"
-            )
+        deadline = self._deadline(timeout)
+        while True:
+            frame = self._recv_frame(deadline)
+            if frame is None:
+                raise AcknowledgementTimeout(
+                    "Failed to receive Acknowlegement from MessageManager"
+                )
+            msg_type, header, payload = frame
+            if msg_type == cd.MT_ACKNOWLEDGE and (
+                self._module_id == 0 or header.dest_mod_id in (0, self._module_id)
+            ):
+                return self._decode(header, payload, False)
 
     @requires_connection
     def discard_messages(self, timeout: float = 1) -> bool:
@@ -1361,8 +1497,8 @@ def client_context(
         msg_list (optional): A list of numeric message IDs to subscribe to
         host_id (optional): Host ID. Defaults to 0.
         logger_status (optional): Flag to declare client as a logger module.
-            This and the arguments after it are keyword-only.
-            Logger modules are automatically subscribed to all message types.
+            This and the arguments after it are keyword-only. A logger isn't
+            subscribed to anything automatically; see :py:func:`Client.connect`.
             Defaults to False.
         name (optional): Name of module
         definitions (optional): MessageDefinitions object or Module containing MessageDefinitions. Defaults to None, which will auto-detect
@@ -1373,10 +1509,18 @@ def client_context(
     Yields:
         Client: initialized pyrtma Client object
     """
-    c = Client(module_id, host_id, name=name, definitions=definitions)
-    c.connect(server_name, logger_status)
-    if msg_list:
-        c.subscribe(msg_list)
-    c.send_module_ready()
-    yield c
-    c.disconnect()
+    c = Client(
+        module_id,
+        host_id,
+        name=name,
+        definitions=definitions,
+        auto_detect=auto_detect,
+    )
+    try:
+        c.connect(server_name, logger_status)
+        if msg_list:
+            c.subscribe(msg_list)
+        c.send_module_ready()
+        yield c
+    finally:
+        c.disconnect()

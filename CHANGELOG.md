@@ -12,6 +12,8 @@ that makes them. The version number is chosen at release time.
 
 ### Added
 
+- `Client.connect(timeout=...)`, keyword-only: one deadline, in seconds, for the TCP connection and the manager's ACK together. The default is 5 seconds; `None` waits as long as it takes. A connection to an unreachable host used to wait for the operating system's limit, from about 20 seconds to minutes. The host name lookup isn't bounded by it.
+- `Client.connect` accepts a server name without a port, such as `"localhost"`, and uses port 7111 (`pyrtma.client.DEFAULT_PORT`).
 - `MessageManager(stall_timeout=...)` and the manager's `--stall-timeout SECONDS` and `--no-stall-timeout` options. A client that sends part of a message and then nothing more for this long is dropped, with a warning giving the bytes received. The default is 5 seconds; `None`, or `--no-stall-timeout`, never drops it, for example while it is paused at a debugger breakpoint. A stalled client doesn't hold up other clients either way.
 - `MessageManager(logger_timeout=...)` and `--logger-timeout SECONDS`. A logger module that can't take a message for this long is dropped, with an error, a `FAILED_MESSAGE` and a `GOODBYE`. The default, `None`, keeps the current behavior of waiting for loggers as long as it takes.
 - The message manager allows at most `MAX_MODULES` (256) connected modules. A `CONNECT` beyond that is refused, with an error, and its connection closed.
@@ -22,6 +24,8 @@ that makes them. The version number is chosen at release time.
 
 ### Changed
 
+- `Client.disconnect()` no longer sleeps for 100 ms. It sends `DISCONNECT`, shuts down its sending side, and waits up to 100 ms for the manager to close its end, which usually takes about a millisecond. A client collected by the garbage collector sends `DISCONNECT` if there is room and closes without waiting.
+- A client with a static module ID completes `connect()` only on an ACK addressed to it, or to module 0. A logger is sent copies of other modules' ACKs and used to take the first one. A client asking for a dynamic ID still takes the first ACK, which the manager sends first on a new connection.
 - `Client.send_message`, `send_signal` and `forward_message` return `True` when the message was sent and `False` when the socket wasn't writable within the caller's `timeout` and the message was dropped. They used to return `None` and print `x`; the drop is now logged at debug level on the `pyrtma.client` logger. With the default timeout, which blocks, they always return `True` or raise.
 - `Client.unsubscribe_from_all()`, and so `reset_subscriptions()`, also forgets paused subscriptions, so a later `resume_all_subscriptions()` doesn't subscribe to them again.
 - `Client.pause_subscription([ALL_MESSAGE_TYPES])` records what it paused: `ALL_MESSAGE_TYPES` itself, or every individually subscribed type, all of which the manager drops. `resume_all_subscriptions()` restores them; it used to resume nothing.
@@ -60,6 +64,8 @@ that makes them. The version number is chosen at release time.
 
 ### Fixed
 
+- `Client.connect` raises `MessageManagerNotFound` for every failure to reach the manager, including a host name that can't be resolved, an unreachable host and a timeout, which used to escape as raw `OSError`s. A malformed server name raises `ValueError`. However `connect()` fails, the client is left disconnected with its socket closed; after an `AcknowledgementTimeout` it used to report itself connected.
+- `client_context` passes `auto_detect` to the client, and disconnects it when the body raises.
 - `Client.send_signal` accepts dynamic module IDs, as `send_message` does; it used to reject any ID above 256. Both accept `dest_host_id=ALL_HOSTS`, and so does the message manager, which used to log an error and drop such a message.
 - A `Client` whose constructor raises, for example for an out-of-range module ID, no longer raises `AttributeError` from `__del__` when it is collected.
 - The `connect()` docstring no longer says that logger modules are subscribed to all message types automatically; they aren't.
