@@ -19,10 +19,13 @@ from pyrtma import core_defs as cd
 from pyrtma.client import Client, client_context
 from pyrtma.exceptions import (
     ConnectionLost,
+    InvalidDestinationHost,
+    InvalidDestinationModule,
     InvalidMessageDefinition,
     UnknownMessageType,
 )
 from pyrtma.header import MessageHeader
+from pyrtma.message import Message
 
 from .helpers import (
     DEFAULT_TIMEOUT,
@@ -461,6 +464,158 @@ class TestSend:
             assert header.msg_type == td.MT_TEST_MSG_8192
             assert header.num_data_bytes == td.MDF_TEST_MSG_8192.type_size
             assert received[offset + HEADER_SIZE] == 255
+
+    def test_signal_reaches_a_dynamically_assigned_module(
+        self, client_factory: Callable[..., Client]
+    ) -> None:
+        sender = client_factory(name="sender")
+        receiver = client_factory(name="receiver")
+        receiver.subscribe([cd.MT_LM_READY])
+
+        got = signal_until_received(
+            sender,
+            receiver,
+            lambda: sender.send_signal(cd.MT_LM_READY, dest_mod_id=receiver.module_id),
+        )
+
+        assert receiver.module_id >= cd.DYN_MOD_ID_START
+        assert got is not None
+        assert got.header.dest_mod_id == receiver.module_id
+
+    @pytest.mark.parametrize("method", ["send_message", "send_signal"])
+    def test_all_hosts_is_accepted(
+        self, client_factory: Callable[..., Client], method: str
+    ) -> None:
+        sender = client_factory(name="sender")
+        receiver = client_factory(name="receiver")
+        receiver.subscribe([cd.MT_LM_READY])
+        if method == "send_message":
+            send = lambda: sender.send_message(
+                cd.MDF_LM_READY(), dest_host_id=cd.ALL_HOSTS
+            )
+        else:
+            send = lambda: sender.send_signal(cd.MT_LM_READY, dest_host_id=cd.ALL_HOSTS)
+
+        got = signal_until_received(sender, receiver, send)
+
+        assert got is not None
+        assert got.header.dest_host_id == cd.ALL_HOSTS
+
+    @pytest.mark.parametrize("method", ["send_message", "send_signal"])
+    @pytest.mark.parametrize(
+        ("dest_mod_id", "dest_host_id", "error"),
+        [
+            (-1, 0, InvalidDestinationModule),
+            (cd.MAX_MODULE_ID + 1, 0, InvalidDestinationModule),
+            (0, -1, InvalidDestinationHost),
+            (0, cd.MAX_HOSTS + 1, InvalidDestinationHost),
+            (0, cd.ALL_HOSTS - 1, InvalidDestinationHost),
+        ],
+    )
+    def test_invalid_destinations_are_rejected(
+        self,
+        scripted_client: Client,
+        method: str,
+        dest_mod_id: int,
+        dest_host_id: int,
+        error: type[Exception],
+    ) -> None:
+        if method == "send_message":
+            send = lambda: scripted_client.send_message(
+                cd.MDF_LM_READY(), dest_mod_id, dest_host_id
+            )
+        else:
+            send = lambda: scripted_client.send_signal(
+                cd.MT_LM_READY, dest_mod_id, dest_host_id
+            )
+
+        with pytest.raises(error):
+            send()
+
+    def test_sends_report_success(self, scripted_client: Client) -> None:
+        assert scripted_client.send_message(cd.MDF_LM_READY()) is True
+        assert scripted_client.send_signal(cd.MT_LM_READY, timeout=0) is True
+        header = MessageHeader()
+        header.msg_type = cd.MT_LM_READY
+        assert scripted_client.forward_message(header) is True
+
+    def test_unwritable_socket_reports_a_dropped_send(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        stand_in = ScriptedManager(receive_buffer=4096)
+        client = Client(name="sender", definitions=td.get_message_definitions())
+        client.logger.enable_console = False
+        try:
+            stand_in.connect(client)
+            client.sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 4096)
+            fill_send_buffer(client)
+            header = MessageHeader()
+            header.msg_type = cd.MT_LM_READY
+
+            results = [
+                client.send_message(cd.MDF_LM_READY(), timeout=0),
+                client.send_signal(cd.MT_LM_READY, timeout=0),
+                client.forward_message(header, timeout=0),
+            ]
+            connected = client.connected
+        finally:
+            # The stand-in goes first: its reset unblocks the client's socket,
+            # so disconnect() can't wait on it.
+            stand_in.stop()
+            client.disconnect()
+
+        assert results == [False, False, False]
+        assert connected
+        assert capsys.readouterr().out == ""
+
+
+def signal_until_received(
+    sender: Client, receiver: Client, send: Callable[[], Any]
+) -> Message | None:
+    """Send with ``send`` until the receiver reads an ``LM_READY``.
+
+    The receiver's subscription may not have reached the manager when the
+    first one is sent; resending avoids a fixed sleep, as ``deliver`` does.
+
+    Args:
+        sender: The sending client.
+        receiver: A client subscribed to ``LM_READY``.
+        send: Sends one ``LM_READY``.
+
+    Returns:
+        The message received, or None if none arrived in time.
+    """
+    received: list[Message] = []
+
+    def attempt() -> bool:
+        send()
+        msg = receiver.read_message(timeout=0.05)
+        if msg is not None and msg.header.msg_type == cd.MT_LM_READY:
+            received.append(msg)
+        return bool(received)
+
+    wait_for(attempt, interval=0)
+    return received[0] if received else None
+
+
+def fill_send_buffer(client: Client) -> None:
+    """Fill the client's socket until it accepts nothing more.
+
+    The peer must not be reading. What is written isn't a message, so the
+    connection is of no further use once this returns.
+
+    Args:
+        client: A connected client.
+    """
+    chunk = b"\x00" * 4096
+    for _ in range(100_000):
+        try:
+            client.sock.send(chunk)
+        except BlockingIOError:
+            _, writable, _ = select.select([], [client.sock], [], 0)
+            if not writable:
+                return
+    pytest.fail("The socket never filled.")
 
 
 # Message types for the subscription tests. The manager forwards types it

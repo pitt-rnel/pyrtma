@@ -92,6 +92,31 @@ _NUM_DATA_BYTES_OFFSET: int = MessageHeader._num_data_bytes.offset  # type: igno
 # already arrived.
 _NO_WAIT: float = float("-inf")
 
+# The module's own logger, for events that mustn't go through a client's RTMA
+# logger: logging a dropped send through it would send another message.
+_log = logging.getLogger(__name__)
+
+
+def _check_destination(dest_mod_id: int, dest_host_id: int) -> None:
+    """Check a message's destination, as both send methods do.
+
+    Args:
+        dest_mod_id: 0 for every module, or a static or dynamic module ID, up
+            to ``MAX_MODULE_ID``.
+        dest_host_id: 0 to ``MAX_HOSTS``, or ``ALL_HOSTS``.
+
+    Raises:
+        InvalidDestinationModule: The module ID is out of range.
+        InvalidDestinationHost: The host ID is out of range.
+    """
+    if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULE_ID:
+        raise InvalidDestinationModule(f"Invalid dest_mod_id of [{dest_mod_id}]")
+
+    if dest_host_id != cd.ALL_HOSTS and (
+        dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS
+    ):
+        raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
+
 
 def requires_connection(func: F) -> F:
     """Decorator wrapper for Client methods that require a connection"""
@@ -712,7 +737,7 @@ class Client(ClientLike):
         dest_mod_id: int = 0,
         dest_host_id: int = 0,
         timeout: float = -1,
-    ):
+    ) -> bool:
         """Send a signal
 
         A signal is a message type without an associated data payload.
@@ -721,21 +746,24 @@ class Client(ClientLike):
 
         Args:
             signal_type: Numeric message type ID of signal
-            dest_mod_id (optional): Specific module ID to send to. Defaults to 0 (broadcast).
-            dest_host_id (optional): Specific host ID to send to. Defaults to 0 (broadcast).
+            dest_mod_id (optional): Specific module ID to send to, static or
+                dynamic. Defaults to 0 (broadcast).
+            dest_host_id (optional): Specific host ID to send to, or
+                ``ALL_HOSTS``. Defaults to 0 (broadcast).
             timeout (optional): Timeout in seconds to wait for socket to be available for sending.
-                Defaults to -1 (blocking).
+                Defaults to -1 (blocking). Once sending starts, the signal is
+                sent whole.
 
         Raises:
             InvalidDestinationModule: Specified destination module is invalid
             InvalidDestinationHost: Specified destination host is invalid
-        """
-        # Verify that the module & host ids are valid
-        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULES:
-            raise InvalidDestinationModule(f"Invalid dest_mod_id  of [{dest_mod_id}]")
+            ConnectionLost: The connection failed. The client is disconnected.
 
-        if dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS:
-            raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
+        Returns:
+            True if the signal was sent, False if the socket wasn't writable
+            within the timeout and the signal was dropped.
+        """
+        _check_destination(dest_mod_id, dest_host_id)
 
         if timeout >= 0:
             readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
@@ -761,10 +789,11 @@ class Client(ClientLike):
             self._sendall(header, self._header_size)
 
             self._msg_count += 1
+            return True
 
-        else:
-            # Socket was not ready to receive data. Drop the packet.
-            print("x", end="")
+        # The socket wasn't writable in time: drop the message.
+        _log.debug("Dropped message type %d: the socket wasn't writable.", signal_type)
+        return False
 
     @requires_connection
     def send_message(
@@ -773,7 +802,7 @@ class Client(ClientLike):
         dest_mod_id: int = 0,
         dest_host_id: int = 0,
         timeout: float = -1,
-    ):
+    ) -> bool:
         """Send a message
 
         A message is a packet that contains a defined data payload.
@@ -781,21 +810,24 @@ class Client(ClientLike):
 
         Args:
             msg_data: Object containing the message to send
-            dest_mod_id (optional): Specific module ID to send to. Defaults to 0 (broadcast).
-            dest_host_id (optional): Specific host ID to send to. Defaults to 0 (broadcast).
+            dest_mod_id (optional): Specific module ID to send to, static or
+                dynamic. Defaults to 0 (broadcast).
+            dest_host_id (optional): Specific host ID to send to, or
+                ``ALL_HOSTS``. Defaults to 0 (broadcast).
             timeout (optional): Timeout in seconds to wait for socket to be available for sending.
-                Defaults to -1 (blocking).
+                Defaults to -1 (blocking). Once sending starts, the message is
+                sent whole.
 
         Raises:
             InvalidDestinationModule: Specified destination module is invalid
             InvalidDestinationHost: Specified destination host is invalid
-        """
-        # Verify that the module & host ids are valid
-        if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULE_ID:
-            raise InvalidDestinationModule(f"Invalid dest_mod_id of [{dest_mod_id}]")
+            ConnectionLost: The connection failed. The client is disconnected.
 
-        if dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS:
-            raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
+        Returns:
+            True if the message was sent, False if the socket wasn't writable
+            within the timeout and the message was dropped.
+        """
+        _check_destination(dest_mod_id, dest_host_id)
 
         if timeout >= 0:
             readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
@@ -836,10 +868,13 @@ class Client(ClientLike):
                 self._sendall(msg_data, num_data_bytes)
 
             self._msg_count += 1
+            return True
 
-        else:
-            # Socket was not ready to receive data. Drop the packet.
-            print("x", end="")
+        # The socket wasn't writable in time: drop the message.
+        _log.debug(
+            "Dropped message type %d: the socket wasn't writable.", msg_data.type_id
+        )
+        return False
 
     @requires_connection
     def forward_message(
@@ -847,7 +882,7 @@ class Client(ClientLike):
         msg_hdr: MessageHeader,
         msg_data: Optional[MessageData] = None,
         timeout: float = -1,
-    ):
+    ) -> bool:
         """Forward a message
 
         A message is a packet that contains a defined data payload.
@@ -857,8 +892,15 @@ class Client(ClientLike):
             msg_hdr: Object containing RTMA header to send
             msg_data: Object containing the message to send
             timeout (optional): Timeout in seconds to wait for socket to be available for sending.
-                Defaults to -1 (blocking).
+                Defaults to -1 (blocking). Once sending starts, the message is
+                sent whole.
 
+        Raises:
+            ConnectionLost: The connection failed. The client is disconnected.
+
+        Returns:
+            True if the message was sent, False if the socket wasn't writable
+            within the timeout and the message was dropped.
         """
         # Assume that msg_type, num_data_bytes, data - have been filled in
         if msg_data is not None:
@@ -877,10 +919,13 @@ class Client(ClientLike):
                 self._sendall(msg_data, ctypes.sizeof(msg_data))
 
             self._msg_count += 1
+            return True
 
-        else:
-            # Socket was not ready to write data. Drop the packet.
-            print("x", end="")
+        # The socket wasn't writable in time: drop the message.
+        _log.debug(
+            "Dropped message type %d: the socket wasn't writable.", msg_hdr.msg_type
+        )
+        return False
 
     def _sendall(
         self,

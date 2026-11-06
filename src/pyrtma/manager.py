@@ -1069,7 +1069,10 @@ class MessageManager(ClientLike):
             )
             return
 
-        if dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS:
+        # ALL_HOSTS is valid too. Host IDs don't affect routing otherwise.
+        if dest_host_id != cd.ALL_HOSTS and (
+            dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS
+        ):
             self.logger.error(
                 f"MessageManager::forward_message: Got invalid dest_host_id [{dest_host_id}] from {src_name}"
             )

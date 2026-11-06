@@ -252,6 +252,11 @@ Most receive tests use `scripted_client`, a client connected to the `scripted_ma
 
 | Test | Purpose | Approach |
 |---|---|---|
+| `test_signal_reaches_a_dynamically_assigned_module` | H4: `send_signal` to a module with a dynamic ID is sent and delivered, instead of raising `InvalidDestinationModule`. | Two `client_factory` clients; `LM_READY` is signalled to the receiver's assigned ID until it arrives. |
+| `test_all_hosts_is_accepted` | H4: `send_message` and `send_signal` accept `ALL_HOSTS`, and the manager forwards the message instead of rejecting it. | Parametrized over both methods; resends `LM_READY` to `ALL_HOSTS` until the receiver reads it, and checks its header. |
+| `test_invalid_destinations_are_rejected` | H4: both methods still reject module IDs below 0 or above `MAX_MODULE_ID`, and host IDs outside 0 to `MAX_HOSTS` other than `ALL_HOSTS`. | Parametrized over both methods and five destinations, including `ALL_HOSTS - 1`, on `scripted_client`. |
+| `test_sends_report_success` | Client Low (silent dropped packet): the three send methods return `True` when they send. | `send_message`, `send_signal` with `timeout=0`, and `forward_message`, on `scripted_client`. |
+| `test_unwritable_socket_reports_a_dropped_send` | Client Low (silent dropped packet): when the socket isn't writable within the timeout, each send method returns `False`, prints nothing, and the client stays connected. | A stand-in that never reads; `fill_send_buffer()` writes raw bytes to the client's socket until `select()` reports it unwritable, then each method is called with `timeout=0`. |
 | `test_send_waits_for_room_in_the_socket` | Client receive: with the socket non-blocking, a send that finds the socket's buffer full waits and carries on, and every byte arrives in order. | A stand-in with a 4 KiB receive buffer and a client with a 4 KiB send buffer; a thread sends 4,000 `TEST_MSG_8192` messages, about 33 MB, while the stand-in reads them all, then each header and the payload's first byte are checked. Fails with a plain `sendall`. |
 
 ### TestSubscriptions

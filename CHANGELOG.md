@@ -22,6 +22,7 @@ that makes them. The version number is chosen at release time.
 
 ### Changed
 
+- `Client.send_message`, `send_signal` and `forward_message` return `True` when the message was sent and `False` when the socket wasn't writable within the caller's `timeout` and the message was dropped. They used to return `None` and print `x`; the drop is now logged at debug level on the `pyrtma.client` logger. With the default timeout, which blocks, they always return `True` or raise.
 - `Client.unsubscribe_from_all()`, and so `reset_subscriptions()`, also forgets paused subscriptions, so a later `resume_all_subscriptions()` doesn't subscribe to them again.
 - `Client.pause_subscription([ALL_MESSAGE_TYPES])` records what it paused: `ALL_MESSAGE_TYPES` itself, or every individually subscribed type, all of which the manager drops. `resume_all_subscriptions()` restores them; it used to resume nothing.
 - The subscription context managers revert only types still in the state they left them, so changes the body made to those types stand, and restore nothing once the client has disconnected. A `subscription_context()` for `ALL_MESSAGE_TYPES` restores the individual and paused subscriptions it replaced.
@@ -59,6 +60,7 @@ that makes them. The version number is chosen at release time.
 
 ### Fixed
 
+- `Client.send_signal` accepts dynamic module IDs, as `send_message` does; it used to reject any ID above 256. Both accept `dest_host_id=ALL_HOSTS`, and so does the message manager, which used to log an error and drop such a message.
 - A `Client` whose constructor raises, for example for an out-of-range module ID, no longer raises `AttributeError` from `__del__` when it is collected.
 - The `connect()` docstring no longer says that logger modules are subscribed to all message types automatically; they aren't.
 - `Client.subscribe`, `unsubscribe`, `pause_subscription` and `resume_subscription` accept any iterable. A generator used to change nothing, because it was empty after a first pass.
