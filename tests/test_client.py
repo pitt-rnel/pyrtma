@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import gc
 import itertools
 import select
 import socket
+import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -64,6 +66,20 @@ def test_options_after_host_id_are_keyword_only(
 def test_timecode_argument_is_rejected(factory: Any) -> None:
     with pytest.raises(TypeError, match="timecode"):
         factory(timecode=True)
+
+
+@pytest.mark.parametrize("module_id", [-1, cd.DYN_MOD_ID_START])
+def test_failed_constructor_leaves_no_unraisable_exception(
+    monkeypatch: pytest.MonkeyPatch, module_id: int
+) -> None:
+    unraisable: list[Any] = []
+    monkeypatch.setattr(sys, "unraisablehook", unraisable.append)
+
+    with pytest.raises(ValueError):
+        Client(module_id=module_id)
+    gc.collect()
+
+    assert unraisable == []
 
 
 def start_message(test_id: int) -> bytes:

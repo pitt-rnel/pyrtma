@@ -59,6 +59,8 @@ that makes them. The version number is chosen at release time.
 
 ### Fixed
 
+- A `Client` whose constructor raises, for example for an out-of-range module ID, no longer raises `AttributeError` from `__del__` when it is collected.
+- The `connect()` docstring no longer says that logger modules are subscribed to all message types automatically; they aren't.
 - `Client.subscribe`, `unsubscribe`, `pause_subscription` and `resume_subscription` accept any iterable. A generator used to change nothing, because it was empty after a first pass.
 - `Client.subscription_context()` and `paused_subscription_context()` restore subscriptions when the body raises. With some lists they also used to skip types while checking them: a context could unsubscribe a type that was subscribed before it, or subscribe on exit a type that never was.
 - `Client.read_message(timeout)` honors its timeout as one deadline for the whole call. Each message the client wasn't subscribed to, such as the ACK the manager sends for every subscription change, used to restart the full timeout, so a steady stream of them could block the read indefinitely.

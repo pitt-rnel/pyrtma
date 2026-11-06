@@ -225,6 +225,7 @@ Most receive tests use `scripted_client`, a client connected to the `scripted_ma
 |---|---|---|
 | `test_options_after_host_id_are_keyword_only` | Timecode removal: `Client` and `client_context` arguments after `host_id` are keyword-only, so an old positional call that passed `timecode` fails instead of shifting the arguments after it. | Parametrized over both; a third positional argument for `Client`, a fifth for `client_context`. |
 | `test_timecode_argument_is_rejected` | Timecode removal: `Client` and `client_context` no longer accept `timecode`. | Parametrized over both; passes `timecode=True` and expects a `TypeError` naming it. |
+| `test_failed_constructor_leaves_no_unraisable_exception` | Client `__del__`: a `Client` whose constructor raises is collected without an exception from `__del__`. | Parametrized over module IDs -1 and 10000, both out of range; `sys.unraisablehook` is replaced to collect what `__del__` raises. |
 
 ### TestReceive
 

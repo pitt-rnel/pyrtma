@@ -283,7 +283,8 @@ class Client(ClientLike):
         return self._definitions.module_id_from_name(module_name)
 
     def __del__(self):
-        if self._connected:
+        # getattr: the constructor may have raised before setting _connected.
+        if getattr(self, "_connected", False):
             try:
                 self.disconnect()
             except Exception:
@@ -388,7 +389,12 @@ class Client(ClientLike):
             server_name (optional): IP_addr:port_num string associated with message manager.
                 Defaults to "localhost:7111".
             logger_status (optional): Flag to declare client as a logger module.
-                Logger modules are automatically subscribed to all message types.
+                A logger module is sent the messages it subscribes to even when
+                they are addressed to another module, and copies of other
+                modules' ACKs, and by default the manager waits for it rather
+                than dropping messages. It isn't subscribed to anything
+                automatically: subscribe to ``ALL_MESSAGE_TYPES`` to receive
+                everything.
                 Defaults to False.
 
         Raises:
