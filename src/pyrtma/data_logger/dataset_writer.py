@@ -47,7 +47,9 @@ class DatasetWriter:
 
         self.name = name
 
-        self.client = pyrtma.Client(0, name=f"dataset.{name}")
+        self.client = pyrtma.Client(
+            0, name=f"dataset.{name}", definitions=cd.get_message_definitions()
+        )
         # Note: We don't connect. Just want to use the RTMALogger
         # self.client.connect(mm_ip)
         self.logger = self.client.logger

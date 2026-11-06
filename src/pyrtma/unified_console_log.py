@@ -72,7 +72,11 @@ class RTMA_UnifiedLog(object):
         self._stop_event = threading.Event()
         self._sleep = sleep if sleep is not None else self._stop_event.wait
 
-        self.mod = Client(name="UnifiedLog_Module")
+        # Only core messages are read, so the core definitions are given
+        # rather than auto-detected, which raises when several are loaded.
+        self.mod = Client(
+            name="UnifiedLog_Module", definitions=cd.get_message_definitions()
+        )
         self.local_log = self.mod.logger
         self.mod.logger.enable_rtma = False
         self.mod.logger.set_all_levels(log_level)

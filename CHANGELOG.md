@@ -24,6 +24,9 @@ that makes them. The version number is chosen at release time.
 
 ### Changed
 
+- When a `Client` is created without `definitions` and `PYRTMA_MSGDEF_MODULES` doesn't choose a module, auto-detection raises `MessageDefinitionsLoadError` if more than one compiled definitions module is loaded, naming them; pass `definitions=` to choose. It used to pick one by the order of a set of module names, which could change from run to run. Modules that share one `get_message_definitions`, as after `from defs import *`, count as one. With one definitions module loaded, nothing changes.
+- `RTMA_UnifiedLog`, the data logger's command-line interface and `DatasetWriter` create their clients with the core definitions, which are all they use, instead of auto-detecting them.
+- `load_message_definitions` loads each file once: loading the same path again returns the same module and classes rather than executing the file again.
 - `Client.disconnect()` no longer sleeps for 100 ms. It sends `DISCONNECT`, shuts down its sending side, and waits up to 100 ms for the manager to close its end, which usually takes about a millisecond. A client collected by the garbage collector sends `DISCONNECT` if there is room and closes without waiting.
 - A client with a static module ID completes `connect()` only on an ACK addressed to it, or to module 0. A logger is sent copies of other modules' ACKs and used to take the first one. A client asking for a dynamic ID still takes the first ACK, which the manager sends first on a new connection.
 - `Client.send_message`, `send_signal` and `forward_message` return `True` when the message was sent and `False` when the socket wasn't writable within the caller's `timeout` and the message was dropped. They used to return `None` and print `x`; the drop is now logged at debug level on the `pyrtma.client` logger. With the default timeout, which blocks, they always return `True` or raise.
@@ -64,6 +67,7 @@ that makes them. The version number is chosen at release time.
 
 ### Fixed
 
+- A definitions file that fails to import is no longer left half-initialized in `sys.modules`, so loading it again after a fix works. An exception from its `get_message_definitions()` is raised as `MessageDefinitionsLoadError`.
 - `Client.connect` raises `MessageManagerNotFound` for every failure to reach the manager, including a host name that can't be resolved, an unreachable host and a timeout, which used to escape as raw `OSError`s. A malformed server name raises `ValueError`. However `connect()` fails, the client is left disconnected with its socket closed; after an `AcknowledgementTimeout` it used to report itself connected.
 - `client_context` passes `auto_detect` to the client, and disconnects it when the body raises.
 - `Client.send_signal` accepts dynamic module IDs, as `send_message` does; it used to reject any ID above 256. Both accept `dest_host_id=ALL_HOSTS`, and so does the message manager, which used to log an error and drop such a message.

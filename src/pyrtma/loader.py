@@ -47,7 +47,26 @@ def _module_name_for_path(path: pathlib.Path) -> str:
 
 
 def _load_module(path: pathlib.Path) -> ModuleType:
+    """Import a definitions file once, and return it.
+
+    A file that has been loaded already isn't executed again, so its classes
+    stay the same objects, as with an ordinary import. A file that fails to
+    import is taken out of ``sys.modules`` again.
+
+    Args:
+        path: The file's resolved path.
+
+    Returns:
+        The module.
+
+    Raises:
+        MessageDefinitionsLoadError: The file couldn't be imported.
+    """
     module_name = _module_name_for_path(path)
+    loaded = sys.modules.get(module_name)
+    if loaded is not None:
+        return loaded
+
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
         raise MessageDefinitionsLoadError(
@@ -59,6 +78,8 @@ def _load_module(path: pathlib.Path) -> ModuleType:
     try:
         spec.loader.exec_module(module)
     except Exception as e:
+        # Don't leave a half-initialized module behind for the next load.
+        sys.modules.pop(module_name, None)
         raise MessageDefinitionsLoadError(
             f"Failed to import message definitions file: {path}"
         ) from e
@@ -90,7 +111,12 @@ def load_message_definitions(path: str | pathlib.Path) -> MessageDefinitions:
         )
         return build_message_definitions_from_module(module)
 
-    defs = getter()
+    try:
+        defs = getter()
+    except Exception as e:
+        raise MessageDefinitionsLoadError(
+            f"get_message_definitions() failed in message definitions file: {defs_path}"
+        ) from e
     if not isinstance(defs, MessageDefinitions):
         raise MessageDefinitionsContractError(
             "get_message_definitions() did not return a MessageDefinitions instance"

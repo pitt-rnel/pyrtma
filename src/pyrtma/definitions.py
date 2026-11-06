@@ -112,7 +112,7 @@ def build_message_definitions(module_name: str) -> MessageDefinitions:
         elif k.isupper():
             if isinstance(v, (int, float, str)):
                 constants[k] = v
-            elif hasattr(v, "__name__") and v.__name__ is not k:
+            elif hasattr(v, "__name__") and v.__name__ != k:
                 typedefs[k] = v
 
     msg_defs: Dict[int, Type[MessageData]] = {}

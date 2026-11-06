@@ -288,6 +288,19 @@ Most receive tests use `scripted_client`, a client connected to the `scripted_ma
 | `test_client_context_passes_auto_detect` | H8: `client_context(auto_detect=False)` gives a client with the core definitions only, though compiled test definitions are loaded. | Looks up the name of `TEST_START`, which only the test definitions have. |
 | `test_client_context_disconnects_when_the_body_raises` | H8: when the body raises, the client is disconnected and the manager removes it. | A body that raises `RuntimeError`; then checks `connected` and the manager's table. |
 
+### TestDefinitions
+
+These tests use `isolated_modules`, which takes every loaded definitions module out of `sys.modules` and clears `PYRTMA_MSGDEF_MODULES` for the test, and `definitions_module()`, which adds a stand-in compiled module whose `get_message_definitions()` returns the definitions given. Nothing connects.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_two_definitions_modules_raise` | H7: with two definitions modules loaded, auto-detection raises `MessageDefinitionsLoadError` naming both, in every run, instead of picking one by set order. | Two stand-ins, one with the test definitions and one with the core definitions. |
+| `test_star_import_of_definitions_is_not_ambiguous` | H7: a module that star-imports a definitions module shares its `get_message_definitions`, and doesn't count as a second one. | A stand-in, and a script module given the same function and version. |
+| `test_single_definitions_module_is_used` | H7: one loaded definitions module is used. | One stand-in; compares the client's definitions by identity. |
+| `test_no_definitions_module_uses_core_defs` | H7: with no definitions module loaded, the client uses the core definitions. | Looks up `TEST_START` and `ACKNOWLEDGE`. |
+| `test_env_var_chooses_among_loaded_modules` | H7: `PYRTMA_MSGDEF_MODULES` picks the first listed module that is loaded and has definitions, without auto-detection, so two loaded modules don't raise. | Two stand-ins; the variable lists a missing module, then the second stand-in. |
+| `test_env_var_does_not_import_modules` | H7: `PYRTMA_MSGDEF_MODULES` only looks in `sys.modules` and never imports, as designed. | Names the compiled test definitions, which are importable but taken out of `sys.modules`; they must stay out, and the client falls back to the core definitions. |
+
 ### TestSubscriptions
 
 | Test | Purpose | Approach |
@@ -470,6 +483,15 @@ Each test starts a `MessageManager` on an unused loopback port in `setUp` and co
 | `test_json` | `to_json()` and `from_json()` round-trip every test-definition message. | As above, comparing the JSON strings. |
 
 ## test_message_definitions.py — loading compiled definitions (needs: none)
+
+The module-level tests load files written to `tmp_path`, so each test's file has its own module name in `sys.modules`.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_failed_import_leaves_nothing_in_sys_modules` | Loader and definitions: a definitions file that raises while importing leaves no half-initialized module in `sys.modules`. | A file that raises `RuntimeError`; compares the loader's `_pyrtma_defs_` modules before and after. |
+| `test_failed_import_can_be_retried` | Loader and definitions: once the file is fixed, loading it again works, so a failed import isn't cached. | The broken file is replaced by a copy of the compiled test definitions and loaded again. |
+| `test_loading_a_file_twice_gives_the_same_classes` | Loader and definitions: loading the same file twice returns the same message classes, instead of executing it again. | A copy of the compiled test definitions, loaded twice; compares the `TEST_START` classes by identity. |
+| `test_errors_from_get_message_definitions_are_wrapped` | Loader and definitions: an exception from the file's `get_message_definitions()` is raised as `MessageDefinitionsLoadError`, with the original as its cause. | A file whose `get_message_definitions()` raises `KeyError`. |
 
 ### TestMessageDefinitions
 

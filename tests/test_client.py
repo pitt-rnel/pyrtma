@@ -5,6 +5,7 @@ from __future__ import annotations
 import gc
 import itertools
 import select
+import types
 import socket
 import sys
 import threading
@@ -24,10 +25,13 @@ from pyrtma.exceptions import (
     InvalidDestinationHost,
     InvalidDestinationModule,
     InvalidMessageDefinition,
+    MessageDefinitionsLoadError,
     MessageManagerNotFound,
     UnknownMessageType,
 )
+from pyrtma.definitions import MessageDefinitions
 from pyrtma.header import MessageHeader
+from pyrtma.loader import is_message_definitions_module
 from pyrtma.message import Message
 
 from .helpers import (
@@ -846,6 +850,120 @@ class TestClientContext:
                 m.mod_id != module_id for m in list(manager.manager.modules.values())
             )
         )
+
+
+@pytest.fixture
+def isolated_modules(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
+    """Take every loaded definitions module out of ``sys.modules`` for a test.
+
+    The suite loads several, so auto-detection would otherwise see them. The
+    ``PYRTMA_MSGDEF_MODULES`` variable is cleared too. Both are restored
+    afterwards.
+
+    Args:
+        monkeypatch: pytest's monkeypatch fixture.
+
+    Returns:
+        The same monkeypatch, for the test to add modules with.
+    """
+    for name, module in list(sys.modules.items()):
+        if module is not None and is_message_definitions_module(module):
+            monkeypatch.delitem(sys.modules, name)
+    monkeypatch.delenv("PYRTMA_MSGDEF_MODULES", raising=False)
+    return monkeypatch
+
+
+def definitions_module(
+    monkeypatch: pytest.MonkeyPatch, name: str, defs: MessageDefinitions
+) -> types.ModuleType:
+    """Put a stand-in compiled definitions module into ``sys.modules``.
+
+    Args:
+        monkeypatch: Undoes the change after the test.
+        name: The module's name.
+        defs: What its ``get_message_definitions()`` returns.
+
+    Returns:
+        The module.
+    """
+    module = types.ModuleType(name)
+    module.COMPILED_PYRTMA_VERSION = cd.COMPILED_PYRTMA_VERSION  # type: ignore[attr-defined]
+    module.get_message_definitions = lambda: defs  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, name, module)
+    return module
+
+
+class TestDefinitions:
+    def test_two_definitions_modules_raise(
+        self, isolated_modules: pytest.MonkeyPatch
+    ) -> None:
+        definitions_module(isolated_modules, "lab_defs", td.get_message_definitions())
+        definitions_module(isolated_modules, "rig_defs", cd.get_message_definitions())
+
+        with pytest.raises(MessageDefinitionsLoadError) as info:
+            Client(name="ambiguous")
+
+        assert "lab_defs" in str(info.value)
+        assert "rig_defs" in str(info.value)
+
+    def test_star_import_of_definitions_is_not_ambiguous(
+        self, isolated_modules: pytest.MonkeyPatch
+    ) -> None:
+        # "from lab_defs import *" in a script copies get_message_definitions
+        # into it, so the script looks like a second definitions module.
+        defs = td.get_message_definitions()
+        lab_defs = definitions_module(isolated_modules, "lab_defs", defs)
+        script = types.ModuleType("lab_script")
+        script.COMPILED_PYRTMA_VERSION = lab_defs.COMPILED_PYRTMA_VERSION  # type: ignore[attr-defined]
+        script.get_message_definitions = lab_defs.get_message_definitions  # type: ignore[attr-defined]
+        isolated_modules.setitem(sys.modules, "lab_script", script)
+
+        client = Client(name="script")
+
+        assert client.definitions is defs
+
+    def test_single_definitions_module_is_used(
+        self, isolated_modules: pytest.MonkeyPatch
+    ) -> None:
+        defs = td.get_message_definitions()
+        definitions_module(isolated_modules, "lab_defs", defs)
+
+        client = Client(name="single")
+
+        assert client.definitions is defs
+
+    def test_no_definitions_module_uses_core_defs(
+        self, isolated_modules: pytest.MonkeyPatch
+    ) -> None:
+        client = Client(name="core")
+
+        assert client.message_name_from_id(td.MT_TEST_START) is None
+        assert client.message_id_from_name("ACKNOWLEDGE") == cd.MT_ACKNOWLEDGE
+
+    def test_env_var_chooses_among_loaded_modules(
+        self, isolated_modules: pytest.MonkeyPatch
+    ) -> None:
+        defs = td.get_message_definitions()
+        definitions_module(isolated_modules, "lab_defs", cd.get_message_definitions())
+        definitions_module(isolated_modules, "rig_defs", defs)
+        isolated_modules.setenv("PYRTMA_MSGDEF_MODULES", "missing_defs;rig_defs")
+
+        client = Client(name="chosen")
+
+        assert client.definitions is defs
+
+    def test_env_var_does_not_import_modules(
+        self, isolated_modules: pytest.MonkeyPatch
+    ) -> None:
+        # The compiled test definitions are importable, but taken out of
+        # sys.modules by the fixture; the variable must not bring them back.
+        name = "tests.test_msg_defs.test_defs"
+        isolated_modules.setenv("PYRTMA_MSGDEF_MODULES", name)
+
+        client = Client(name="unimported", auto_detect=False)
+
+        assert name not in sys.modules
+        assert client.message_name_from_id(td.MT_TEST_START) is None
 
 
 # Message types for the subscription tests. The manager forwards types it

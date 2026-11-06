@@ -57,7 +57,8 @@ def main():
     else:
         server = "127.0.0.1:7111"
 
-    mod = pyrtma.Client()
+    # Only data logger messages, which are core messages, are used.
+    mod = pyrtma.Client(definitions=cd.get_message_definitions())
     mod.connect(server)
     mod.subscribe(Dataset.DATALOGGER_TYPES)
 

@@ -255,24 +255,55 @@ class Client(ClientLike):
             self._name = name
 
     def _auto_detect_definitions(self) -> MessageDefinitions:
-        """Attempt to auto-detect message definitions from loaded modules"""
-        # Prune the modules to only those that are not built-in or standard library modules
-        mod_names = sys.modules.keys() - (
-            set(sys.builtin_module_names) | sys.stdlib_module_names
-        )
+        """Find the one compiled definitions module that has been imported.
 
-        for name in mod_names:
+        Modules that share one ``get_message_definitions`` function count as
+        one, because ``from defs import *`` copies it into the importing
+        module. Modules whose names start with ``_``, pyrtma's own, and the
+        standard library's are skipped.
+
+        Raises:
+            MessageDefinitionsLoadError: More than one definitions module is
+                loaded, so the choice would be a guess.
+
+        Returns:
+            That module's definitions, or the core definitions if there is
+            none.
+        """
+        # Prune the modules to only those that are not built-in or standard library modules
+        skipped = set(sys.builtin_module_names) | sys.stdlib_module_names
+
+        # The modules found, keyed by their get_message_definitions function,
+        # in import order. sys.modules is copied: an import in another thread
+        # can change it.
+        found: Dict[int, List[str]] = {}
+        getters: Dict[int, ModuleType] = {}
+        for name, mod in list(sys.modules.items()):
+            if name in skipped or mod is None:
+                continue
+
             if name == "pyrtma" or name.startswith("pyrtma."):
                 continue
 
             if name.startswith("_"):
                 continue
 
-            mod = sys.modules[name]
-
             if is_message_definitions_module(mod):
-                self.debug(f"Auto-detected message definitions from module: {name}")
-                return get_message_definitions_from_module(mod)
+                key = id(mod.get_message_definitions)
+                found.setdefault(key, []).append(name)
+                getters.setdefault(key, mod)
+
+        if len(found) > 1:
+            names = "; ".join(", ".join(names) for names in found.values())
+            raise MessageDefinitionsLoadError(
+                "Message definitions were found in more than one loaded module "
+                f"({names}). Pass definitions= to the client to choose one."
+            )
+
+        if found:
+            ((key, names),) = found.items()
+            self.debug(f"Auto-detected message definitions from module: {names[0]}")
+            return get_message_definitions_from_module(getters[key])
 
         # Return core_defs if no other message definitions found
         self.debug("No message definitions found in loaded modules, using core_defs")
