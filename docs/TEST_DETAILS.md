@@ -277,6 +277,23 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 | `test_lost_connection_is_retried_with_back_off` | C4: losing the manager mid-run is retried with the same back-off, starting from 0.5 s. | `start()` in a thread against a separate `ManagerHarness`, which is then stopped; the second wait stops the loop. |
 | `test_stop_interrupts_the_default_sleep` | C4: `stop()` ends the default wait between attempts at once, rather than after the delay. | A 30-second `retry_delay` and no manager; calls `stop()` after the first attempt and expects the thread to end within 5 s. |
 
+## test_web_manager.py — the websocket bridge (needs: integration for `TestProxyRead`)
+
+`StubHandler` is an `RTMAWebSocketHandler` with no websocket behind it. `socketserver` handlers do all their work in their constructor, so it skips the base constructors, sets only the proxy and `keep_alive`, reports the websocket as always ready, and collects what would be sent to it in `sent`.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_import_keeps_root_handlers` | Web manager: importing `pyrtma.web_manager` leaves the root logger's handlers alone. | A fresh interpreter adds its own root handler, imports the module, and prints whether the handlers are unchanged. |
+| `test_configure_logging_replaces_root_handlers` | Web manager: the logging setup works with no handlers at all, and replaces existing ones with one `RichHandler`. | Two stand-alone loggers, one empty and one with a `StreamHandler`. |
+| `test_defs_option_is_required` | Web manager: leaving out `--defs` is a usage error. | `parse_args()` without it; expects exit status 2 and `--defs` in the message. |
+| `test_definitions_are_loaded_once` | Web manager: `run()` loads the definitions file once, and doesn't import it by name or add its folder to `sys.path`. | A copy of the compiled test definitions in `tmp_path`; `load_message_definitions` is wrapped to count calls, and `run_forever` is replaced so the server closes at once. |
+
+### TestProxyRead
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_unsubscribed_message_does_not_block` | Web manager: reading a message the proxy isn't subscribed to returns without waiting for another. | The real manager follows such a message with an ACK, so a listening socket stands in for it: the proxy connects to it, the peer sends one `TEST_START` and nothing more, and `read_proxy_message()` runs in a thread that must finish within 5 s. |
+
 ## test_integration.py — client and manager interaction (needs: loopback sockets; not yet marked)
 
 Each test starts a `MessageManager` on an unused loopback port in `setUp` and connects one client with module ID 11 or 12. `wait_for_message()` is a fixed short sleep. Two message types defined in the file, `TEST_MESSAGE` and `TEST_MESSAGE2`, are used for subscriptions.

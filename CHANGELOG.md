@@ -18,6 +18,7 @@ that makes them. The version number is chosen at release time.
 - The manager refuses a connection that `select()` couldn't watch, with a warning, instead of stopping: past 512 sockets on Windows, or with a descriptor numbered 1024 or higher on Linux and macOS. A manager whose listening socket would be beyond that limit raises `RuntimeError` when constructed.
 - `RTMALogger.close()` removes and closes the logger's handlers. It runs by itself when the logger's client is garbage collected.
 - `RTMA_UnifiedLog(retry_delay=..., max_retry_delay=..., sleep=...)`, keyword-only, and `RTMA_UnifiedLog.stop()`, which makes `start()` return from another thread. `pyrtma.unified_console_log` also has `parse_args()` and `main()`; `python -m pyrtma.unified_console_log` runs `main()`.
+- `pyrtma.web_manager` has `parse_args()`, `run()` and `configure_logging()`, and `main()` takes an optional argument list.
 
 ### Changed
 
@@ -42,6 +43,9 @@ that makes them. The version number is chosen at release time.
 - `RTMALogHandler` no longer turns RTMA logging off when a send fails. A record whose send raises a `ClientError`, such as `ConnectionLost`, is dropped, and sending resumes after the client reconnects. Other errors are reported through `Handler.handleError`. `RTMALogger.enable_rtma` changes only when it is set.
 - RTMA log messages replace characters that aren't ASCII with `?`, one for one, in the message, name, path and function name. A path that is too long keeps its end, after `...`; a name or function name that is too long is cut. The wire format and field sizes are unchanged.
 - The unified console log waits between connection attempts while the message manager can't be reached. The wait starts at 0.5 seconds, doubles after each failure up to 5 seconds, and starts again from 0.5 seconds after each successful connection. It retries after any `ClientError` or `OSError` from connecting or reading, where it used to retry only after `MessageManagerNotFound` and `ConnectionLost`; failed attempts are logged at debug level.
+- Importing `pyrtma.web_manager` no longer changes the root logger. It used to remove the root logger's first handler, whichever that was, and add a `RichHandler`. `main()` now does the setup: it replaces every root handler with a `RichHandler`.
+- The web manager's `-d/--defs` option is marked required, so leaving it out gives a usage error with exit status 2 instead of a `TypeError`. Running it with no arguments still prints the help.
+- The web manager loads its definitions file once. It no longer also imports the file by its module name or adds its folder to `sys.path`.
 
 ### Fixed
 
@@ -64,3 +68,4 @@ that makes them. The version number is chosen at release time.
 - Setting `RTMALogger.enable_console` back to `True` after setting it to `False` adds the console handler again; it used to stay off.
 - The unified console log connects again; `connect()` was still passed the removed `allow_multiple` argument and raised `TypeError`. It no longer spins a CPU core and floods its log while the manager is absent, and its `--log-level` option works on Python 3.10, where `logging.getLevelNamesMapping()` doesn't exist.
 - The unified console log's remote logger shares the module's own client instead of a throwaway `Client()`, which was garbage collected at once.
+- The web manager's handler no longer waits for a further message when the proxy reads one it isn't subscribed to, such as a copy still in flight after the web client unsubscribed. Websocket input was not read while it waited.

@@ -3,8 +3,6 @@ import select
 import errno
 import struct
 import argparse
-import importlib
-import pathlib
 import sys
 import json
 import time
@@ -40,11 +38,7 @@ from websocket_server import (  # type: ignore
     OPCODE_TEXT,
 )
 
-from typing import Optional, List, Callable, Any, Dict, cast
-
-# use rich logging
-logging.getLogger().removeHandler(logging.getLogger().handlers[0])
-logging.getLogger().addHandler(RichHandler())
+from typing import Optional, List, Callable, Any, Dict, Sequence, cast
 
 
 class RTMAWebSocketHandler(WebSocketHandler):
@@ -103,30 +97,37 @@ class RTMAWebSocketHandler(WebSocketHandler):
                 self.read_ws_message()
 
             if self.proxy.sock in rd and self.proxy.connected:
-                try:
-                    msg = self.proxy.read_message(timeout=None, ack=True)
-                except RTMAMessageError as e:
-                    error_json = json.dumps(
-                        {"rtma_msg_error": str(e)}, separators=(",", ":")
-                    )
-                    if self.ws_ready_to_send:
-                        self.send_message(error_json)
-                    logger.error(e, stack_info=False)
-                    continue
+                self.read_proxy_message()
 
-                if msg is not None and self.keep_alive:
-                    # Pass message thru websocket as json
-                    if self.ws_ready_to_send:
-                        logger.debug(
-                            f"Forwarding message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} to ws"
-                        )
-                        self.send_message(msg.to_json(minify=True))
-                    else:
-                        if self.proxy.connected:
-                            self.send_failed_message(msg.header, time.perf_counter())
-                        logger.warning(
-                            f"Failed to foward message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} to ws. Mod ID = {self.proxy.module_id}"
-                        )
+    def read_proxy_message(self) -> None:
+        """Pass a message from the message manager on to the websocket.
+
+        Called when the proxy's socket is readable. The read doesn't wait for
+        a further message, so a message the proxy is no longer subscribed to,
+        which is dropped, doesn't hold up input from the websocket.
+        """
+        try:
+            msg = self.proxy.read_message(timeout=0, ack=True)
+        except RTMAMessageError as e:
+            error_json = json.dumps({"rtma_msg_error": str(e)}, separators=(",", ":"))
+            if self.ws_ready_to_send:
+                self.send_message(error_json)
+            logger.error(e, stack_info=False)
+            return
+
+        if msg is not None and self.keep_alive:
+            # Pass message thru websocket as json
+            if self.ws_ready_to_send:
+                logger.debug(
+                    f"Forwarding message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} to ws"
+                )
+                self.send_message(msg.to_json(minify=True))
+            else:
+                if self.proxy.connected:
+                    self.send_failed_message(msg.header, time.perf_counter())
+                logger.warning(
+                    f"Failed to foward message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} to ws. Mod ID = {self.proxy.module_id}"
+                )
 
     def pong_received(self, msg: str):
         """Log that pong was received
@@ -429,9 +430,35 @@ def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
         pass
 
 
-def main():
-    """Main function for starting web_manager"""
+def configure_logging(root: Optional[logging.Logger] = None) -> None:
+    """Send log records to the console through rich.
 
+    Called by :func:`main` rather than at import, so importing this module
+    leaves an application's logging alone. Any existing handlers, such as
+    the one ``websocket_server`` adds with ``logging.basicConfig()`` when it
+    is imported, are removed and closed.
+
+    Args:
+        root: The logger to configure, for tests. Defaults to the root logger.
+    """
+    if root is None:
+        root = logging.getLogger()
+    for handler in list(root.handlers):
+        root.removeHandler(handler)
+        handler.close()
+    root.addHandler(RichHandler())
+
+
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    """Parse the command line.
+
+    Args:
+        argv: The arguments, without the program name. Defaults to
+            ``sys.argv[1:]``.
+
+    Returns:
+        The options.
+    """
     parser = argparse.ArgumentParser(description="Websocket Message Manager")
 
     parser.add_argument(
@@ -466,17 +493,27 @@ def main():
         "--defs",
         dest="defs_file",
         type=str,
+        required=True,
         help="Path to python message definitions file. Required argument.",
     )
 
-    if len(sys.argv) == 1:
+    if argv is None:
+        argv = sys.argv[1:]
+    if len(argv) == 0:
         parser.print_help(sys.stderr)
         sys.exit(1)
-    args = parser.parse_args()
+    return parser.parse_args(argv)
 
-    base = pathlib.Path(args.defs_file).absolute().parent
-    fname = pathlib.Path(args.defs_file).stem
 
+def run(args: argparse.Namespace) -> None:
+    """Load the definitions and serve websocket clients until stopped.
+
+    Args:
+        args: Options from :func:`parse_args`.
+
+    Raises:
+        MessageDefinitionsLoadError: The definitions file can't be loaded.
+    """
     defs = load_message_definitions(args.defs_file)
 
     websocket_server = WebMessageManager(
@@ -487,10 +524,19 @@ def main():
         definitions=defs,
     )
 
-    sys.path.insert(0, (str(base.absolute())))
-    importlib.import_module(fname)
-
     websocket_server.run_forever()
+
+
+def main(argv: Optional[Sequence[str]] = None) -> None:
+    """Main function for starting web_manager
+
+    Args:
+        argv: The arguments, without the program name. Defaults to
+            ``sys.argv[1:]``.
+    """
+    args = parse_args(argv)
+    configure_logging()
+    run(args)
 
 
 if __name__ == "__main__":
