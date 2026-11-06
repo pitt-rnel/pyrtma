@@ -247,6 +247,7 @@ Most receive tests use `scripted_client`, a client connected to the `scripted_ma
 | `test_unsubscribed_message_of_unknown_type_is_skipped` | Client receive: a message of an unknown type that the client isn't subscribed to is discarded without raising. | An unknown-type message, then a `TEST_START` the client is subscribed to. |
 | `test_subscribed_message_of_unknown_type_raises` | Client receive: a subscribed message of an unknown type still raises `UnknownMessageType` with its raw payload, and the next message reads correctly. Already right before the fix. | Subscribes to the unknown type and `TEST_START`, and sends one of each. |
 | `test_subscribed_message_of_wrong_size_raises` | Client receive: a subscribed message whose size doesn't match its definition still raises `InvalidMessageDefinition`, and the next message reads correctly. Already right before the fix. | A `TEST_START` with an 8-byte payload instead of 4, then a correct one. |
+| `test_decode_errors_carry_the_header` | C5: `UnknownMessageType` and `InvalidMessageDefinition` raised while reading carry the message's header, so a data logger can tell which type it couldn't record. | Parametrized over a type the definitions don't have and a `TEST_START` of 8 bytes; checks `header.msg_type` on the exception. |
 | `test_discard_messages_empties_the_queue` | H1: `discard_messages()` discards every message that has arrived, subscribed or not, of any type, and returns True. | Ten rounds of an ACK, a `TEST_START` and an unknown-type message; afterwards the socket must have nothing to read. |
 | `test_discard_messages_reports_messages_left_at_its_timeout` | H1: `discard_messages()` returns False when its timeout ends with messages still waiting, and True once they're gone. | 200 ACKs; `discard_messages(timeout=0)`, then `discard_messages()`. |
 | `test_reset_subscriptions_leaves_nothing_queued` | H1: `reset_subscriptions()` unsubscribes from everything and leaves nothing queued. | 25 rounds of an ACK and a `TEST_START`; the stand-in doesn't ACK the unsubscribes, so anything left was queued before the reset. |
@@ -421,9 +422,50 @@ The `handler` fixture gives a `StubHandler` whose proxy already has a socket to 
 | `test_connect_v2_after_connect_updates_name` | Manager connect messages: a `CONNECT_V2` after the web client's `CONNECT` updates the proxy's name, which the manager announces with a new `HELLO`, without a second ACK to the web client and without a change of module ID. | `handle_connect()`, then `handle_connect_v2()` named "late-page". A wait for an ACK would time out and send an error to the websocket. |
 | `test_connect_after_connect_v2_is_ignored` | Manager connect messages: a `CONNECT` after the web client's `CONNECT_V2` changes nothing and sends nothing. | `handle_connect_v2()` named "page", then `handle_connect()`. |
 
+## test_data_logger.py — `DataLogger` with a real manager, and its entry point (needs: integration)
+
+The `data_logger` fixture runs a `DataLogger` in a thread against the `manager` fixture, with the test definitions and a `FakeClock` for its datasets, and stops it with `stop()` at teardown; if `run()` raises, the `thread_exceptions` fixture fails the test. The `controller` fixture is a client subscribed to `Dataset.DATALOGGER_TYPES` that sends the requests. `wait_for_logger()` sends `DATA_LOGGER_CONFIG_REQUEST` until a `DATA_LOGGER_CONFIG` comes back, which shows the logger's and the client's subscriptions are in place; because the logger answers requests in order, the same exchange also serves as a barrier after other requests. Datasets record with the `json` formatter into `tmp_path`. `StaleTestStart` is `TEST_START` with 8 bytes instead of 4, as an out-of-date definition would send it, and `UnknownMessage` is type 7777, which the logger's definitions don't have. `events()` lists the dataset events (`DATA_LOGGER_ERROR`, `STARTED`, `STOPPED`, `SAVED`, `REMOVED`) about one dataset, in the order they arrived.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_main_exits_cleanly_without_manager` | Low: `python -m pyrtma.data_logger` with no manager running exits with status 1 and a one-line error, rather than a traceback. | Calls `main()` with `-m` set to a free port and `-d` the test definitions, and checks `SystemExit` and stderr. |
+
+### TestUndecodableMessages
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_stops_only_datasets_that_record_it` | C5: a message the logger's definitions can't decode doesn't stop the logger. A dataset that records it is stopped and reported, in order, with `DATA_LOGGER_ERROR` naming the type and error, `DATASET_STOPPED`, `DATASET_SAVED` and `DATASET_REMOVED`, and its file is kept. A dataset that doesn't record that type keeps recording. | Parametrized over a stale `TEST_START` and an unknown type; one dataset records everything, one only `TEST_END`, which is sent afterwards and must be in its file. |
+| `test_unrecorded_type_is_warned_about_once` | C5: messages that can't be decoded and that no dataset records are warned about once per type and error, not once each, and recording carries on. | Three stale `TEST_START`s with only a `TEST_END` dataset recording; counts the warnings with `caplog` and asks for the dataset's status. |
+
+### TestDatasetFailures
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_writer_failure_is_reported_while_others_record` | C5: a dataset whose writer fails is reported with `DATA_LOGGER_ERROR` naming the error, then `DATASET_STOPPED` and `DATASET_REMOVED`, while another dataset keeps recording. | A formatter that fails as on a full disk, registered for the test, and a `json` dataset; the clock is advanced past a write period. |
+| `test_failing_request_handler_is_reported` | C5: a request whose handling raises something other than a `DataLoggerError` is reported with `DATA_LOGGER_ERROR` naming the exception, and the logger keeps answering. | Replaces the logger's `send_config` with one that raises `RuntimeError`, then adds a dataset. |
+
+### TestRequests
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_start_all_twice_is_harmless` | C5: a second `DATASET_START "all"` skips the dataset that is already recording, without an error, and it keeps recording. | Starts all twice, then a config barrier and a status request. |
+| `test_directed_request_is_answered_to_its_sender` | C6: a request addressed to the logger is answered to its sender only, and a broadcast request is still answered with a broadcast that other modules see. | An observer subscribed to the replies; a directed `DATASET_ADD`, then a broadcast one as a marker, which the observer must receive without the first. |
+| `test_request_addressed_to_another_module_is_ignored` | Data logger requests: a request addressed to another module, which the manager copies to logger modules, isn't acted on. | A `DATASET_ADD` addressed to another client, then a config request, which must list no datasets. |
+| `test_full_logger_refuses_before_creating_folders` | Data logger: with `MAX_DATASETS` datasets configured, another is refused with `DataLoggerFullError` before its save folder is created. | Adds six datasets, then a seventh with a new folder. |
+| `test_duplicate_name_refused_before_creating_folders` | Data logger: a second dataset with a name in use is refused with `DatasetExistsError` before its save folder is created. | Two datasets named `same`, in different folders. |
+| `test_duplicate_file_is_refused_when_added` | Data logger: a dataset that would write to another dataset's file is refused when it is added, with an error naming that dataset. | Two datasets with the same folder, file name and formatter. |
+
+### TestRemoval
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_reset_reports_saved_files` | Data logger requests: `DATA_LOGGER_RESET` reports each recording dataset's saved file before removing it, rather than removing it before the writer finishes. | Resets while one dataset records. |
+| `test_remove_after_stop_reports_saved_file_once` | Data logger requests: `DATASET_REMOVE` right after `DATASET_STOP` waits for the file, so `DATASET_SAVED` comes before `DATASET_REMOVED`, and each is sent once. | Sends both requests back to back, then a config barrier to collect anything late. |
+| `test_exit_reports_stopped_and_saved` | Data logger requests: when the logger stops, a recording dataset's `DATASET_STOPPED` and `DATASET_SAVED` are sent before it disconnects, and the file is finished. | Calls `stop()` while a dataset records. |
+
 ## test_dataset_writer.py — `DatasetWriter`: write failures, slow writes, pause and resume, and its files (needs: none)
 
-Each writer saves to `tmp_path` with a stand-in formatter registered as `stub` for the test. It writes a header line, one line per message (the message's `name` field) and a footer line, and flushes after each write. Its writes can be held at a gate, which shows when a write has begun, or made to raise; so can its constructor. Writers take a `FakeClock` that moves only when the test advances it, so write periods and subdivisions need no waiting. `write_now()` advances past a write period and calls `update()`. The `make_writer` fixture stops every writer and joins its thread at teardown.
+Each writer saves to `tmp_path` with a stand-in formatter registered as `stub` for the test. It writes a header line, one line per message (the message's `name` field) and a footer line, and flushes after each write. Its writes can be held at a gate, which shows when a write has begun, or made to raise; so can its constructor. Writers take a `FakeClock` from `helpers.py`, which moves only when the test advances it, so write periods and subdivisions need no waiting. `write_now()` advances past a write period and calls `update()`. The `make_writer` fixture stops every writer and joins its thread at teardown.
 
 ### TestWriterFailure
 

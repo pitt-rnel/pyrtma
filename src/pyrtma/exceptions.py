@@ -1,7 +1,17 @@
-class RTMAMessageError(Exception):
-    """Base exception for message errors."""
+from typing import Any, Optional
 
-    pass
+
+class RTMAMessageError(Exception):
+    """Base exception for message errors.
+
+    Attributes:
+        header: The header of the received message that caused the error, when
+            a client raised it while reading; otherwise None. A data logger
+            uses it to tell which message type it couldn't record.
+    """
+
+    # Typed as Any to avoid importing the header module here.
+    header: Optional[Any] = None
 
 
 class UnknownMessageType(RTMAMessageError):

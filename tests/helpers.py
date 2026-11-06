@@ -112,6 +112,27 @@ def wait_for(
         sleep(interval)
 
 
+class FakeClock:
+    """A clock that only moves when the test advances it.
+
+    Reading it from several threads is safe; it is only advanced by the test.
+    """
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        """Move the clock forward.
+
+        Args:
+            seconds: How far.
+        """
+        self.now += seconds
+
+
 def deliver(
     sender: Client,
     receiver: Client,

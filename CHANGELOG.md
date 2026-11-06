@@ -22,6 +22,9 @@ that makes them. The version number is chosen at release time.
 - `RTMA_UnifiedLog(retry_delay=..., max_retry_delay=..., sleep=...)`, keyword-only, and `RTMA_UnifiedLog.stop()`, which makes `start()` return from another thread. `pyrtma.unified_console_log` also has `parse_args()` and `main()`; `python -m pyrtma.unified_console_log` runs `main()`.
 - `pyrtma.web_manager` has `parse_args()`, `run()` and `configure_logging()`, and `main()` takes an optional argument list.
 - `DatasetWriter(clock=...)`, keyword-only: the clock for its write and subdivide schedule and its elapsed time, injectable for tests. `DatasetWriter.failed` is True once writing has failed and the dataset has stopped recording.
+- `DataLogger.stop()`, which makes `run()` return from another thread, and `DataLogger(clock=...)`, keyword-only, the clock its datasets schedule writes with.
+- `UnknownMessageType` and `InvalidMessageDefinition` raised by `Client.read_message` carry the received message's header as `header`, so a caller can tell which type failed. It is a new attribute of `RTMAMessageError`, `None` when an exception wasn't raised for a received message; the exceptions' arguments are unchanged.
+- `DatasetWriter.started`, and `pyrtma.data_logger.dataset_writer.error_message()`, which builds a `DATA_LOGGER_ERROR` that always fits its fields.
 
 ### Changed
 
@@ -70,6 +73,16 @@ that makes them. The version number is chosen at release time.
 - `DatasetWriter.pause()` and `resume()` return whether they changed anything. `pause()` on a dataset that isn't recording or is already paused, and `resume()` on one that isn't paused, do nothing; `resume "all"` used to reset the elapsed time and subdivide schedule of datasets that weren't paused, and `pause "all"` marked datasets that hadn't started as paused.
 - `DatasetWriter.start()` on a dataset that was already started raises `DatasetInProgress` instead of `RuntimeError`.
 - `DatasetWriter` creates its files exclusively, so a file that appears after the dataset was added, such as another dataset's with the same path and name, raises `DatasetExistsError` when recording starts or subdivides instead of being overwritten. Text formats are written as UTF-8 rather than in the platform's encoding; their content is ASCII.
+- The data logger stops every dataset that would record a message its definitions can't decode, with a stale size or of an unknown type, since that recording would be missing data until the definitions are fixed. Each is reported with `DATA_LOGGER_ERROR` naming the type and the error, then `DATASET_STOPPED`, `DATASET_SAVED` and `DATASET_REMOVED`; its file keeps what was recorded, buffered messages included. Datasets that don't record that type carry on. When no dataset records it, the logger warns once per type and error instead of on every message.
+- A request addressed to the data logger is answered to the module that sent it. A broadcast request is still answered with a broadcast, so modules watching the logger keep seeing those replies. `DATASET_STATUS_REQUEST` is still answered to its sender either way, and `DATASET_STARTED`, `DATASET_STOPPED`, `DATASET_SAVED` and `DATA_LOGGER_ERROR` are still broadcast.
+- The data logger acts only on requests that are broadcast or addressed to it. The manager sends a logger module copies of messages addressed to other modules, and the data logger used to act on those too.
+- `DATASET_START "all"` skips datasets that are recording or have already recorded, with a warning, and reports a dataset that fails to start without stopping the rest.
+- A dataset that has recorded is removed once its file is finished, by `DATASET_REMOVE`, by `DATA_LOGGER_RESET` or after it stops, so its `DATASET_SAVED` always comes before its `DATASET_REMOVED`. Its name stays in use until then. A reset also sends `DATASET_STOPPED` for the datasets that were recording.
+- When the data logger exits, it waits up to 60 seconds for the datasets' files to be finished, then sends their `DATASET_STOPPED`, `DATASET_SAVED` and `DATASET_REMOVED` before disconnecting, if it still can.
+- A dataset whose writer fails is reported with `DATA_LOGGER_ERROR`, `DATASET_STOPPED`, `DATASET_SAVED` for the files finished before the failure, and `DATASET_REMOVED`. It used to get no `DATASET_STOPPED`.
+- The data logger sends a `DATASET_SAVED` for every file a dataset saves. One of two files saved in quick succession could be missed before.
+- `DATASET_ADD` is checked for capacity, a name in use, and a file another dataset already writes to before the dataset's folder is created. The last is new: two datasets with the same folder, file name and formatter are refused when the second is added.
+- `DATA_LOGGER_ERROR` messages from the data logger replace characters that aren't ASCII with `?` and cut text too long for their fields, as `DatasetWriter`'s do.
 
 ### Fixed
 
@@ -117,3 +130,6 @@ that makes them. The version number is chosen at release time.
 - A save path that can't be created for any reason raises `DatasetError`; only a missing parent or a permission error did before, and other errors escaped raw.
 - `DATA_LOGGER_ERROR` messages built by `DatasetWriter` replace characters that aren't ASCII with `?` and cut text too long for their fields, so a localized system message or a long path can always be reported.
 - `DataFormatterKeyError` from registering a formatter name twice carries its text as the message rather than as the dataset name.
+- The data logger keeps running when a message can't be decoded with its definitions (C5): `InvalidMessageDefinition` from a message of the wrong size ended it. It also keeps running when a dataset's writer fails, when a request fails with an exception other than a `DataLoggerError`, and on a second `DATASET_START "all"`. Each failure is reported with `DATA_LOGGER_ERROR` and affects only its dataset or request.
+- Replies to requests addressed to the data logger reach the module that sent them (C6). They used to be addressed to the logger itself, so C, MATLAB and other clients that addressed the logger never got `DATASET_ADDED`, `DATASET_REMOVED`, `DATASET_STATUS` or `DATA_LOGGER_CONFIG`.
+- `python -m pyrtma.data_logger` with no message manager running prints one line and exits with status 1, instead of a traceback.

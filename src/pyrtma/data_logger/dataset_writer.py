@@ -26,6 +26,28 @@ from .exceptions import (
 )
 
 
+def error_message(dataset: str, exc_type: str, text: str) -> cd.MDF_DATA_LOGGER_ERROR:
+    """Build a ``DATA_LOGGER_ERROR`` that always fits its fields.
+
+    Characters that aren't ASCII, as in a localized system message, become
+    "?", and text too long for its field is cut, so building the message
+    never raises.
+
+    Args:
+        dataset: The dataset's name, or "" for the logger as a whole.
+        exc_type: The exception's type name.
+        text: What happened.
+
+    Returns:
+        The message.
+    """
+    error = cd.MDF_DATA_LOGGER_ERROR()
+    error.dataset_name = _ascii_field(dataset, _field_size(error, "dataset_name"))
+    error.exc_type = _ascii_field(exc_type, _field_size(error, "exc_type"))
+    error.msg = _ascii_field(text, _field_size(error, "msg"), marker=TRUNCATED_MARKER)
+    return error
+
+
 def _exclusive_mode(mode: str) -> str:
     """Turn a formatter's file mode into one that refuses an existing file.
 
@@ -246,6 +268,11 @@ class DatasetWriter:
         return self._dead
 
     @property
+    def started(self) -> bool:
+        """True once :py:meth:`start` has succeeded, including after it stops."""
+        return self._started
+
+    @property
     def failed(self) -> bool:
         """True once writing failed and the dataset stopped recording.
 
@@ -444,14 +471,8 @@ class DatasetWriter:
             dataset: The dataset's name.
             text: What happened.
         """
-        error = cd.MDF_DATA_LOGGER_ERROR()
-        error.dataset_name = _ascii_field(dataset, _field_size(error, "dataset_name"))
-        error.exc_type = _ascii_field(exc_type, _field_size(error, "exc_type"))
-        error.msg = _ascii_field(
-            text, _field_size(error, "msg"), marker=TRUNCATED_MARKER
-        )
         # A new object, so the main thread never sends one being filled in.
-        self.error = error
+        self.error = error_message(dataset, exc_type, text)
         self.error_event.set()
 
     def _fail(self, exc_type: str, text: str) -> None:

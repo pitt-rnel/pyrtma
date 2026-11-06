@@ -328,6 +328,31 @@ class TestReceive:
         assert after is not None
         assert after.data.id == 9
 
+    @pytest.mark.parametrize(
+        ("subscribe_to", "wire", "msg_type"),
+        [
+            (UNKNOWN_TYPE, None, UNKNOWN_TYPE),
+            (td.MT_TEST_START, frame(td.MT_TEST_START, b"\x00" * 8), td.MT_TEST_START),
+        ],
+        ids=["unknown", "wrong_size"],
+    )
+    def test_decode_errors_carry_the_header(
+        self,
+        scripted_client: Client,
+        scripted_manager: ScriptedManager,
+        subscribe_to: int,
+        wire: bytes | None,
+        msg_type: int,
+    ) -> None:
+        scripted_client.subscribe([subscribe_to])
+        scripted_manager.send(unknown_message() if wire is None else wire)
+
+        with pytest.raises((UnknownMessageType, InvalidMessageDefinition)) as raised:
+            scripted_client.read_message(timeout=DEFAULT_TIMEOUT)
+
+        assert raised.value.header is not None
+        assert raised.value.header.msg_type == msg_type
+
     def test_discard_messages_empties_the_queue(
         self, scripted_client: Client, scripted_manager: ScriptedManager
     ) -> None:

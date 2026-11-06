@@ -54,7 +54,11 @@ def main():
 
     definitions = pyrtma.load_message_definitions(args.defs_file)
 
-    d = DataLogger(args.mm_ip, log_level=level, definitions=definitions)
+    try:
+        d = DataLogger(args.mm_ip, log_level=level, definitions=definitions)
+    except MessageManagerNotFound as e:
+        print(f"MessageManagerNotFound: {e}", file=sys.stderr)
+        sys.exit(1)
 
     try:
         d.run()

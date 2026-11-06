@@ -1395,19 +1395,23 @@ class Client(ClientLike):
             try:
                 msg_cls = self._definitions.get_msg_cls(header.msg_type)
             except UnknownMessageType as e:
-                raise UnknownMessageType(
+                unknown = UnknownMessageType(
                     f"No message definition found for MT={header.msg_type}",
                     header,
                     bytes(payload),
-                ) from e
+                )
+                unknown.header = header
+                raise unknown from e
 
             type_size = msg_cls.type_size
             if type_size == -1:  # not defined for v1 message defs
                 type_size = ctypes.sizeof(msg_cls)
             if type_size != header.num_data_bytes:
-                raise InvalidMessageDefinition(
+                invalid = InvalidMessageDefinition(
                     f"Received message header indicating a message data size ({header.num_data_bytes}) that does not match the expected size ({type_size}) of message type {msg_cls.type_name}. Message definitions may be out of sync across systems."
                 )
+                invalid.header = header
+                raise invalid
             data = msg_cls.from_buffer_copy(payload)
         else:
             data = payload
@@ -1415,9 +1419,11 @@ class Client(ClientLike):
         # Note: Ignore the sync check if header.version is not filled in
         # This can removed once all clients support this field.
         if sync_check and header.version != 0 and header.version != data.type_hash:
-            raise InvalidMessageDefinition(
+            invalid = InvalidMessageDefinition(
                 f"Received message header indicating a message version that does not match the expected version of message type {data.type_name}. Message definitions may be out of sync across systems."
             )
+            invalid.header = header
+            raise invalid
 
         return Message(header, data)
 

@@ -30,23 +30,10 @@ from pyrtma.data_logger.exceptions import (
 from pyrtma.header import MessageHeader
 from pyrtma.message import Message
 
-from .helpers import DEFAULT_TIMEOUT, wait_for
+from .helpers import DEFAULT_TIMEOUT, FakeClock, wait_for
 
 # A little more than one write period, to make a write due.
 PAST_WRITE = DatasetWriter.WRITE_PERIOD + 1
-
-
-class FakeClock:
-    """A clock that only moves when the test advances it."""
-
-    def __init__(self) -> None:
-        self.now = 1000.0
-
-    def __call__(self) -> float:
-        return self.now
-
-    def advance(self, seconds: float) -> None:
-        self.now += seconds
 
 
 class StubFormatter(DataFormatter):
