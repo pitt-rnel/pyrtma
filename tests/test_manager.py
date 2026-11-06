@@ -1736,3 +1736,106 @@ class TestModuleLimit:
             == 2  # the manager's own entry and the observer
         )
         assert client_factory().connected
+
+
+def connect_v2_message(
+    name: str, *, pid: int = 0, mod_id: int = 0, logger_status: int = 0
+) -> bytes:
+    """Build the bytes of a CONNECT_V2 message.
+
+    Args:
+        name: The module name.
+        pid: The process ID.
+        mod_id: The requested module ID, or 0 for a dynamic one.
+        logger_status: 1 to connect as a logger.
+
+    Returns:
+        The message bytes.
+    """
+    data = cd.MDF_CONNECT_V2()
+    data.name = name
+    data.pid = pid
+    data.mod_id = mod_id
+    data.logger_status = logger_status
+    return raw_message(cd.MT_CONNECT_V2, bytes(data))
+
+
+class TestLateConnectV2:
+    def test_connect_v2_after_connect_updates_name_and_pid(
+        self, bare_manager: MessageManager
+    ) -> None:
+        module = add_fake_module(bare_manager, 101)
+        observer = add_fake_module(bare_manager, 102, subs=[cd.MT_HELLO])
+
+        handle(bare_manager, module, connect_v2_message("late-name", pid=4321))
+
+        assert is_routed(bare_manager, module)
+        assert (module.mod_id, module.name, module.pid) == (101, "late-name", 4321)
+        hellos = [
+            cd.MDF_HELLO.from_buffer_copy(payload)
+            for header, payload in sent_messages(observer)
+            if header.msg_type == cd.MT_HELLO
+        ]
+        assert [(h.mod_id, h.name, h.pid) for h in hellos] == [(101, "late-name", 4321)]
+        assert [h.msg_type for h, _ in sent_messages(module)] == []
+
+    def test_connect_after_connect_v2_changes_nothing(
+        self, bare_manager: MessageManager
+    ) -> None:
+        module = add_fake_module(bare_manager, 101)
+        observer = add_fake_module(bare_manager, 102, subs=[cd.MT_HELLO])
+        data = cd.MDF_CONNECT()
+        data.logger_status = 1
+
+        handle(bare_manager, module, raw_message(cd.MT_CONNECT, bytes(data)))
+
+        assert is_routed(bare_manager, module)
+        assert (module.mod_id, module.name, module.is_logger) == (101, "fake101", False)
+        assert hello_ids(observer) == []
+        assert sent_messages(module) == []
+
+    def test_late_connect_v2_keeps_id_and_logger_status(
+        self, bare_manager: MessageManager, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        module = add_fake_module(bare_manager, 101)
+        bare_manager.logger.set_all_levels(logging.WARNING)
+        bare_manager.logger.enable_console = False
+
+        with caplog.at_level(logging.WARNING):
+            handle(
+                bare_manager,
+                module,
+                connect_v2_message("late", mod_id=77, logger_status=1),
+            )
+
+        assert (module.mod_id, module.is_logger, module.name) == (101, False, "late")
+        assert module not in bare_manager.logger_modules
+        warnings = [r.getMessage() for r in caplog.records]
+        assert any("77" in text for text in warnings)
+        assert any("logger" in text.lower() for text in warnings)
+
+    @pytest.mark.integration
+    def test_late_connect_v2_is_announced(
+        self,
+        raw_connection: socket.socket,
+        client_factory: Callable[..., Client],
+    ) -> None:
+        observer = client_factory()
+        observer.subscribe([cd.MT_HELLO, td.MT_TEST_START])
+        sender = client_factory()
+        assert deliver(sender, observer, td.MDF_TEST_START()) is not None
+        # Old clients sent CONNECT first, for managers without CONNECT_V2.
+        raw_connection.sendall(raw_message(cd.MT_CONNECT, bytes(cd.MDF_CONNECT())))
+        header, _ = recv_message(raw_connection)
+        assert header.msg_type == cd.MT_ACKNOWLEDGE
+
+        raw_connection.sendall(connect_v2_message("late-name", pid=4321))
+
+        seen = read_until(
+            observer,
+            lambda m: m.type_id == cd.MT_HELLO
+            and m.data.mod_id == RAW_SRC_MOD_ID
+            and m.data.name == "late-name",
+        )
+        assert seen is not None
+        assert seen[-1].data.pid == 4321

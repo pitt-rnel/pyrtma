@@ -516,6 +516,39 @@ class MessageManager(ClientLike):
 
         return True
 
+    def update_connection(self, module: Module, msg: Message) -> None:
+        """Take the details of a connect message from a connected module.
+
+        Clients used to send both CONNECT and CONNECT_V2, in either order, for
+        managers that didn't support CONNECT_V2. The first one connects the
+        module and is acknowledged. A CONNECT_V2 after that updates the
+        module's name and process ID, and a HELLO announces them; no ACK is
+        sent, because the client waits for only one. Its module ID and logger
+        status can't change while the module is connected, so a different
+        request is logged and ignored. A CONNECT after either carries nothing
+        new and is ignored.
+
+        Args:
+            module: The connected module.
+            msg: Its CONNECT or CONNECT_V2 message.
+        """
+        if not isinstance(msg.data, cd.MDF_CONNECT_V2):
+            return
+
+        data = msg.data
+        if data.mod_id not in (0, module.mod_id):
+            self.logger.warning(
+                f"CONNECT v2 - {module!s} - Already connected; ignoring the requested ID({data.mod_id})."
+            )
+        if (data.logger_status == 1) != module.is_logger:
+            self.logger.warning(
+                f"CONNECT v2 - {module!s} - Already connected; ignoring the change of logger status to {data.logger_status}."
+            )
+        module.name = data.name
+        module.pid = data.pid
+        self.logger.info(f"CONNECT v2 update - {module!s}")
+        self.send_hello(module)
+
     def remove_module(self, module: Module):
         """Remove connected module
 
@@ -1300,7 +1333,9 @@ class MessageManager(ClientLike):
             return
 
         if msg_type == cd.MT_CONNECT or msg_type == cd.MT_CONNECT_V2:
-            if self.connect_module(src_module, core_msg):
+            if src_module.connected:
+                self.update_connection(src_module, core_msg)
+            elif self.connect_module(src_module, core_msg):
                 self.send_ack(src_module)
                 self.send_hello(src_module)
                 if msg_type == cd.MT_CONNECT:

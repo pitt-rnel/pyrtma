@@ -205,6 +205,15 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | `test_manager_and_unconnected_sockets_do_not_count` | Manager, second pass: the manager's own entry and sockets that haven't connected don't count toward the limit. | A limit of 1, with an accepted-only fake besides the manager's entry. |
 | `test_connect_beyond_the_limit_is_refused` | Manager, second pass: a `CONNECT` beyond the limit is refused with an error naming it, the manager keeps routing, and a module can connect again once another leaves. | Lowers the limit to the two connected clients, then connects a third, disconnects one and connects again. |
 
+### TestLateConnectV2
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_connect_v2_after_connect_updates_name_and_pid` | Manager connect messages: a `CONNECT_V2` from a connected module updates its name and process ID and sends one `HELLO` with them, without an ACK; the module keeps its ID. | A connected fake module sends `CONNECT_V2`; an observer subscribed to `HELLO`. |
+| `test_connect_after_connect_v2_changes_nothing` | Manager connect messages: a `CONNECT` from a connected module changes nothing and sends nothing, even with a different logger status. | A connected fake module sends `CONNECT` with `logger_status` 1. |
+| `test_late_connect_v2_keeps_id_and_logger_status` | Manager connect messages: a late `CONNECT_V2` asking for another module ID or logger status keeps the existing ones and logs a warning about each; the name is still taken. | A `CONNECT_V2` asking for ID 77 as a logger, with the manager logging at `WARNING` and `caplog` capturing. |
+| `test_late_connect_v2_is_announced` | Manager connect messages: over a real connection, a `CONNECT` and then a `CONNECT_V2` give one ACK, then a `HELLO` with the name and process ID from the `CONNECT_V2`. | A raw socket, whose `CONNECT` asks for ID 123 through its header; an observer whose subscriptions are confirmed with `deliver()` first. |
+
 ## test_client.py — the client's constructor and context manager (needs: none)
 
 | Test | Purpose | Approach |
