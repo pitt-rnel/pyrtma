@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import itertools
 import select
 import socket
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
 
@@ -444,3 +445,229 @@ class TestSend:
             assert header.msg_type == td.MT_TEST_MSG_8192
             assert header.num_data_bytes == td.MDF_TEST_MSG_8192.type_size
             assert received[offset + HEADER_SIZE] == 255
+
+
+# Message types for the subscription tests. The manager forwards types it
+# doesn't know, and nothing is sent of these, so they needn't be defined.
+A, B, C, D, E = 7001, 7002, 7003, 7004, 7005
+
+_sync_names = itertools.count()
+
+
+def manager_subscriptions(manager: ManagerHarness, client: Client) -> set[int]:
+    """The manager's subscriptions for a client, after it has acted on all it sent.
+
+    The manager handles each client's messages in order, so once it has
+    taken a ``CLIENT_SET_NAME`` with a fresh name, every subscription message
+    the client sent before it has been handled too.
+
+    Args:
+        manager: The running manager.
+        client: A client connected to it.
+
+    Returns:
+        The message types the manager has the client subscribed to.
+    """
+    token = f"sync-{next(_sync_names)}"
+    msg = cd.MDF_CLIENT_SET_NAME()
+    msg.name = token
+    client.send_message(msg)
+    module = next(
+        m
+        for m in list(manager.manager.modules.values())
+        if m.mod_id == client.module_id
+    )
+    assert wait_for(lambda: module.name == token)
+    return set(module.subs)
+
+
+@pytest.mark.integration
+class TestSubscriptions:
+    def test_generator_subscribes_every_type(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+
+        client.subscribe(mt for mt in [A, B, C])
+
+        assert client.subscribed_types == {A, B, C}
+        assert manager_subscriptions(manager, client) == {A, B, C}
+
+    @pytest.mark.parametrize("method", ["unsubscribe", "pause_subscription"])
+    def test_generator_removes_every_type(
+        self,
+        manager: ManagerHarness,
+        client_factory: Callable[..., Client],
+        method: str,
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A, B, C])
+
+        getattr(client, method)(mt for mt in [A, B])
+
+        assert client.subscribed_types == {C}
+        assert manager_subscriptions(manager, client) == {C}
+
+    def test_generator_resumes_every_type(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A, B])
+        client.pause_subscription([A, B])
+
+        client.resume_subscription(mt for mt in [A, B])
+
+        assert client.subscribed_types == {A, B}
+        assert client.paused_subscribed_types == set()
+        assert manager_subscriptions(manager, client) == {A, B}
+
+    def test_subscription_context_keeps_existing_subscriptions(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A, B, C])
+
+        with pytest.warns(UserWarning, match="already subscribed"):
+            with client.subscription_context([A, B, C, D]):
+                inside = client.subscribed_types
+
+        assert inside == {A, B, C, D}
+        assert client.subscribed_types == {A, B, C}
+        assert manager_subscriptions(manager, client) == {A, B, C}
+
+    def test_subscription_context_restores_after_exception(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A])
+
+        with pytest.raises(RuntimeError, match="body"):
+            with client.subscription_context([B]):
+                raise RuntimeError("body")
+
+        assert client.subscribed_types == {A}
+        assert manager_subscriptions(manager, client) == {A}
+
+    def test_subscription_context_for_all_types_restores_previous_ones(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A, B])
+        client.pause_subscription([B])
+
+        with client.subscription_context([cd.ALL_MESSAGE_TYPES]):
+            inside = client.subscribed_types
+
+        assert inside == {cd.ALL_MESSAGE_TYPES}
+        assert client.subscribed_types == {A}
+        assert client.paused_subscribed_types == {B}
+        assert manager_subscriptions(manager, client) == {A}
+
+    def test_paused_subscription_context_restores_after_exception(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A, B])
+
+        with pytest.raises(RuntimeError, match="body"):
+            with client.paused_subscription_context([A]):
+                raise RuntimeError("body")
+
+        assert client.subscribed_types == {A, B}
+        assert client.paused_subscribed_types == set()
+        assert manager_subscriptions(manager, client) == {A, B}
+
+    def test_paused_subscription_context_ignores_every_unsubscribed_type(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        # B and D come first: removing B while iterating skipped D, which was
+        # then paused and, on exit, subscribed.
+        client = client_factory()
+        client.subscribe([A])
+
+        with pytest.warns(UserWarning, match="not subscribed"):
+            with client.paused_subscription_context([B, D, A]):
+                inside = client.subscribed_types
+
+        assert inside == set()
+        assert client.subscribed_types == {A}
+        assert client.paused_subscribed_types == set()
+        assert manager_subscriptions(manager, client) == {A}
+
+    def test_contexts_leave_changes_the_body_made(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A])
+
+        with client.subscription_context([B]):
+            client.unsubscribe([B])
+            client.subscribe([E])
+        with client.paused_subscription_context([A]):
+            client.resume_subscription([A])
+            client.unsubscribe([A])
+
+        assert client.subscribed_types == {E}
+        assert client.paused_subscribed_types == set()
+        assert manager_subscriptions(manager, client) == {E}
+
+    @pytest.mark.parametrize(
+        "context", ["subscription_context", "paused_subscription_context"]
+    )
+    def test_context_exit_after_disconnect_does_not_raise(
+        self, client_factory: Callable[..., Client], context: str
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A])
+
+        # The paused context pauses A; the other subscribes to B.
+        with getattr(client, context)([A] if context.startswith("paused") else [B]):
+            client.disconnect()
+
+        assert client.connected is False
+
+    def test_pause_and_resume_of_all_types_round_trips(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([cd.ALL_MESSAGE_TYPES])
+
+        client.pause_subscription([cd.ALL_MESSAGE_TYPES])
+        paused = client.paused_subscribed_types
+        paused_at_manager = manager_subscriptions(manager, client)
+        client.resume_all_subscriptions()
+
+        assert paused == {cd.ALL_MESSAGE_TYPES}
+        assert paused_at_manager == set()
+        assert client.subscribed_types == {cd.ALL_MESSAGE_TYPES}
+        assert manager_subscriptions(manager, client) == {cd.ALL_MESSAGE_TYPES}
+
+    def test_pausing_all_types_pauses_individual_subscriptions(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A, B])
+
+        client.pause_subscription([cd.ALL_MESSAGE_TYPES])
+        paused = client.paused_subscribed_types
+        paused_at_manager = manager_subscriptions(manager, client)
+        client.resume_all_subscriptions()
+
+        assert paused == {A, B}
+        assert paused_at_manager == set()
+        assert client.subscribed_types == {A, B}
+        assert manager_subscriptions(manager, client) == {A, B}
+
+    def test_unsubscribe_from_all_forgets_paused_types(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A, B])
+        client.pause_subscription([A])
+
+        client.unsubscribe_from_all()
+        client.resume_all_subscriptions()
+
+        assert client.subscribed_types == set()
+        assert client.paused_subscribed_types == set()
+        assert manager_subscriptions(manager, client) == set()

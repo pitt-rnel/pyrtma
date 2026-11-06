@@ -22,6 +22,9 @@ that makes them. The version number is chosen at release time.
 
 ### Changed
 
+- `Client.unsubscribe_from_all()`, and so `reset_subscriptions()`, also forgets paused subscriptions, so a later `resume_all_subscriptions()` doesn't subscribe to them again.
+- `Client.pause_subscription([ALL_MESSAGE_TYPES])` records what it paused: `ALL_MESSAGE_TYPES` itself, or every individually subscribed type, all of which the manager drops. `resume_all_subscriptions()` restores them; it used to resume nothing.
+- The subscription context managers revert only types still in the state they left them, so changes the body made to those types stand, and restore nothing once the client has disconnected. A `subscription_context()` for `ALL_MESSAGE_TYPES` restores the individual and paused subscriptions it replaced.
 - `Client.read_message` discards messages the client isn't subscribed to without decoding them, so a queued message of an unknown type, or one that doesn't match its definition, no longer raises unless the client is subscribed to it.
 - The client's socket is non-blocking once connected; waiting is done in `select()`. Code that reads or writes `Client.sock` directly sees a non-blocking socket. A `select()` on it still shows whether a message is waiting, because the client never reads past the message it is receiving.
 - A lost connection closes `Client.sock`, as `disconnect()` does, and clears the client's subscriptions; code that calls `select()` on the socket should check `Client.connected` first. A send that fails with any `OSError` raises `ConnectionLost`, not only a `ConnectionError`.
@@ -56,6 +59,8 @@ that makes them. The version number is chosen at release time.
 
 ### Fixed
 
+- `Client.subscribe`, `unsubscribe`, `pause_subscription` and `resume_subscription` accept any iterable. A generator used to change nothing, because it was empty after a first pass.
+- `Client.subscription_context()` and `paused_subscription_context()` restore subscriptions when the body raises. With some lists they also used to skip types while checking them: a context could unsubscribe a type that was subscribed before it, or subscribe on exit a type that never was.
 - `Client.read_message(timeout)` honors its timeout as one deadline for the whole call. Each message the client wasn't subscribed to, such as the ACK the manager sends for every subscription change, used to restart the full timeout, so a steady stream of them could block the read indefinitely.
 - `Client.read_message` no longer blocks past its timeout when only part of a message has arrived; a timeout of 0 never waits. The bytes received so far are kept, and a later read completes the message. The web manager's proxy no longer holds up websocket input on a partial message either.
 - `Client.discard_messages()` and `Client.reset_subscriptions()` empty the queue of messages that have arrived. They stopped after the first message the client wasn't subscribed to, so after `reset_subscriptions()` everything but one message stayed queued.
