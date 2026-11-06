@@ -286,7 +286,7 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 | `test_lost_connection_is_retried_with_back_off` | C4: losing the manager mid-run is retried with the same back-off, starting from 0.5 s. | `start()` in a thread against a separate `ManagerHarness`, which is then stopped; the second wait stops the loop. |
 | `test_stop_interrupts_the_default_sleep` | C4: `stop()` ends the default wait between attempts at once, rather than after the delay. | A 30-second `retry_delay` and no manager; calls `stop()` after the first attempt and expects the thread to end within 5 s. |
 
-## test_web_manager.py — the websocket bridge (needs: integration for `TestProxyRead`)
+## test_web_manager.py — the websocket bridge (needs: integration for `TestProxyRead` and `TestConnect`)
 
 `StubHandler` is an `RTMAWebSocketHandler` with no websocket behind it. `socketserver` handlers do all their work in their constructor, so it skips the base constructors, sets only the proxy and `keep_alive`, reports the websocket as always ready, and collects what would be sent to it in `sent`.
 
@@ -302,6 +302,19 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_unsubscribed_message_does_not_block` | Web manager: reading a message the proxy isn't subscribed to returns without waiting for another. | The real manager follows such a message with an ACK, so a listening socket stands in for it: the proxy connects to it, the peer sends one `TEST_START` and nothing more, and `read_proxy_message()` runs in a thread that must finish within 5 s. |
+
+### TestConnect
+
+The `handler` fixture gives a `StubHandler` whose proxy already has a socket to the `manager` fixture, as `handle()` sets up before the web client's first message. `hello_observer` is a client subscribed to `HELLO`, with its subscription confirmed by `deliver()`, and returns a function that reads until a `HELLO` passes a check.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_handle_connect_returns_ack` | C4: a web client's `CONNECT` connects the proxy with a dynamic ID and passes the manager's ACK, addressed to that ID, to the websocket. | `handle_connect()` with a `CONNECT`. |
+| `test_handle_connect_v2_returns_ack_and_sets_name` | C4: a web client's `CONNECT_V2` connects the proxy under the client's name, which the manager announces in its `HELLO`. | `handle_connect_v2()` with a `CONNECT_V2` named "web-page". |
+| `test_connect_json_from_web_client` | C4: a `CONNECT` arriving as JSON, as rtma-js sends it, is answered with an ACK. | `process_json_message()` with the JSON of a `CONNECT`. |
+| `test_requested_static_id_gets_dynamic_id` | C4: a web client's request for a static module ID is ignored, and the proxy takes a dynamic one. | Parametrized over `CONNECT`, which asks through its header, and `CONNECT_V2`, which asks in its data; both ask for 50. |
+| `test_connect_v2_after_connect_updates_name` | Manager connect messages: a `CONNECT_V2` after the web client's `CONNECT` updates the proxy's name, which the manager announces with a new `HELLO`, without a second ACK to the web client and without a change of module ID. | `handle_connect()`, then `handle_connect_v2()` named "late-page". A wait for an ACK would time out and send an error to the websocket. |
+| `test_connect_after_connect_v2_is_ignored` | Manager connect messages: a `CONNECT` after the web client's `CONNECT_V2` changes nothing and sends nothing. | `handle_connect_v2()` named "page", then `handle_connect()`. |
 
 ## test_integration.py — client and manager interaction (needs: loopback sockets; not yet marked)
 

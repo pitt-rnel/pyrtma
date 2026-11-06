@@ -35,6 +35,7 @@ from .helpers import (
     ManagerHarness,
     deliver,
     manager_options,
+    read_until,
     wait_for,
 )
 from .test_msg_defs import test_defs as td
@@ -258,34 +259,6 @@ def make_header(
     header.dest_mod_id = dest_mod_id
     header.msg_count = msg_count
     return header
-
-
-def read_until(
-    client: Client,
-    predicate: Callable[[Message], bool],
-    timeout: float = DEFAULT_TIMEOUT,
-) -> list[Message] | None:
-    """Read messages until one matches.
-
-    Args:
-        client: The client to read from.
-        predicate: Returns True for the message being waited for.
-        timeout: Seconds to keep reading.
-
-    Returns:
-        Every message read, ending with the matching one, or None if none
-        matched before the deadline.
-    """
-    seen: list[Message] = []
-
-    def matched() -> bool:
-        msg = client.read_message(timeout=0.05)
-        if msg is None:
-            return False
-        seen.append(msg)
-        return predicate(msg)
-
-    return seen if wait_for(matched, timeout, interval=0) else None
 
 
 def watcher(

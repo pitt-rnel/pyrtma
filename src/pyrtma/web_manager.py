@@ -3,6 +3,7 @@ import select
 import errno
 import struct
 import argparse
+import os
 import sys
 import json
 import time
@@ -45,6 +46,10 @@ class RTMAWebSocketHandler(WebSocketHandler):
     """RTMA Web Socket Handler class"""
 
     disable_nagle_algorithm = True
+
+    #: Whether the proxy has connected to the message manager for the web
+    #: client. Set by the web client's first CONNECT or CONNECT_V2.
+    rtma_connected: bool = False
 
     def __init__(self, socket, addr, server):
         """RTMA Web Socket Handler
@@ -137,56 +142,92 @@ class RTMAWebSocketHandler(WebSocketHandler):
         """
         logger.info("Websocket PONG received.")
 
-    def handle_connect(self, msg: Message):
+    def _connect_proxy(self, logger_status: bool, requested_id: int) -> None:
+        """Connect the proxy to the message manager and pass the ACK on.
+
+        The proxy always takes a dynamic module ID. A web client's request
+        for a static ID is logged and ignored: a page that closes without
+        closing its websocket would hold the ID until the connection timed
+        out, so a reloaded page would be refused.
+
+        Args:
+            logger_status: Whether the web client connects as a logger.
+            requested_id: The module ID the web client asked for, or 0.
+
+        Raises:
+            ClientError: The connection failed, for example
+                ``AcknowledgementTimeout``.
+        """
+        if requested_id != 0:
+            logger.warning(
+                f"Web client asked for module ID {requested_id}; the web manager assigns dynamic IDs only."
+            )
+        ack_msg = self.proxy._connect_helper(logger_status)
+        self.rtma_connected = True
+        logger.info(f"Proxy CONNECTED, assigned module ID {self.proxy.module_id}")
+
+        # forward ack
+        # Pass message thru websocket as json
+        if self.ws_ready_to_send:
+            logger.debug(
+                f"Forwarding ACK from connect to ws. Mod ID = {self.proxy.module_id}"
+            )
+            self.send_message(ack_msg.to_json(minify=True))
+        else:
+            self.send_failed_message(ack_msg.header, time.perf_counter())
+            logger.warning(
+                f"Failed to foward ACK to ws. Mod ID = {self.proxy.module_id}."
+            )
+
+    def handle_connect(self, msg: Message) -> None:
+        """Connect the proxy for a web client's CONNECT.
+
+        CONNECT asks for a module ID in its header. A CONNECT after the
+        web client has connected carries nothing new and is ignored, as the
+        message manager ignores it.
+
+        Args:
+            msg: The web client's CONNECT.
+
+        Raises:
+            ClientError: The connection failed.
+        """
         logger.debug("Received CONNECT")
+        data = cast(cd.MDF_CONNECT, msg.data)
+        if self.rtma_connected:
+            logger.debug("Ignoring CONNECT from a web client that has connected.")
+            return
+        self._connect_proxy(bool(data.logger_status), msg.header.src_mod_id)
 
-        # self.proxy._module_id = msg.header.src_mod_id
-        # self.proxy._host_id = msg.header.src_host_id
-        msg.data = cast(cd.MDF_CONNECT, msg.data)
-        # Known bug, fixed in Phase 3 (C4): _connect_helper() takes one argument.
-        ack_msg = self.proxy._connect_helper(
-            bool(msg.data.logger_status),
-            bool(msg.data.daemon_status),  # pyright: ignore[reportCallIssue]
-            allow_multiple=False,
-        )
-        # forward ack
-        # Pass message thru websocket as json
-        if self.ws_ready_to_send:
-            logger.debug(
-                f"Forwarding ACK from connect to ws. Mod ID = {self.proxy.module_id}"
-            )
-            self.send_message(ack_msg.to_json(minify=True))
-        else:
-            self.send_failed_message(ack_msg.header, time.perf_counter())
-            logger.warning(
-                f"Failed to foward ACK to ws. Mod ID = {self.proxy.module_id}."
-            )
+    def handle_connect_v2(self, msg: Message) -> None:
+        """Connect the proxy for a web client's CONNECT_V2.
 
-    def handle_connect_v2(self, msg: Message):
+        The web client's name becomes the proxy's. A CONNECT_V2 after the web
+        client has connected, such as one that follows its CONNECT, is passed
+        on to update the name, without waiting for an ACK and without
+        sending the web client a second one, as the message manager does.
+
+        Args:
+            msg: The web client's CONNECT_V2.
+
+        Raises:
+            ClientError: The connection failed.
+        """
         logger.debug("Received CONNECT_V2")
+        data = cast(cd.MDF_CONNECT_V2, msg.data)
+        self.proxy._name = data.name
+        if not self.rtma_connected:
+            self._connect_proxy(bool(data.logger_status), data.mod_id)
+            return
 
-        # self.proxy._module_id = msg.header.src_mod_id
-        # self.proxy._host_id = msg.header.src_host_id
-        msg.data = cast(cd.MDF_CONNECT_V2, msg.data)
-        self.proxy._name = msg.data.name
-        # Known bug, fixed in Phase 3 (C4): _connect_helper() takes one argument.
-        ack_msg = self.proxy._connect_helper(
-            bool(msg.data.logger_status),
-            bool(msg.data.daemon_status),  # pyright: ignore[reportCallIssue]
-            bool(msg.data.allow_multiple),  # TODO add CONNECT_V2 support to rtma-js
-        )
-        # forward ack
-        # Pass message thru websocket as json
-        if self.ws_ready_to_send:
-            logger.debug(
-                f"Forwarding ACK from connect to ws. Mod ID = {self.proxy.module_id}"
-            )
-            self.send_message(ack_msg.to_json(minify=True))
-        else:
-            self.send_failed_message(ack_msg.header, time.perf_counter())
-            logger.warning(
-                f"Failed to foward ACK to ws. Mod ID = {self.proxy.module_id}."
-            )
+        self.proxy.logger.log_name = data.name or f"Module {self.proxy.module_id}"
+        update = cd.MDF_CONNECT_V2()
+        update.logger_status = data.logger_status
+        update.pid = os.getpid()
+        update.mod_id = self.proxy.module_id
+        update.name = data.name
+        self.proxy.send_message(update)
+        logger.info(f"Proxy name updated to {data.name!r}")
 
     def process_json_message(self, message: str):
         """Process incoming json message
@@ -232,14 +273,8 @@ class RTMAWebSocketHandler(WebSocketHandler):
                 )
             elif msg.header.msg_type == cd.MT_CONNECT:
                 self.handle_connect(msg)
-                logger.info(
-                    f"Proxy CONNECTED, assigned module ID {self.proxy.module_id}"
-                )
             elif msg.header.msg_type == cd.MT_CONNECT_V2:
                 self.handle_connect_v2(msg)
-                logger.info(
-                    f"Proxy CONNECTED, assigned module ID {self.proxy.module_id}"
-                )
             else:
                 self.proxy.forward_message(msg.header, msg.data or None)
                 logger.debug(

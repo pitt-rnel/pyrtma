@@ -4,24 +4,28 @@ websocket handler, driven without a real websocket."""
 from __future__ import annotations
 
 import ctypes
+import json
 import logging
 import shutil
 import socket
 import subprocess
 import sys
 import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 
+import pyrtma.core_defs as cd
 import pyrtma.web_manager as wm
 from pyrtma.client import Client
 from pyrtma.definitions import MessageDefinitions
 from pyrtma.header import MessageHeader
+from pyrtma.message import Message
 from pyrtma.message_data import MessageData
 
-from .helpers import DEFAULT_TIMEOUT, LOOPBACK
+from .helpers import DEFAULT_TIMEOUT, LOOPBACK, ManagerHarness, deliver, read_until
 from .test_msg_defs import test_defs as td
 
 DEFS_FILE = Path(td.__file__)
@@ -165,3 +169,153 @@ class TestProxyRead:
             finally:
                 peer.close()
                 proxy.disconnect()
+
+
+def connect_message(*, src_mod_id: int = 0, logger_status: int = 0) -> Message:
+    """Build a CONNECT as a web client sends it, after JSON decoding.
+
+    Args:
+        src_mod_id: The module ID in its header; CONNECT asks for an ID there.
+        logger_status: 1 to connect as a logger.
+
+    Returns:
+        The message.
+    """
+    header = MessageHeader()
+    header.msg_type = cd.MT_CONNECT
+    header.src_mod_id = src_mod_id
+    data = cd.MDF_CONNECT()
+    data.logger_status = logger_status
+    return Message(header, data)
+
+
+def connect_v2_message(name: str, *, mod_id: int = 0) -> Message:
+    """Build a CONNECT_V2 as a web client would send it, after JSON decoding.
+
+    Args:
+        name: The module name.
+        mod_id: The requested module ID, or 0 for a dynamic one.
+
+    Returns:
+        The message.
+    """
+    header = MessageHeader()
+    header.msg_type = cd.MT_CONNECT_V2
+    data = cd.MDF_CONNECT_V2()
+    data.name = name
+    data.mod_id = mod_id
+    return Message(header, data)
+
+
+def sent_types(handler: StubHandler) -> list[int]:
+    """Return the message types a handler passed to its websocket.
+
+    Args:
+        handler: The handler.
+
+    Returns:
+        One message type per JSON message, in order.
+    """
+    return [json.loads(text)["header"]["msg_type"] for text in handler.sent]
+
+
+@pytest.mark.integration
+class TestConnect:
+    @pytest.fixture
+    def handler(self, manager: ManagerHarness) -> Iterator[StubHandler]:
+        """A stub handler whose proxy has a socket to the manager, as
+        ``handle()`` sets up before the web client's first message."""
+        proxy = Client(definitions=td.get_message_definitions())
+        proxy.logger.enable_console = False
+        proxy._socket_connect(manager.address)
+        try:
+            yield StubHandler(proxy)
+        finally:
+            proxy.disconnect()
+
+    @pytest.fixture
+    def hello_observer(
+        self, client_factory: Callable[..., Client]
+    ) -> Callable[[Callable[[Any], bool]], list[Message] | None]:
+        """A client subscribed to HELLO, with the subscription confirmed.
+
+        Returns:
+            A function that reads HELLO messages until one passes a check on
+            its data.
+        """
+        observer = client_factory(name="observer")
+        observer.subscribe([cd.MT_HELLO, td.MT_TEST_START])
+        sender = client_factory(name="sender")
+        assert deliver(sender, observer, td.MDF_TEST_START()) is not None
+
+        def wait_for_hello(check: Callable[[Any], bool]) -> list[Message] | None:
+            return read_until(
+                observer, lambda m: m.type_id == cd.MT_HELLO and check(m.data)
+            )
+
+        return wait_for_hello
+
+    def test_handle_connect_returns_ack(self, handler: StubHandler) -> None:
+        handler.handle_connect(connect_message())
+
+        assert sent_types(handler) == [cd.MT_ACKNOWLEDGE]
+        ack = json.loads(handler.sent[0])
+        assert ack["header"]["dest_mod_id"] == handler.proxy.module_id
+        assert handler.proxy.module_id >= cd.DYN_MOD_ID_START
+
+    def test_handle_connect_v2_returns_ack_and_sets_name(
+        self, handler: StubHandler, hello_observer: Any
+    ) -> None:
+        handler.handle_connect_v2(connect_v2_message("web-page"))
+
+        assert sent_types(handler) == [cd.MT_ACKNOWLEDGE]
+        mod_id = handler.proxy.module_id
+        assert hello_observer(lambda d: d.mod_id == mod_id and d.name == "web-page")
+
+    def test_connect_json_from_web_client(self, handler: StubHandler) -> None:
+        text = connect_message().to_json(minify=True)
+
+        handler.process_json_message(text)
+
+        assert sent_types(handler) == [cd.MT_ACKNOWLEDGE]
+
+    @pytest.mark.parametrize(
+        "make",
+        [
+            lambda: connect_message(src_mod_id=50),
+            lambda: connect_v2_message("static", mod_id=50),
+        ],
+        ids=["CONNECT", "CONNECT_V2"],
+    )
+    def test_requested_static_id_gets_dynamic_id(
+        self, handler: StubHandler, make: Callable[[], Message]
+    ) -> None:
+        msg = make()
+
+        handler.process_json_message(msg.to_json(minify=True))
+
+        assert sent_types(handler) == [cd.MT_ACKNOWLEDGE]
+        assert handler.proxy.module_id >= cd.DYN_MOD_ID_START
+
+    def test_connect_v2_after_connect_updates_name(
+        self, handler: StubHandler, hello_observer: Any
+    ) -> None:
+        handler.handle_connect(connect_message())
+        mod_id = handler.proxy.module_id
+
+        handler.handle_connect_v2(connect_v2_message("late-page"))
+
+        assert sent_types(handler) == [cd.MT_ACKNOWLEDGE]
+        assert handler.proxy.module_id == mod_id
+        assert handler.proxy.name == "late-page"
+        assert hello_observer(lambda d: d.mod_id == mod_id and d.name == "late-page")
+
+    def test_connect_after_connect_v2_is_ignored(self, handler: StubHandler) -> None:
+        handler.handle_connect_v2(connect_v2_message("page"))
+        mod_id = handler.proxy.module_id
+
+        handler.handle_connect(connect_message())
+
+        assert sent_types(handler) == [cd.MT_ACKNOWLEDGE]
+        assert handler.proxy.module_id == mod_id
+        assert handler.proxy.name == "page"
