@@ -21,6 +21,7 @@ that makes them. The version number is chosen at release time.
 - `RTMALogger.close()` removes and closes the logger's handlers. It runs by itself when the logger's client is garbage collected.
 - `RTMA_UnifiedLog(retry_delay=..., max_retry_delay=..., sleep=...)`, keyword-only, and `RTMA_UnifiedLog.stop()`, which makes `start()` return from another thread. `pyrtma.unified_console_log` also has `parse_args()` and `main()`; `python -m pyrtma.unified_console_log` runs `main()`.
 - `pyrtma.web_manager` has `parse_args()`, `run()` and `configure_logging()`, and `main()` takes an optional argument list.
+- `DatasetWriter(clock=...)`, keyword-only: the clock for its write and subdivide schedule and its elapsed time, injectable for tests. `DatasetWriter.failed` is True once writing has failed and the dataset has stopped recording.
 
 ### Changed
 
@@ -64,6 +65,11 @@ that makes them. The version number is chosen at release time.
 - Importing `pyrtma.web_manager` no longer changes the root logger. It used to remove the root logger's first handler, whichever that was, and add a `RichHandler`. `main()` now does the setup: it replaces every root handler with a `RichHandler`.
 - The web manager's `-d/--defs` option is marked required, so leaving it out gives a usage error with exit status 2 instead of a `TypeError`. Running it with no arguments still prints the help.
 - The web manager loads its definitions file once. It no longer also imports the file by its module name or adds its folder to `sys.path`.
+- `DatasetWriter` schedules writes and subdivisions with `time.monotonic()` instead of `time.time()`, so a step of the system clock no longer makes them fall due early or late.
+- When a `DatasetWriter`'s previous write hasn't finished by the time the next is due, it keeps buffering messages and writes them once the writer is free, logging one warning when it falls behind and one message when it catches up. It used to raise `DatasetWriterError("Unable to write fast enough.")` into the data logger's loop, which stopped the logger. A subdivision that falls due meanwhile waits too, so messages still go to the file they arrived for. There is no limit on what is buffered.
+- `DatasetWriter.pause()` and `resume()` return whether they changed anything. `pause()` on a dataset that isn't recording or is already paused, and `resume()` on one that isn't paused, do nothing; `resume "all"` used to reset the elapsed time and subdivide schedule of datasets that weren't paused, and `pause "all"` marked datasets that hadn't started as paused.
+- `DatasetWriter.start()` on a dataset that was already started raises `DatasetInProgress` instead of `RuntimeError`.
+- `DatasetWriter` creates its files exclusively, so a file that appears after the dataset was added, such as another dataset's with the same path and name, raises `DatasetExistsError` when recording starts or subdivides instead of being overwritten. Text formats are written as UTF-8 rather than in the platform's encoding; their content is ASCII.
 
 ### Fixed
 
@@ -106,3 +112,8 @@ that makes them. The version number is chosen at release time.
 - The web manager's handler no longer waits for a further message when the proxy reads one it isn't subscribed to, such as a copy still in flight after the web client unsubscribed. Websocket input was not read while it waited.
 - A `CONNECT_V2` from a module that has already connected, such as one that follows its `CONNECT`, updates the module's name and process ID, and the manager announces them with a `HELLO`. It used to be ignored, so a client that sent `CONNECT` first kept no name. No second ACK is sent, because a client that sends both waits for one. A different module ID or logger status in it is logged as a warning and ignored. A `CONNECT` from a connected module is still ignored.
 - The web manager connects web clients again (C4). Both `CONNECT` and `CONNECT_V2` from a web client raised `TypeError` or `AttributeError`, because they still passed the removed `daemon_status` and `allow_multiple` arguments, and the handler's thread died. A `CONNECT_V2`'s name becomes the proxy's module name. The proxy still always takes a dynamic module ID; a request for a static one is now logged as a warning. A `CONNECT_V2` after the web client has connected updates the name without a second ACK, and a `CONNECT` after it is ignored, as the message manager does.
+- A `DatasetWriter` whose write thread fails for any reason, such as a full disk or a subdivision file that already exists, stops recording, records the error for the data logger to report, and closes its file. An `OSError` used to escape the thread unreported, and any failure left the dataset dead but still recording, which made the data logger exit. Files finished before the failure are kept and reported as saved; the failed file isn't finalized, and the messages not yet written are lost, as the error says.
+- `DatasetWriter.start()` creates the file before starting its write thread, so a file that can't be created or started leaves no thread running. It raises `DatasetError` naming the cause and removes a file it created.
+- A save path that can't be created for any reason raises `DatasetError`; only a missing parent or a permission error did before, and other errors escaped raw.
+- `DATA_LOGGER_ERROR` messages built by `DatasetWriter` replace characters that aren't ASCII with `?` and cut text too long for their fields, so a localized system message or a long path can always be reported.
+- `DataFormatterKeyError` from registering a formatter name twice carries its text as the message rather than as the dataset name.

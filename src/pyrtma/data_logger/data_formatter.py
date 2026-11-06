@@ -44,7 +44,7 @@ def add_formatter(fmt_cls: Type[DataFormatter]):
     assert issubclass(fmt_cls, DataFormatter)
     if _formatter_map.get(fmt_cls.name) is not None:
         raise DataFormatterKeyError(
-            f"A DataFormatter already exists with the name: {fmt_cls.name}"
+            msg=f"A DataFormatter already exists with the name: {fmt_cls.name}"
         )
 
     _formatter_map[fmt_cls.name] = fmt_cls

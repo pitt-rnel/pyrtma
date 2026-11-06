@@ -421,6 +421,52 @@ The `handler` fixture gives a `StubHandler` whose proxy already has a socket to 
 | `test_connect_v2_after_connect_updates_name` | Manager connect messages: a `CONNECT_V2` after the web client's `CONNECT` updates the proxy's name, which the manager announces with a new `HELLO`, without a second ACK to the web client and without a change of module ID. | `handle_connect()`, then `handle_connect_v2()` named "late-page". A wait for an ACK would time out and send an error to the websocket. |
 | `test_connect_after_connect_v2_is_ignored` | Manager connect messages: a `CONNECT` after the web client's `CONNECT_V2` changes nothing and sends nothing. | `handle_connect_v2()` named "page", then `handle_connect()`. |
 
+## test_dataset_writer.py — `DatasetWriter`: write failures, slow writes, pause and resume, and its files (needs: none)
+
+Each writer saves to `tmp_path` with a stand-in formatter registered as `stub` for the test. It writes a header line, one line per message (the message's `name` field) and a footer line, and flushes after each write. Its writes can be held at a gate, which shows when a write has begun, or made to raise; so can its constructor. Writers take a `FakeClock` that moves only when the test advances it, so write periods and subdivisions need no waiting. `write_now()` advances past a write period and calls `update()`. The `make_writer` fixture stops every writer and joins its thread at teardown.
+
+### TestWriterFailure
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_write_error_stops_recording_and_reports_it` | C5: an `OSError` from the formatter, such as a full disk, doesn't escape the write thread. The dataset stops recording and is marked failed, the error names the dataset, the exception type, the message and the file, and later messages aren't buffered. | The stand-in raises `OSError(ENOSPC)` on write; the autouse `thread_exceptions` fixture fails the test if anything escapes the thread. |
+| `test_dataset_error_in_writer_stops_recording` | C5: a `DataLoggerError` in the write thread, here a subdivision whose file already exists, stops recording instead of leaving the dataset dead but recording. The finished first file is kept and reported, and the file in the way is untouched. | Creates `rec_0001.txt` first, then makes the subdivision due. |
+| `test_error_text_fits_its_fields` | Data logger writer: an error whose text isn't ASCII or is too long for `DATA_LOGGER_ERROR`'s fields is still recorded, with the other characters replaced by `?` and the text cut with a marker. | A long French `OSError` message, like a localized Windows one, and a 31-character dataset name. |
+
+### TestSlowWrites
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_slow_write_keeps_buffering` | C5: a write that hasn't finished when the next is due doesn't raise. Messages keep being buffered and are all written, in order, once the writer is free. | Holds the gate during the first write, makes a second write due, then opens it. |
+| `test_falling_behind_warns_once_and_reports_catching_up` | C5: a writer that falls behind logs one warning however many writes fall due meanwhile, and one message when it catches up. | Three writes fall due while the gate is closed; counts the writer logger's records with `caplog`. |
+| `test_subdivide_waits_for_busy_writer` | C5: a subdivision that falls due while the writer is busy waits for it, so the messages that arrived before it go to the old file and later ones to the new file. | Holds the gate during the first write and makes the subdivision due meanwhile; compares both files. |
+| `test_stop_while_behind_writes_everything` | C5: stopping a dataset whose writer is behind still writes every buffered message and finalizes the file. | Stops while the gate is closed with a second write due, then opens it. |
+
+### TestPauseResume
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_resume_when_not_paused_keeps_elapsed_time` | Data logger: `resume()` on a dataset that isn't paused, as `resume "all"` does, changes nothing and returns False; its elapsed time and subdivide schedule carry on. | Resumes after 10 s and checks the elapsed time, then that the subdivision still falls due at 30 s. The gate stays closed so the writer doesn't act on it first. |
+| `test_pause_before_start_does_nothing` | Data logger: `pause()` and `resume()` on a dataset that isn't recording change nothing and return False. | A dataset that was never started. |
+| `test_pause_and_resume_track_elapsed_time` | Elapsed time stops while a dataset is paused and carries on after it resumes. | Pauses at 5 s for 100 s, then resumes for 2 s. |
+
+### TestStartAndFiles
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_start_twice_raises_dataset_in_progress` | C5: starting a dataset a second time raises `DatasetInProgress`, which the logger reports, rather than `RuntimeError` from starting its thread again, and it keeps recording. | Calls `start()` twice. |
+| `test_second_writer_for_same_file_is_refused` | Data logger: of two datasets with the same path and file name, which both pass the check when added, the second to start raises `DatasetExistsError` and starts nothing, and the first one's file isn't truncated. | The first writes a message before the second starts. |
+| `test_failed_start_leaves_no_thread_and_no_file` | Data logger: when the file can't be started, `start()` raises `DatasetError` with the cause, leaves no write thread running, isn't recording, and removes the file it created. | The stand-in's constructor raises `OSError(EACCES)`, after the writer is constructed. |
+| `test_save_path_that_cannot_be_created_raises_dataset_error` | C5: a save path that can't be created for a reason other than a missing parent or permissions raises `DatasetError`, which the logger reports, not a raw `OSError`. | A save path inside a regular file. |
+| `test_stop_writes_buffered_messages_and_saves` | Stopping writes the buffered messages, finalizes the file, and records it as saved. | Two messages, then `stop()`. |
+| `test_default_clock_ignores_wall_clock_steps` | Data logger writer: by default the write schedule uses a monotonic clock, so a step of the wall clock doesn't make a write due. | Replaces `time.time` with one an hour ahead after the dataset starts. |
+
+## test_data_formatter.py — formatter registration (needs: none)
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_duplicate_formatter_name_error_has_its_message` | Data logger writer: registering a formatter name twice raises `DataFormatterKeyError` with its text in `msg` and no dataset, rather than the text as the dataset name and an empty message. | Registers one class twice into an emptied registry. |
+
 ## test_integration.py — client and manager interaction (needs: loopback sockets; not yet marked)
 
 Each test starts a `MessageManager` on an unused loopback port in `setUp` and connects one client with module ID 11 or 12. `wait_for_message()` is a fixed short sleep. Two message types defined in the file, `TEST_MESSAGE` and `TEST_MESSAGE2`, are used for subscriptions.
