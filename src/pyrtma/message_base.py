@@ -147,14 +147,14 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         Returns:
             bytes: Copy of message field data bytes
         """
-        meta = getattr(type(self), f"_{name}")
-        if name not in [x[0] for x in self._fields_]:
-            raise KeyError(f"{name} is not a field of {self.__name__}")
-        else:
-            offset = meta.offset
-            sz = meta.size
+        # The ctypes fields are the public names with a "_" in front; the
+        # public names are the validators.
+        cls = type(self)
+        if not any(f[0] == f"_{name}" for f in cls._fields_):
+            raise KeyError(f"{name} is not a field of {cls.__name__}")
+        meta = getattr(cls, f"_{name}")
 
-        return bytes(memoryview(self).cast("c")[offset : offset + sz])
+        return ctypes.string_at(ctypes.addressof(self) + meta.offset, meta.size)
 
     @classmethod
     def from_dict(cls: Type[MB], data: Dict[str, Any]) -> MB:
@@ -172,7 +172,7 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         except Exception as e:
             raise JSONDecodingError(
                 f"Unable to decode {type(obj).__name__} from {data}"
-            )
+            ) from e
 
     @classmethod
     def from_json(cls: Type[MB], s: str) -> MB:
@@ -283,13 +283,15 @@ def _from_dict(obj: MessageBase, data: Dict[str, Any]):
                 for i, elem in enumerate(getattr(obj, name)):
                     _from_dict(elem, data[name][i])
             elif ftype._type_ is ctypes.c_char:
-                # list of characters is equivalent to str
-                if type(data[name]) is list and all(
-                    [(type(x) is str and len(x) <= 1) for x in data[name]]
+                # list of characters is equivalent to str. Joined into a new
+                # value, so the caller's dictionary is left as it was.
+                value = data[name]
+                if type(value) is list and all(
+                    [(type(x) is str and len(x) <= 1) for x in value]
                 ):
-                    data[name] = "".join(data[name])
+                    value = "".join(value)
 
-                setattr(obj, name, data[name])
+                setattr(obj, name, value)
             else:
                 getattr(obj, name)[:] = data[name]
         else:

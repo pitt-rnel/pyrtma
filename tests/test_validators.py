@@ -1,6 +1,16 @@
 # These tests assign values of the wrong type on purpose, to check they're rejected.
 # pyright: reportAttributeAccessIssue=false
+import copy
+import sys
 import unittest
+from typing import Any
+
+import pytest
+
+from pyrtma.exceptions import JSONDecodingError
+from pyrtma.header import MessageHeader
+from pyrtma.message import Message
+from pyrtma.validators import disable_message_validation
 
 # Import message defs to add to pyrtma.msg_defs map
 from .test_msg_defs.test_defs import *
@@ -886,3 +896,127 @@ class TestEncoding(unittest.TestCase):
         self.assertFalse(A.double_arr is B.double_arr)
         self.assertFalse(A.byte_arr is B.byte_arr)
         self.assertFalse(A.struct_arr is B.struct_arr)
+
+
+def test_validation_is_enabled_again_after_an_exception() -> None:
+    with pytest.raises(RuntimeError):
+        with disable_message_validation():
+            raise RuntimeError("body failed")
+    m = MDF_VALIDATOR_A()
+
+    with pytest.raises(ValueError):
+        m.int8 = 1000
+
+
+@pytest.mark.parametrize(
+    ("field", "values"),
+    [
+        ("int8_arr", [1, -2, 3, -4]),
+        ("uint64_arr", [1, 2, 3, 2**64 - 1]),
+        ("byte_arr", [1, 2, 3, 255]),
+        ("float_arr", [0.5, -1.5, 2.0, 4.0]),
+    ],
+)
+def test_generator_assigns_every_value(field: str, values: list[Any]) -> None:
+    m = MDF_VALIDATOR_A()
+
+    getattr(m, field)[:] = (v for v in values)
+
+    assert list(getattr(m, field)) == values
+
+
+def test_generator_assigns_every_struct() -> None:
+    m = MDF_VALIDATOR_A()
+    structs = [VALIDATOR_STRUCT() for _ in range(4)]
+    for i, s in enumerate(structs):
+        s.int32 = i + 1
+
+    m.struct_arr[:] = (s for s in structs)
+
+    assert [s.int32 for s in m.struct_arr] == [1, 2, 3, 4]
+
+
+def test_generator_with_a_value_out_of_range_is_rejected() -> None:
+    m = MDF_VALIDATOR_A()
+
+    with pytest.raises(ValueError):
+        m.int8_arr[:] = (v for v in [1, 2, 3, 1000])
+
+
+@pytest.mark.parametrize(
+    "validator",
+    [Int8(), Uint32(), Byte(), Float(), Double()],
+    ids=["Int8", "Uint32", "Byte", "Float", "Double"],
+)
+def test_validate_many_reads_a_generator_once(validator: Any) -> None:
+    validator.validate_many(v for v in [1, 2, 3])
+
+
+def test_get_field_raw_returns_the_field_bytes() -> None:
+    m = MDF_VALIDATOR_A()
+    m.int32 = 0x01020304
+    m.string = "abc"
+
+    assert m.get_field_raw("int32") == (0x01020304).to_bytes(4, sys.byteorder)
+    assert m.get_field_raw("string") == b"abc\x00"
+
+
+def test_get_field_raw_rejects_an_unknown_field() -> None:
+    m = MDF_VALIDATOR_A()
+
+    with pytest.raises(KeyError):
+        m.get_field_raw("no_such_field")
+
+
+def test_from_dict_leaves_its_input_unchanged() -> None:
+    data = MDF_VALIDATOR_A().to_dict()
+    data["string"] = ["a", "b"]
+    data["struct_"]["string"] = ["c"]
+    before = copy.deepcopy(data)
+
+    m = MDF_VALIDATOR_A.from_dict(data)
+
+    assert data == before
+    assert m.string == "ab"
+    assert m.struct_.string == "c"
+
+
+def test_from_dict_keeps_the_cause_of_a_failure() -> None:
+    with pytest.raises(JSONDecodingError) as info:
+        MDF_VALIDATOR_A.from_dict({})
+
+    assert isinstance(info.value.__cause__, KeyError)
+
+
+def test_message_copy_keeps_the_header_class() -> None:
+    class TaggedHeader(MessageHeader):
+        pass
+
+    header = TaggedHeader()
+    header.msg_type = MT_VALIDATOR_A
+    data = MDF_VALIDATOR_A()
+    data.int32 = 7
+    original = Message(header, data)
+
+    duplicate = Message.copy(original)
+
+    assert type(duplicate.header) is TaggedHeader
+    assert bytes(duplicate.header) == bytes(header)
+    assert duplicate.data.int32 == 7
+    assert duplicate.data is not data
+
+
+def test_string_that_is_not_ascii_raises_on_read() -> None:
+    m = MDF_VALIDATOR_A()
+    # Bytes as a C client could send them, written past the validator.
+    m._string = "\u00f3".encode("utf-8")
+
+    with pytest.raises(UnicodeDecodeError):
+        m.string
+
+
+def test_string_that_is_not_ascii_is_rejected_on_write() -> None:
+    m = MDF_VALIDATOR_A()
+
+    with pytest.raises(TypeError):
+        m.string = "\u00f3"

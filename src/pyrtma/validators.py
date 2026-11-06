@@ -5,6 +5,7 @@ import collections.abc as abc
 import math
 
 from typing import (
+    Any,
     List,
     ClassVar,
     Type,
@@ -67,10 +68,32 @@ def disable_message_validation(ignore=False):
     """
     if not ignore:
         token = _VALIDATION_ENABLED.set(False)
-        yield
-        _VALIDATION_ENABLED.reset(token)
+        try:
+            yield
+        finally:
+            # Restored even when the body raises; otherwise validation would
+            # stay off in this context from then on.
+            _VALIDATION_ENABLED.reset(token)
     else:
         yield  # dummy context
+
+
+def _materialize(value: Any) -> Any:
+    """Read an iterator into a list, so it can be gone through more than once.
+
+    Validation goes through the values, and the assignment after it needs
+    them again; a generator would be empty by then. Sequences, bytes and
+    ctypes arrays are returned unchanged, so they aren't copied.
+
+    Args:
+        value: Values about to be validated and assigned.
+
+    Returns:
+        ``value``, or a list of its items if it was an iterator.
+    """
+    if isinstance(value, abc.Iterator):
+        return list(value)
+    return value
 
 
 _P = TypeVar("_P")  # Parent
@@ -149,6 +172,8 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P, _C], metaclass=A
             TypeError: Wrong type
             ValueError: Value cannot be precisely represented with this datatype
         """
+
+        value = _materialize(value)
 
         # Note: This may not be worth it since this is a rare overflow case.
         try:
@@ -247,6 +272,8 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P, _C], metaclass=ABCMe
             TypeError: Wrong type
             ValueError: Integer out of range for this datatype
         """
+
+        value = _materialize(value)
 
         # Check all values
         if any(not isinstance(v, int) for v in value):
@@ -436,6 +463,8 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
         if isinstance(value, (bytes, bytearray)):
             return
 
+        value = _materialize(value)
+
         # Commented this check to help performance
         if any(not isinstance(v, int) for v in value):
             raise TypeError(
@@ -606,6 +635,8 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
+        # Read a generator once, for both validation and assignment.
+        value = _materialize(value)
         if _VALIDATION_ENABLED.get():
             if isinstance(value, abc.Iterable) or hasattr(value, "__getitem__"):
                 self.validate_many(value)
@@ -824,6 +855,8 @@ class ByteArray(ArrayField[Byte]):
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
+        # Read a generator once, for both validation and assignment.
+        value = _materialize(value)
         if _VALIDATION_ENABLED.get():
             if isinstance(value, abc.Iterable) or hasattr(value, "__getitem__"):
                 self.validate_many(value)
@@ -950,6 +983,7 @@ class Struct(FieldValidator, Generic[_S]):
         Raises:
             TypeError: Wrong type
         """
+        value = _materialize(value)
         if any(not isinstance(v, self._ctype) for v in value):
             raise TypeError(f"Expected {value} to be an {self._ctype.__name__}.")
 
@@ -1019,6 +1053,8 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
                 "StructArray descriptor is not bound to an instance object."
             )
 
+        # Read a generator once, for both validation and assignment.
+        value = _materialize(value)
         if _VALIDATION_ENABLED.get():
             if isinstance(value, abc.Iterable) or hasattr(value, "__getitem__"):
                 self.validate_many(value)

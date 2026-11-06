@@ -147,6 +147,10 @@ class Message:
         Args:
             m: Message structure to copy
         """
+        # The classes come from the message, so a header or data subclass is
+        # kept. from_buffer_copy is looked up on the class, because ctypes
+        # defines it on the structure's type and instances don't have it.
         return Message(
-            MessageHeader.from_buffer_copy(m.header), m.data.from_buffer_copy(m.data)
+            type(m.header).from_buffer_copy(m.header),
+            type(m.data).from_buffer_copy(m.data),
         )

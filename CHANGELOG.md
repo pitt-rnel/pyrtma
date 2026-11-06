@@ -67,6 +67,11 @@ that makes them. The version number is chosen at release time.
 
 ### Fixed
 
+- `disable_message_validation()` turns validation back on when its body raises; it used to stay off for that thread from then on.
+- Array fields accept a generator: every value is validated and stored. Validators' `validate_many` reads its input once; with a generator it used to fail or check nothing.
+- `MessageBase.get_field_raw()` returns the field's raw bytes, and raises `KeyError` for an unknown name; it always raised before.
+- `MessageBase.from_dict()` no longer modifies the dictionary it is given, and its `JSONDecodingError` keeps the original exception as its cause.
+- `Message.copy()` works and keeps the classes of the header and data; it raised `AttributeError` before.
 - A definitions file that fails to import is no longer left half-initialized in `sys.modules`, so loading it again after a fix works. An exception from its `get_message_definitions()` is raised as `MessageDefinitionsLoadError`.
 - `Client.connect` raises `MessageManagerNotFound` for every failure to reach the manager, including a host name that can't be resolved, an unreachable host and a timeout, which used to escape as raw `OSError`s. A malformed server name raises `ValueError`. However `connect()` fails, the client is left disconnected with its socket closed; after an `AcknowledgementTimeout` it used to report itself connected.
 - `client_context` passes `auto_detect` to the client, and disconnects it when the body raises.

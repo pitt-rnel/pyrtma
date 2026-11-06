@@ -215,6 +215,12 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | `test_late_connect_v2_keeps_id_and_logger_status` | Manager connect messages: a late `CONNECT_V2` asking for another module ID or logger status keeps the existing ones and logs a warning about each; the name is still taken. | A `CONNECT_V2` asking for ID 77 as a logger, with the manager logging at `WARNING` and `caplog` capturing. |
 | `test_late_connect_v2_is_announced` | Manager connect messages: over a real connection, a `CONNECT` and then a `CONNECT_V2` give one ACK, then a `HELLO` with the name and process ID from the `CONNECT_V2`. | A raw socket, whose `CONNECT` asks for ID 123 through its header; an observer whose subscriptions are confirmed with `deliver()` first. |
 
+### TestConnectNames
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_connect_with_a_name_that_is_not_ascii_is_dropped` | Strings, validation and logging: names must be ASCII, as decided in Phase 5. A `CONNECT_V2` whose name isn't ASCII drops that connection, and the manager keeps running. | A raw connection sends a `CONNECT_V2` with "Módulo" encoded as UTF-8 written straight into the name field; then a new client connects. |
+
 ## test_client.py — the client: signatures, receiving, sending, connecting, lost connections and subscriptions (needs: integration for every class)
 
 Most receive tests use `scripted_client`, a client connected to the `scripted_manager` fixture: a stand-in manager (`helpers.ScriptedManager`) that ACKs the client's connect and then sends only the bytes the test gives it, built with `helpers.frame()`. It never ACKs subscriptions, so nothing reaches the client unless the test sends it. Tests wait for sent bytes to arrive with `wait_until_arrived()`, which peeks at the client's socket. A read that could block on a partial message runs under `watchdog()`, which resets the stand-in's connection after 3 s, so that the old code fails with `ConnectionLost` instead of hanging. Timing checks allow `SLACK`, 1 s, beyond the timeout. Type 7777 stands for a type the test definitions don't define.
@@ -542,6 +548,21 @@ Each test writes YAML to temporary files and expects `Parser.parse()` to raise a
 ## test_validators.py — field descriptors and validation (needs: none)
 
 Uses the `VALIDATOR_A` and `VALIDATOR_B` messages from the test definitions, which have a field of every supported type.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_validation_is_enabled_again_after_an_exception` | H6: validation is on again after the body of `disable_message_validation()` raises. | A body that raises `RuntimeError`; then an out-of-range `int8` must raise `ValueError`. |
+| `test_generator_assigns_every_value` | H5 (validators): assigning a generator to an array slice validates and stores every value. | Parametrized over `int8`, `uint64`, byte and float arrays. |
+| `test_generator_assigns_every_struct` | H5 (validators): the same for a struct array. | A generator of four structs with distinct `int32` values. |
+| `test_generator_with_a_value_out_of_range_is_rejected` | H5 (validators): a generator still gets every value checked. | A generator whose last value doesn't fit `int8`. |
+| `test_validate_many_reads_a_generator_once` | H5 (validators): `validate_many` accepts a generator of valid values; it used to iterate up to three times and fail on the empty remainder. | Parametrized over integer, byte and float validators. |
+| `test_get_field_raw_returns_the_field_bytes` | Client `get_field_raw`: it returns a copy of a field's raw bytes. | An `int32` and a `char[4]` field. |
+| `test_get_field_raw_rejects_an_unknown_field` | Client `get_field_raw`: an unknown name raises `KeyError`, as documented. | A name the message doesn't have. |
+| `test_from_dict_leaves_its_input_unchanged` | Low (`from_dict`): `from_dict` doesn't modify the dictionary it is given, including nested ones. | Char fields given as lists of characters, at the top level and in a struct; compared with a deep copy. |
+| `test_from_dict_keeps_the_cause_of_a_failure` | Low (`from_dict`): a failure raises `JSONDecodingError` with the original exception as its cause. | An empty dictionary, which raises `KeyError` inside. |
+| `test_message_copy_keeps_the_header_class` | Low (`Message.copy`): `Message.copy` works, copies the data, and keeps the header's class. | A message with a `MessageHeader` subclass; compares classes, bytes and identity. |
+| `test_string_that_is_not_ascii_raises_on_read` | Strings, validation and logging: a string field holding bytes that aren't ASCII raises on read, as decided in Phase 5. | UTF-8 bytes written to the raw field, past the validator. |
+| `test_string_that_is_not_ascii_is_rejected_on_write` | Strings, validation and logging: assigning text that isn't ASCII raises `TypeError`. | Assigns "ó". |
 
 ### TestEncoding
 

@@ -1812,3 +1812,22 @@ class TestLateConnectV2:
         )
         assert seen is not None
         assert seen[-1].data.pid == 4321
+
+
+class TestConnectNames:
+    def test_connect_with_a_name_that_is_not_ascii_is_dropped(
+        self,
+        raw_connection: socket.socket,
+        client_factory: Callable[..., Client],
+    ) -> None:
+        # A C client could send a UTF-8 name. Names must be ASCII: the
+        # connection is dropped, and the manager keeps running.
+        payload = bytearray(bytes(cd.MDF_CONNECT_V2()))
+        offset = cd.MDF_CONNECT_V2._name.offset  # type: ignore[attr-defined]
+        name = "M\u00f3dulo".encode("utf-8")
+        payload[offset : offset + len(name)] = name
+
+        raw_connection.sendall(raw_message(cd.MT_CONNECT_V2, bytes(payload)))
+
+        assert_closed_by_manager(raw_connection)
+        assert client_factory(name="after").connected
