@@ -12,6 +12,7 @@ import random
 import ctypes
 import os
 import struct
+import sys
 from contextlib import contextmanager
 
 
@@ -44,6 +45,19 @@ DEFAULT_STALL_TIMEOUT: float = 5.0
 _NUM_DATA_BYTES = struct.Struct("i")
 _NUM_DATA_BYTES_OFFSET: int = MessageHeader._num_data_bytes.offset  # type: ignore[attr-defined]
 assert ctypes.sizeof(ctypes.c_int) == _NUM_DATA_BYTES.size
+
+# What select() can watch. On Linux and macOS it can't take a descriptor
+# numbered FD_SETSIZE (1024) or higher; on Windows it takes at most 512
+# sockets per list. Past either limit it raises ValueError, which would stop
+# the manager, so connections beyond them are refused instead.
+_SELECT_MAX_SOCKETS: Optional[int]
+_SELECT_MAX_FD: Optional[int]
+if sys.platform == "win32":
+    _SELECT_MAX_SOCKETS = 512
+    _SELECT_MAX_FD = None
+else:
+    _SELECT_MAX_SOCKETS = None
+    _SELECT_MAX_FD = 1024
 
 
 @dataclass
@@ -293,6 +307,9 @@ class MessageManager(ClientLike):
 
         Raises:
             ValueError: A timeout is zero or negative.
+            RuntimeError: The listening socket's descriptor is beyond what
+                ``select()`` can watch, because the process has too many
+                files open.
         """
         for name, value in (
             ("stall_timeout", stall_timeout),
@@ -325,10 +342,23 @@ class MessageManager(ClientLike):
         if ip_address == socket.INADDR_ANY:
             ip_address = ""  # bind and Module require a string input, '' is treated as INADDR_ANY by bind
 
+        # Connected modules allowed at once, not counting the manager itself.
+        self._max_modules: int = cd.MAX_MODULES
+
+        # Connections beyond these are refused; see _SELECT_MAX_SOCKETS.
+        self._max_sockets: Optional[int] = _SELECT_MAX_SOCKETS
+        self._max_fd: Optional[int] = _SELECT_MAX_FD
+
         # Create the tcp listening socket
         self.listen_socket = socket.socket(
             family=socket.AF_INET, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP
         )
+        listen_fd = self.listen_socket.fileno()
+        if self._max_fd is not None and listen_fd >= self._max_fd:
+            self.listen_socket.close()
+            raise RuntimeError(
+                f"The listening socket's descriptor ({listen_fd}) is beyond what select() can watch (below {self._max_fd}). Start the manager with fewer files open."
+            )
         self.listen_socket.bind((ip_address, port))
         self.listen_socket.listen(socket.SOMAXCONN)
         self.modules: Dict[socket.socket, Module] = {}
@@ -416,8 +446,9 @@ class MessageManager(ClientLike):
     def connect_module(self, module: Module, msg: Message) -> bool:
         """Connect module
 
-        A module that asks for an ID that is out of range or already in use is
-        refused and its connection closed. It keeps no ID, and it gets no
+        A module is refused and its connection closed when ``MAX_MODULES``
+        modules are already connected, or when it asks for an ID that is out
+        of range or already in use. It keeps no ID, and it gets no
         GOODBYE, since it was never introduced with a HELLO.
 
         Args:
@@ -445,14 +476,25 @@ class MessageManager(ClientLike):
         # fields common to v1 and v2
         module.is_logger = msg.data.logger_status == 1
 
+        connected = sum(
+            1 for m in self.modules.values() if m.connected and m is not self.mm_module
+        )
+        if connected >= self._max_modules:
+            self.logger.error(
+                f"DROPPING - {module!s} - The limit of {self._max_modules} modules (MAX_MODULES) is reached. Closing connection."
+            )
+            self.remove_module(module)
+            return False
+
         # The ID is checked before it is given to the module, so that a
         # refused module never carries another module's ID.
         if requested == 0:
             requested = self.assign_module_id()
         else:
-            if requested < 1 or requested > cd.DYN_MOD_ID_START:
+            # DYN_MOD_ID_START is the first dynamic ID, so it can't be static.
+            if requested < 1 or requested >= cd.DYN_MOD_ID_START:
                 self.logger.error(
-                    f"Invalid Module id specified: {requested}. User assigned ids must be in range or 1 - {cd.DYN_MOD_ID_START}"
+                    f"Invalid Module id specified: {requested}. User assigned ids must be in range 1 - {cd.DYN_MOD_ID_START - 1}"
                 )
                 self.remove_module(module)
                 return False
@@ -491,7 +533,7 @@ class MessageManager(ClientLike):
 
         # Drop all subscriptions for this module
         for msg_type in module.subs:
-            self.subscriptions[msg_type].discard(module)
+            self._unsubscribe(module, msg_type)
 
         # Discard from logger module set if needed
         self.logger_modules.discard(module)
@@ -673,6 +715,23 @@ class MessageManager(ClientLike):
         """
         self.remove_module(src_module)
 
+    def _unsubscribe(self, module: Module, msg_type: int) -> None:
+        """Take a module off one type's subscriber set.
+
+        A set left empty is deleted, so the table holds only types that have
+        subscribers.
+
+        Args:
+            module: The module.
+            msg_type: The message type.
+        """
+        subscribers = self.subscriptions.get(msg_type)
+        if subscribers is None:
+            return
+        subscribers.discard(module)
+        if not subscribers:
+            del self.subscriptions[msg_type]
+
     def add_subscription(self, src_module: Module, msg: Message):
         """Add message subscription
 
@@ -687,7 +746,8 @@ class MessageManager(ClientLike):
 
             # Clear out the individual subs
             for sub_type in src_module.subs:
-                self.subscriptions[sub_type].discard(src_module)
+                if sub_type != ALL_MESSAGE_TYPES:
+                    self._unsubscribe(src_module, sub_type)
             src_module.subs.clear()
 
             src_module.subs.add(sub.msg_type)
@@ -710,11 +770,11 @@ class MessageManager(ClientLike):
         unsub = cd.MDF_UNSUBSCRIBE.from_buffer(msg.data)
 
         if unsub.msg_type == ALL_MESSAGE_TYPES:
-            self.subscriptions[unsub.msg_type].discard(src_module)
+            self._unsubscribe(src_module, unsub.msg_type)
 
             # Clear out the individual subs
             for sub_type in src_module.subs:
-                self.subscriptions[sub_type].discard(src_module)
+                self._unsubscribe(src_module, sub_type)
             src_module.subs.clear()
 
             self.logger.debug(f"UNSUBSCRIBE- {src_module!s} from ALL_MESSAGE_TYPES")
@@ -722,7 +782,7 @@ class MessageManager(ClientLike):
             # Ignore individual msg_types unsubs when subscribed to ALL_MESSAGE_TYPES
             if src_module.sub_all:
                 return
-            self.subscriptions[unsub.msg_type].discard(src_module)
+            self._unsubscribe(src_module, unsub.msg_type)
             src_module.subs.discard(unsub.msg_type)
             self.logger.debug(f"UNSUBSCRIBE- {src_module!s} from MT:{unsub.msg_type}")
 
@@ -985,10 +1045,12 @@ class MessageManager(ClientLike):
         with self._routing():
             # Subscriber list for this message type. It's a snapshot: modules
             # removed while it's in use are skipped below.
+            # get(), not [], so that a type nobody subscribes to doesn't add
+            # an entry to the table.
             subscribers = list(
                 chain(
-                    self.subscriptions[header.msg_type],
-                    self.subscriptions[ALL_MESSAGE_TYPES],
+                    self.subscriptions.get(header.msg_type, ()),
+                    self.subscriptions.get(ALL_MESSAGE_TYPES, ()),
                 )
             )
 
@@ -1035,18 +1097,22 @@ class MessageManager(ClientLike):
         self,
         header: MessageHeader,
         payload: Union[bytes, MessageData],
+        *,
+        exclude: Optional[Module] = None,
     ):
         """Forward message to registered logger modules
 
         Args:
             header (MessageHeader): Message header to send
             payload (Union[bytes, MessageData]): Message data to send
+            exclude (Module, optional): A logger not to send it to, because it
+                was already sent the message directly.
         """
         with self._routing():
             wire = b"".join((header, payload))
             # A snapshot, because a failed send removes the logger from the set.
             for module in list(self.logger_modules):
-                if not self._is_routed(module):
+                if module is exclude or not self._is_routed(module):
                     continue
                 self._send_to_logger(module, header, wire)
 
@@ -1097,8 +1163,10 @@ class MessageManager(ClientLike):
         except OSError as err:
             self._drop_after_send_error(src_module, header, err)
 
-        # Always forward to logger modules
-        self.send_to_loggers(header, b"")
+        # Always forward to logger modules, except the requester: a logger
+        # sent its own ACK twice would take the copy as the reply to its next
+        # request.
+        self.send_to_loggers(header, b"", exclude=src_module)
 
     def send_failed_message(
         self,
@@ -1159,11 +1227,16 @@ class MessageManager(ClientLike):
         self.send_message(msg)
 
     def send_hello(self, module: Module, dest_mod_id: int = 0):
-        """Send HELLO
+        """Send HELLO, for a module that has connected
+
+        A module that hasn't connected has nothing to introduce, and would get
+        no GOODBYE later, so nothing is sent for it.
 
         Args:
             module (Module): Module object to send info for
         """
+        if not module.connected:
+            return
         self.logger.debug("HELLO")
         msg = cd.MDF_HELLO()
         msg.pid = module.pid
@@ -1266,8 +1339,25 @@ class MessageManager(ClientLike):
             header (MessageHeader): Message header of the incoming message
         """
 
+        # A module must connect before it does anything else.
+        if not src_module.connected and header.msg_type not in (
+            cd.MT_CONNECT,
+            cd.MT_CONNECT_V2,
+        ):
+            self._drop_quietly(
+                src_module,
+                f"DROPPING - {src_module!s} - Sent MT={header.msg_type} before CONNECT; a module must connect first.",
+            )
+            return
+
         # Handle any internal core messages that come through
         self.process_core_message(src_module, header)
+
+        # A message whose handling dropped its sender, such as a refused
+        # CONNECT, isn't passed on. DISCONNECT is, since it drops its sender by
+        # design.
+        if not self._is_routed(src_module) and header.msg_type != cd.MT_DISCONNECT:
+            return
 
         # Forward all messages that come through to MM
         self.logger.debug(f"FORWARD - msg_type:{header.msg_type} from {src_module!s}")
@@ -1288,6 +1378,18 @@ class MessageManager(ClientLike):
             conn, address = self.listen_socket.accept()
         except OSError as err:
             self.logger.warning(f"Failed to accept a new connection - {err!s}")
+            return
+
+        refusal = None
+        if self._max_sockets is not None and len(self.modules) >= self._max_sockets:
+            refusal = f"the limit of {self._max_sockets} sockets that select() can watch is reached"
+        elif self._max_fd is not None and conn.fileno() >= self._max_fd:
+            refusal = f"its descriptor ({conn.fileno()}) is beyond what select() can watch (below {self._max_fd})"
+        if refusal is not None:
+            self.logger.warning(
+                f"Refusing connection from {address[0]}:{address[1]} - {refusal}."
+            )
+            conn.close()
             return
 
         self.logger.info(f"New connection accepted from {address[0]}:{address[1]}")

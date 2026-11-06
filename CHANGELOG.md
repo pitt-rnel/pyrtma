@@ -14,6 +14,8 @@ that makes them. The version number is chosen at release time.
 
 - `MessageManager(stall_timeout=...)` and the manager's `--stall-timeout SECONDS` and `--no-stall-timeout` options. A client that sends part of a message and then nothing more for this long is dropped, with a warning giving the bytes received. The default is 5 seconds; `None`, or `--no-stall-timeout`, never drops it, for example while it is paused at a debugger breakpoint. A stalled client doesn't hold up other clients either way.
 - `MessageManager(logger_timeout=...)` and `--logger-timeout SECONDS`. A logger module that can't take a message for this long is dropped, with an error, a `FAILED_MESSAGE` and a `GOODBYE`. The default, `None`, keeps the current behavior of waiting for loggers as long as it takes.
+- The message manager allows at most `MAX_MODULES` (256) connected modules. A `CONNECT` beyond that is refused, with an error, and its connection closed.
+- The manager refuses a connection that `select()` couldn't watch, with a warning, instead of stopping: past 512 sockets on Windows, or with a descriptor numbered 1024 or higher on Linux and macOS. A manager whose listening socket would be beyond that limit raises `RuntimeError` when constructed.
 
 ### Changed
 
@@ -30,6 +32,10 @@ that makes them. The version number is chosen at release time.
 - The message manager sends a `GOODBYE` only for a module that connected, so each `GOODBYE` matches an earlier HELLO. A socket that is closed before it connects, or a module refused at connect, gets none.
 - A module refused because its static ID is out of range or already in use no longer takes that ID.
 - The reply to `INTRODUCE` has a HELLO for each connected module only. It no longer includes the manager's own entry or sockets that haven't connected, which all appeared with ID 0.
+- A socket must send `CONNECT` before anything else. The manager drops a socket that sends any other message first, with a warning, and doesn't act on or forward that message.
+- A message whose handling drops its sender, such as a refused `CONNECT`, is no longer forwarded. `DISCONNECT` still is.
+- A module can no longer take `DYN_MOD_ID_START` (10000), the first dynamic ID, as a static ID. Static IDs are 1 to 9999.
+- `MessageManager.send_to_loggers` takes a keyword-only `exclude`, a logger not to send the message to.
 
 ### Fixed
 
@@ -37,6 +43,9 @@ that makes them. The version number is chosen at release time.
 - A slow consumer whose connection had some room, but not enough for a whole message, could block the manager in a send until the consumer read again.
 - `INTRODUCE` no longer fails with "dictionary changed size during iteration" when a send fails partway through the reply, which dropped the requesting module and cut the reply short. The module whose send failed is dropped and the rest of the reply goes out.
 - A module refused at connect for using another module's static ID no longer causes a `GOODBYE` with that ID while its owner is still connected.
+- A logger module is no longer sent its own ACKs twice. The extra copy could be taken as the reply to its next request, before that request was processed.
+- The manager's subscription table no longer grows with every message type it forwards, or keeps types whose last subscriber left.
+- A connection that `select()` can't watch no longer stops the manager with `ValueError`.
 - The message manager no longer crashes on a header with a negative `num_data_bytes`. It drops that client and logs an error naming the size; the oversized case now logs the size too.
 - An unexpected exception while handling one client's message is logged with its traceback and drops that client, instead of stopping the manager. A failure while accepting a connection is logged and the connection discarded.
 - The message manager no longer crashes when several subscribers or logger modules fail at once, as when a rig is power-cycled. Each is removed once, with one `GOODBYE`, and any `OSError` on a send drops the module, not only `ConnectionError`. Removing a module that was already removed does nothing.

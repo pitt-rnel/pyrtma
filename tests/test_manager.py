@@ -11,8 +11,11 @@ from __future__ import annotations
 import ctypes
 import errno
 import logging
+import os
 import socket
+import sys
 import time
+from contextlib import contextmanager
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any, cast
 
@@ -340,6 +343,60 @@ def raw_message(msg_type: int, payload: bytes = b"") -> bytes:
     return raw_header(msg_type, len(payload)) + payload
 
 
+def recv_message(sock: socket.socket) -> tuple[MessageHeader, bytes]:
+    """Read one whole message from a raw connection.
+
+    Args:
+        sock: A raw connection with a read timeout.
+
+    Returns:
+        The message's header and payload.
+    """
+
+    def recv_exact(count: int) -> bytes:
+        data = b""
+        while len(data) < count:
+            chunk = sock.recv(count - len(data))
+            assert chunk, "the manager closed the connection"
+            data += chunk
+        return data
+
+    header = MessageHeader.from_buffer_copy(recv_exact(ctypes.sizeof(MessageHeader)))
+    return header, recv_exact(header.num_data_bytes)
+
+
+def connect_raw(sock: socket.socket, name: str = "raw") -> int:
+    """Connect a raw connection as a module, as ``Client.connect`` does.
+
+    Args:
+        sock: A raw connection with a read timeout.
+        name: The module name to send.
+
+    Returns:
+        The module ID the manager assigned.
+    """
+    data = cd.MDF_CONNECT_V2()
+    data.name = name
+    sock.sendall(raw_message(cd.MT_CONNECT_V2, bytes(data)))
+    header, _ = recv_message(sock)
+    assert header.msg_type == cd.MT_ACKNOWLEDGE
+    return header.dest_mod_id
+
+
+def subscribe_raw(sock: socket.socket, msg_type: int) -> None:
+    """Subscribe a connected raw connection to a message type.
+
+    Args:
+        sock: A raw connection that has connected, with a read timeout.
+        msg_type: The type to subscribe to.
+    """
+    data = cd.MDF_SUBSCRIBE()
+    data.msg_type = msg_type
+    sock.sendall(raw_message(cd.MT_SUBSCRIBE, bytes(data)))
+    header, _ = recv_message(sock)
+    assert header.msg_type == cd.MT_ACKNOWLEDGE
+
+
 def read_once(
     manager: MessageManager, module: Module
 ) -> tuple[MessageHeader, bytes] | None:
@@ -567,6 +624,7 @@ class TestHeaderValidation:
     ) -> None:
         sender, observer = watcher(client_factory, cd.MT_DATASET_START)
         size = cd.MDF_DATASET_START.type_size
+        connect_raw(raw_connection)
 
         # Two in a row: the second arriving shows the first didn't drop the
         # raw client.
@@ -1314,8 +1372,8 @@ class TestConnect:
 
     @pytest.mark.parametrize(
         "requested",
-        [50, cd.DYN_MOD_ID_START + 1],
-        ids=["already in use", "out of range"],
+        [50, cd.DYN_MOD_ID_START + 1, cd.DYN_MOD_ID_START],
+        ids=["already in use", "out of range", "first dynamic ID"],
     )
     def test_rejected_module_id_is_not_kept(
         self, bare_manager: MessageManager, requested: int
@@ -1389,3 +1447,292 @@ class TestIntroductions:
         assert not is_routed(bare_manager, requester)
         assert is_routed(bare_manager, other)
         assert goodbye_ids(observer) == [101]
+
+
+def handle(manager: MessageManager, module: Module, data: bytes) -> None:
+    """Feed a fake module bytes and give it one turn, as ``run()`` does.
+
+    Args:
+        manager: A manager that isn't running.
+        module: A module made by ``add_fake_module``.
+        data: The bytes it sends.
+    """
+    fake_conn(module).feed(data)
+    manager._handle_client(module.conn, module)
+
+
+def subscribe_message(msg_type: int, unsubscribe: bool = False) -> bytes:
+    """Build the bytes of a SUBSCRIBE or UNSUBSCRIBE message.
+
+    Args:
+        msg_type: The type to subscribe to or unsubscribe from.
+        unsubscribe: Build UNSUBSCRIBE instead.
+
+    Returns:
+        The message bytes.
+    """
+    data = cd.MDF_UNSUBSCRIBE() if unsubscribe else cd.MDF_SUBSCRIBE()
+    data.msg_type = msg_type
+    return raw_message(
+        cd.MT_UNSUBSCRIBE if unsubscribe else cd.MT_SUBSCRIBE, bytes(data)
+    )
+
+
+class TestConnectRequired:
+    @pytest.mark.parametrize(
+        "msg_type", [cd.MT_SUBSCRIBE, USER_MSG_TYPE, cd.MT_MODULE_READY]
+    )
+    @pytest.mark.manager_options(log_level=logging.WARNING)
+    def test_messages_before_connect_drop_the_socket(
+        self,
+        manager: ManagerHarness,
+        client_factory: Callable[..., Client],
+        raw_connection: socket.socket,
+        caplog: pytest.LogCaptureFixture,
+        msg_type: int,
+    ) -> None:
+        sender, observer = watcher(client_factory, cd.MT_HELLO, USER_MSG_TYPE)
+        payload = {
+            cd.MT_SUBSCRIBE: bytes(cd.MDF_SUBSCRIBE()),
+            USER_MSG_TYPE: b"data",
+            cd.MT_MODULE_READY: bytes(cd.MDF_MODULE_READY()),
+        }[msg_type]
+
+        raw_connection.sendall(raw_message(msg_type, payload))
+
+        assert_closed_by_manager(raw_connection)
+        seen = read_until_marker(sender, observer)
+        assert not any(m.header.src_mod_id == RAW_SRC_MOD_ID for m in seen)
+        assert not any(m.type_id == cd.MT_HELLO and m.data.mod_id == 0 for m in seen)
+        assert wait_for(
+            lambda: any("before CONNECT" in r.getMessage() for r in caplog.records)
+        )
+
+    def test_hello_is_not_sent_for_a_socket_that_never_connected(
+        self, bare_manager: MessageManager
+    ) -> None:
+        accepted_only = add_fake_module(bare_manager, 0, connected=False)
+        observer = add_fake_module(bare_manager, 102, subs=[cd.MT_HELLO])
+
+        bare_manager.send_hello(accepted_only)
+
+        assert sent_messages(observer) == []
+
+
+class TestForwardingAfterDrop:
+    def test_refused_connect_is_not_forwarded(
+        self, bare_manager: MessageManager
+    ) -> None:
+        add_fake_module(bare_manager, 50)
+        newcomer = add_fake_module(bare_manager, 0, connected=False)
+        observer = add_fake_module(bare_manager, 102, subs=[cd.MT_CONNECT_V2])
+        data = cd.MDF_CONNECT_V2()
+        data.mod_id = 50
+
+        handle(bare_manager, newcomer, raw_message(cd.MT_CONNECT_V2, bytes(data)))
+
+        assert not is_routed(bare_manager, newcomer)
+        assert sent_messages(observer) == []
+
+    def test_disconnect_is_still_forwarded(self, bare_manager: MessageManager) -> None:
+        leaving = add_fake_module(bare_manager, 101)
+        observer = add_fake_module(bare_manager, 102, subs=[cd.MT_DISCONNECT])
+
+        handle(bare_manager, leaving, raw_message(cd.MT_DISCONNECT))
+
+        assert not is_routed(bare_manager, leaving)
+        assert [h.msg_type for h, _ in sent_messages(observer)] == [cd.MT_DISCONNECT]
+
+
+class TestAcknowledgements:
+    def test_logger_gets_one_ack_per_request(
+        self, bare_manager: MessageManager
+    ) -> None:
+        requester = add_fake_module(
+            bare_manager, 101, subs=[ALL_MESSAGE_TYPES], is_logger=True
+        )
+        other = add_fake_module(
+            bare_manager, 102, subs=[ALL_MESSAGE_TYPES], is_logger=True
+        )
+
+        handle(bare_manager, requester, subscribe_message(td.MT_TEST_START))
+
+        def acks(module: Module) -> list[int]:
+            return [
+                h.dest_mod_id
+                for h, _ in sent_messages(module)
+                if h.msg_type == cd.MT_ACKNOWLEDGE
+            ]
+
+        assert acks(requester) == [101]
+        assert acks(other) == [101]
+
+
+class TestSubscriptionTable:
+    def test_forwarding_adds_no_entries(self, bare_manager: MessageManager) -> None:
+        src = add_fake_module(bare_manager, 101)
+        before = set(bare_manager.subscriptions)
+
+        for msg_type in range(20000, 20100):
+            bare_manager.forward_message(src, make_header(bare_manager, msg_type), b"")
+
+        assert set(bare_manager.subscriptions) == before
+
+    def test_unsubscribed_types_leave_no_entries(
+        self, bare_manager: MessageManager
+    ) -> None:
+        module = add_fake_module(bare_manager, 101)
+
+        handle(bare_manager, module, subscribe_message(20001))
+        handle(bare_manager, module, subscribe_message(20001, unsubscribe=True))
+        handle(bare_manager, module, subscribe_message(20002))
+        subscribed = 20002 in bare_manager.subscriptions
+        bare_manager.remove_module(module)
+
+        assert subscribed
+        assert 20001 not in bare_manager.subscriptions
+        assert 20002 not in bare_manager.subscriptions
+
+
+class TestStaticIds:
+    def test_highest_static_id_is_accepted(self, bare_manager: MessageManager) -> None:
+        newcomer = add_fake_module(bare_manager, 0, connected=False)
+        data = cd.MDF_CONNECT_V2()
+        data.mod_id = cd.DYN_MOD_ID_START - 1
+
+        accepted = bare_manager.connect_module(
+            newcomer, Message(make_header(bare_manager, cd.MT_CONNECT_V2), data)
+        )
+
+        assert accepted
+        assert newcomer.mod_id == cd.DYN_MOD_ID_START - 1
+
+
+@contextmanager
+def descriptors_above(threshold: int) -> Iterator[None]:
+    """Hold open enough descriptors that new ones are numbered above a threshold.
+
+    Args:
+        threshold: The descriptor number new ones should exceed.
+
+    Yields:
+        Nothing; descriptors opened inside are numbered above ``threshold``.
+    """
+    base = os.open(os.devnull, os.O_RDONLY)
+    held = [base]
+    try:
+        while held[-1] <= threshold:
+            held.append(os.dup(base))
+        yield
+    finally:
+        for fd in held:
+            os.close(fd)
+
+
+posix_only = pytest.mark.skipif(
+    sys.platform == "win32", reason="the descriptor limit applies to select() on POSIX"
+)
+
+
+class TestSelectLimits:
+    def test_limits_follow_the_platform(self, bare_manager: MessageManager) -> None:
+        if sys.platform == "win32":
+            assert (bare_manager._max_sockets, bare_manager._max_fd) == (512, None)
+        else:
+            assert (bare_manager._max_sockets, bare_manager._max_fd) == (None, 1024)
+
+    @pytest.mark.manager_options(log_level=logging.WARNING)
+    def test_connection_beyond_socket_limit_is_refused(
+        self,
+        manager: ManagerHarness,
+        client_factory: Callable[..., Client],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        sender, observer = watcher(client_factory)
+        manager.manager._max_sockets = 3  # the listener and the two clients
+
+        extra = socket.create_connection(
+            (LOOPBACK, manager.port), timeout=DEFAULT_TIMEOUT
+        )
+        try:
+            assert_closed_by_manager(extra)
+        finally:
+            extra.close()
+
+        assert wait_for(
+            lambda: any("limit of 3 sockets" in r.getMessage() for r in caplog.records)
+        )
+        assert_still_routes(sender, observer)
+
+    @posix_only
+    @pytest.mark.manager_options(log_level=logging.WARNING)
+    def test_connection_with_high_descriptor_is_refused(
+        self,
+        manager: ManagerHarness,
+        client_factory: Callable[..., Client],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        sender, observer = watcher(client_factory)
+
+        with descriptors_above(1100):
+            extra = socket.create_connection(
+                (LOOPBACK, manager.port), timeout=DEFAULT_TIMEOUT
+            )
+            try:
+                assert_closed_by_manager(extra)
+            finally:
+                extra.close()
+
+        assert wait_for(
+            lambda: any("select()" in r.getMessage() for r in caplog.records)
+        )
+        assert manager.running
+        assert_still_routes(sender, observer)
+
+    @posix_only
+    def test_listening_socket_with_high_descriptor_raises(self) -> None:
+        with descriptors_above(1100):
+            with pytest.raises(RuntimeError, match="select"):
+                MessageManager(ip_address=LOOPBACK, port=0, log_level=logging.ERROR)
+
+
+class TestModuleLimit:
+    def test_limit_is_max_modules(self, bare_manager: MessageManager) -> None:
+        assert bare_manager._max_modules == cd.MAX_MODULES == 256
+
+    def test_manager_and_unconnected_sockets_do_not_count(
+        self, bare_manager: MessageManager
+    ) -> None:
+        bare_manager._max_modules = 1
+        add_fake_module(bare_manager, 0, connected=False)
+        newcomer = add_fake_module(bare_manager, 0, connected=False)
+
+        accepted = bare_manager.connect_module(
+            newcomer,
+            Message(make_header(bare_manager, cd.MT_CONNECT_V2), cd.MDF_CONNECT_V2()),
+        )
+
+        assert accepted
+
+    def test_connect_beyond_the_limit_is_refused(
+        self,
+        manager: ManagerHarness,
+        client_factory: Callable[..., Client],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        sender, observer = watcher(client_factory)
+        manager.manager._max_modules = 2
+
+        with pytest.raises(ConnectionLost):
+            client_factory()
+
+        assert wait_for(
+            lambda: any("limit of 2 modules" in r.getMessage() for r in caplog.records)
+        )
+        assert_still_routes(sender, observer)
+        sender.disconnect()
+        assert wait_for(
+            lambda: sum(m.connected for m in list(manager.manager.modules.values()))
+            == 2  # the manager's own entry and the observer
+        )
+        assert client_factory().connected

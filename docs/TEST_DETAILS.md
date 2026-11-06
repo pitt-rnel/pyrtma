@@ -49,7 +49,7 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 |---|---|---|
 | `test_invalid_data_size_drops_only_that_client` | C2: a header announcing a negative or oversized payload drops that client with an error naming the size, and the manager keeps routing for the others. | Parametrized over -1 and 1 MiB + 1; a raw header, then the manager closing the raw socket, a fresh `TEST_START`, and the log record. |
 | `test_core_message_with_wrong_size_drops_client` | C2: a core message whose `num_data_bytes` doesn't match its core definition drops the client with an error naming the type, isn't forwarded, and leaves the manager routing. | Parametrized over `SUBSCRIBE` with 0 bytes, `CONNECT_V2` with 4, and `DATASET_START` with 31; once the manager closes the raw socket, the observer, which also subscribes to the type, reads up to a marker `TEST_START` and must not have been sent the raw socket's message. |
-| `test_core_message_with_right_size_is_forwarded` | C2: the core size check doesn't reject a correctly sized core message that the manager only forwards. | Two raw `DATASET_START`s of 32 bytes both reach the observer, so the first didn't drop the raw client. |
+| `test_core_message_with_right_size_is_forwarded` | C2: the core size check doesn't reject a correctly sized core message that the manager only forwards. | The raw socket connects, then two `DATASET_START`s of 32 bytes both reach the observer, so the first didn't drop it. |
 
 ### TestRemoval
 
@@ -144,7 +144,7 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_rejected_module_id_sends_no_goodbye` | Manager introductions: a client refused because its static module ID is in use gets no `GOODBYE`, so nothing suggests the module already holding that ID left, and that module stays connected. | A second client asking for ID 50; then a marker client connects and disconnects, and the observer must see no `GOODBYE` for 50 before the marker's. |
-| `test_rejected_module_id_is_not_kept` | Manager introductions: a refused module doesn't keep the ID it asked for, and is removed without a `GOODBYE`. | Parametrized over an ID already in use and one out of range; drives `connect_module` with a `CONNECT_V2`. |
+| `test_rejected_module_id_is_not_kept` | Manager introductions: a refused module doesn't keep the ID it asked for, and is removed without a `GOODBYE`. Manager, second pass: the first dynamic ID can't be taken as a static one. | Parametrized over an ID already in use, one out of range, and `DYN_MOD_ID_START`; drives `connect_module` with a `CONNECT_V2`. |
 | `test_only_connected_modules_get_a_goodbye` | Manager introductions: removing a socket that never connected closes it without a `GOODBYE`, while a connected module still gets one. | Removes one of each. |
 
 ### TestIntroductions
@@ -154,6 +154,56 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | `test_introductions_list_only_connected_modules` | Manager introductions: the reply to `INTRODUCE` has a HELLO for each connected module, the requester included, and none for the manager itself or for sockets that haven't connected. | A requester, another module and an accepted-only socket, besides the manager's own entry. |
 | `test_failed_logger_send_during_introductions` | Manager introductions: a logger whose send fails partway through the reply is dropped, and the reply still reaches the requester in full, instead of failing with "dictionary changed size during iteration". | A logger fake that resets on its first HELLO copy. |
 | `test_failed_requester_send_during_introductions` | Manager introductions: a requester whose send fails is dropped with a `GOODBYE`, and the introductions stop without an error. | A requester fake that resets. |
+
+### TestConnectRequired
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_messages_before_connect_drop_the_socket` | Manager, second pass: a socket that sends anything but `CONNECT` first is dropped with a warning, and nothing it sent is acted on or forwarded, including the HELLO that `MODULE_READY` would trigger. | Parametrized over `SUBSCRIBE`, a user message and `MODULE_READY` from a raw socket; the observer reads up to a marker after the manager closes it. |
+| `test_hello_is_not_sent_for_a_socket_that_never_connected` | Manager, second pass: `send_hello` sends nothing for a module that hasn't connected. | Calls it for an accepted-only fake. |
+
+### TestForwardingAfterDrop
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_refused_connect_is_not_forwarded` | Manager, second pass: a `CONNECT` refused for a duplicate ID isn't passed on to subscribers. | A `CONNECT_V2` asking for ID 50, which another module holds; the observer subscribes to `CONNECT_V2`. |
+| `test_disconnect_is_still_forwarded` | Manager, second pass: `DISCONNECT` is still passed on, although handling it drops its sender. | The observer subscribes to `DISCONNECT`. |
+
+### TestAcknowledgements
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_logger_gets_one_ack_per_request` | Manager, second pass: a logger that makes a request gets one ACK for it, while other loggers still get their copy. | Two logger fakes subscribed to everything; one sends `SUBSCRIBE`. |
+
+### TestSubscriptionTable
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_forwarding_adds_no_entries` | Manager, second pass: forwarding messages of types nobody subscribes to adds nothing to the subscription table. | Forwards 100 distinct types. |
+| `test_unsubscribed_types_leave_no_entries` | Manager, second pass: a type is removed from the table when its last subscriber unsubscribes or is removed. | Subscribes and unsubscribes one type, subscribes to another, then removes the module. |
+
+### TestStaticIds
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_highest_static_id_is_accepted` | Manager, second pass: the ID just below the dynamic range is still accepted as a static ID. | `connect_module` with `DYN_MOD_ID_START - 1`. |
+
+### TestSelectLimits
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_limits_follow_the_platform` | Manager, second pass: the manager refuses connections past 512 sockets on Windows and past descriptor 1023 elsewhere, which are the limits of `select()`. | Reads both limits. |
+| `test_connection_beyond_socket_limit_is_refused` | Manager, second pass: a connection beyond the socket limit is closed with a warning, and the manager keeps routing. | Lowers the limit to the three sockets already open, then connects a raw socket. |
+| `test_connection_with_high_descriptor_is_refused` | Manager, second pass: a connection whose descriptor `select()` can't watch is closed with a warning, instead of `select()` raising and stopping the manager. POSIX only. | Holds open descriptors until new ones are numbered above 1100, then connects a raw socket. |
+| `test_listening_socket_with_high_descriptor_raises` | Manager, second pass: a manager whose listening socket would be beyond the descriptor limit fails at construction with a clear error. POSIX only. | Constructs a manager while descriptors above 1100 are held open. |
+
+### TestModuleLimit
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_limit_is_max_modules` | Manager, second pass: at most `MAX_MODULES` (256) modules may be connected at once. | Reads the limit. |
+| `test_manager_and_unconnected_sockets_do_not_count` | Manager, second pass: the manager's own entry and sockets that haven't connected don't count toward the limit. | A limit of 1, with an accepted-only fake besides the manager's entry. |
+| `test_connect_beyond_the_limit_is_refused` | Manager, second pass: a `CONNECT` beyond the limit is refused with an error naming it, the manager keeps routing, and a module can connect again once another leaves. | Lowers the limit to the two connected clients, then connects a third, disconnects one and connects again. |
 
 ## test_client.py — the client's constructor and context manager (needs: none)
 
