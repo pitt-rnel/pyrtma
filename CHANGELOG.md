@@ -16,6 +16,7 @@ that makes them. The version number is chosen at release time.
 - `MessageManager(logger_timeout=...)` and `--logger-timeout SECONDS`. A logger module that can't take a message for this long is dropped, with an error, a `FAILED_MESSAGE` and a `GOODBYE`. The default, `None`, keeps the current behavior of waiting for loggers as long as it takes.
 - The message manager allows at most `MAX_MODULES` (256) connected modules. A `CONNECT` beyond that is refused, with an error, and its connection closed.
 - The manager refuses a connection that `select()` couldn't watch, with a warning, instead of stopping: past 512 sockets on Windows, or with a descriptor numbered 1024 or higher on Linux and macOS. A manager whose listening socket would be beyond that limit raises `RuntimeError` when constructed.
+- `RTMALogger.close()` removes and closes the logger's handlers. It runs by itself when the logger's client is garbage collected.
 
 ### Changed
 
@@ -36,6 +37,9 @@ that makes them. The version number is chosen at release time.
 - A message whose handling drops its sender, such as a refused `CONNECT`, is no longer forwarded. `DISCONNECT` still is.
 - A module can no longer take `DYN_MOD_ID_START` (10000), the first dynamic ID, as a static ID. Static IDs are 1 to 9999.
 - `MessageManager.send_to_loggers` takes a keyword-only `exclude`, a logger not to send the message to.
+- Each `RTMALogger` has its own `logging` logger, named `pyrtma.logger.<n>` from a counter, instead of one named after `hex(id(client))`. Code that looked a client's logger up by that name should use `client.logger.logger`.
+- `RTMALogHandler` no longer turns RTMA logging off when a send fails. A record whose send raises a `ClientError`, such as `ConnectionLost`, is dropped, and sending resumes after the client reconnects. Other errors are reported through `Handler.handleError`. `RTMALogger.enable_rtma` changes only when it is set.
+- RTMA log messages replace characters that aren't ASCII with `?`, one for one, in the message, name, path and function name. A path that is too long keeps its end, after `...`; a name or function name that is too long is cut. The wire format and field sizes are unchanged.
 
 ### Fixed
 
@@ -52,3 +56,7 @@ that makes them. The version number is chosen at release time.
 - Subscribers that aren't the destination of a directed message are no longer counted as drops, and no longer cause `FAILED_MESSAGE`, when they aren't writable.
 - `FAILED_MESSAGE` reports the original message's `msg_count`, rather than the count of whichever module happened to be sent it before the failure.
 - The message manager's `sockets` list no longer grows with every connection; a module's socket leaves it when the module is removed.
+- Log lines no longer print several times. A new client could inherit the logger of a client that had been garbage collected, with its handlers, so each line printed once per client ever created at that address; after 200 clients, one logger had 400 handlers.
+- Logging text that isn't ASCII, such as "kΩ" or "µV", or from a path longer than 511 characters, no longer switches RTMA logging off for the rest of the process.
+- `RichLogFormatter` formats a copy of the record. It used to escape `record.msg` in place, so handlers after the console handler, such as the file handler, logged backslash-escaped brackets. It also escapes markup in the message's arguments, and accepts a message that isn't a string.
+- Setting `RTMALogger.enable_console` back to `True` after setting it to `False` adds the console handler again; it used to stay off.

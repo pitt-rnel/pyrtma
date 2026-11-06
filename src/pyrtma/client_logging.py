@@ -1,3 +1,5 @@
+import copy
+import itertools
 import logging
 import logging.handlers
 import pyrtma.core_defs as cd
@@ -55,6 +57,62 @@ class ClientLike(ABC):
 #     def logger(self) -> "RTMALogger": ...
 
 
+# Each RTMALogger gets its own logger name. Names built from id() were reused
+# after garbage collection, and logging never frees a logger, so a new client
+# inherited an old client's handlers.
+_logger_ids = itertools.count(1)
+
+#: Prefix of the names of the loggers that RTMALogger creates.
+LOGGER_NAME_PREFIX: str = "pyrtma.logger"
+
+TRUNCATED_MARKER: str = "[TRUNCATED]"
+PATH_ELLIPSIS: str = "..."
+
+
+def _ascii_field(
+    text: str, size: int, *, marker: str = "", keep_end: bool = False
+) -> str:
+    """Make text fit a char field of an RTMA log message.
+
+    Characters that aren't ASCII become "?", one for one, so the wire format
+    and the field size are unchanged. Text that is still too long is cut to
+    ``size - 1`` characters, leaving room for the null terminator.
+
+    Args:
+        text: The text to store.
+        size: The size of the char field, including the null terminator.
+        marker: Text that shows a cut: appended when the start is kept,
+            prepended when the end is kept.
+        keep_end: Keep the end of the text instead of the start, as for a
+            path, whose file name is at the end.
+
+    Returns:
+        ASCII text of at most ``size - 1`` characters.
+    """
+    text = text.encode("ascii", "replace").decode("ascii")
+    limit = size - 1
+    if len(text) <= limit:
+        return text
+    room = limit - len(marker)
+    if keep_end:
+        return marker + text[len(text) - room :]
+    return text[:room] + marker
+
+
+def _field_size(msg: object, field: str) -> int:
+    """Return the size in bytes of a message's char field.
+
+    Args:
+        msg: The message.
+        field: The field name.
+
+    Returns:
+        The field's size, including the null terminator.
+    """
+    # The ctypes field behind each descriptor is the name with a leading "_".
+    return getattr(type(msg), f"_{field}").size
+
+
 RTMA_LOG_MSG = Union[
     cd.MDF_RTMA_LOG,
     cd.MDF_RTMA_LOG_DEBUG,
@@ -90,38 +148,45 @@ class RTMALogHandler(logging.Handler):
         # See https://docs.python.org/3/library/logging.html#logrecord-attributes
         # for LogRecord attributes that could be added
         msg = self.get_log_msg_cls(record.levelno)()
-        if hasattr(record, "log_name"):
-            msg.name = record.log_name  # type: ignore
-        else:
-            msg.name = record.name
+        name = str(getattr(record, "log_name", record.name))
+        msg.name = _ascii_field(name, _field_size(msg, "name"))
         msg.time = record.created
         msg.level = record.levelno
         msg.lineno = record.lineno
-        msg.pathname = record.pathname
-        msg.funcname = record.funcName
-        msg_str = record.getMessage()
-        if len(msg_str) > (cd.MAX_LOG_LENGTH - 1):
-            # truncate
-            truncate_str = "[TRUNCATED]"
-            trunc_len = cd.MAX_LOG_LENGTH - len(truncate_str) - 1
-            msg_str = msg_str[:trunc_len] + truncate_str
-        msg.message = msg_str
+        msg.pathname = _ascii_field(
+            str(record.pathname),
+            _field_size(msg, "pathname"),
+            marker=PATH_ELLIPSIS,
+            keep_end=True,
+        )
+        msg.funcname = _ascii_field(str(record.funcName), _field_size(msg, "funcname"))
+        msg.message = _ascii_field(
+            record.getMessage(), cd.MAX_LOG_LENGTH, marker=TRUNCATED_MARKER
+        )
         return msg
 
-    def emit(self, record: logging.LogRecord):
+    def emit(self, record: logging.LogRecord) -> None:
+        """Send a record to the message manager as an RTMA log message.
+
+        Nothing is sent while the client is disconnected. A record whose send
+        fails with a ``ClientError``, such as ``ConnectionLost``, is dropped;
+        the client marks itself disconnected, and sending resumes when it
+        reconnects. Other errors are reported by ``handleError``. Neither
+        changes ``RTMALogger.enable_rtma``, which only the user sets.
+
+        Args:
+            record: The record to send.
+        """
         client = self.client_ref()
-        if client:
-            try:
-                if client.connected:
-                    msg = self.gen_log_msg(record)
-                    client.send_message(msg)
-            except ClientError:
-                if client:
-                    client.logger.enable_rtma = False
-            except Exception:
-                if client:
-                    client.logger.enable_rtma = False
-                self.handleError(record)
+        if client is None or not client.connected:
+            return
+        try:
+            msg = self.gen_log_msg(record)
+            client.send_message(msg)
+        except ClientError:
+            return
+        except Exception:
+            self.handleError(record)
 
 
 class RichLogFormatter(logging.Formatter):
@@ -129,9 +194,23 @@ class RichLogFormatter(logging.Formatter):
     that rich formatting can be applied to formatting ONLY
     """
 
-    def format(self, record: logging.LogRecord, *args):
-        record.msg = escape(record.msg)
-        return super().format(record, *args)
+    def format(self, record: logging.LogRecord) -> str:
+        """Format a copy of the record with its message text escaped.
+
+        The record itself is shared with the logger's other handlers, so it
+        is left unchanged. The message is escaped after its arguments are
+        merged, so markup in the arguments is escaped too.
+
+        Args:
+            record: The record to format.
+
+        Returns:
+            The formatted text.
+        """
+        escaped = copy.copy(record)
+        escaped.msg = escape(record.getMessage())
+        escaped.args = None
+        return super().format(escaped)
 
 
 class RtmaLogFilter(logging.Filter):
@@ -165,7 +244,7 @@ class RTMALogger(object):
         # initialize private attributes
         self._log_name = log_name
         self.children: List[logging.Logger] = []
-        self._logger = logging.getLogger(hex(id(rtma_client)))
+        self._logger = logging.getLogger(f"{LOGGER_NAME_PREFIX}.{next(_logger_ids)}")
         self._logger.propagate = True
         self.set_all_levels(level)
         self._filter = RtmaLogFilter(self._log_name)
@@ -196,22 +275,28 @@ class RTMALogger(object):
         self.exception = self.logger.exception
         self.critical = self.logger.critical
 
-    def __del__(self):
-        return  # below causes error in logger.removeHandler when exiting REPL and is likely unecessary
-        if self._console_handler:
-            self._logger.removeHandler(self._console_handler)
+        # Release the handlers when the client is garbage collected. The
+        # finalizer holds this logger, not the client. At interpreter exit,
+        # logging.shutdown() flushes and closes the handlers instead.
+        self._finalizer = weakref.finalize(rtma_client, self.close)
+        self._finalizer.atexit = False
 
-        if self._file_handler:
-            self._logger.removeHandler(self._file_handler)
-            self._file_handler = None
+    def close(self) -> None:
+        """Remove and close this logger's handlers.
 
-        if self._rtma_handler:
-            self._logger.removeHandler(self._rtma_handler)
-
-        # remove any other handlers
-        for handler in self._logger.handlers:
+        Called when the client is garbage collected, and safe to call more
+        than once. Records logged afterwards reach only handlers further up
+        the logger hierarchy. A closed logger isn't meant to be used again.
+        """
+        handlers = [self._rtma_handler, self._console_handler, self._file_handler]
+        for handler in handlers:
             if handler is not None:
                 self._logger.removeHandler(handler)
+                handler.close()
+        self._file_handler = None
+        self._enable_rtma = False
+        self._enable_console = False
+        self._enable_file = False
 
     @property
     def logger(self) -> logging.Logger:  # read only
@@ -262,13 +347,15 @@ class RTMALogger(object):
     @enable_console.setter
     def enable_console(self, value: bool):
         if self._enable_console != bool(value):  # value changed
-            if self.console_handler:
+            # Use the handler itself: the console_handler property is None
+            # while the console is disabled.
+            if self._console_handler:
                 if bool(value):
                     # add handler
-                    self.logger.addHandler(self.console_handler)
+                    self.logger.addHandler(self._console_handler)
                 else:
                     # disable handler
-                    self.logger.removeHandler(self.console_handler)
+                    self.logger.removeHandler(self._console_handler)
             self._enable_console = bool(value)
 
     @property

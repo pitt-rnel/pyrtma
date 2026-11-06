@@ -212,6 +212,46 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | `test_options_after_host_id_are_keyword_only` | Timecode removal: `Client` and `client_context` arguments after `host_id` are keyword-only, so an old positional call that passed `timecode` fails instead of shifting the arguments after it. | Parametrized over both; a third positional argument for `Client`, a fifth for `client_context`. |
 | `test_timecode_argument_is_rejected` | Timecode removal: `Client` and `client_context` no longer accept `timecode`. | Parametrized over both; passes `timecode=True` and expects a `TypeError` naming it. |
 
+## test_client_logging.py — `RTMALogger`, `RTMALogHandler` and `RichLogFormatter` (needs: integration for `TestRtmaSending`)
+
+Clients from `quiet_client()` are unconnected and have their console turned off, so tests don't print. `TestRtmaSending` uses `deliver_log()`, which logs a line from a connected sender until a receiver subscribed to `RTMA_LOG_INFO` reads it, because a subscription can race messages from other clients. It matches by type ID and the sender's log name, since the receiver decodes with the compiled test definitions rather than `core_defs`.
+
+### TestLoggerLifecycle
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_live_clients_have_distinct_loggers` | C8: two clients alive at once have different loggers with different names. | Two clients; compares their `logging.Logger` objects and names. |
+| `test_new_client_logger_has_only_its_own_handlers` | C8: a new client's logger holds only its own RTMA and console handlers, never those of a garbage-collected client. | Creates and discards 20 clients in turn, so a new one is often allocated at a freed one's address, and compares each logger's handlers with its own two. |
+| `test_discarded_clients_release_their_handlers` | C8: discarding clients leaves the total number of handlers across all loggers unchanged. | Counts handlers on every registered logger and the root, creates and discards 50 clients, collects garbage, and counts again. |
+| `test_logger_does_not_keep_client_alive` | C8: the finalizer that releases the handlers doesn't keep the client alive. | A weak reference to a client is dead after the client is deleted and garbage collected. |
+| `test_close_removes_handlers_and_is_idempotent` | C8: `RTMALogger.close()` removes every handler and turns the outputs off, and can be called twice. | Calls `close()` twice on a client's logger. |
+| `test_console_can_be_enabled_again` | Strings, validation and logging: setting `enable_console` back to `True` adds the console handler again. | Turns the console off, then on, and looks for the handler on the logger. |
+
+### TestLogMessageFields
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_non_ascii_text_is_replaced` | Strings, validation and logging: characters that aren't ASCII become `?`, one for one, in the message, path, function name and log name. | `gen_log_msg()` on a record with "kΩ", "µV", a path under "Jürgen", and an accented function and log name. |
+| `test_long_message_is_truncated_with_marker` | Strings, validation and logging: a long message that isn't ASCII is replaced, then cut to the field with the `[TRUNCATED]` marker. | A message of 2000 "é" characters. |
+| `test_long_fields_are_truncated` | Strings, validation and logging: a path that is too long keeps its end after `...`, and a function name or log name that is too long is cut to its field. | A 600-character path, a 300-character function name and a 200-character log name. |
+
+### TestRtmaSending
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_non_ascii_message_is_sent_and_rtma_stays_enabled` | Strings, validation and logging: logging "kΩ" sends an RTMA log message with "k?" and leaves RTMA logging on. | A sender and a subscribed receiver from `client_factory`, with `deliver_log()`. |
+| `test_rtma_logging_resumes_after_reconnect` | Strings, validation and logging: a send that fails when the manager goes away doesn't turn RTMA logging off, and log messages arrive again after the client reconnects. | Connects the sender to a second `ManagerHarness`, stops it, and logs until the client sees the connection is lost; then reconnects to the `manager` fixture and uses `deliver_log()`. |
+| `test_disabled_rtma_logging_stays_disabled_after_reconnect` | Strings, validation and logging: RTMA logging that the user turned off stays off across a reconnect. | Turns it off on a connected client, reconnects, and checks the handler isn't attached. |
+
+### TestRichLogFormatter
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_record_is_left_unchanged` | Strings, validation and logging: formatting doesn't alter the record's `msg`. | Formats a record whose message has brackets, then checks `msg`. |
+| `test_markup_in_message_and_arguments_is_escaped` | Strings, validation and logging: markup is escaped in the message and in its `%`-arguments. | A `%s` message with markup in both, formatted with `{message}`. |
+| `test_message_that_is_not_a_string_is_formatted` | Strings, validation and logging: a message that isn't a string is formatted rather than raising. | A record whose `msg` is 42. |
+| `test_file_handler_after_console_sees_original_text` | Strings, validation and logging: a file handler added after the console handler writes the message as logged, without escapes. | A client with the console on and a file handler in `tmp_path`; logs "a [b] c" and reads the file. |
+
 ## test_integration.py — client and manager interaction (needs: loopback sockets; not yet marked)
 
 Each test starts a `MessageManager` on an unused loopback port in `setUp` and connects one client with module ID 11 or 12. `wait_for_message()` is a fixed short sleep. Two message types defined in the file, `TEST_MESSAGE` and `TEST_MESSAGE2`, are used for subscriptions.
