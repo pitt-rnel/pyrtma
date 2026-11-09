@@ -18,6 +18,7 @@ from pyrtma.__version__ import __version__
 type_map = {
     "char": '""',
     "string": '""',  # not really a C type, used to distinguish char from string (length > 1) in js
+    "signed char": 0,
     "unsigned char": 0,
     "byte": 0,
     "int": 0,

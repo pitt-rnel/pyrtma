@@ -8,12 +8,14 @@ from ``conftest.py`` directly is fragile.
 from __future__ import annotations
 
 import logging
+import pathlib
 import select
 import socket
 import struct
 import sys
 import threading
 import time
+import textwrap
 import traceback
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
@@ -24,6 +26,7 @@ from pyrtma.header import MessageHeader
 from pyrtma.manager import MessageManager
 from pyrtma.message import Message
 from pyrtma.message_data import MessageData
+from pyrtma.parser import Parser
 
 if TYPE_CHECKING:
     import pytest
@@ -581,3 +584,89 @@ class ScriptedManager:
             if self._conn is not None:
                 self._conn.close()
         self._listener.close()
+
+
+class RecordingHandler(logging.Handler):
+    """A logging handler that keeps the records it is given."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.DEBUG)
+        self.records: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Keep a record.
+
+        Args:
+            record: The record to keep.
+        """
+        self.records.append(record)
+
+    @property
+    def warnings(self) -> list[str]:
+        """The messages of the records at WARNING or above.
+
+        Returns:
+            The formatted messages, in the order they were logged.
+        """
+        return [r.getMessage() for r in self.records if r.levelno >= logging.WARNING]
+
+
+def write_definitions(
+    directory: pathlib.Path,
+    files: dict[str, str],
+    *,
+    options: str = "",
+    defs_name: str = "test.defs",
+) -> pathlib.Path:
+    """Write YAML definition files and a compiler index that lists them.
+
+    Args:
+        directory: Where to write the files, such as ``tmp_path``.
+        files: YAML text for each index entry, by entry name, in index order.
+            Each is written to ``<name>.yaml``, dedented.
+        options: The body of a ``compiler_options`` section, if any, dedented.
+        defs_name: The index file's name.
+
+    Returns:
+        The path of the index file.
+    """
+    index = []
+    if options:
+        index.append("compiler_options:")
+        index.extend(f"  {line}" for line in textwrap.dedent(options).splitlines())
+    index.append("index:")
+    for name, text in files.items():
+        path = directory / f"{name}.yaml"
+        path.write_text(textwrap.dedent(text), encoding="utf-8")
+        index.append(f"  {name}: {path.name}")
+    defs_file = directory / defs_name
+    defs_file.write_text("\n".join(index) + "\n", encoding="utf-8")
+    return defs_file
+
+
+def quiet_parser() -> tuple[Parser, RecordingHandler]:
+    """A parser whose log goes to a recording handler instead of the console.
+
+    Returns:
+        The parser and the handler that records its warnings.
+    """
+    parser = Parser()
+    recorder = RecordingHandler()
+    parser.logger.handlers.clear()
+    parser.logger.addHandler(recorder)
+    parser.logger.setLevel(logging.WARNING)
+    return parser, recorder
+
+
+def parse_definitions(defs_file: pathlib.Path) -> tuple[Parser, RecordingHandler]:
+    """Parse a compiler index with a quiet parser.
+
+    Args:
+        defs_file: The index file to parse.
+
+    Returns:
+        The parser, holding the parsed definitions, and its recorded log.
+    """
+    parser, recorder = quiet_parser()
+    parser.parse(defs_file)
+    return parser, recorder

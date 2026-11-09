@@ -27,7 +27,7 @@ from typing import (
     cast,
     TYPE_CHECKING,
 )
-from dataclasses import dataclass, field, is_dataclass, asdict
+from dataclasses import dataclass, field, fields, is_dataclass, asdict
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
@@ -38,6 +38,23 @@ except AttributeError:
     # if we deprecate and remove this constant, we can fall back on inf
     # changed from inf to maxsize to maintain int type
     MAX_MESSAGE_TYPES = sys.maxsize
+
+try:
+    from .core_defs import DYN_MOD_ID_START, MAX_HOSTS
+except (AttributeError, ImportError):
+    # The values in rtma_core.yaml, for a build of the core definitions
+    # themselves.
+    DYN_MOD_ID_START = 10000
+    MAX_HOSTS = 5
+
+MAX_REFERENCE_DEPTH: int = 16
+"""How deeply constants and aliases may be defined in terms of each other.
+
+A constant whose expression uses only numbers has depth 0, and one that uses
+other constants is one deeper than the deepest of them. An alias of a native
+type or a struct has depth 1, and an alias of an alias is one deeper than it.
+Deeper definitions raise `RecurisionError`.
+"""
 
 import os
 import re
@@ -101,7 +118,7 @@ class NativeType:
 # Native C types and sizes that are supported
 supported_types = {
     "char": NativeType(name="char", size=1, format="c"),
-    "signed char": NativeType(name="signed_char", size=1, format="b"),
+    "signed char": NativeType(name="signed char", size=1, format="b"),
     "unsigned char": NativeType(name="unsigned char", size=1, format="B"),
     "byte": NativeType(name="byte", size=1, format="B"),
     "int": NativeType(name="int", size=4, format="i"),
@@ -196,7 +213,7 @@ class ExpressionExpansionError(ParserError):
     pass
 
 
-class RecurisionError(ParserError):
+class RecurisionError(ParserError, RecursionError):
     """Raised when recursion limit is exceeded evaluating aliases and expressions."""
 
     pass
@@ -261,13 +278,26 @@ class ConstantExpr:
     expanded: Optional[str]
     value: Union[str, int, float]
     src: MsgDefIndex
+    depth: int = 0
 
 
 @dataclass
 class ConstantString:
+    """A string constant.
+
+    Attributes:
+        name: The constant's name.
+        value: The text as a double-quoted literal, with backslashes and
+            double quotes escaped by a backslash. It is valid, and means the
+            same text, in Python, C and JavaScript.
+        src: The definitions file it came from.
+        text: The text itself.
+    """
+
     name: str
     value: str
     src: MsgDefIndex
+    text: str = ""
 
 
 @dataclass
@@ -297,6 +327,7 @@ class TypeAlias:
     type_name: str
     type_obj: Union[NativeType, "SDF"]
     src: MsgDefIndex
+    depth: int = 1
 
     @property
     def size(self) -> int:
@@ -447,6 +478,10 @@ class Parser:
         self.message_ids: Dict[str, MT] = {}
         self.message_defs: Dict[str, MDF] = {}
 
+        # Aliases of structs defined later in the file being parsed, by name,
+        # with the struct each names. They are resolved as the structs are.
+        self._pending_aliases: Dict[str, str] = {}
+
         self.logger = logging.getLogger(f"pyrtma.parser ({self._instance_count})")
         self.logger.propagate = False
         if self.debug:
@@ -513,6 +548,7 @@ class Parser:
         self.struct_defs = {}
         self.message_ids = {}
         self.message_defs = {}
+        self._pending_aliases = {}
 
     def check_duplicate_name(
         self, section: str, name: str, namespaces: Tuple[str, ...]
@@ -526,48 +562,76 @@ class Parser:
                         f"Duplicate name conflict found: \n\n1: {namespace} -> {o.name} -> {o.src.file.absolute()}\n2: {section} -> {name} -> {self.current_file}\n"
                     )
 
-    def expand_expression(self, name: str, expr: str) -> Tuple[str, int]:
-        rdepth_limit = 10
-        n = 0
+    def expand_expression(self, name: str, expr: str) -> Tuple[str, Any]:
+        """Replace the constants in an expression with their values, and evaluate it.
+
+        Every constant an expression uses must be defined before it, and
+        already has a value, so one pass replaces them all and nothing is
+        expanded again. That rules out circular references between constants;
+        an expression that uses its own name raises `CircularRefError`.
+
+        Args:
+            name: What the expression defines, such as a constant's name, or
+                ``MESSAGE->field`` for an array length.
+            expr: The expression.
+
+        Returns:
+            The expression with every constant replaced by its value, and the
+            value it evaluates to.
+
+        Raises:
+            CircularRefError: The expression uses the name it defines.
+            ExpressionExpansionError: It uses a name that isn't a constant
+                defined before it, or doesn't evaluate.
+        """
         symbol_regex = r"\b(?P<symbol>[a-zA-Z_]+\w*)\b"
-        m = re.search(symbol_regex, expr)
-        while m:
-            symbol = m.group()
-            n += 1
+
+        def substitute(m: "re.Match[str]") -> str:
+            symbol = m.group("symbol")
+            if symbol == name:
+                raise CircularRefError(
+                    f"Circular reference in expression: {name} -> {expr} -> {self.current_file}"
+                )
             try:
                 c = self.constants[symbol]
             except KeyError:
                 raise ExpressionExpansionError(
-                    f"Unable to expand expression {name} -> {symbol} not defined: {self.current_file}"
-                )
-
-            if re.search(rf"\b{name}\b", c.expression) is not None:
-                raise CircularRefError(
-                    f"Circular reference in expression: {name} -> {expr}."
-                )
+                    f"Unable to expand expression {name} -> {symbol} not defined. "
+                    f"Constants must be defined before they are used: {self.current_file}"
+                ) from None
 
             if c.value is None:
                 raise ExpressionExpansionError(
                     f"{c.name} has not been evaluated to a value."
                 )
+            # Not parenthesized, as before, so existing values don't change.
+            return str(c.value)
 
-            expr = re.sub(rf"\b{c.name}\b", str(c.value), expr)
-
-            if n > rdepth_limit:
-                raise RecursionError(
-                    f"Recursion limit reached expanding constant expression {name} in {self.current_file}"
-                )
-
-            # Try to match another macro symbol
-            m = re.search(symbol_regex, expr)
-
-        # Add the expanded form and evaluated value
-        expanded = expr
+        expanded = re.sub(symbol_regex, substitute, expr)
 
         # TODO: check that only numbers and operators are left in expression
-        value = eval(expr)
+        try:
+            value = eval(expanded)
+        except Exception as e:
+            raise ExpressionExpansionError(
+                f"Unable to evaluate expression {name}: {expr} -> {expanded} ({type(e).__name__}: {e}) -> {self.current_file}"
+            ) from e
 
         return expanded, value
+
+    def expression_depth(self, expr: str) -> int:
+        """How deeply an expression is nested in other constants.
+
+        Args:
+            expr: An expression whose constants are all defined.
+
+        Returns:
+            0 for an expression of numbers only, otherwise one more than the
+            deepest constant it uses.
+        """
+        symbols = re.findall(r"\b[a-zA-Z_]+\w*\b", expr)
+        depths = [self.constants[s].depth for s in symbols if s in self.constants]
+        return 1 + max(depths) if depths else 0
 
     def handle_import(self, fname: str):
         if fname not in self.index.keys():
@@ -594,7 +658,6 @@ class Parser:
 
         if imp.file.suffix == ".yml":
             self.warning(f"Please change {imp.file} to use '.yaml' extension.")
-            input("Hit enter to continue...")
 
         self.parse_index(fname)
 
@@ -619,10 +682,13 @@ class Parser:
 
     def handle_compiler_options(self, name: str, value: Union[int, float, bool, str]):
         self.check_name(name)
-        try:
-            setattr(self.compiler_options, name, value)
-        except AttributeError:
-            raise RTMASyntaxError(f"Unknown compiler option: {name}")
+        # setattr() on the dataclass accepts any name, so check it first.
+        known = [f.name for f in fields(CompilerOptions)]
+        if name not in known:
+            raise RTMASyntaxError(
+                f"Unknown compiler option: {name}. The options are {', '.join(known)} -> {self.defs_path}"
+            )
+        setattr(self.compiler_options, name, value)
 
     def handle_expression(self, name: str, expression: Union[int, float, str]):
         self.check_name(name)
@@ -654,12 +720,18 @@ class Parser:
             )
         elif isinstance(expression, str):
             expanded, value = self.expand_expression(name, expression)
+            depth = self.expression_depth(expression)
+            if depth > MAX_REFERENCE_DEPTH:
+                raise RecurisionError(
+                    f"Constant {name} is nested {depth} deep in other constants, more than the limit of {MAX_REFERENCE_DEPTH} -> {self.current_file}"
+                )
             self.constants[name] = ConstantExpr(
                 name,
                 expression=expression,
                 expanded=expanded,
                 value=value,
                 src=self.current_index,
+                depth=depth,
             )
 
     def handle_string(self, name: str, value: str):
@@ -681,14 +753,40 @@ class Parser:
                 f"Values in 'string_constants' section must evaluate to string type not {type(value)}. {name}: {value} -> {self.current_file}"
             )
 
+        # Printable ASCII only: strings are ASCII on the wire, and control
+        # characters would need a different escape in every target.
+        for ch in value:
+            if not " " <= ch <= "~":
+                raise RTMASyntaxError(
+                    f"String constant {name} contains {ch!r}. String constants can only hold printable ASCII characters -> {self.current_file}"
+                )
+
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
         self.string_constants[name] = ConstantString(
             name,
-            value=f'"{value}"',
+            value=f'"{escaped}"',
             src=self.current_index,
+            text=value,
         )
 
     def handle_alias(self, alias: str, ftype: str):
-        """Find the base type ultimately represented by the typedef alias"""
+        """Find the base type ultimately represented by the typedef alias.
+
+        The alias's `type_name` is the native type or struct it resolves to,
+        through any aliases in between.
+
+        Args:
+            alias: The alias's name.
+            ftype: The type it names: a native type, a struct, or an alias,
+                each defined before it.
+
+        Raises:
+            InvalidTypeError: `ftype` isn't a string.
+            CircularRefError: The alias names itself.
+            RTMASyntaxError: `ftype` isn't a type defined before it.
+            RecurisionError: The chain of aliases is longer than
+                `MAX_REFERENCE_DEPTH`.
+        """
         if not isinstance(ftype, str):
             raise InvalidTypeError(
                 f"Values in 'aliases' section must be a string not {type(ftype).__name__}.\n{alias} -> {self.current_file}"
@@ -707,36 +805,55 @@ class Parser:
             ),
         )
 
-        n = 0
-        prev = ftype
-        while n < 10:
-            if ftype in supported_types.keys():
-                self.aliases[alias] = TypeAlias(
-                    alias, ftype, supported_types[ftype], self.current_index
+        self.aliases[alias] = self.resolve_alias(alias, ftype)
+
+    def resolve_alias(self, alias: str, ftype: str) -> TypeAlias:
+        """Resolve the type an alias names.
+
+        Args:
+            alias: The alias's name.
+            ftype: The type it names.
+
+        Returns:
+            The alias, resolved to a native type or struct.
+
+        Raises:
+            CircularRefError: The alias names itself.
+            RTMASyntaxError: `ftype` isn't a type defined before it.
+            RecurisionError: The chain of aliases is too long.
+        """
+        if ftype == alias:
+            raise CircularRefError(
+                f"Alias {alias} refers to itself -> {self.current_file}"
+            )
+
+        if ftype in supported_types:
+            return TypeAlias(alias, ftype, supported_types[ftype], self.current_index)
+
+        if ftype in self.struct_defs:
+            return TypeAlias(
+                alias, ftype, self.struct_defs[ftype], src=self.current_index
+            )
+
+        # An alias defined earlier is already resolved, so one step is enough.
+        if ftype in self.aliases:
+            target = self.aliases[ftype]
+            depth = target.depth + 1
+            if depth > MAX_REFERENCE_DEPTH:
+                raise RecurisionError(
+                    f"Alias {alias} is a chain of {depth} aliases, more than the limit of {MAX_REFERENCE_DEPTH} -> {self.current_file}"
                 )
-                return
+            return TypeAlias(
+                alias,
+                target.type_name,
+                target.type_obj,
+                src=self.current_index,
+                depth=depth,
+            )
 
-            # Check if ftype points back to a user defined struct
-            for sdf in self.struct_defs.values():
-                if ftype == sdf.name:
-                    ftype = sdf.name
-                    self.aliases[alias] = TypeAlias(
-                        alias, ftype, sdf, src=self.current_index
-                    )
-                    return
-
-            # Check if ftype points back to another typedef
-            for a in self.aliases.values():
-                if ftype == a.name:
-                    n += 1
-                    ftype = a.type_name
-
-            if ftype == prev:
-                raise RTMASyntaxError(f"Unable to resolve alias {alias}: {ftype}")
-            else:
-                prev = ftype
-
-        raise RecursionError(f"Recursion limit exceeded for alias: {alias}")
+        raise RTMASyntaxError(
+            f"Unable to resolve alias {alias}: {ftype} -> {self.current_file}"
+        )
 
     def handle_host_id(self, name: str, value: int):
         self.check_name(name)
@@ -747,14 +864,18 @@ class Parser:
                 f"Values in 'host_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value}"
             )
 
+        user_file = (
+            self.current_index.name not in Parser.core_imports and self.import_coredefs
+        )
         if value < 1 or value > 32767:
-            if (
-                self.current_index.name not in Parser.core_imports
-                and self.import_coredefs
-            ):
+            if user_file:
                 raise RTMASyntaxError(
                     f"Value outside of valid range [1 - 32767] for host_id: {name}: {value}"
                 )
+        elif value > MAX_HOSTS and user_file:
+            self.warning(
+                f"Host ID {name}: {value} is above MAX_HOSTS ({MAX_HOSTS}). A client can send from it, but messages can't be addressed to it -> {self.current_file}"
+            )
 
         for hid in self.host_ids.values():
             if value == hid.value:
@@ -776,14 +897,16 @@ class Parser:
                 f"Values in 'module_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value} -> {self.current_file}"
             )
 
-        if value < 10 or (99 < value < 200):
+        # IDs from DYN_MOD_ID_START up are assigned by the manager; a client
+        # can't ask for one.
+        if value < 10 or (99 < value < 200) or value >= DYN_MOD_ID_START:
             if (
                 self.current_index.name not in Parser.core_imports
                 and value != 0
                 and self.import_coredefs
             ):
                 raise RTMASyntaxError(
-                    f"Value outside of valid range [10 - 99 or > 200] for module_id: {name}: {value} -> {self.current_file}"
+                    f"Value outside of valid range [10 - 99 or 200 - {DYN_MOD_ID_START - 1}] for module_id: {name}: {value} -> {self.current_file}"
                 )
 
         for mid in self.module_ids.values():
@@ -936,6 +1059,7 @@ class Parser:
         # Field type name to ctypes
         type_map = {
             "char": ctypes.c_char,
+            "signed char": ctypes.c_int8,
             "unsigned char": ctypes.c_ubyte,
             "byte": ctypes.c_ubyte,
             "int": ctypes.c_int32,
@@ -974,7 +1098,7 @@ class Parser:
                 if isinstance(field.type_obj.type_obj, NativeType):
                     cobj = type_map[field.type_obj.type_obj.name]
                 else:
-                    cobj = self.get_ctype_size(field.type_obj.type_obj)
+                    cobj = self.get_ctype_cls(field.type_obj.type_obj)
             else:
                 raise RuntimeError(f"Unexpected type {type(field.type_obj)}")
 
@@ -1021,9 +1145,43 @@ class Parser:
                 f"{mdf.name} size of {mdf.size} exceeds maximum allowe of 65535 bytes."
             )
 
+    def check_array_length(
+        self, def_name: str, field_name: str, spec: str, value: Any
+    ) -> int:
+        """Check an array field's evaluated length.
+
+        Args:
+            def_name: The message or struct the field belongs to.
+            field_name: The field's name.
+            spec: The field's type spec, for the error message.
+            value: What its length expression evaluated to.
+
+        Returns:
+            The length.
+
+        Raises:
+            RTMASyntaxError: The length isn't a whole number of 1 or more.
+                A length of 0 used to give a scalar in Python and an empty
+                array in the other targets, so no layout fits it.
+        """
+        where = f"{def_name}.{field_name}: {spec} -> {self.current_file}"
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise RTMASyntaxError(
+                f"Array length must be a number, not {value!r}: {where}"
+            )
+        if isinstance(value, float) and not value.is_integer():
+            raise RTMASyntaxError(
+                f"Array length must be a whole number, not {value}: {where}"
+            )
+        if value < 1:
+            raise RTMASyntaxError(
+                f"Array length must be 1 or more, not {int(value)}: {where}"
+            )
+        return int(value)
+
     def add_fields(self, mdf: Union[SDF, MDF], fields: Union[Dict, str]):
         # Pattern to parse field specs
-        FIELD_REGEX = r"\s*(?P<ftype>[\s\w]*)(\[(?P<len_str>.*)\])?"
+        FIELD_REGEX = r"\s*(?P<ftype>[\s\w]*)(\[(?P<len_str>.*)\])?\s*"
 
         # Copy fields from another definition
         if isinstance(fields, str):
@@ -1054,7 +1212,8 @@ class Parser:
                         f"Field types must be a string not {type(fstr).__name__}: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
                     )
 
-                m = re.match(FIELD_REGEX, fstr)
+                # The whole spec must match, so trailing text is an error.
+                m = re.fullmatch(FIELD_REGEX, fstr)
                 if m is None:
                     raise RTMASyntaxError(
                         f"Invalid syntax for field type specification: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
@@ -1083,6 +1242,10 @@ class Parser:
                     ftype_obj = self.struct_defs[ftype]
                 elif ftype in self.message_defs.keys():
                     ftype_obj = self.message_defs[ftype]
+                elif ftype in self._pending_aliases:
+                    raise RTMASyntaxError(
+                        f"{mdf.name}.{fname} uses alias {ftype} of {self._pending_aliases[ftype]}, which isn't defined yet. Define {self._pending_aliases[ftype]} before the definitions that use {ftype} -> {self.current_file}"
+                    )
                 else:
                     raise RTMASyntaxError(
                         f"Unknown type specified ({ftype}): {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
@@ -1105,7 +1268,7 @@ class Parser:
                         type_obj=ftype_obj,
                         length_expression=len_str,
                         length_expanded=expanded,
-                        length=int(flen),
+                        length=self.check_array_length(mdf.name, fname, fstr, flen),
                     )
                 else:
                     new_field = Field(name=fname, type_name=ftype, type_obj=ftype_obj)
@@ -1299,6 +1462,61 @@ class Parser:
             name = f"RESERVED_{id:06d}"
             self.handle_signal(name, dict(id=id, fields=None))
 
+    def names_later_struct(self, ftype: Any, file_structs: Dict[str, Any]) -> bool:
+        """Whether an alias's type is a struct defined later in this file.
+
+        Args:
+            ftype: The type the alias names.
+            file_structs: The ``struct_defs`` section of the file.
+
+        Returns:
+            True when `ftype` is a struct in `file_structs`, or an alias of one
+            that is waiting for it.
+        """
+        if not isinstance(ftype, str):
+            return False
+        return ftype in self._pending_aliases or (
+            ftype in file_structs and ftype not in self.struct_defs
+        )
+
+    def defer_alias(self, alias: str, ftype: str, file_structs: Dict[str, Any]):
+        """Check an alias now, and resolve it once the struct it names is defined.
+
+        Args:
+            alias: The alias's name.
+            ftype: The struct it names, or an alias waiting for one.
+            file_structs: The ``struct_defs`` section of the file.
+
+        Raises:
+            RTMASyntaxError: The name is invalid.
+            DuplicateNameError: The name is already used, or is a struct in
+                this file too.
+        """
+        self.check_name(alias)
+        self.check_duplicate_name(
+            "aliases",
+            alias,
+            namespaces=(
+                "constants",
+                "string_constants",
+                "aliases",
+                "struct_defs",
+                "message_defs",
+            ),
+        )
+        if alias in self._pending_aliases or alias in file_structs:
+            raise DuplicateNameError(
+                f"Duplicate name conflict found: {alias} -> {self.current_file}"
+            )
+        self._pending_aliases[alias] = ftype
+
+    def resolve_pending_aliases(self):
+        """Resolve the deferred aliases whose type is now defined, in order."""
+        for alias, ftype in list(self._pending_aliases.items()):
+            if ftype in self.struct_defs or ftype in self.aliases:
+                del self._pending_aliases[alias]
+                self.aliases[alias] = self.resolve_alias(alias, ftype)
+
     def parse_text(self, text: str):
         self.check_key_value_separation(text)
 
@@ -1354,9 +1572,17 @@ class Parser:
                 self.handle_string(name, str_const)
             self.yaml_dict["string_constants"].update(data["string_constants"])
 
+        # An alias may name a struct defined later in this file. It is
+        # resolved once that struct is, like a struct that uses another.
+        file_structs = data.get("struct_defs") or {}
+        if not isinstance(file_structs, dict):
+            file_structs = {}
         if data.get("aliases") is not None:
             for alias, ftype in data["aliases"].items():
-                self.handle_alias(alias, ftype)
+                if self.names_later_struct(ftype, file_structs):
+                    self.defer_alias(alias, ftype, file_structs)
+                else:
+                    self.handle_alias(alias, ftype)
             self.yaml_dict["aliases"].update(data["aliases"])
 
         if data.get("host_ids") is not None:
@@ -1372,7 +1598,10 @@ class Parser:
         if data.get("struct_defs") is not None:
             for name, sdf in data["struct_defs"].items():
                 self.handle_struct(name, sdf)
+                self.resolve_pending_aliases()
             self.yaml_dict["struct_defs"].update(data["struct_defs"])
+        # Only a struct in this file defers an alias, so all are resolved.
+        assert not self._pending_aliases, self._pending_aliases
 
         if data.get("message_defs") is not None:
             for name, mdf in data["message_defs"].items():

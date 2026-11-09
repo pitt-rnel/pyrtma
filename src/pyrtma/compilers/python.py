@@ -21,6 +21,7 @@ from pyrtma.__version__ import __version__
 # Field type name to ctypes
 type_map = {
     "char": "ctypes.c_char",
+    "signed char": "ctypes.c_int8",
     "unsigned char": "ctypes.c_ubyte",
     "byte": "ctypes.c_ubyte",
     "float": "ctypes.c_float",
@@ -52,6 +53,7 @@ type_map = {
 desctype_map = {
     "char": "Char",
     "byte": "Byte",
+    "signed char": "Int8",
     "unsigned char": "Byte",
     "float": "Float",
     "double": "Double",

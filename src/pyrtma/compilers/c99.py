@@ -20,6 +20,7 @@ tab = "    "
 # Native C types that are supported
 type_map = {
     "char": "char",
+    "signed char": "signed char",
     "unsigned char": "unsigned char",
     "byte": "uint8_t",
     "int": "int32_t",

@@ -28,6 +28,9 @@ that makes them. The version number is chosen at release time.
 - `DataFormatter.max_bytes`, 500,000,000 bytes by default: no file the data logger writes grows past it, whatever its formatter. When a file is full, the dataset continues in the next file, numbered `rec_0001`, `rec_0002` and so on; each file is complete and gets its own `DATASET_SAVED`. A file always holds at least one message. A lab can change the limit by subclassing a formatter.
 - `DataFormatter.write()` returns how many messages it wrote, and `DataFormatter.discard()`, which does nothing by default, releases what a formatter holds when writing fails. Formatters that override `write()` and return None are treated as having written everything and aren't split. A formatter that takes no messages even into a new file fails its dataset with `DatasetWriterError`.
 - `pyrtma.data_logger.cli.parse_msg_types()`, which parses message types as the CLI takes them: `all` or `*`, or IDs separated by spaces or commas. `cli.add_dataset()` takes the client to send with.
+- `signed char` fields work, as a one-byte signed integer: `c_int8` in Python, `signed char` in C, and `int8` in MATLAB. The parser listed the type but failed on it with `KeyError`.
+- `pyrtma.parser.MAX_REFERENCE_DEPTH` (16): how deeply constants may be defined in terms of other constants, and how long a chain of aliases may be. A constant of numbers only has depth 0, and one that uses other constants is one deeper than the deepest of them. Deeper definitions raise `RecurisionError`, which is now also a `RecursionError`, as before.
+- `ConstantString.text` holds a string constant's text. `ConstantString.value` is still the double-quoted literal, now escaped.
 
 ### Changed
 
@@ -95,6 +98,15 @@ that makes them. The version number is chosen at release time.
 - `Dataset(..., max_size_mb=...)` and `DatasetWriter(..., max_size_mb=...)`, keyword-only, default 500, set a dataset's size limit and raise `ValueError` and `DatasetError` respectively when it is out of range. Their `subdivide_interval` parameter is deprecated and ignored, with a `DeprecationWarning` when nonzero. `DATA_LOGGER_CONFIG` reports each dataset's `max_size_mb`.
 - `DataFormatter.max_bytes` is an ordinary class attribute, a ceiling that the data logger lowers per file to the dataset's `max_size_mb`.
 - The data logger CLI asks for `max_size_mb`, from 1 to 500 with 500 as the default, and accepts message types separated by commas as well as spaces.
+- Array lengths must be whole numbers of 1 or more, and other lengths raise `RTMASyntaxError` naming the field. `int32[0]`, or a length expression that evaluates to 0, used to give a scalar in Python and an empty array in C, JavaScript and MATLAB, so their layouts disagreed. A fractional length, such as `STR_SIZE / 3`, used to be truncated, and a negative one raised a raw `ValueError`. A whole number written as a float, such as `STR_SIZE / 2`, is still accepted.
+- A field's type spec must match as a whole: trailing text, as in `int32[4] junk`, raises an error instead of being ignored.
+- A constant expression may use any number of constants; it used to fail with `RecursionError` past 10. Instead, its nesting depth is limited to `MAX_REFERENCE_DEPTH`. An expression that uses its own name raises `CircularRefError`, and one that doesn't evaluate, such as `1 +` or `1 / 0`, raises `ExpressionExpansionError` instead of the raw `SyntaxError` or `ZeroDivisionError`. Constants are still defined before they are used, which rules out circular references between them.
+- A chain of aliases is limited to `MAX_REFERENCE_DEPTH`, raising `RecurisionError`; the limit was 10, raising the built-in `RecursionError`. An alias of itself raises `CircularRefError`.
+- String constants can only hold printable ASCII, and other text raises `RTMASyntaxError`. Backslashes and double quotes are escaped in every target, so `C:\data\new` and `say "hi"` compile as written; they used to give a newline, or invalid code.
+- Module IDs from `DYN_MOD_ID_START` (10000) up raise `RTMASyntaxError`: the client can't connect with them, and those above 32767 didn't fit the header. User module IDs are 10 to 99 and 200 to 9999.
+- A host ID above `MAX_HOSTS` (5) compiles with a warning: a client can send from it, but the client and manager don't accept it as a destination.
+- An unknown compiler option raises `RTMASyntaxError`; it used to be ignored silently.
+- Importing a `.yml` file still warns, but no longer waits for Enter, which hung non-interactive runs and raised `EOFError` without a terminal.
 
 ### Fixed
 
@@ -155,3 +167,4 @@ that makes them. The version number is chosen at release time.
 - The data logger CLI asks again for a name or other text that is too long or isn't ASCII, for message types that would record nothing or aren't IDs, and for more than 64 message types, instead of crashing or adding a dataset that records nothing. A command whose dataset name is too long or isn't ASCII is reported, and the CLI carries on. With no manager running, it prints one line and exits with status 1.
 - The `msg_header` formatter's CSV rows no longer end with a comma. Each row had one more field than the header row, an empty one, which made `pandas.read_csv` label every column with the next column's values. Scripts that dropped that empty last column need updating.
 - `examples/data_log_example.py` stops sending when interrupted with Ctrl-C. With a packet count, its sending thread ignored the stop request and the script waited for every packet to be sent, at least 2 ms each.
+- Aliases of structs work in the parser (H11): an alias may name a struct from an imported file, or one later in the same file, and an alias of such an alias works too. A struct alias used to fail with `TypeError` while checking alignment, and one naming a struct in the same file couldn't be resolved.

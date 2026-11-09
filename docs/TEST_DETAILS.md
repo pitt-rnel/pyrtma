@@ -756,6 +756,85 @@ Each test writes YAML to temporary files and expects `Parser.parse()` to raise a
 | `test_reserved_fields` | A field named with a reserved word raises `RTMASyntaxError`. | A field named `auto`. |
 | `test_prefix_fields` | Field and constant names with a leading underscore or digit raise `RTMASyntaxError`. | `_bad_prefix` and `9bad_prefix` fields, and a `_bad_prefix` constant. |
 
+The pytest classes after `TestParser`, added in Phase 8, write their definitions to `tmp_path` with `helpers.write_definitions()` and parse them with `helpers.parse_definitions()`, whose parser records its log instead of printing it.
+
+### TestArrayLengths
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_zero_length_is_rejected` | Parser and compilers: an array length of 0 raises `RTMASyntaxError` naming the field, since targets disagreed on its layout. | Parametrized over `int32[0]`, a constant of 0, and an expression that evaluates to 0. |
+| `test_fractional_length_is_rejected` | Parser and compilers: a fractional array length raises `RTMASyntaxError` instead of being truncated. | `int32[N / 3]` with `N` 8. |
+| `test_whole_float_length_is_accepted` | Parser and compilers: a length that is a whole number written as a float is still accepted. | `int32[N / 2]` with `N` 8 gives a length of 4 and 16 bytes. |
+| `test_negative_length_is_rejected` | Parser and compilers: a negative length raises `RTMASyntaxError` naming it, not a raw ctypes `ValueError`. | `int32[-2]`. |
+| `test_trailing_text_is_rejected` | Parser and compilers: a field spec must match as a whole. | Parametrized over `int32[4] junk`, `int32[4]junk` and `int32[4]]`; each raises a `ParserError`. |
+| `test_spaces_around_a_field_spec_are_accepted` | Parser and compilers: spaces around and inside a spec are still accepted, as before. | `' int32 [ 4 ] '`. |
+
+### TestConstantExpressions
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_many_symbols_are_accepted` | Parser and compilers: an expression may use more than 10 constants. | Twelve constants summed in one expression. |
+| `test_nesting_up_to_the_limit_is_accepted` | Parser and compilers: constants nested `MAX_REFERENCE_DEPTH` deep are accepted, and evaluate correctly. | A chain `C0` to `C16`, each one more than the last, used as an array length. |
+| `test_nesting_past_the_limit_is_rejected` | Parser and compilers: a constant nested deeper than `MAX_REFERENCE_DEPTH` raises `RecurisionError` naming it, which is also a `RecursionError`. | A chain one longer than the limit. |
+| `test_self_reference_is_rejected` | Parser and compilers: an expression that uses its own name raises `CircularRefError`. | `A: A + 1`. |
+| `test_reference_to_a_later_constant_is_rejected` | Parser and compilers: constants must be defined before they are used, which rules out circular references between them. | `A: B + 1` before `B: A + 1` raises `ExpressionExpansionError` naming `B`. |
+| `test_invalid_expression_raises_a_parser_error` | Parser and compilers: an expression that doesn't evaluate raises `ExpressionExpansionError` naming the constant. | Parametrized over `1 +`, `1 / 0` and `(2`. |
+
+### TestAliases
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_alias_to_a_struct_in_an_imported_file` | H11: an alias of a struct from an imported file, and an alias of that alias, work as field types, scalar and array. | `POINT` in one file; `PT` and `PT2` in another, used by a message; checks offsets, sizes and the resolved struct. |
+| `test_alias_to_a_struct_in_the_same_file` | H11: an alias may name a struct defined later in the same file, and be used once the struct is defined. | `PT: POINT` with `POINT` and a `LINE` of two `PT`s below it, and a message using both. |
+| `test_struct_using_an_alias_before_its_struct_is_rejected` | H11: a struct that uses such an alias before its struct is defined raises `RTMASyntaxError` naming the alias. | `LINE` uses `PT` before `POINT` is defined. |
+| `test_alias_to_an_unknown_type_is_rejected` | Parser and compilers: an alias of a type that doesn't exist still raises `RTMASyntaxError`. | `PT: NOPE`. |
+| `test_alias_to_itself_is_rejected` | Parser and compilers: an alias of itself raises `CircularRefError`. | `PT: PT`. |
+| `test_alias_chain_past_the_limit_is_rejected` | Parser and compilers: a chain of aliases longer than `MAX_REFERENCE_DEPTH` raises `RecurisionError` naming the last. | Seventeen aliases, each of the one before. |
+| `test_alias_chain_resolves_to_its_final_type` | Parser and compilers: an alias of an alias keeps the final type as its `type_name`, as the compilers expect. | `B: A` with `A: int32`. |
+
+### TestStringConstants
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_value_is_an_escaped_literal` | Parser and compilers: a string constant's `value` escapes backslashes and double quotes, and means its `text` as a Python literal, as in C and JS. | A Windows path and a quoted word; compares `text`, `value`, and `eval(value)`. |
+| `test_unprintable_text_is_rejected` | Parser and compilers: a string constant that isn't printable ASCII raises `RTMASyntaxError` naming it. | Parametrized over a tab, a newline, and an accented letter. |
+
+### TestNativeTypes
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_signed_char_is_a_one_byte_integer` | Parser and compilers: `signed char` fields parse as one-byte signed integers. | A scalar and an array of 7. |
+
+### TestIds
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_module_id_in_the_dynamic_range_is_rejected` | Parser and compilers: module IDs the client can't connect with raise `RTMASyntaxError` giving the range. | Parametrized over 10000, 20000 and 40000. |
+| `test_module_ids_in_range_are_accepted` | Parser and compilers: the ends of both user ranges are accepted. | Parametrized over 10, 99, 200 and 9999. |
+| `test_host_id_above_max_hosts_warns` | Parser and compilers: a host ID above `MAX_HOSTS` is accepted with a warning naming it. | A host ID of 6. |
+| `test_host_id_within_max_hosts_does_not_warn` | Parser and compilers: a host ID up to `MAX_HOSTS` gives no warning. | A host ID of 5. |
+
+### TestCompilerOptions
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_unknown_option_is_rejected` | Parser and compilers: an unknown compiler option raises `RTMASyntaxError` naming it, instead of being ignored. | `IMPORT_COREDEFS`, the upper-case key `--combined` used to write. |
+| `test_known_options_are_applied` | Parser and compilers: the known options still take effect. | `import_coredefs` and `auto_pad` false; no core messages are parsed. |
+
+### TestImports
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_yml_import_warns_without_prompting` | Parser and compilers: importing a `.yml` file warns, naming it, without waiting for input. | `input` replaced by a function that fails the test. |
+
+## test_compilers.py — the compilers and the layouts they are built from (needs: none)
+
+`compiled_layouts_snapshot.json` records the core, test and example definitions as the parser computed them before Phase 8: each message's ID, and each message's and struct's hash, size and fields, as `name:type@offset` with aliases resolved. The snapshot is never edited to make a change pass.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_definitions_keep_their_layouts` | Parser and compilers: parser changes leave every existing layout and hash as it was. | Parametrized over the three sets of definitions; lists each entry that differs. |
+
 ## test_validators.py — field descriptors and validation (needs: none)
 
 Uses the `VALIDATOR_A` and `VALIDATOR_B` messages from the test definitions, which have a field of every supported type.

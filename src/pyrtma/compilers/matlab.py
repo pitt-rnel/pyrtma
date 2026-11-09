@@ -19,6 +19,7 @@ from textwrap import dedent
 # Field type name to matlab types
 type_map = {
     "char": "int8",
+    "signed char": "int8",
     "unsigned char": "uint8",
     "byte": "uint8",
     "int": "int32",
