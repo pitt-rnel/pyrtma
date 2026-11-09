@@ -146,6 +146,39 @@ supported_types = {
     "int64": NativeType(name="int64", size=8, format="q"),
 }
 
+# The name each native type has in a type hash, so that spellings of the same
+# type, such as ``int`` and ``int32``, hash the same. ``char`` stays distinct
+# from ``int8``, since the targets decode them differently.
+CANONICAL_TYPE_NAMES: Dict[str, str] = {
+    "char": "char",
+    "signed char": "int8",
+    "unsigned char": "uint8",
+    "byte": "uint8",
+    "int": "int32",
+    "signed int": "int32",
+    "unsigned int": "uint32",
+    "unsigned": "uint32",
+    "short": "int16",
+    "signed short": "int16",
+    "unsigned short": "uint16",
+    "long": "int32",
+    "signed long": "int32",
+    "unsigned long": "uint32",
+    "long long": "int64",
+    "signed long long": "int64",
+    "unsigned long long": "uint64",
+    "float": "float",
+    "double": "double",
+    "uint8": "uint8",
+    "uint16": "uint16",
+    "uint32": "uint32",
+    "uint64": "uint64",
+    "int8": "int8",
+    "int16": "int16",
+    "int32": "int32",
+    "int64": "int64",
+}
+
 
 class ParserError(Exception):
     """Base class for all parser exceptions"""
@@ -360,6 +393,8 @@ class Field:
     length_expanded: Optional[str] = None
     length: Optional[int] = None
     offset: int = -1
+    # True for the padding fields the parser inserts for alignment.
+    padding: bool = False
 
     @property
     def base_size(self) -> int:
@@ -970,6 +1005,7 @@ class Parser:
                 length_expanded=f'"{pad_len}"',
                 length=pad_len,
                 offset=ptr,
+                padding=True,
             )
 
             # Insert the padding into MDF or SDF object before the current field
@@ -1031,6 +1067,7 @@ class Parser:
                 length=pad_len or None,
                 # It starts where the last field ends.
                 offset=ptr,
+                padding=True,
             )
 
             # Stride by an amount equal to the field size
@@ -1289,6 +1326,76 @@ class Parser:
 
         self.validate_msg_def(mdf)
 
+    @staticmethod
+    def field_text(fld: Field) -> str:
+        """Describe a field as it appears in its definition's type hash.
+
+        The line has the field as written, ignoring spacing, and what it
+        resolves to, so a change to either changes the hash. A native type
+        has one name, from `CANONICAL_TYPE_NAMES`. An alias is followed by
+        ``->`` and its final type. A length written with constants or an
+        expression is followed by ``=`` and its value. A struct or message
+        is followed by ``hash=`` and the first eight hex digits of its own
+        hash, which covers its name and fields. Padding the parser inserted
+        is a ``uint8`` field with its length.
+
+        Args:
+            fld: A parsed field.
+
+        Returns:
+            The field's line, such as ``age: AGE -> int32``,
+            ``name: char[MAX_NAME_LEN=32]`` or ``pts: PT[N=3] -> POINT
+            hash=1a2b3c4d``.
+        """
+        length = ""
+        if fld.length is not None:
+            written = re.sub(r"\s+", "", fld.length_expression or "")
+            if fld.padding or written in ("", str(fld.length)):
+                length = f"[{fld.length}]"
+            else:
+                length = f"[{written}={fld.length}]"
+
+        type_obj = fld.type_obj
+        alias = ""
+        if isinstance(type_obj, TypeAlias):
+            # An alias already points at the end of its chain.
+            alias = type_obj.name
+            type_obj = type_obj.type_obj
+
+        if isinstance(type_obj, NativeType):
+            final, suffix = CANONICAL_TYPE_NAMES[type_obj.name], ""
+        else:
+            final, suffix = type_obj.name, f" hash={type_obj.hash[:8]}"
+
+        if alias:
+            return f"{fld.name}: {alias}{length} -> {final}{suffix}"
+        return f"{fld.name}: {final}{length}{suffix}"
+
+    @classmethod
+    def definition_hash(cls, df: Union["MDF", "SDF"]) -> Tuple[str, str]:
+        """Build a struct's or message's hashed text and its type hash.
+
+        The text has the layout the hash has always been taken over: the
+        name, a message's ID, and a line per field, from `field_text`,
+        including the padding the parser inserted. A definition written with
+        canonical native type names and literal lengths only, that needs no
+        padding, therefore keeps the hash it had before.
+
+        Args:
+            df: A struct or message whose fields have been parsed.
+
+        Returns:
+            The text, and the hex SHA-256 of it. The type hash is its first
+            eight hex digits.
+        """
+        lines = [f"{df.name}:"]
+        if isinstance(df, MDF):
+            lines.append(f"  id: {df.type_id}")
+        lines.append("  fields:")
+        lines.extend(f"    {cls.field_text(f)}" for f in df.fields)
+        raw = "\n".join(lines)
+        return raw, sha256(raw.encode()).hexdigest()
+
     def handle_signal(self, name: str, mdf: Dict[str, Any]):
         # Create a string representation of the defintion to hash
         raw = f"{name}:\n  id: {mdf['id']}\n  fields: null"
@@ -1336,23 +1443,12 @@ class Parser:
                     f"Invalid top-level section '{section}' in message or struct definition of {name} -> {self.current_file}."
                 )
 
-        # Create a string representation of the defintion to hash
-        f: Union[str, List[str]]
-        if isinstance(sdf["fields"], str):
-            f = f"    fields: {sdf['fields']}"
-        else:
-            f = [f"    {fname}: {ftype}" for fname, ftype in sdf["fields"].items()]
-        f = "\n".join(f)
-
-        raw = f"{name}:\n  fields:\n{f}"
-        raw = textwrap.dedent(raw)
-        hash = sha256(raw.encode()).hexdigest()
-
-        # Create the SDF data class
-        obj = SDF(raw, hash, name, src=self.current_index)
+        # Create the SDF data class. Its text and hash need its fields.
+        obj = SDF("", "", name, src=self.current_index)
 
         # Parse and the fields of the definition
         self.add_fields(obj, sdf["fields"])
+        obj.raw, obj.hash = self.definition_hash(obj)
 
         # Store the new defintion
         self.struct_defs[name] = obj
@@ -1405,20 +1501,8 @@ class Parser:
             self.handle_signal(name, mdf)
             return
 
-        # Create a string representation of the defintion to hash
-        f: Union[str, List[str]]
-        if isinstance(mdf["fields"], str):
-            f = f"    fields: {mdf['fields']}"
-        else:
-            f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
-            f = "\n".join(f)
-        raw = f"{name}:\n  id: {mdf['id']}\n  fields:\n{f}"
-
-        raw = textwrap.dedent(raw)
-        hash = sha256(raw.encode()).hexdigest()
-
-        # Create the MDF data class
-        obj = MDF(raw, hash, name, type_id=mdf["id"], src=self.current_index)
+        # Create the MDF data class. Its text and hash need its fields.
+        obj = MDF("", "", name, type_id=mdf["id"], src=self.current_index)
 
         # Check and validate message id
         msg_id = mdf["id"]
@@ -1427,6 +1511,7 @@ class Parser:
 
         # Parse and the fields of the definition
         self.add_fields(obj, mdf["fields"])
+        obj.raw, obj.hash = self.definition_hash(obj)
 
         # Store the new defintion
         self.message_defs[name] = obj

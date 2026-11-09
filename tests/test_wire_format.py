@@ -6,6 +6,10 @@ with the core module and host IDs, as they were in pyrtma 4.0.0. A failure
 here means a change would break existing C, MATLAB, and JavaScript clients, or
 existing recordings. Fix the change; never edit the snapshot to make it pass.
 
+The type hashes are the one deliberate exception. Phase 9 changed them, with
+the user's approval, so that each covers its definition as written and as resolved:
+aliases, constants, nested structs and padding (H9). Only the snapshot's hash values changed.
+
 Layouts name field types by kind and size, such as ``int64``, rather than by
 ctypes class, because ctypes aliases differ between platforms: ``c_int64`` is
 ``c_long`` on Linux and ``c_longlong`` on Windows.

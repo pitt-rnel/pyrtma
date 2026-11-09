@@ -833,13 +833,34 @@ The pytest classes after `TestParser`, added in Phase 8, write their definitions
 |---|---|---|
 | `test_trailing_padding_records_its_offset` | Parser and compilers: the padding added at the end of a struct records its offset, where the last field ends, as other fields do; it used to be -1. | A `double` followed by fields that need 4, 6, 7 and 1 trailing bytes, the last a one-byte scalar. |
 
-## test_compilers.py — the compilers and the layouts they are built from (needs: none; `TestC`: toolchain, gcc; `TestJavaScript`: toolchain, node)
+### TestTypeHash
 
-`compiled_layouts_snapshot.json` records the core, test and example definitions as the parser computed them before Phase 8: each message's ID, and each message's and struct's hash, size and fields, as `name:type@offset` with aliases resolved. The snapshot is never edited to make a change pass.
+Each test parses two versions of a definition, each in a folder of its own, and compares the hashes. A field's line in the hashed text has the field as written, ignoring spacing, and what it resolves to, such as `age: AGE -> int32`, `name: char[MAX_NAME_LEN=32]` or `pts: PT[2] -> P hash=1a2b3c4d`. `NESTED` is a message with two constant-length char arrays, an `int32` alias, a struct field and an array of a struct alias, beside a second struct with the same fields as the first.
 
 | Test | Purpose | Approach |
 |---|---|---|
-| `test_definitions_keep_their_layouts` | Parser and compilers: parser changes leave every existing layout and hash as it was. | Parametrized over the three sets of definitions; lists each entry that differs. |
+| `test_a_resolved_change_changes_the_hash` | H9: a change to what a field resolves to changes the message's hash, even when its size doesn't change; it used to keep the hash. | Parametrized over `NESTED` with its constants moved (8 and 24 to 16 and 16), the alias retargeted from `int32` to `float`, the struct's field types swapped, a struct field renamed, and the struct alias pointed at the identical second struct. |
+| `test_a_renamed_nested_struct_changes_the_hash` | H9: renaming a struct that a message contains changes the message's hash. | Renames the struct in `NESTED` and every use of it. |
+| `test_a_changed_nested_message_changes_the_hash` | H9: a change to a message used as a field changes the hash of the message that contains it; it used to keep the hash. | `INNER.x` changed from `int32` to `float`. |
+| `test_changed_copied_fields_change_the_hash` | H9: a message that copies its fields with `fields: BASE` changes its hash when `BASE`'s fields change; it used to hash only the name. | `BASE.x` changed from `int32` to `float`. |
+| `test_a_renamed_field_changes_the_hash` | H9: renaming a field changes the hash, as it always has. | A one-field message with `a` renamed to `b`. |
+| `test_spelling_does_not_change_the_hash` | H9: spacing in a field spec, and another name for the same native type, keep the hash; spacing used to change it. | Parametrized over spaces inside the brackets, spaces in a length expression, and `int`, `byte`, `signed char`, `short` and `unsigned long long` for their fixed-width names. Only the field changes. |
+| `test_names_a_field_uses_change_the_hash` | H9: using a different constant, a literal or an expression for the same length, or a different alias or a native type for the same final type, changes the hash, since the author may mean something by it. | Parametrized over a message with a `char[N]` field and an `int32` alias field, where `N` and a second constant are both 32 and a second alias is also `int32`. |
+| `test_a_renamed_name_changes_the_hash` | H9: renaming a constant or an alias, together with the field that uses it, changes the hash. | Parametrized over the constant and the alias of the same message. |
+| `test_char_and_int8_hash_differently` | H9: `char` and `int8`, which decode differently, hash differently. | Two one-field messages of `char[4]` and `int8[4]`. |
+| `test_the_hash_is_of_the_definition_text` | H9: each definition's hash is the SHA-256 of its `raw` text, so `type_def` shows what the hash covers. | Every struct and message in `NESTED`. |
+| `test_struct_fields_carry_the_struct_hash` | H9: a struct field's line carries the struct's hash, and a struct alias field names the alias and the struct it resolves to; the hash used to cover only the name written. | The lines for `NESTED`'s struct field and struct alias array. |
+| `test_inserted_padding_is_in_the_hash` | H9: the padding the parser inserts, between fields and at the end, is in the hashed text with its length, so a change to it changes the hash. | An `int8`, a `double` and an `int8`, which get 7 bytes of padding twice. |
+| `test_padding_options_change_the_hash` | H9: a message parsed with `validate_alignment: false`, which gets no padding and a different size, hashes differently from the same message padded; it used to hash the same. | The same `int8` and `double` message, with and without the option. |
+| `test_plain_definitions_keep_their_hash` | H9: signals, and structs and messages written with canonical native types and literal lengths only, that need no padding, keep the hash the old text gave them. | Compares each hash with the SHA-256 of the text the parser used to build. |
+
+## test_compilers.py — the compilers and the layouts they are built from (needs: none; `TestC`: toolchain, gcc; `TestJavaScript`: toolchain, node)
+
+`compiled_layouts_snapshot.json` records the core, test and example definitions as the parser computed them before Phase 8: each message's ID, and each message's and struct's hash, size and fields, as `name:type@offset` with aliases resolved. The snapshot is never edited to make a change pass. Its hash values are the one exception: Phase 9 regenerated them, by decision, when hashes came to cover each definition as written and as resolved.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_definitions_keep_their_layouts` | Parser and compilers: parser changes leave every existing layout as it was, and every hash as Phase 9 made it. | Parametrized over the three sets of definitions; lists each entry that differs. |
 
 The classes below compile into `tmp_path` with `pyrtma.compile.compile`. Most use `tests/compiler_defs/compiler_defs.defs`, the fixture: aliases of native types, of structs in the same and an imported file, and of aliases; struct and message fields and arrays of each; `signed char`; a core alias; a Windows path and a quoted word as string constants; and `_RESERVED_` IDs in both files. Tests parametrized over `fixture` and `test` also compile the test definitions. `TestC` uses `tests/compiler_defs/core_c.defs`, the core definitions under other index names, as a stand-in for `rtma.h`, since the C compiler leaves the core definitions out. `TestJavaScript` copies the output to `.mjs`, so node loads it as an ES module, and runs a script that prints JSON.
 
@@ -875,6 +896,13 @@ MATLAB isn't available to the tests, so these check the generated text.
 |---|---|---|
 | `test_struct_aliases_follow_their_struct` | H11: each alias of a struct is assigned after its struct's last field, and before the first field that uses it. | Compares line numbers in the generated `.m` file. |
 | `test_string_constants_are_escaped` | Parser and compilers: MATLAB string constants double their quotes and keep backslashes as they are. | The fixture's `PATH` and `QUOTE` lines. |
+
+### TestTypeHashes
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_every_target_writes_the_parsers_hashes` | H9: the C, JavaScript and MATLAB output carries each message's hash as the parser computed it, and the fixture's own messages all have one. | Parametrized over the three targets; reads the `HASH_` defines, `RTMA.HASH` and `RTMA.hash` lines. |
+| `test_type_def_is_what_type_hash_covers` | H9: every generated Python class's `type_hash` is the start of the SHA-256 of its `type_def`, so two modules whose hashes differ can compare their `type_def`s. | Every message and struct class compiled from the fixture. |
 
 ### TestCombined
 
@@ -924,7 +952,7 @@ Uses the `VALIDATOR_A` and `VALIDATOR_B` messages from the test definitions, whi
 
 ## test_wire_format.py — the frozen wire format (needs: none)
 
-`wire_format_snapshot.json` records the 4.0.0 wire format, less the timecode header, which Phase 2 removed by decision. Layouts are written as `name:type@offset`, with types named by kind and size, such as `int64`, so the snapshot is the same on Linux and Windows. The snapshot is never edited to make a change pass.
+`wire_format_snapshot.json` records the 4.0.0 wire format, less the timecode header, which Phase 2 removed by decision, and with the type hashes that Phase 9 changed by decision to cover each definition as written and as resolved. Layouts are written as `name:type@offset`, with types named by kind and size, such as `int64`, so the snapshot is the same on Linux and Windows. The snapshot is never edited to make a change pass.
 
 | Test | Purpose | Approach |
 |---|---|---|

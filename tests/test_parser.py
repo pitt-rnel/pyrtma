@@ -679,6 +679,8 @@ class TestParser(unittest.TestCase):
 # definitions to ``tmp_path`` and parses them with a parser whose log is
 # recorded rather than printed.
 
+from hashlib import sha256
+
 import pytest
 
 from pyrtma.parser import (
@@ -1104,3 +1106,347 @@ class TestPadding:
         assert padding.name.startswith("padding_")
         assert (padding.offset, padding.size) == (16 - pad, pad)
         assert [f.offset for f in fields] == sorted(f.offset for f in fields)
+
+
+# The type hash is the first 32 bits of a SHA-256 over a definition's text:
+# its name, ID and fields, each as written, ignoring spacing, and as resolved,
+# with a struct field carrying that struct's own hash, and inserted padding.
+# These tests write two versions of a definition and compare their hashes.
+def type_hash(directory: Path, text: str, name: str = "M") -> str:
+    """Parse definitions in a folder of their own and return one's hash.
+
+    Args:
+        directory: A folder for the files, created if it doesn't exist.
+        text: The YAML text of the definitions.
+        name: The message or struct whose hash to return.
+
+    Returns:
+        The definition's hash, as the parser computed it.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    parser, _ = parse_definitions(write_definitions(directory, {"m": text}))
+    definition = parser.message_defs.get(name) or parser.struct_defs[name]
+    return definition.hash
+
+
+def old_hash(text: str) -> str:
+    """The hash of a definition text, computed as the parser always has.
+
+    Args:
+        text: The definition's text, dedented.
+
+    Returns:
+        The SHA-256 of the text, as hex.
+    """
+    return sha256(textwrap.dedent(text).encode()).hexdigest()
+
+
+NESTED = """\
+    constants:
+      N: 8
+      K: 24
+    aliases:
+      AGE: int32
+      PT: P
+    struct_defs:
+      P:
+        fields:
+          x: int32
+          y: float
+      Q:
+        fields:
+          x: int32
+          y: float
+    message_defs:
+      M:
+        id: 7000
+        fields:
+          a: char[N]
+          b: char[K]
+          age: AGE
+          p: P
+          pts: PT[2]
+    """
+
+
+class TestTypeHash:
+    @pytest.mark.parametrize(
+        ("old", "new"),
+        [
+            ("N: 8\n      K: 24", "N: 16\n      K: 16"),
+            ("AGE: int32", "AGE: float"),
+            ("x: int32\n          y: float", "x: float\n          y: int32"),
+            ("x: int32", "z: int32"),
+            ("PT: P", "PT: Q"),
+        ],
+        ids=[
+            "constant",
+            "alias target",
+            "nested struct fields",
+            "nested struct field name",
+            "struct alias target",
+        ],
+    )
+    def test_a_resolved_change_changes_the_hash(
+        self, tmp_path: Path, old: str, new: str
+    ) -> None:
+        # Q has the same fields as P, so the last case changes only a name.
+        text = NESTED
+        assert old in text
+
+        before = type_hash(tmp_path / "before", text)
+        after = type_hash(tmp_path / "after", text.replace(old, new))
+
+        assert before != after
+
+    def test_a_renamed_nested_struct_changes_the_hash(self, tmp_path: Path) -> None:
+        renamed = NESTED.replace("  P:\n", "  R:\n").replace("PT: P", "PT: R")
+        renamed = renamed.replace("p: P", "p: R")
+
+        before = type_hash(tmp_path / "before", NESTED)
+        after = type_hash(tmp_path / "after", renamed)
+
+        assert before != after
+
+    def test_a_changed_nested_message_changes_the_hash(self, tmp_path: Path) -> None:
+        text = """\
+            message_defs:
+              INNER:
+                id: 7001
+                fields:
+                  x: int32
+              M:
+                id: 7000
+                fields:
+                  inner: INNER
+            """
+
+        before = type_hash(tmp_path / "before", text)
+        after = type_hash(tmp_path / "after", text.replace("x: int32", "x: float"))
+
+        assert before != after
+
+    def test_changed_copied_fields_change_the_hash(self, tmp_path: Path) -> None:
+        text = """\
+            struct_defs:
+              BASE:
+                fields:
+                  x: int32
+            message_defs:
+              M:
+                id: 7000
+                fields: BASE
+            """
+
+        before = type_hash(tmp_path / "before", text)
+        after = type_hash(tmp_path / "after", text.replace("x: int32", "x: float"))
+
+        assert before != after
+
+    def test_a_renamed_field_changes_the_hash(self, tmp_path: Path) -> None:
+        before = type_hash(tmp_path / "before", message("int32"))
+        after = type_hash(tmp_path / "after", message("int32").replace("a:", "b:"))
+
+        assert before != after
+
+    @pytest.mark.parametrize(
+        ("old", "new"),
+        [
+            ("char[N]", "char[ N ]"),
+            ("int32[N / 16]", "int32[N/16]"),
+            ("int32", "int"),
+            ("uint8", "byte"),
+            ("int8", "signed char"),
+            ("int16", "short"),
+            ("uint64", "unsigned long long"),
+        ],
+    )
+    def test_spelling_does_not_change_the_hash(
+        self, tmp_path: Path, old: str, new: str
+    ) -> None:
+        text = """\
+            constants:
+              N: 32
+            aliases:
+              TEXT: char
+              ID: int32
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  text: char[N]
+                  pair: int32[N / 16]
+                  count: int32
+                  small: int8
+                  octet: uint8
+                  half: int16
+                  big: uint64
+            """
+        # Change the field only, not an alias with the same text.
+        head, fields = text.split("message_defs:")
+        assert f": {old}\n" in fields
+        changed = head + "message_defs:" + fields.replace(f": {old}\n", f": {new}\n")
+
+        before = type_hash(tmp_path / "before", text)
+        after = type_hash(tmp_path / "after", changed)
+
+        assert before == after
+
+    @pytest.mark.parametrize(
+        ("old", "new"),
+        [
+            ("text: char[N]", "text: char[32]"),
+            ("text: char[N]", "text: char[2 * 16]"),
+            ("text: char[N]", "text: char[L]"),
+            ("count: ID", "count: int32"),
+            ("count: ID", "count: OTHER_ID"),
+        ],
+        ids=[
+            "constant to literal",
+            "constant to expression",
+            "other constant, same value",
+            "alias to native type",
+            "other alias, same type",
+        ],
+    )
+    def test_names_a_field_uses_change_the_hash(
+        self, tmp_path: Path, old: str, new: str
+    ) -> None:
+        text = """\
+            constants:
+              N: 32
+              L: 32
+            aliases:
+              ID: int32
+              OTHER_ID: int32
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  text: char[N]
+                  count: ID
+            """
+
+        before = type_hash(tmp_path / "before", text)
+        after = type_hash(tmp_path / "after", text.replace(old, new))
+
+        assert before != after
+
+    @pytest.mark.parametrize("kind", ["constant", "alias"])
+    def test_a_renamed_name_changes_the_hash(self, tmp_path: Path, kind: str) -> None:
+        text = """\
+            constants:
+              N: 32
+            aliases:
+              ID: int32
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  text: char[N]
+                  count: ID
+            """
+        old, new = ("N", "LEN") if kind == "constant" else ("ID", "COUNT")
+        renamed = text.replace(f"{old}:", f"{new}:").replace(f"[{old}]", f"[{new}]")
+        renamed = renamed.replace(f": {old}\n", f": {new}\n")
+        assert renamed.count(new) == 2
+
+        before = type_hash(tmp_path / "before", text)
+        after = type_hash(tmp_path / "after", renamed)
+
+        assert before != after
+
+    def test_char_and_int8_hash_differently(self, tmp_path: Path) -> None:
+        char = type_hash(tmp_path / "char", message("char[4]"))
+        int8 = type_hash(tmp_path / "int8", message("int8[4]"))
+
+        assert char != int8
+
+    def test_the_hash_is_of_the_definition_text(self, tmp_path: Path) -> None:
+        defs = write_definitions(tmp_path, {"m": NESTED})
+
+        parser, _ = parse_definitions(defs)
+
+        for definition in [*parser.message_defs.values(), *parser.struct_defs.values()]:
+            assert definition.hash == old_hash(definition.raw), definition.name
+
+    def test_struct_fields_carry_the_struct_hash(self, tmp_path: Path) -> None:
+        defs = write_definitions(tmp_path, {"m": NESTED})
+
+        parser, _ = parse_definitions(defs)
+
+        p_hash = parser.struct_defs["P"].hash[:8]
+        lines = parser.message_defs["M"].raw.splitlines()
+        assert f"    p: P hash={p_hash}" in lines
+        assert f"    pts: PT[2] -> P hash={p_hash}" in lines
+
+    def test_inserted_padding_is_in_the_hash(self, tmp_path: Path) -> None:
+        text = """\
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  a: int8
+                  b: double
+                  c: int8
+            """
+        defs = write_definitions(tmp_path, {"m": text})
+
+        parser, _ = parse_definitions(defs)
+
+        assert parser.message_defs["M"].raw.splitlines()[3:] == [
+            "    a: int8",
+            "    padding_0_: uint8[7]",
+            "    b: double",
+            "    c: int8",
+            "    padding_1_: uint8[7]",
+        ]
+
+    def test_padding_options_change_the_hash(self, tmp_path: Path) -> None:
+        # Without alignment checks, nothing is inserted and the parser's size
+        # differs, so the hash must too.
+        text = message("int8").replace(
+            "      a: int8\n", "      a: int8\n      b: double\n"
+        )
+        for folder in ("padded", "unchecked"):
+            (tmp_path / folder).mkdir()
+        defs = write_definitions(tmp_path / "padded", {"m": text})
+        unchecked = write_definitions(
+            tmp_path / "unchecked", {"m": text}, options="validate_alignment: false"
+        )
+
+        padded = parse_definitions(defs)[0].message_defs["M"]
+        plain = parse_definitions(unchecked)[0].message_defs["M"]
+
+        assert (padded.size, plain.size) == (16, 9)
+        assert padded.hash != plain.hash
+
+    def test_plain_definitions_keep_their_hash(self, tmp_path: Path) -> None:
+        text = """\
+            struct_defs:
+              S:
+                fields:
+                  x: double
+                  name: char[16]
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  x: double
+                  name: char[16]
+              SIG:
+                id: 7001
+                fields: null
+            """
+        defs = write_definitions(tmp_path, {"m": text})
+
+        parser, _ = parse_definitions(defs)
+
+        fields = "    x: double\n    name: char[16]"
+        assert parser.struct_defs["S"].hash == old_hash(f"S:\n  fields:\n{fields}")
+        assert parser.message_defs["M"].hash == old_hash(
+            f"M:\n  id: 7000\n  fields:\n{fields}"
+        )
+        assert parser.message_defs["SIG"].hash == old_hash(
+            "SIG:\n  id: 7001\n  fields: null"
+        )

@@ -5,17 +5,20 @@ definitions, every message's ID and every message's and struct's type hash,
 size and field layout, as the parser computed them before Phase 8. Every
 target's generated code follows these, so a change to them would break
 existing clients and recordings. Fix the change; never edit the snapshot to
-make it pass.
+make it pass. The type hashes are the one exception: Phase 9 changed them, with
+the user's approval, to cover each definition as written and as resolved (H9).
 """
 
 from __future__ import annotations
 
 import ctypes
 import json
+import re
 import shutil
 import subprocess
 import sys
 import textwrap
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -448,6 +451,43 @@ class TestMatlab:
         # MATLAB doubles a quote inside a string, and takes backslashes as is.
         assert 'RTMA.defines.PATH = "C:\\data\\new";\n' in text
         assert 'RTMA.defines.QUOTE = "say ""hi""";\n' in text
+
+
+# How each target writes a message's type hash, as a pattern over its file.
+HASH_LINES = {
+    "c_lang": ("h", r"#define HASH_(\w+)\s+0x([0-9a-f]{8})"),
+    "javascript": ("js", r'RTMA\.HASH\.(\w+) = "([0-9a-f]{8})";'),
+    "matlab": ("m", r'RTMA\.hash\.(\w+) = "([0-9a-f]{8})";'),
+}
+
+
+class TestTypeHashes:
+    @pytest.mark.parametrize("target", sorted(HASH_LINES))
+    def test_every_target_writes_the_parsers_hashes(
+        self, tmp_path: Path, target: str
+    ) -> None:
+        parser = fixture_parser()
+        ext, pattern = HASH_LINES[target]
+        compile_defs(FIXTURE, tmp_path, "out", **{target: True})
+
+        text = (tmp_path / f"out.{ext}").read_text(encoding="utf-8")
+
+        # The C header leaves out the core definitions, which are in rtma.h.
+        written = dict(re.findall(pattern, text))
+        expected = {n: parser.message_defs[n].hash[:8] for n in written}
+        assert written == expected
+        assert {"SHAPES", "NESTED", "SHAPES_READY"} <= written.keys()
+
+    def test_type_def_is_what_type_hash_covers(self, tmp_path: Path) -> None:
+        compile_defs(FIXTURE, tmp_path, "out", python=True)
+
+        defs = load_message_definitions(tmp_path / "out.py")
+
+        for cls in [*defs.MDF.values(), *defs.SDF.values()]:
+            if cls.__module__ != "out":
+                continue  # the imported base classes
+            digest = sha256(cls.type_def.encode()).hexdigest()
+            assert cls.type_hash == int(digest[:8], 16), cls.type_name
 
 
 class TestCombined:

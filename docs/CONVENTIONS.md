@@ -22,7 +22,7 @@ These design rules, and the annotation and docstring rules above, apply to code 
 
 ## Project rules
 
-- **The wire format is frozen.** No change to the message header, message layouts, type hash values, or core message and module IDs. `tests/test_wire_format.py` enforces this; never edit its snapshot to make a change pass.
+- **The wire format is frozen.** No change to the message header, message layouts, type hash values, or core message and module IDs. `tests/test_wire_format.py` enforces this; never edit its snapshot to make a change pass. The one exception was Phase 9, which changed by decision how type hashes are computed, so that each covers its definition as written and as resolved; the snapshots' hash values were regenerated then, and nothing else in them.
 - **The public API stays compatible.** Don't remove or rename public names or parameters. New parameters are keyword-only and default to the current behavior, unless that behavior is the bug being fixed.
 - **Behavior changes go in `CHANGELOG.md`** under "Unreleased", in the same patch as the change.
 - **Long-running loops isolate failures.** In the manager, data logger, and web manager, an exception caused by one client or one dataset is logged, the offender is dropped, and the loop continues.
