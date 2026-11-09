@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import errno
 import logging
+import os
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -22,6 +23,9 @@ from pyrtma.client_logging import TRUNCATED_MARKER
 from pyrtma.data_logger import data_formatter, dataset_writer
 from pyrtma.data_logger.data_formatter import DataFormatter
 from pyrtma.data_logger.dataset_writer import DatasetWriter
+from pyrtma.data_logger.formatters.quicklogger import QLFormatter
+from pyrtma.header import MessageHeader
+from pyrtma.utils.log_reader import LogReader
 from pyrtma.data_logger.exceptions import (
     DatasetError,
     DatasetExistsError,
@@ -31,9 +35,18 @@ from pyrtma.header import MessageHeader
 from pyrtma.message import Message
 
 from .helpers import DEFAULT_TIMEOUT, FakeClock, wait_for
+from .ql_files import starts
+from .test_msg_defs import test_defs as td
 
 # A little more than one write period, to make a write due.
 PAST_WRITE = DatasetWriter.WRITE_PERIOD + 1
+
+# Bytes a "\n" takes on disk in a text file, which is two on Windows.
+NEWLINE: int = len(os.linesep)
+# The stand-in's "header\n" or "footer\n" on disk.
+HEADER: int = 6 + NEWLINE
+# Room for the header, two one-letter lines and the footer.
+TWO_LINES: int = HEADER + 2 * (1 + NEWLINE) + HEADER
 
 
 class StubFormatter(DataFormatter):
@@ -48,6 +61,7 @@ class StubFormatter(DataFormatter):
     ext: ClassVar[str] = ".txt"
     gate: ClassVar[threading.Event]
     write_started: ClassVar[threading.Event]
+    discarded: ClassVar[threading.Event]
     fail_on_write: ClassVar[Exception | None] = None
     fail_on_init: ClassVar[Exception | None] = None
 
@@ -65,15 +79,19 @@ class StubFormatter(DataFormatter):
     def format_message(self, msg: Message) -> str:
         return f"{msg.data.name}\n"
 
-    def write(self, wbuf: list[Message]) -> None:
+    def write(self, wbuf: list[Message]) -> int:
         type(self).write_started.set()
         if not type(self).gate.wait(DEFAULT_TIMEOUT):
             raise TimeoutError("the test never opened the gate")
         if (exc := type(self).fail_on_write) is not None:
             raise exc
-        super().write(wbuf)
+        count = super().write(wbuf)
         # So the test can read what was written while the file is open.
         self.fd.flush()
+        return count
+
+    def discard(self) -> None:
+        type(self).discarded.set()
 
 
 @pytest.fixture
@@ -86,7 +104,11 @@ def stub_formatter(monkeypatch: pytest.MonkeyPatch) -> Iterator[type[StubFormatt
     cls = type(
         "Stub",
         (StubFormatter,),
-        {"gate": threading.Event(), "write_started": threading.Event()},
+        {
+            "gate": threading.Event(),
+            "write_started": threading.Event(),
+            "discarded": threading.Event(),
+        },
     )
     cls.gate.set()
     monkeypatch.setitem(data_formatter._formatter_map, "stub", cls)
@@ -194,6 +216,7 @@ class TestWriterFailure:
         assert "No space left on device" in writer.error.msg
         assert "rec.txt" in writer.error.msg
         assert writer.rbuf == []
+        assert stub_formatter.discarded.is_set()
 
     def test_dataset_error_in_writer_stops_recording(
         self,
@@ -486,3 +509,170 @@ class TestStartAndFiles:
 
         assert not writer.write_to_disk.is_set()
         assert writer.elapsed_time < DatasetWriter.WRITE_PERIOD
+
+
+class LegacyFormatter(StubFormatter):
+    """A formatter written before ``write()`` returned a count."""
+
+    def write(self, wbuf: list[Message]) -> None:  # type: ignore[override]
+        self.fd.writelines(self.format_message(msg) for msg in wbuf)
+
+
+class TestRollover:
+    def test_full_file_continues_in_a_new_one(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        stub_formatter: type[StubFormatter],
+        clock: FakeClock,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(stub_formatter, "max_bytes", TWO_LINES)
+        writer = make_writer()
+        writer.start()
+        for text in "abc":
+            writer.update(message(text))
+        write_now(writer, clock)
+        wait_written(writer)
+        for text in "de":
+            writer.update(message(text))
+
+        writer.stop()
+        wait_dead(writer)
+
+        names = ["rec.txt", "rec_0001.txt", "rec_0002.txt"]
+        assert writer.saved_files == [tmp_path / n for n in names]
+        assert [lines(tmp_path / n)[1:-1] for n in names] == [
+            ["a", "b"],
+            ["c", "d"],
+            ["e"],
+        ]
+        assert all((tmp_path / n).stat().st_size <= TWO_LINES for n in names)
+        assert not writer.error_event.is_set()
+
+    def test_rollover_shares_numbering_with_subdivision(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        stub_formatter: type[StubFormatter],
+        clock: FakeClock,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(stub_formatter, "max_bytes", TWO_LINES)
+        writer = make_writer(subdivide_interval=DatasetWriter.MIN_INTERVAL)
+        writer.start()
+        for text in "abc":
+            writer.update(message(text))
+        write_now(writer, clock)
+        wait_written(writer)
+
+        clock.advance(DatasetWriter.MIN_INTERVAL)
+        writer.update(message("d"))
+        wait_written(writer)
+        writer.update(message("e"))
+        writer.stop()
+        wait_dead(writer)
+
+        assert [p.name for p in writer.saved_files] == [
+            "rec.txt",
+            "rec_0001.txt",
+            "rec_0002.txt",
+        ]
+        assert lines(tmp_path / "rec_0001.txt")[1:-1] == ["c", "d"]
+        assert lines(tmp_path / "rec_0002.txt")[1:-1] == ["e"]
+
+    def test_rolled_over_quicklogger_files_all_read(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # The file header and three TEST_STARTs per file.
+        per_message = MessageHeader().size + 4 + 4
+        monkeypatch.setattr(QLFormatter, "max_bytes", 24 + 3 * per_message)
+        writer = make_writer(formatter="quicklogger")
+        writer.start()
+        for msg in starts(7):
+            writer.update(msg)
+
+        writer.stop()
+        wait_dead(writer)
+
+        assert len(writer.saved_files) == 3
+        assert all(
+            p.stat().st_size <= QLFormatter.max_bytes for p in writer.saved_files
+        )
+        log = LogReader(td.get_message_definitions()).load(writer.saved_files)
+        assert [m.data.id for m in log.iter_by_mt(td.MT_TEST_START)] == list(range(7))
+
+    def test_crash_keeps_finished_files_readable(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        clock: FakeClock,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        per_message = MessageHeader().size + 4 + 4
+        monkeypatch.setattr(QLFormatter, "max_bytes", 24 + 3 * per_message)
+        writer = make_writer(formatter="quicklogger")
+        writer.start()
+        for msg in starts(5):
+            writer.update(msg)
+        write_now(writer, clock)
+        wait_written(writer)
+
+        # Read as if the logger had died now, with rec_0001.bin unfinished.
+        reader = LogReader(td.get_message_definitions())
+        finished = reader.load([tmp_path / "rec.bin"])
+        unfinished = LogReader(td.get_message_definitions()).load(
+            [tmp_path / "rec_0001.bin"], throw=False
+        )
+
+        assert [m.data.id for m in finished.iter_by_mt(td.MT_TEST_START)] == [0, 1, 2]
+        assert list(unfinished.iter_by_mt(td.MT_TEST_START)) == []
+
+    def test_formatter_without_a_count_is_not_split(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setitem(data_formatter._formatter_map, "legacy", LegacyFormatter)
+        monkeypatch.setattr(LegacyFormatter, "max_bytes", TWO_LINES)
+        writer = make_writer(formatter="legacy")
+        writer.start()
+        for text in "abcde":
+            writer.update(message(text))
+
+        writer.stop()
+        wait_dead(writer)
+
+        assert writer.saved_files == [tmp_path / "rec.txt"]
+        assert lines(tmp_path / "rec.txt")[1:-1] == list("abcde")
+
+
+class StubbornFormatter(DataFormatter):
+    """A formatter that never takes a message, even into a new file."""
+
+    name: ClassVar[str] = "stubborn"
+
+    def write(self, wbuf: list[Message]) -> int:
+        return 0
+
+
+def test_formatter_that_takes_nothing_fails_the_dataset(
+    make_writer: Callable[..., DatasetWriter],
+    clock: FakeClock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(data_formatter._formatter_map, "stubborn", StubbornFormatter)
+    writer = make_writer(formatter="stubborn")
+    writer.start()
+    writer.update(message("a"))
+
+    write_now(writer, clock)
+    wait_dead(writer)
+
+    assert writer.failed
+    assert writer.error.exc_type == "DatasetWriterError"
+    assert "took no messages" in writer.error.msg

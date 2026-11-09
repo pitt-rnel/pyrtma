@@ -22,6 +22,7 @@ from .exceptions import (
     DatasetExistsError,
     DatasetInProgress,
     DatasetThreadError,
+    DatasetWriterError,
     DataLoggerError,
 )
 
@@ -424,9 +425,40 @@ class DatasetWriter:
         self.saved_files.append(self.file_path)
         self.last_saved = self.file_path
 
+    def _write_batch(self, batch: List[Message]) -> None:
+        """Write messages, continuing in new files when one is full.
+
+        Args:
+            batch: The messages, in order.
+        """
+        # The formatter sees every batch, even an empty one, as before.
+        fresh = False
+        while True:
+            written = self.formatter.write(batch)
+            if written is None or written >= len(batch):
+                return
+            if written == 0 and fresh:
+                raise DatasetWriterError(
+                    self.name,
+                    f"Formatter '{self.formatter_name}' took no messages into a "
+                    f"new file, {self.file_path}.",
+                )
+            batch = batch[written:]
+            self.logger.info(
+                f"Dataset '{self.name}': {self.file_path} reached its size limit "
+                f"of {self.formatter.max_bytes} bytes; continuing in a new file."
+            )
+            self.subdivide()
+            fresh = True
+
     def subdivide(self):
+        """Finish the current file and continue in the next one.
+
+        Used both for the subdivide interval and when a file is full; both
+        share the file numbering.
+        """
         self.sub_index += 1
-        self.formatter.finalize(self.wbuf)
+        self.formatter.finalize([])
 
         if self.fd:
             self.fd.close()
@@ -511,7 +543,7 @@ class DatasetWriter:
         try:
             while True:
                 if self.write_to_disk.wait(0.5):
-                    self.formatter.write(self.wbuf)
+                    self._write_batch(self.wbuf)
                     self.wbuf.clear()
 
                     if not self.stopped and self.subdivide_flag:
@@ -522,7 +554,8 @@ class DatasetWriter:
                     self.write_finished.set()
                 elif self.stop_flag.is_set():
                     self.stage_for_write()
-                    self.formatter.finalize(self.wbuf)
+                    self._write_batch(self.wbuf)
+                    self.formatter.finalize([])
                     if self.fd is not None:
                         self.fd.close()
                         self.store_saved()
@@ -540,9 +573,12 @@ class DatasetWriter:
             self.logger.exception(text)
             self._fail(type(e).__name__, text)
         finally:
-            if self._failed and self.fd is not None:
+            if self._failed:
                 with contextlib.suppress(Exception):
-                    self.fd.close()
+                    self.formatter.discard()
+                if self.fd is not None:
+                    with contextlib.suppress(Exception):
+                        self.fd.close()
             self.wbuf = []
             self._dead = True
             self.logger.debug("Collection write thread exited.")

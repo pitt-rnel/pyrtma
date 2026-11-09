@@ -467,11 +467,15 @@ The `data_logger` fixture runs a `DataLogger` in a thread against the `manager` 
 
 Each writer saves to `tmp_path` with a stand-in formatter registered as `stub` for the test. It writes a header line, one line per message (the message's `name` field) and a footer line, and flushes after each write. Its writes can be held at a gate, which shows when a write has begun, or made to raise; so can its constructor. Writers take a `FakeClock` from `helpers.py`, which moves only when the test advances it, so write periods and subdivisions need no waiting. `write_now()` advances past a write period and calls `update()`. The `make_writer` fixture stops every writer and joins its thread at teardown.
 
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_formatter_that_takes_nothing_fails_the_dataset` | C9: a formatter that takes no messages even into a new file fails the dataset with `DatasetWriterError`, instead of making new files forever. | A formatter whose `write()` always returns 0. |
+
 ### TestWriterFailure
 
 | Test | Purpose | Approach |
 |---|---|---|
-| `test_write_error_stops_recording_and_reports_it` | C5: an `OSError` from the formatter, such as a full disk, doesn't escape the write thread. The dataset stops recording and is marked failed, the error names the dataset, the exception type, the message and the file, and later messages aren't buffered. | The stand-in raises `OSError(ENOSPC)` on write; the autouse `thread_exceptions` fixture fails the test if anything escapes the thread. |
+| `test_write_error_stops_recording_and_reports_it` | C5: an `OSError` from the formatter, such as a full disk, doesn't escape the write thread. The dataset stops recording and is marked failed, the error names the dataset, the exception type, the message and the file, later messages aren't buffered, and the formatter's `discard()` is called. | The stand-in raises `OSError(ENOSPC)` on write; the autouse `thread_exceptions` fixture fails the test if anything escapes the thread. |
 | `test_dataset_error_in_writer_stops_recording` | C5: a `DataLoggerError` in the write thread, here a subdivision whose file already exists, stops recording instead of leaving the dataset dead but recording. The finished first file is kept and reported, and the file in the way is untouched. | Creates `rec_0001.txt` first, then makes the subdivision due. |
 | `test_error_text_fits_its_fields` | Data logger writer: an error whose text isn't ASCII or is too long for `DATA_LOGGER_ERROR`'s fields is still recorded, with the other characters replaced by `?` and the text cut with a marker. | A long French `OSError` message, like a localized Windows one, and a 31-character dataset name. |
 
@@ -503,11 +507,29 @@ Each writer saves to `tmp_path` with a stand-in formatter registered as `stub` f
 | `test_stop_writes_buffered_messages_and_saves` | Stopping writes the buffered messages, finalizes the file, and records it as saved. | Two messages, then `stop()`. |
 | `test_default_clock_ignores_wall_clock_steps` | Data logger writer: by default the write schedule uses a monotonic clock, so a step of the wall clock doesn't make a write due. | Replaces `time.time` with one an hour ahead after the dataset starts. |
 
-## test_data_formatter.py — formatter registration (needs: none)
+### TestRollover
+
+The stand-in's limit is set with room for its header, two one-letter lines and its footer, counting newlines as the platform writes them.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_full_file_continues_in_a_new_one` | C9: when a file is full, the dataset continues in `rec_0001`, `rec_0002` and so on, each within the limit, with every message in order across them and each file saved. | Three messages in one write, then two at stop. |
+| `test_rollover_shares_numbering_with_subdivision` | C9: files started because one was full and files started by the subdivide interval share one numbering. | A full file, then a subdivision. |
+| `test_rolled_over_quicklogger_files_all_read` | C9: QuickLogger files from a rollover are each within the limit and together read back every message, in order. | The real `quicklogger` formatter with room for three messages, and seven messages. |
+| `test_crash_keeps_finished_files_readable` | C9: if the logger dies while recording, the files it finished read completely, and the one it was writing loads nothing with `throw=False` rather than raising. | Reads both files after a rollover, while the second is still open. |
+| `test_formatter_without_a_count_is_not_split` | A formatter written before `write()` returned a count, whose `write()` returns None, still writes everything to one file. | A formatter overriding `write()` the old way, with a small limit. |
+
+## test_data_formatter.py — formatter registration and the file size limit (needs: none)
+
+`starts()` from `tests/ql_files.py` supplies `TEST_START` messages with increasing IDs.
 
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_duplicate_formatter_name_error_has_its_message` | Data logger writer: registering a formatter name twice raises `DataFormatterKeyError` with its text in `msg` and no dataset, rather than the text as the dataset name and an empty message. | Registers one class twice into an emptied registry. |
+| `test_default_limit_is_500_mb` | Every formatter's default limit is 500,000,000 bytes. | Reads `DataFormatter.max_bytes`. |
+| `test_write_leaves_room_for_the_footer` | `write()` takes only the messages that leave room for the footer within `max_bytes`, and returns how many it took. | A text formatter with a 7-character header and footer, and a limit that fits three one-digit lines. Sizes count each newline as the platform's line ending. |
+| `test_first_message_is_written_even_past_the_limit` | An empty file always takes one message. | A limit of 1 byte. |
+| `test_limit_counts_encoded_bytes` | The limit counts UTF-8 bytes on disk, not characters. | Lines of `é`, two bytes each, and a limit that fits exactly two. |
 
 ## test_quicklogger.py — the QuickLogger formatter (needs: none)
 
@@ -518,6 +540,25 @@ Each writer saves to `tmp_path` with a stand-in formatter registered as `stub` f
 | `test_single_batch_matches_the_v1_layout` | QuickLogger formatter: the formatter can be constructed, and a recording finalized in one batch is byte for byte a version 1 file. | Three messages through `finalize()` only, compared with `v1_file()`. |
 | `test_several_batches_match_the_v1_layout` | QuickLogger formatter: a recording written in several batches, whose data goes through the temporary file, is byte for byte the same version 1 file. | Seven messages in two writes and a final batch. |
 | `test_recording_round_trips_through_log_reader` | QuickLogger formatter: what the formatter writes, `LogReader` reads back. | Five messages in two batches, read with the test definitions. |
+
+### TestSizeLimit
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_write_stops_before_the_limit` | C9: `write()` takes only the messages that keep the finished file within `max_bytes` and returns how many it took, so the file never passes the limit and stays a valid v1 file. | A limit with room for exactly three messages; five offered, then the other two. |
+| `test_first_message_is_written_even_past_the_limit` | C9: an empty file always takes one message, so a message larger than the limit can't stall a dataset. | A limit of 1 byte. |
+| `test_finalize_writes_every_message_it_is_given` | `finalize()` writes all the messages passed to it, whatever the limit. | A limit of 1 byte and three messages to `finalize()`. |
+| `test_default_limit_is_500_mb` | C9: the QuickLogger formatter's default limit is 500,000,000 bytes. | Reads the class attribute. |
+
+### TestSpill
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_small_recording_never_creates_a_spill_file` | C9: data under the spill threshold stays in memory, so a small recording writes only its `.bin`. | Lists the folder after finishing. |
+| `test_data_past_the_threshold_spills_beside_the_recording` | C9: data past the threshold moves to `rec.bin.tmp` beside the recording, not the system's temporary folder; the finished file is still byte for byte a v1 file, and the spill file is deleted. | A threshold of 10 bytes; checks for the spill file between writes. |
+| `test_discard_removes_the_spill_file` | C9: `discard()`, which the writer calls when writing fails, deletes the spill file. | Spills, then discards. |
+| `test_stale_spill_file_from_a_crash_is_replaced` | C9: a spill file left by a crashed logger doesn't stop a new recording of the same name; it is replaced. | Writes junk at the spill path first. |
+| `test_offsets_take_four_bytes_each` | C9: offsets are stored in a 4-byte array, not as Python ints. | Checks `offsets.itemsize` and the values. |
 
 ## test_log_reader.py — `LogReader` on QuickLogger files (needs: none)
 

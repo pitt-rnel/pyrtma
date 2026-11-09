@@ -25,6 +25,8 @@ that makes them. The version number is chosen at release time.
 - `DataLogger.stop()`, which makes `run()` return from another thread, and `DataLogger(clock=...)`, keyword-only, the clock its datasets schedule writes with.
 - `UnknownMessageType` and `InvalidMessageDefinition` raised by `Client.read_message` carry the received message's header as `header`, so a caller can tell which type failed. It is a new attribute of `RTMAMessageError`, `None` when an exception wasn't raised for a received message; the exceptions' arguments are unchanged.
 - `DatasetWriter.started`, and `pyrtma.data_logger.dataset_writer.error_message()`, which builds a `DATA_LOGGER_ERROR` that always fits its fields.
+- `DataFormatter.max_bytes`, 500,000,000 bytes by default: no file the data logger writes grows past it, whatever its formatter. When a file is full, the dataset continues in the next file, numbered like a subdivision (`rec_0001`, `rec_0002`, ...); each file is complete and gets its own `DATASET_SAVED`. A file always holds at least one message. A lab can change the limit by subclassing a formatter.
+- `DataFormatter.write()` returns how many messages it wrote, and `DataFormatter.discard()`, which does nothing by default, releases what a formatter holds when writing fails. Formatters that override `write()` and return None are treated as having written everything and aren't split. A formatter that takes no messages even into a new file fails its dataset with `DatasetWriterError`.
 
 ### Changed
 
@@ -85,6 +87,9 @@ that makes them. The version number is chosen at release time.
 - `DATA_LOGGER_ERROR` messages from the data logger replace characters that aren't ASCII with `?` and cut text too long for their fields, as `DatasetWriter`'s do.
 - `LogReader.load` applies `include` and `exclude` before checking a message against the definitions, so a type the definitions don't have, or have with another size, can be excluded to load the rest of a file.
 - `LogReader` logs the messages it skips with `throw=False` as warnings on the `pyrtma.utils.log_reader` logger instead of printing them.
+- The QuickLogger formatter keeps a file's message data in memory up to 32 MiB (`QLFormatter.spill_threshold`), then in a file beside the recording named with a `.tmp` suffix (`rec.bin.tmp`, `QLFormatter.spill_suffix`), which is deleted when the file is finished or writing fails. It used to keep all of it in an anonymous file in the system's temporary folder. A spill file left by a crashed logger is replaced by the next recording of the same name.
+- The QuickLogger formatter stores data offsets in a 4-byte array instead of a list of Python ints, and writes each batch's headers and data in one call each. For 300,000 small messages, peak memory falls from about 51 MB to under 5 MB; the files are byte for byte the same.
+- If the data logger dies while recording, the files it finished are complete, and the file it was writing is lost; it holds message headers but no data, and `LogReader` with `throw=False` reports it as truncated. There is nothing to recover by hand.
 
 ### Fixed
 
@@ -138,3 +143,4 @@ that makes them. The version number is chosen at release time.
 - The QuickLogger formatter can be constructed again. It read a `size` attribute that `BinFileHeader` doesn't have, so adding a `quicklogger` dataset raised `AttributeError`, which stopped the data logger before the fixes above. Its files have the same version 1 layout as before.
 - `LogReader.load(..., throw=False)` reads a truncated file, such as one left by a crashed logger, as far as it goes: every message whose header, offset and data are all in the file, with a warning. It used to raise a raw `ValueError`. With `throw=True`, a truncated file raises a `ValueError` saying so.
 - `pyrtma.utils.log_reader`, and with it `pyrtma.data_logger`, imports where `tkinter` isn't installed, such as on headless Linux. `tkinter` is imported only when a file dialog is needed, and its absence then raises `RuntimeError`.
+- A QuickLogger recording no longer loses its data once it passes 4 GiB (C9). Packing an offset past 4 GiB raised `OverflowError` before the data was copied in, and the header's 32-bit sizes wrapped. Files now stop at `max_bytes`, and a QuickLogger file is never allowed past the 4 GiB its format can describe even if `max_bytes` is raised.
