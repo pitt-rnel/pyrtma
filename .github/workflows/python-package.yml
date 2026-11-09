@@ -30,13 +30,37 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .
+          python -m pip install -e ".[dev]"
       - name: Lint with black
         if: ${{ matrix.python-version == '3.14' }}
         uses: psf/black@stable
+      # Pyright checks for Python 3.10 whatever runs it (pyproject.toml), so
+      # one entry is enough.
+      - name: Type check with pyright
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' }}
+        run: pyright
       - name: Test compiler
         run: |
-          python -m pyrtma.compile -i ${{ github.workspace }}/tests/test_msg_defs/test_defs.yaml --py -o ${{ github.workspace }}/tests/test_msg_defs
-      - name: Test with unittest
+          python -m pyrtma.compile -i tests/test_msg_defs/test_defs.yaml --py -o tests/test_msg_defs -n test_defs
+      # The toolchain tests in tests/test_compilers.py check more, but skip
+      # when gcc or node is missing; these steps can't skip.
+      - name: Check generated C and JavaScript
+        if: ${{ runner.os == 'Linux' }}
+        shell: bash
         run: |
-          python -m unittest discover
+          set -euo pipefail
+          out=build/compiled
+          mkdir -p "$out"
+          python -m pyrtma.compile -i tests/compiler_defs/core_c.defs --c -o "$out" -n core
+          for defs in tests/test_msg_defs/test_defs.yaml tests/compiler_defs/compiler_defs.defs; do
+            name=$(basename "${defs%.*}")
+            python -m pyrtma.compile -i "$defs" --c --js -o "$out" -n "$name"
+            # core.h stands in for rtma.h, which C clients include first.
+            printf '#include "core.h"\n#include "%s.h"\n' "$name" | gcc -fsyntax-only -std=c11 -Wall -Werror -I "$out" -x c -
+            # The output is an ES module; as .mjs, node loads it as one.
+            cp "$out/$name.js" "$out/$name.mjs"
+            node --input-type=module -e "const { RTMA } = await import('./$out/$name.mjs'); for (const kind of ['SDF', 'MDF']) for (const make of Object.values(RTMA[kind])) make();"
+          done
+      - name: Test with pytest
+        run: |
+          python -m pytest
