@@ -81,21 +81,14 @@ def main(trial_num: int, count: int):
         try:
             if count > 0:
                 print(f"Sending {count} packets...")
-                for _ in range(count):
-                    mod.send_message(msg)
-                    n += 1
+            # Checked before every packet, so Ctrl-C stops a counted run too.
+            while not stop.is_set() and (count <= 0 or n < count):
+                mod.send_message(msg)
+                n += 1
 
-                    tic = time.perf_counter()
-                    while (time.perf_counter() - tic) < 0.002:
-                        pass
-            else:
-                while not stop.is_set():
-                    mod.send_message(msg)
-                    n += 1
-
-                    tic = time.perf_counter()
-                    while (time.perf_counter() - tic) < 0.002:
-                        pass
+                tic = time.perf_counter()
+                while (time.perf_counter() - tic) < 0.002:
+                    pass
         finally:
             print(f"Sent {n} packets.")
             stop.set()
