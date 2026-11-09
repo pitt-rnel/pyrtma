@@ -109,7 +109,12 @@ def load_message_definitions(path: str | pathlib.Path) -> MessageDefinitions:
             DeprecationWarning,
             stacklevel=2,
         )
-        return build_message_definitions_from_module(module)
+        try:
+            return build_message_definitions_from_module(module)
+        except MessageDefinitionsLoadError:
+            # Leave nothing behind, so a corrected file at the same path loads.
+            sys.modules.pop(module.__name__, None)
+            raise
 
     try:
         defs = getter()

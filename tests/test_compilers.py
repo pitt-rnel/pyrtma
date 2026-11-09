@@ -30,6 +30,7 @@ from pyrtma.compilers.python import PyDefCompiler
 from pyrtma.loader import load_message_definitions
 from pyrtma.parser import (
     MDF,
+    FileFormatError,
     SDF,
     Field,
     GeneratedSourceError,
@@ -526,6 +527,16 @@ class TestCompileCommand:
 
         with pytest.raises(FileExistsError, match="directory"):
             compile_defs(FIXTURE, out, "out", python=True)
+
+    def test_c_header_input_is_rejected(self, tmp_path: Path) -> None:
+        header = tmp_path / "defs.h"
+        header.write_text("#define MID_TEST_MOD 50\n", encoding="utf-8")
+        out = tmp_path / "out"
+
+        with pytest.raises(FileFormatError, match="YAML"):
+            pyrtma.compile.compile([str(header)], str(out), "defs", python=True)
+
+        assert not out.exists()
 
     def test_import_leaves_the_exception_hook_alone(self) -> None:
         code = (

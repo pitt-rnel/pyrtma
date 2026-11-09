@@ -33,7 +33,7 @@ class MessageMeta(CStructType):
         if fields:
             namespace["_fields_"] = fields
         elif "_fields_" not in namespace:
-            # else important to not overwrite v1 message def fields
+            # A class with no fields at all gets an empty list.
             namespace["_fields_"] = []
 
         return super().__new__(cls, name, bases, namespace)
@@ -207,36 +207,6 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
             return False
 
         return bytes(self) == bytes(other)
-
-    def __getattribute__(self, name: str) -> Any:
-        # for backwards compatibility with messages without descriptors
-        # can be deprecated
-        value = super().__getattribute__(name)
-        # need to convert chars from bytes to str
-        if type(value) is bytes:
-            fnames, ftypes = zip(*self._fields_)
-            if name in fnames and name[0] != "_":  # v1 fields
-                i = fnames.index(name)
-                ftype = ftypes[i]
-                if ftype is ctypes.c_char or (
-                    issubclass(ftype, ctypes.Array) and ftype._type_ is ctypes.c_char
-                ):
-                    return value.decode()
-        return value
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        # for backwards compatibility with messages without descriptors
-        # can be deprecated
-        if type(value) is str:
-            fnames, ftypes = zip(*self._fields_)
-            if name in fnames and name[0] != "_":  # v1 fields
-                i = fnames.index(name)
-                ftype = ftypes[i]
-                if ftype is ctypes.c_char or (
-                    issubclass(ftype, ctypes.Array) and ftype._type_ is ctypes.c_char
-                ):
-                    value = value.encode()
-        super().__setattr__(name, value)
 
 
 class RTMAJSONEncoder(json.JSONEncoder):

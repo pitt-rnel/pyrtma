@@ -10,6 +10,9 @@ from pyrtma.data_logger.dataset import Dataset
 from pyrtma.definitions import MessageDefinitions
 from pyrtma.exceptions import MessageDefinitionsLoadError
 from pyrtma.loader import load_message_definitions
+from pyrtma.message_base import MessageMeta
+from pyrtma.message_data import MessageData
+from pyrtma.validators import Int32
 
 
 class TestMessageDefinitions(unittest.TestCase):
@@ -115,6 +118,60 @@ def test_errors_from_get_message_definitions_are_wrapped(
         load_message_definitions(path)
 
     assert isinstance(info.value.__cause__, KeyError)
+
+
+# A definitions file as the removed v1 compiler wrote it, from C headers: no
+# get_message_definitions(), and message classes without type_hash or
+# type_size.
+V1_FILE = """\
+import ctypes
+import pyrtma
+
+MT_OLD_STYLE = 3000
+
+
+@pyrtma.msg_def
+class MDF_OLD_STYLE(pyrtma.MessageData):
+    _fields_ = [("value", ctypes.c_int)]
+    type_id = MT_OLD_STYLE
+    type_name = "OLD_STYLE"
+"""
+
+
+def test_v1_definitions_file_is_refused(tmp_path: pathlib.Path) -> None:
+    path = tmp_path / "v1_defs.py"
+    path.write_text(V1_FILE, encoding="utf-8")
+    before = loaded_definition_files()
+
+    with (
+        pytest.warns(DeprecationWarning),
+        pytest.raises(MessageDefinitionsLoadError, match="OLD_STYLE"),
+    ):
+        load_message_definitions(path)
+
+    assert loaded_definition_files() == before
+
+
+def test_message_classes_without_type_hash_are_refused() -> None:
+    class NoHash(MessageData, metaclass=MessageMeta):
+        type_id = 3001
+        type_name = "NO_HASH"
+        type_size = 4
+        value = Int32()
+
+    with pytest.raises(MessageDefinitionsLoadError, match="NO_HASH"):
+        MessageDefinitions.create(
+            compiled_version=None,
+            msg_defs={NoHash.type_id: NoHash},
+            constants={},
+            typedefs={},
+            MID={},
+            MON={},
+            SDF={},
+            MT={"NO_HASH": NoHash.type_id},
+            MTN={NoHash.type_id: "NO_HASH"},
+            MDF={"NO_HASH": NoHash},
+        )
 
 
 if __name__ == "__main__":

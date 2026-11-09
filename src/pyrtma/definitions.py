@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass
 from types import MappingProxyType, ModuleType
-from typing import Any, Dict, Mapping, Optional, Type
+from typing import Any, Dict, Iterable, Mapping, Optional, Type
 
 from .exceptions import UnknownMessageType, MessageDefinitionsLoadError
 from .message_base import MessageBase
@@ -40,6 +40,14 @@ class MessageDefinitions:
         MTN: Mapping[int, str],
         MDF: Mapping[str, Type[MessageData]],
     ) -> MessageDefinitions:
+        """Build definitions, with read-only copies of the mappings given.
+
+        Raises:
+            MessageDefinitionsLoadError: A message class has no ``type_hash``
+                or ``type_size``, as v1 definitions compiled from C headers
+                don't.
+        """
+        _check_message_classes([*msg_defs.values(), *MDF.values()])
         return cls(
             compiled_version=compiled_version,
             msg_defs=MappingProxyType(dict(msg_defs)),
@@ -75,6 +83,37 @@ class MessageDefinitions:
 
     def module_id_from_name(self, module_name: str) -> Optional[int]:
         return self.MID.get(module_name)
+
+
+def _check_message_classes(classes: Iterable[Type[MessageData]]) -> None:
+    """Refuse message classes that lack what compiled definitions always have.
+
+    Every class the compiler writes has a ``type_hash`` and a ``type_size``.
+    Classes from v1 definitions, compiled from C headers, have neither, and
+    pyrtma no longer supports them.
+
+    Args:
+        classes: The message classes, possibly with repeats.
+
+    Raises:
+        MessageDefinitionsLoadError: One or more classes lack them; the error
+            names each.
+    """
+    missing = sorted(
+        {
+            msg_cls.type_name or msg_cls.__name__
+            for msg_cls in classes
+            if not isinstance(getattr(msg_cls, "type_hash", None), int)
+            or msg_cls.type_size < 0
+        }
+    )
+    if missing:
+        raise MessageDefinitionsLoadError(
+            f"Message classes without type_hash or type_size: {', '.join(missing)}. "
+            "They look like v1 definitions compiled from C headers, which pyrtma "
+            "no longer supports. Write the definitions in YAML and compile them "
+            "with python -m pyrtma.compile."
+        )
 
 
 def build_message_definitions(module_name: str) -> MessageDefinitions:

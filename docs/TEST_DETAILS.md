@@ -699,6 +699,14 @@ Each test starts a `MessageManager` on an unused loopback port in `setUp` and co
 | `test_dict` | `to_dict()` and `from_dict()` round-trip every test-definition message. | `from_random()` data for each type; compares fields, bytes, and the dicts. |
 | `test_json` | `to_json()` and `from_json()` round-trip every test-definition message. | As above, comparing the JSON strings. |
 
+## test_message_base.py — attribute access on message classes (needs: none)
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_plain_char_fields_read_as_bytes` | P1: a `char` array declared directly in `_fields_` reads as `bytes`, as in ctypes, now that the v1 conversion to `str` is gone. | A message class with an 8-byte `c_char` array in `_fields_`. |
+| `test_plain_char_fields_take_only_bytes` | P1: such a field takes only `bytes`; a `str` raises `TypeError`, as in ctypes, instead of being encoded. | The same class, assigned a `str`. |
+| `test_string_fields_still_read_as_str` | P1: a `String` field, as compiled definitions have, still reads and takes `str`, and stores its bytes null-terminated. | A message class with `String(8)`. |
+
 ## test_message_definitions.py — loading compiled definitions (needs: none)
 
 The module-level tests load files written to `tmp_path`, so each test's file has its own module name in `sys.modules`.
@@ -709,6 +717,8 @@ The module-level tests load files written to `tmp_path`, so each test's file has
 | `test_failed_import_can_be_retried` | Loader and definitions: once the file is fixed, loading it again works, so a failed import isn't cached. | The broken file is replaced by a copy of the compiled test definitions and loaded again. |
 | `test_loading_a_file_twice_gives_the_same_classes` | Loader and definitions: loading the same file twice returns the same message classes, instead of executing it again. | A copy of the compiled test definitions, loaded twice; compares the `TEST_START` classes by identity. |
 | `test_errors_from_get_message_definitions_are_wrapped` | Loader and definitions: an exception from the file's `get_message_definitions()` is raised as `MessageDefinitionsLoadError`, with the original as its cause. | A file whose `get_message_definitions()` raises `KeyError`. |
+| `test_v1_definitions_file_is_refused` | P1: a definitions file the removed v1 compiler wrote is refused with `MessageDefinitionsLoadError` naming its message, and leaves nothing in `sys.modules`. | A file in v1's form, with no `get_message_definitions()` and a message class without `type_hash` or `type_size`; the loader's `DeprecationWarning` for the missing function still comes first. |
+| `test_message_classes_without_type_hash_are_refused` | P1: `MessageDefinitions.create` refuses a message class without `type_hash`, naming it, so every way of building definitions does. | A class with validators and a `type_size` but no `type_hash`. |
 
 ### TestMessageDefinitions
 
@@ -917,6 +927,7 @@ MATLAB isn't available to the tests, so these check the generated text.
 |---|---|---|
 | `test_missing_output_folder_is_created` | Parser and compilers: `compile` creates a missing output folder instead of raising `FileExistsError`. | An output path under `tmp_path` that doesn't exist yet. |
 | `test_output_path_that_is_a_file_is_rejected` | Parser and compilers: an output path that is a file still raises `FileExistsError`. | An empty file as the output path. |
+| `test_c_header_input_is_rejected` | P1: `compile` raises `FileFormatError` for a C header file, saying to use YAML, now that the v1 compiler is gone, and writes nothing. | A one-line `.h` file in `tmp_path`. |
 | `test_import_leaves_the_exception_hook_alone` | Packaging and imports: importing `pyrtma.compile` no longer installs `rich`'s exception hook. | A fresh interpreter compares `sys.excepthook` before and after the import. |
 
 ## test_validators.py — field descriptors and validation (needs: none)

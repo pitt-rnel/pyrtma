@@ -1024,17 +1024,7 @@ class Client(ClientLike):
                 header.num_data_bytes = num_data_bytes
                 header.remaining_bytes = 0
                 header.reserved = 0
-
-                try:
-                    header.version = msg_data.type_hash
-                except AttributeError as e:
-                    if not hasattr(msg_data, "type_hash"):
-                        warn(
-                            "Message class is missing type_hash. V1 message defs are deprecated.",
-                            FutureWarning,
-                        )
-                    else:
-                        raise e
+                header.version = msg_data.type_hash
 
             self._sendall(header, self._header_size)
             if num_data_bytes > 0:
@@ -1356,10 +1346,7 @@ class Client(ClientLike):
         except UnknownMessageType:
             return bytearray(data_size)
 
-        type_size = msg_cls.type_size
-        if type_size == -1:  # not defined for v1 message defs
-            type_size = ctypes.sizeof(msg_cls)
-        if type_size != data_size:
+        if msg_cls.type_size != data_size:
             return bytearray(data_size)
         return msg_cls()
 
@@ -1404,8 +1391,6 @@ class Client(ClientLike):
                 raise unknown from e
 
             type_size = msg_cls.type_size
-            if type_size == -1:  # not defined for v1 message defs
-                type_size = ctypes.sizeof(msg_cls)
             if type_size != header.num_data_bytes:
                 invalid = InvalidMessageDefinition(
                     f"Received message header indicating a message data size ({header.num_data_bytes}) that does not match the expected size ({type_size}) of message type {msg_cls.type_name}. Message definitions may be out of sync across systems."
