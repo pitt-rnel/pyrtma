@@ -611,6 +611,12 @@ The stand-in's limit is set, through its class's `max_bytes`, with room for its 
 | `test_stale_spill_file_from_a_crash_is_replaced` | C9: a spill file left by a crashed logger doesn't stop a new recording of the same name; it is replaced. | Writes junk at the spill path first. |
 | `test_offsets_take_four_bytes_each` | C9: offsets are stored in a 4-byte array, not as Python ints. | Checks `offsets.itemsize` and the values. |
 
+## test_msg_headers.py — the CSV message header formatter (needs: none)
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_rows_have_one_field_per_column` | Message header formatter: each row has one field per column of the header row, with the header's values in order. Rows used to end with a comma, so each had an extra empty field and `pandas.read_csv` labeled every column with the next column's values. | Three messages with set header fields, read back with `csv.reader`. |
+
 ## test_log_reader.py — `LogReader` on QuickLogger files (needs: none)
 
 Files are built with `tests/ql_files.py` (see `test_quicklogger.py`), so they have exactly the layout of files written before this change. `StaleTestEnd` is `TEST_END` with 8 bytes instead of 4, as an out-of-date definition would record it, and `UnknownMessage` is type 7777, which the test definitions don't have.
