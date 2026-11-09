@@ -125,6 +125,77 @@ def unknown_message() -> bytes:
     return frame(UNKNOWN_TYPE, b"\x00" * 4)
 
 
+class RecordingSocket:
+    """Stands in for a client's socket, recording what each ``send()`` takes.
+
+    Everything else goes to the real socket, which ``select()`` watches
+    through ``fileno()``.
+
+    Args:
+        sock: The client's socket.
+        refuse: How many ``send()`` calls to refuse first with
+            ``BlockingIOError``, as a full socket would.
+    """
+
+    def __init__(self, sock: socket.socket, refuse: int = 0) -> None:
+        self._sock = sock
+        self._refuse = refuse
+        self.sends: list[bytes] = []
+
+    def send(self, data: Any, *args: Any) -> int:
+        if self._refuse:
+            self._refuse -= 1
+            raise BlockingIOError
+        sent = self._sock.send(data, *args)
+        self.sends.append(bytes(memoryview(data).cast("B")[:sent]))
+        return sent
+
+    def fileno(self) -> int:
+        return self._sock.fileno()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._sock, name)
+
+
+class FakeTime:
+    """Stands in for the ``time`` module in ``pyrtma.client``, with a set clock.
+
+    Args:
+        perf_counter: Returns the clock's readings.
+    """
+
+    def __init__(self, perf_counter: Callable[[], float]) -> None:
+        self.perf_counter = perf_counter
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(time, name)
+
+
+def send_one(client: Client, method: str, timeout: float = -1) -> int:
+    """Send one message with the named method.
+
+    Args:
+        client: The sending client.
+        method: ``send_message``, ``send_signal`` or ``forward_message``.
+        timeout: The send's timeout.
+
+    Returns:
+        The number of bytes the message takes on the wire.
+    """
+    data = td.MDF_TEST_START()
+    data.id = 42
+    if method == "send_message":
+        assert client.send_message(data, timeout=timeout)
+        return HEADER_SIZE + data.type_size
+    if method == "send_signal":
+        assert client.send_signal(cd.MT_LM_READY, timeout=timeout)
+        return HEADER_SIZE
+    header = MessageHeader()
+    header.msg_type = td.MT_TEST_START
+    assert client.forward_message(header, data, timeout=timeout)
+    return HEADER_SIZE + data.type_size
+
+
 @pytest.fixture
 def scripted_client(scripted_manager: ScriptedManager) -> Iterator[Client]:
     """A client connected to the ``scripted_manager`` stand-in.
@@ -684,6 +755,67 @@ class TestSend:
 
         with pytest.raises(TypeError):
             send()
+
+    @pytest.mark.parametrize(
+        "method", ["send_message", "send_signal", "forward_message"]
+    )
+    def test_message_goes_out_in_one_send(
+        self, scripted_client: Client, scripted_manager: ScriptedManager, method: str
+    ) -> None:
+        recorder = RecordingSocket(scripted_client._sock)
+        scripted_client._sock = recorder  # type: ignore[assignment]
+
+        size = send_one(scripted_client, method)
+        received = scripted_manager.receive(size)
+
+        assert recorder.sends == [received]
+
+    @pytest.mark.parametrize(
+        "method", ["send_message", "send_signal", "forward_message"]
+    )
+    @pytest.mark.parametrize("timeout", [-1, 1.0])
+    def test_writable_socket_sends_without_select(
+        self,
+        scripted_client: Client,
+        scripted_manager: ScriptedManager,
+        monkeypatch: pytest.MonkeyPatch,
+        method: str,
+        timeout: float,
+    ) -> None:
+        calls: list[Any] = []
+
+        def counting_select(*args: Any) -> Any:
+            calls.append(args)
+            return select.select(*args)
+
+        monkeypatch.setattr(
+            pyrtma.client, "select", types.SimpleNamespace(select=counting_select)
+        )
+
+        size = send_one(scripted_client, method, timeout)
+
+        assert len(scripted_manager.receive(size)) == size
+        assert calls == []
+
+    def test_send_that_waits_is_stamped_when_it_starts(
+        self,
+        scripted_client: Client,
+        scripted_manager: ScriptedManager,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # The first send finds the socket "full", so the client waits in
+        # select(); the clock reads 100 before the wait and 200 after it.
+        recorder = RecordingSocket(scripted_client._sock, refuse=1)
+        scripted_client._sock = recorder  # type: ignore[assignment]
+        readings = iter([100.0, 200.0])
+        monkeypatch.setattr(pyrtma.client, "time", FakeTime(lambda: next(readings)))
+
+        size = send_one(scripted_client, "send_message")
+        received = scripted_manager.receive(size)
+
+        header = MessageHeader.from_buffer_copy(received)
+        assert header.send_time == 200.0
+        assert recorder.sends == [received]
 
     def test_unwritable_socket_reports_a_dropped_send(
         self, capsys: pytest.CaptureFixture[str]

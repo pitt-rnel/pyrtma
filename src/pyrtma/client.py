@@ -88,6 +88,9 @@ _NUM_DATA_BYTES, _NUM_DATA_BYTES_OFFSET = _field_struct(
     MessageHeader, "_num_data_bytes"
 )
 
+# A sent header's send_time, set again when sending had to wait for room.
+_SEND_TIME, _SEND_TIME_OFFSET = _field_struct(MessageHeader, "_send_time")
+
 # Checks a signal's type as the header's msg_type field would.
 _SIGNAL_TYPE = Int32()
 
@@ -971,40 +974,32 @@ class Client(ClientLike):
         _check_destination(dest_mod_id, dest_host_id)
         _SIGNAL_TYPE.validate_one(signal_type)
 
-        if timeout >= 0:
-            readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
-        else:
-            readfds, writefds, exceptfds = select.select(
-                [], [self._sock], []
-            )  # blocking
+        header = bytearray(self._header_size)
+        self._header_cls._pack_into(
+            header,
+            0,
+            signal_type,
+            _int32(self._msg_count),
+            time.perf_counter(),
+            0.0,  # recv_time
+            self._host_id,
+            self._module_id,
+            dest_host_id,
+            dest_mod_id,
+            0,  # num_data_bytes
+            0,  # remaining_bytes
+            0,  # is_dynamic
+            0,  # reserved: a signal has no version
+        )
 
-        if writefds:
-            header = bytearray(self._header_size)
-            self._header_cls._pack_into(
-                header,
-                0,
-                signal_type,
-                _int32(self._msg_count),
-                time.perf_counter(),
-                0.0,  # recv_time
-                self._host_id,
-                self._module_id,
-                dest_host_id,
-                dest_mod_id,
-                0,  # num_data_bytes
-                0,  # remaining_bytes
-                0,  # is_dynamic
-                0,  # reserved: a signal has no version
+        if not self._send_or_drop(header, timeout, restamp=True):
+            _log.debug(
+                "Dropped message type %d: the socket wasn't writable.", signal_type
             )
+            return False
 
-            self._sendall(header, self._header_size)
-
-            self._msg_count += 1
-            return True
-
-        # The socket wasn't writable in time: drop the message.
-        _log.debug("Dropped message type %d: the socket wasn't writable.", signal_type)
-        return False
+        self._msg_count += 1
+        return True
 
     @requires_connection
     def send_message(
@@ -1040,47 +1035,38 @@ class Client(ClientLike):
         """
         _check_destination(dest_mod_id, dest_host_id)
 
-        if timeout >= 0:
-            readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
-        else:
-            readfds, writefds, exceptfds = select.select(
-                [], [self._sock], []
-            )  # blocking
-
-        if writefds:
-            num_data_bytes = ctypes.sizeof(msg_data)
-            header = bytearray(self._header_size)
-            # Every value fits its field: the count and hash are wrapped to 32
-            # bits as ctypes would store them, and the IDs are checked.
-            self._header_cls._pack_into(
-                header,
-                0,
-                msg_data.type_id,
-                _int32(self._msg_count),
-                time.perf_counter(),
-                0.0,  # recv_time
-                self._host_id,
-                self._module_id,
-                dest_host_id,
-                dest_mod_id,
-                num_data_bytes,
-                0,  # remaining_bytes
-                0,  # is_dynamic
-                msg_data.type_hash & 0xFFFFFFFF,  # reserved: the version
-            )
-
-            self._sendall(header, self._header_size)
-            if num_data_bytes > 0:
-                self._sendall(msg_data, num_data_bytes)
-
-            self._msg_count += 1
-            return True
-
-        # The socket wasn't writable in time: drop the message.
-        _log.debug(
-            "Dropped message type %d: the socket wasn't writable.", msg_data.type_id
+        num_data_bytes = ctypes.sizeof(msg_data)
+        buffer = bytearray(self._header_size)
+        # Every value fits its field: the count and hash are wrapped to 32 bits
+        # as ctypes would store them, and the IDs are checked.
+        self._header_cls._pack_into(
+            buffer,
+            0,
+            msg_data.type_id,
+            _int32(self._msg_count),
+            time.perf_counter(),
+            0.0,  # recv_time
+            self._host_id,
+            self._module_id,
+            dest_host_id,
+            dest_mod_id,
+            num_data_bytes,
+            0,  # remaining_bytes
+            0,  # is_dynamic
+            msg_data.type_hash & 0xFFFFFFFF,  # reserved: the version
         )
-        return False
+        # Header and payload in one buffer, for one send() and one packet.
+        buffer += msg_data
+
+        if not self._send_or_drop(buffer, timeout, restamp=True):
+            _log.debug(
+                "Dropped message type %d: the socket wasn't writable.",
+                msg_data.type_id,
+            )
+            return False
+
+        self._msg_count += 1
+        return True
 
     @requires_connection
     def forward_message(
@@ -1112,30 +1098,71 @@ class Client(ClientLike):
         if msg_data is not None:
             msg_hdr.num_data_bytes = ctypes.sizeof(msg_data)
 
-        if timeout >= 0:
-            readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
-        else:
-            readfds, writefds, exceptfds = select.select(
-                [], [self._sock], []
-            )  # blocking
+        # The header is sent as the caller made it, so its send_time stays.
+        buffer = bytearray(msg_hdr)
+        if msg_data is not None:
+            buffer += msg_data
 
-        if writefds:
-            self._sendall(msg_hdr, ctypes.sizeof(msg_hdr))
-            if msg_data is not None:
-                self._sendall(msg_data, ctypes.sizeof(msg_data))
+        if not self._send_or_drop(buffer, timeout, restamp=False):
+            _log.debug(
+                "Dropped message type %d: the socket wasn't writable.",
+                msg_hdr.msg_type,
+            )
+            return False
 
-            self._msg_count += 1
-            return True
+        self._msg_count += 1
+        return True
 
-        # The socket wasn't writable in time: drop the message.
-        _log.debug(
-            "Dropped message type %d: the socket wasn't writable.", msg_hdr.msg_type
-        )
-        return False
+    def _send_or_drop(
+        self, buffer: bytearray, timeout: float, *, restamp: bool
+    ) -> bool:
+        """Send one whole message, or none of it if there's no room in time.
+
+        Usually one ``send()`` takes the whole message, with no ``select()``
+        first. Only when the socket takes none of it does this wait in
+        ``select()``, for up to ``timeout``. Once any of the message has gone,
+        the rest is sent however long that takes, so a message is never cut
+        short on the wire.
+
+        Args:
+            buffer: The message's header and payload.
+            timeout: Seconds to wait for room; a negative value waits as long
+                as it takes.
+            restamp: Set the header's ``send_time`` again after a wait, so it
+                is the time sending started, as when the wait came first.
+
+        Raises:
+            ConnectionLost: The connection failed. The client is disconnected.
+
+        Returns:
+            True if the message was sent; False if the socket had no room
+            within the timeout, and none of it was sent.
+        """
+        nbytes = len(buffer)
+        try:
+            sent = self._sock.send(buffer)
+        except BlockingIOError:
+            sent = 0
+        except OSError as e:
+            self._connection_lost()
+            raise ConnectionLost(
+                f"Lost the connection to the message manager: {e}"
+            ) from e
+
+        if sent == 0:
+            wait = None if timeout < 0 else timeout
+            _, writable, _ = select.select([], [self._sock], [], wait)
+            if not writable:
+                return False
+            if restamp:
+                _SEND_TIME.pack_into(buffer, _SEND_TIME_OFFSET, time.perf_counter())
+        if sent < nbytes:
+            self._sendall(memoryview(buffer)[sent:], nbytes - sent)
+        return True
 
     def _sendall(
         self,
-        buffer: Union[ctypes.Structure, bytes, bytearray],
+        buffer: Union[ctypes.Structure, bytes, bytearray, memoryview],
         nbytes: Optional[int] = None,
     ):
         """Send a whole buffer, waiting for room in the socket as long as it takes.

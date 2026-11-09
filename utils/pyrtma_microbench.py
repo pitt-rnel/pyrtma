@@ -5,7 +5,8 @@ process shares the machine and the slowest one sets the pace. This measures
 single operations instead, so a change to one of them shows up on its own:
 
 - Header and message field access, as the client and manager use them.
-- ``Client.send_message`` to a stand-in manager that only drains the socket.
+- ``Client.send_message`` to a stand-in manager that only drains the socket,
+  and the ``select()`` and ``send()`` calls a send can be made of.
 - ``Client.read_message`` from a stand-in that streams ready-made messages.
 
 The stand-ins run in their own process, accept one client, and answer its
@@ -21,6 +22,7 @@ import argparse
 import ctypes
 import multiprocessing
 import platform
+import select
 import socket
 import statistics
 import sys
@@ -243,20 +245,47 @@ def field_operations(number: int, repeat: int) -> list[tuple[str, list[float]]]:
     return results
 
 
-def send_operation(number: int, repeat: int) -> list[float]:
-    """Time ``send_message`` of a ``WIRE_MSG`` to a stand-in that drains.
+def send_operations(number: int, repeat: int) -> list[tuple[str, list[float]]]:
+    """Time sends of a ``WIRE_MSG`` to a stand-in that drains.
+
+    After ``send_message``, the two socket calls a send can be made of are
+    timed on their own, on the same connection: a ``select()`` for
+    writability, and a ``send()`` of a whole message's bytes. They show how
+    much of a send the operating system takes.
 
     Args:
-        number: Sends per repeat.
+        number: Operations per repeat.
         repeat: Repeats.
 
     Returns:
-        Seconds per send, one value per repeat.
+        ``(name, seconds per operation for each repeat)`` per operation.
     """
     client, process = _connect_to_stand_in("drain", 0)
     try:
         data = client.definitions.MDF[WIRE_MSG].from_random()
-        return time_loop(lambda: client.send_message(data), number, repeat)
+        sock = client.sock
+        wire = bytes(HEADER_SIZE) + bytes(data)
+
+        def raw_send() -> None:
+            # The stand-in reads bytes without framing them, so a partial
+            # send does no harm here.
+            try:
+                sock.send(wire)
+            except BlockingIOError:
+                select.select([], [sock], [])
+
+        size = WIRE_MSG.rsplit("_", 1)[1]
+        return [
+            (
+                f"send_message, {size} B",
+                time_loop(lambda: client.send_message(data), number, repeat),
+            ),
+            (
+                "select() for writability",
+                time_loop(lambda: select.select([], [sock], [], 0), number, repeat),
+            ),
+            (f"socket send(), {len(wire)} B", time_loop(raw_send, number, repeat)),
+        ]
     finally:
         client.disconnect()
         process.join(timeout=10)
@@ -350,10 +379,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         f"{platform.system()}; {args.number} operations, {args.repeat} repeats"
     )
     results = field_operations(args.number, args.repeat)
+    results += send_operations(args.number, args.repeat)
     size = WIRE_MSG.rsplit("_", 1)[1]
-    results.append(
-        (f"send_message, {size} B", send_operation(args.number, args.repeat))
-    )
     results.append(
         (f"read_message, {size} B", read_operation(args.number, args.repeat))
     )

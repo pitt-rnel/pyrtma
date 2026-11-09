@@ -121,6 +121,7 @@ that makes them. The version number is chosen at release time.
 - `Client.send_message` and `send_signal` build each header with one `struct` call, `MessageHeader._pack_into`, and the client sets each received header's `recv_time` the same way, instead of setting the fields one by one through their validators. The bytes sent are the same. In a sandbox, the Python work of a send fell from about 3.8 µs to 1.0 µs.
 - `Client` checks `host_id` when it is constructed: an `int` from -32768 to 32767, the range the header holds, or it raises `TypeError` or `ValueError`. Before, `send_signal` raised `ValueError` for a host ID outside that range, and `send_message` sent it truncated.
 - `send_message` and `send_signal` raise `TypeError` for a destination ID that isn't an `int` before waiting for the socket, rather than while building the header. `send_signal` checks `signal_type` before waiting too, and also inside `disable_message_validation()`, where a type outside 32 bits used to be truncated.
+- `send_message`, `send_signal` and `forward_message` send each message's header and payload with one `send()` call, so a message is one TCP segment rather than two, and they no longer call `select()` before every send. They wait in `select()` only when the socket has no room at all, for up to their `timeout` as before, and return `False` if none appears. A message that had to wait gets its `send_time` when sending starts, as before; `forward_message` sends its header as given. The bytes sent are the same.
 
 ### Fixed
 
