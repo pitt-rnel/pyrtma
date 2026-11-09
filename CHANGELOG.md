@@ -83,6 +83,8 @@ that makes them. The version number is chosen at release time.
 - The data logger sends a `DATASET_SAVED` for every file a dataset saves. One of two files saved in quick succession could be missed before.
 - `DATASET_ADD` is checked for capacity, a name in use, and a file another dataset already writes to before the dataset's folder is created. The last is new: two datasets with the same folder, file name and formatter are refused when the second is added.
 - `DATA_LOGGER_ERROR` messages from the data logger replace characters that aren't ASCII with `?` and cut text too long for their fields, as `DatasetWriter`'s do.
+- `LogReader.load` applies `include` and `exclude` before checking a message against the definitions, so a type the definitions don't have, or have with another size, can be excluded to load the rest of a file.
+- `LogReader` logs the messages it skips with `throw=False` as warnings on the `pyrtma.utils.log_reader` logger instead of printing them.
 
 ### Fixed
 
@@ -133,3 +135,6 @@ that makes them. The version number is chosen at release time.
 - The data logger keeps running when a message can't be decoded with its definitions (C5): `InvalidMessageDefinition` from a message of the wrong size ended it. It also keeps running when a dataset's writer fails, when a request fails with an exception other than a `DataLoggerError`, and on a second `DATASET_START "all"`. Each failure is reported with `DATA_LOGGER_ERROR` and affects only its dataset or request.
 - Replies to requests addressed to the data logger reach the module that sent them (C6). They used to be addressed to the logger itself, so C, MATLAB and other clients that addressed the logger never got `DATASET_ADDED`, `DATASET_REMOVED`, `DATASET_STATUS` or `DATA_LOGGER_CONFIG`.
 - `python -m pyrtma.data_logger` with no message manager running prints one line and exits with status 1, instead of a traceback.
+- The QuickLogger formatter can be constructed again. It read a `size` attribute that `BinFileHeader` doesn't have, so adding a `quicklogger` dataset raised `AttributeError`, which stopped the data logger before the fixes above. Its files have the same version 1 layout as before.
+- `LogReader.load(..., throw=False)` reads a truncated file, such as one left by a crashed logger, as far as it goes: every message whose header, offset and data are all in the file, with a warning. It used to raise a raw `ValueError`. With `throw=True`, a truncated file raises a `ValueError` saying so.
+- `pyrtma.utils.log_reader`, and with it `pyrtma.data_logger`, imports where `tkinter` isn't installed, such as on headless Linux. `tkinter` is imported only when a file dialog is needed, and its absence then raises `RuntimeError`.

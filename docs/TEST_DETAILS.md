@@ -509,6 +509,31 @@ Each writer saves to `tmp_path` with a stand-in formatter registered as `stub` f
 |---|---|---|
 | `test_duplicate_formatter_name_error_has_its_message` | Data logger writer: registering a formatter name twice raises `DataFormatterKeyError` with its text in `msg` and no dataset, rather than the text as the dataset name and an empty message. | Registers one class twice into an emptied registry. |
 
+## test_quicklogger.py — the QuickLogger formatter (needs: none)
+
+`tests/ql_files.py` builds QuickLogger version 1 files by hand from the layout the existing readers use, MATLAB's included: a file header of six 32-bit fields, every message header, a 32-bit offset per message, then the data, in native byte order. It doesn't use the formatter, so comparing against it checks that the format is unchanged. The messages are `TEST_START`s with increasing IDs and receive times.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_single_batch_matches_the_v1_layout` | QuickLogger formatter: the formatter can be constructed, and a recording finalized in one batch is byte for byte a version 1 file. | Three messages through `finalize()` only, compared with `v1_file()`. |
+| `test_several_batches_match_the_v1_layout` | QuickLogger formatter: a recording written in several batches, whose data goes through the temporary file, is byte for byte the same version 1 file. | Seven messages in two writes and a final batch. |
+| `test_recording_round_trips_through_log_reader` | QuickLogger formatter: what the formatter writes, `LogReader` reads back. | Five messages in two batches, read with the test definitions. |
+
+## test_log_reader.py — `LogReader` on QuickLogger files (needs: none)
+
+Files are built with `tests/ql_files.py` (see `test_quicklogger.py`), so they have exactly the layout of files written before this change. `StaleTestEnd` is `TEST_END` with 8 bytes instead of 4, as an out-of-date definition would record it, and `UnknownMessage` is type 7777, which the test definitions don't have.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_reads_a_file_with_the_v1_layout` | A version 1 file, as written before this change, still reads. | Four messages. |
+| `test_excluded_type_is_skipped_before_it_is_checked` | Data logger: a type in `exclude` is skipped before it is checked against the definitions, so a stale or unknown type can be excluded to load the rest of the file. | Parametrized over a stale type by number and by name, and an unknown type by number, between `TEST_START`s. |
+| `test_included_types_are_chosen_before_others_are_checked` | Data logger: with `include`, other types are skipped before they are checked. | A stale and an unknown message after two `TEST_START`s, with `include=["TEST_START"]`. |
+| `test_stale_type_still_raises_when_not_filtered` | A stale message that isn't filtered out still raises `MessageDefinitionsError` naming the type. | One stale `TEST_END`, no filters. |
+| `test_truncated_data_loads_as_far_as_it_goes` | Data logger: with `throw=False`, a file whose data block was cut short, as by a crashed logger, loads every message whose data is complete and logs a warning, instead of raising `ValueError`. | Parametrized over a cut inside the last message's data and one that removes the last two messages' data. |
+| `test_file_truncated_before_its_data_loads_nothing` | Data logger: with `throw=False`, a file cut before its data block loads no messages and logs a warning, instead of raising. | Parametrized over cuts in the file header, the message headers and the offsets. |
+| `test_truncated_file_raises_a_clear_error` | Data logger: with `throw=True`, a truncated file raises a `ValueError` that says the file is truncated. | A file cut inside its last message's data. |
+| `test_imports_without_tkinter` | Data logger: the module imports where `tkinter` isn't available, and asking it to show a file dialog then raises `RuntimeError` naming `tkinter`. | Sets `sys.modules["tkinter"]` to None and imports the module again, then calls `LogReader(None)`. |
+
 ## test_integration.py — client and manager interaction (needs: loopback sockets; not yet marked)
 
 Each test starts a `MessageManager` on an unused loopback port in `setUp` and connects one client with module ID 11 or 12. `wait_for_message()` is a fixed short sleep. Two message types defined in the file, `TEST_MESSAGE` and `TEST_MESSAGE2`, are used for subscriptions.

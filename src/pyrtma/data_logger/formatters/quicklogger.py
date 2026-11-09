@@ -1,5 +1,6 @@
 """data_logger legacy QuickLogger Formatter"""
 
+import ctypes
 import pyrtma
 import os
 import sys
@@ -24,7 +25,7 @@ class QLFormatter(DataFormatter):
         self.ql_header.num_messages = 0
         self.ql_header.message_header_size = hdr().size
         self.ql_header.data_block_offset_size = 4
-        self.ql_header.total_bytes = self.ql_header.size
+        self.ql_header.total_bytes = ctypes.sizeof(self.ql_header)
 
         self.ofs = 0
         self.offsets: list[int] = []
@@ -72,7 +73,7 @@ class QLFormatter(DataFormatter):
 
     def copy_data(self):
         # Reset the file pointer back to the start
-        self.data_tmp.seek(os.SEEK_SET)
+        self.data_tmp.seek(0, os.SEEK_SET)
 
         # Append the message data tempfile to the data set file
         shutil.copyfileobj(self.data_tmp, self.fd)
