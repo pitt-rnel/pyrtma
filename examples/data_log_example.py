@@ -25,7 +25,7 @@ def main(trial_num: int, count: int):
         filename=f"trial_{trial_num:04d}",
         formatter="json",
         msg_types=[cd.MT_DATA_LOG_TEST_2048],
-        subdivide_interval=30,
+        max_size_mb=100,
     )
 
     # Could also reset before adding a Dataset
@@ -41,7 +41,6 @@ def main(trial_num: int, count: int):
         filename=f"trial_{trial_num:04d}",
         formatter="msg_header",
         msg_types=[cd.MT_DATA_LOG_TEST_2048],
-        subdivide_interval=0,
     )
     headersf_ds.add()
     datasets.append(headersf_ds)

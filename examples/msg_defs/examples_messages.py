@@ -51,6 +51,7 @@ MESSAGE_TRAFFIC_SIZE: int = 64
 MAX_MESSAGE_SIZE: int = 65535
 MAX_DATASETS: int = 6
 DATASET_NAME_LEN: int = 32
+DATASET_MAX_SIZE_MB: int = 500
 MAX_LOGGER_FILENAME_LENGTH: int = 256
 STR_SIZE: int = 32
 LONG_STRING: int = 64
@@ -175,18 +176,18 @@ class RTMA_MSG_HEADER(MessageBase, metaclass=MessageMeta):
 
 class DATASET(MessageBase, metaclass=MessageMeta):
     type_name: ClassVar[str] = "DATASET"
-    type_hash: ClassVar[int] = 0xE2E58374
+    type_hash: ClassVar[int] = 0xDE52D257
     type_size: ClassVar[int] = 708
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET:\n  fields:\n    name: char[DATASET_NAME_LEN]\n    save_path: char[256]\n    filename: char[128]\n    formatter: char[32]\n    subdivide_interval: int32\n    msg_types: int32[64]'"
+        "'DATASET:\n  fields:\n    name: char[DATASET_NAME_LEN]\n    save_path: char[256]\n    filename: char[128]\n    formatter: char[32]\n    max_size_mb: int32\n    msg_types: int32[64]'"
     )
 
     name: String = String(32)
     save_path: String = String(256)
     filename: String = String(128)
     formatter: String = String(32)
-    subdivide_interval: Int32 = Int32()
+    max_size_mb: Int32 = Int32()
     msg_types: IntArray[Int32] = IntArray(Int32, 64)
 
 

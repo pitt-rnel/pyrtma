@@ -4,7 +4,7 @@
     "MessageHeader": {"size": 48, "layout": "msg_type:int32@0 msg_count:int32@4 send_time:float64@8 recv_time:float64@16 src_host_id:int16@24 src_mod_id:int16@26 dest_host_id:int16@28 dest_mod_id:int16@30 num_data_bytes:int32@32 remaining_bytes:int32@36 is_dynamic:int32@40 reserved:uint32@44"}
   },
   "structs": {
-    "DATASET": {"hash": "0xE2E58374", "size": 708, "layout": "name:char[32]@0 save_path:char[256]@32 filename:char[128]@288 formatter:char[32]@416 subdivide_interval:int32@448 msg_types:int32[64]@452"},
+    "DATASET": {"hash": "0xDE52D257", "size": 708, "layout": "name:char[32]@0 save_path:char[256]@32 filename:char[128]@288 formatter:char[32]@416 max_size_mb:int32@448 msg_types:int32[64]@452"},
     "RTMA_MSG_HEADER": {"hash": "0x35CC5A39", "size": 48, "layout": "msg_type:int32@0 msg_count:int32@4 send_time:float64@8 recv_time:float64@16 src_host_id:int16@24 src_mod_id:int16@26 dest_host_id:int16@28 dest_mod_id:int16@30 num_data_bytes:int32@32 remaining_bytes:int32@36 is_dynamic:int32@40 reserved:uint32@44"}
   },
   "messages": {

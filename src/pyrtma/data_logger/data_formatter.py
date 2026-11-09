@@ -33,8 +33,10 @@ class DataFormatter(ABC):
     ext: ClassVar[str] = ".txt"
     #: The most bytes a file may hold. The data logger continues a dataset in
     #: a new file before a message would pass it. A file always holds at
-    #: least one message, even one larger than this.
-    max_bytes: ClassVar[int] = 500_000_000
+    #: least one message, even one larger than this. The class value is a
+    #: ceiling; the data logger lowers it per file to the dataset's
+    #: ``max_size_mb``.
+    max_bytes: int = 500_000_000
 
     def __init__(self, fd: IO[Any], **kwargs):
         self.fd = fd

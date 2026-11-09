@@ -422,6 +422,18 @@ The `handler` fixture gives a `StubHandler` whose proxy already has a socket to 
 | `test_connect_v2_after_connect_updates_name` | Manager connect messages: a `CONNECT_V2` after the web client's `CONNECT` updates the proxy's name, which the manager announces with a new `HELLO`, without a second ACK to the web client and without a change of module ID. | `handle_connect()`, then `handle_connect_v2()` named "late-page". A wait for an ACK would time out and send an error to the websocket. |
 | `test_connect_after_connect_v2_is_ignored` | Manager connect messages: a `CONNECT` after the web client's `CONNECT_V2` changes nothing and sends nothing. | `handle_connect_v2()` named "page", then `handle_connect()`. |
 
+## test_dataset.py — the `Dataset` helper, without a manager (needs: none)
+
+Each `Dataset` is given a stand-in client that keeps what it would send.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_max_size_mb_is_sent_when_added` | `max_size_mb` is sent in `DATASET_ADD`. | `max_size_mb=20`, then `add()`. |
+| `test_default_max_size_is_500_mb` | The default `max_size_mb` is `DATASET_MAX_SIZE_MB`, 500. | A dataset with the defaults. |
+| `test_max_size_mb_outside_its_range_raises` | `max_size_mb` outside 1 to 500 raises `ValueError`, and the half-built dataset cleans up without an error of its own. | Parametrized over 0, -1 and 501. |
+| `test_subdivide_interval_is_deprecated_and_ignored` | A nonzero `subdivide_interval` warns and isn't sent; the default size is. | `subdivide_interval=30`. |
+| `test_positional_subdivide_interval_still_accepted` | `subdivide_interval` is still accepted in its old position, so existing calls run. | Passes it as the fifth positional argument. |
+
 ## test_data_logger.py — `DataLogger` with a real manager, and its entry point (needs: integration)
 
 The `data_logger` fixture runs a `DataLogger` in a thread against the `manager` fixture, with the test definitions and a `FakeClock` for its datasets, and stops it with `stop()` at teardown; if `run()` raises, the `thread_exceptions` fixture fails the test. The `controller` fixture is a client subscribed to `Dataset.DATALOGGER_TYPES` that sends the requests. `wait_for_logger()` sends `DATA_LOGGER_CONFIG_REQUEST` until a `DATA_LOGGER_CONFIG` comes back, which shows the logger's and the client's subscriptions are in place; because the logger answers requests in order, the same exchange also serves as a barrier after other requests. Datasets record with the `json` formatter into `tmp_path`. `StaleTestStart` is `TEST_START` with 8 bytes instead of 4, as an out-of-date definition would send it, and `UnknownMessage` is type 7777, which the logger's definitions don't have. `events()` lists the dataset events (`DATA_LOGGER_ERROR`, `STARTED`, `STOPPED`, `SAVED`, `REMOVED`) about one dataset, in the order they arrived.
@@ -451,6 +463,7 @@ The `data_logger` fixture runs a `DataLogger` in a thread against the `manager` 
 | `test_start_all_twice_is_harmless` | C5: a second `DATASET_START "all"` skips the dataset that is already recording, without an error, and it keeps recording. | Starts all twice, then a config barrier and a status request. |
 | `test_directed_request_is_answered_to_its_sender` | C6: a request addressed to the logger is answered to its sender only, and a broadcast request is still answered with a broadcast that other modules see. | An observer subscribed to the replies; a directed `DATASET_ADD`, then a broadcast one as a marker, which the observer must receive without the first. |
 | `test_request_addressed_to_another_module_is_ignored` | Data logger requests: a request addressed to another module, which the manager copies to logger modules, isn't acted on. | A `DATASET_ADD` addressed to another client, then a config request, which must list no datasets. |
+| `test_max_size_mb_from_the_request` | A request's `max_size_mb` from 1 to 500 is used as given. One outside that range, such as the 0 or interval that a client built before `max_size_mb` replaced `subdivide_interval` sends, is replaced by 500 with a warning, so that client keeps recording. | Parametrized over 20, 0, -5 and 900; reads the limit back from `DATA_LOGGER_CONFIG`. |
 | `test_full_logger_refuses_before_creating_folders` | Data logger: with `MAX_DATASETS` datasets configured, another is refused with `DataLoggerFullError` before its save folder is created. | Adds six datasets, then a seventh with a new folder. |
 | `test_duplicate_name_refused_before_creating_folders` | Data logger: a second dataset with a name in use is refused with `DatasetExistsError` before its save folder is created. | Two datasets named `same`, in different folders. |
 | `test_duplicate_file_is_refused_when_added` | Data logger: a dataset that would write to another dataset's file is refused when it is added, with an error naming that dataset. | Two datasets with the same folder, file name and formatter. |
@@ -476,7 +489,7 @@ Each writer saves to `tmp_path` with a stand-in formatter registered as `stub` f
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_write_error_stops_recording_and_reports_it` | C5: an `OSError` from the formatter, such as a full disk, doesn't escape the write thread. The dataset stops recording and is marked failed, the error names the dataset, the exception type, the message and the file, later messages aren't buffered, and the formatter's `discard()` is called. | The stand-in raises `OSError(ENOSPC)` on write; the autouse `thread_exceptions` fixture fails the test if anything escapes the thread. |
-| `test_dataset_error_in_writer_stops_recording` | C5: a `DataLoggerError` in the write thread, here a subdivision whose file already exists, stops recording instead of leaving the dataset dead but recording. The finished first file is kept and reported, and the file in the way is untouched. | Creates `rec_0001.txt` first, then makes the subdivision due. |
+| `test_dataset_error_in_writer_stops_recording` | C5: a `DataLoggerError` in the write thread, here a rollover whose next file already exists, stops recording instead of leaving the dataset dead but recording. The finished first file is kept and reported, and the file in the way is untouched. | Creates `rec_0001.txt` first, then writes more than one file holds. |
 | `test_error_text_fits_its_fields` | Data logger writer: an error whose text isn't ASCII or is too long for `DATA_LOGGER_ERROR`'s fields is still recorded, with the other characters replaced by `?` and the text cut with a marker. | A long French `OSError` message, like a localized Windows one, and a 31-character dataset name. |
 
 ### TestSlowWrites
@@ -485,14 +498,13 @@ Each writer saves to `tmp_path` with a stand-in formatter registered as `stub` f
 |---|---|---|
 | `test_slow_write_keeps_buffering` | C5: a write that hasn't finished when the next is due doesn't raise. Messages keep being buffered and are all written, in order, once the writer is free. | Holds the gate during the first write, makes a second write due, then opens it. |
 | `test_falling_behind_warns_once_and_reports_catching_up` | C5: a writer that falls behind logs one warning however many writes fall due meanwhile, and one message when it catches up. | Three writes fall due while the gate is closed; counts the writer logger's records with `caplog`. |
-| `test_subdivide_waits_for_busy_writer` | C5: a subdivision that falls due while the writer is busy waits for it, so the messages that arrived before it go to the old file and later ones to the new file. | Holds the gate during the first write and makes the subdivision due meanwhile; compares both files. |
 | `test_stop_while_behind_writes_everything` | C5: stopping a dataset whose writer is behind still writes every buffered message and finalizes the file. | Stops while the gate is closed with a second write due, then opens it. |
 
 ### TestPauseResume
 
 | Test | Purpose | Approach |
 |---|---|---|
-| `test_resume_when_not_paused_keeps_elapsed_time` | Data logger: `resume()` on a dataset that isn't paused, as `resume "all"` does, changes nothing and returns False; its elapsed time and subdivide schedule carry on. | Resumes after 10 s and checks the elapsed time, then that the subdivision still falls due at 30 s. The gate stays closed so the writer doesn't act on it first. |
+| `test_resume_when_not_paused_keeps_elapsed_time` | Data logger: `resume()` on a dataset that isn't paused, as `resume "all"` does, changes nothing and returns False; its elapsed time and write schedule carry on. | Resumes after 10 s and checks the elapsed time, then that a write still falls due one write period after the start. |
 | `test_pause_before_start_does_nothing` | Data logger: `pause()` and `resume()` on a dataset that isn't recording change nothing and return False. | A dataset that was never started. |
 | `test_pause_and_resume_track_elapsed_time` | Elapsed time stops while a dataset is paused and carries on after it resumes. | Pauses at 5 s for 100 s, then resumes for 2 s. |
 
@@ -509,12 +521,16 @@ Each writer saves to `tmp_path` with a stand-in formatter registered as `stub` f
 
 ### TestRollover
 
-The stand-in's limit is set with room for its header, two one-letter lines and its footer, counting newlines as the platform writes them.
+The stand-in's limit is set, through its class's `max_bytes`, with room for its header, two one-letter lines and its footer, counting newlines as the platform writes them.
 
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_full_file_continues_in_a_new_one` | C9: when a file is full, the dataset continues in `rec_0001`, `rec_0002` and so on, each within the limit, with every message in order across them and each file saved. | Three messages in one write, then two at stop. |
-| `test_rollover_shares_numbering_with_subdivision` | C9: files started because one was full and files started by the subdivide interval share one numbering. | A full file, then a subdivision. |
+| `test_subdivide_interval_is_ignored` | `subdivide_interval` is deprecated: a nonzero value warns and no longer splits files by time. | An interval of 30 s, ten minutes of recording, one file. |
+| `test_max_size_mb_sets_the_file_limit` | A dataset's `max_size_mb` becomes its formatter's `max_bytes`, in MB of 1,000,000 bytes. | `max_size_mb=20`. |
+| `test_formatter_limit_below_max_size_mb_wins` | A formatter whose own `max_bytes` is lower than the dataset's limit keeps it. | A formatter limit of 1000 bytes and `max_size_mb=20`. |
+| `test_max_size_mb_outside_its_range_is_refused` | `max_size_mb` outside 1 to `DATASET_MAX_SIZE_MB` raises `DatasetError` before anything is created. | Parametrized over 0, -1 and 501. |
+| `test_default_max_size_is_500_mb` | The default `max_size_mb` is `DATASET_MAX_SIZE_MB`, 500. | A writer with the defaults. |
 | `test_rolled_over_quicklogger_files_all_read` | C9: QuickLogger files from a rollover are each within the limit and together read back every message, in order. | The real `quicklogger` formatter with room for three messages, and seven messages. |
 | `test_crash_keeps_finished_files_readable` | C9: if the logger dies while recording, the files it finished read completely, and the one it was writing loads nothing with `throw=False` rather than raising. | Reads both files after a rollover, while the second is still open. |
 | `test_formatter_without_a_count_is_not_split` | A formatter written before `write()` returned a count, whose `write()` returns None, still writes everything to one file. | A formatter overriding `write()` the old way, with a small limit. |

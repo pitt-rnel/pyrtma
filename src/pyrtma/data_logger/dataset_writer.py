@@ -2,6 +2,7 @@
 
 import contextlib
 import pathlib
+import warnings
 import io
 import math
 import time
@@ -63,10 +64,14 @@ def _exclusive_mode(mode: str) -> str:
 
 
 class DatasetWriter:
+    # Deprecated: files are no longer split by time. Kept so existing
+    # references still resolve.
     MIN_INTERVAL = 30
     MAX_INTERVAL = 600
     CONTINUOUS = math.inf
     WRITE_PERIOD = 15.0
+    #: Bytes in one MB of ``max_size_mb``.
+    BYTES_PER_MB = 1_000_000
 
     def __init__(
         self,
@@ -77,6 +82,7 @@ class DatasetWriter:
         subdivide_interval: int,
         msg_types: List[int],
         *,
+        max_size_mb: int = cd.DATASET_MAX_SIZE_MB,
         clock: Callable[[], float] = time.monotonic,
     ):
         """Set up a dataset; nothing is recorded until :py:meth:`start`.
@@ -86,17 +92,21 @@ class DatasetWriter:
             save_path: The folder to save to; it is created if needed.
             filename: The file name, without the formatter's extension.
             formatter: The name of a registered formatter.
-            subdivide_interval: Seconds of recording per file, clamped to
-                ``MIN_INTERVAL`` to ``MAX_INTERVAL``; 0 or less records one
-                continuous file.
+            subdivide_interval: Deprecated and ignored: files are split by
+                size, with ``max_size_mb``. A nonzero value warns.
             msg_types: The message types to record; ``ALL_MESSAGE_TYPES``
                 records every type.
-            clock: Seconds from a monotonic clock, for the write and
-                subdivide schedule and the elapsed time. Injectable for tests.
+            max_size_mb: The largest file, in MB of 1,000,000 bytes, from 1
+                to ``DATASET_MAX_SIZE_MB``. A full file continues in a new one,
+                numbered ``_0001``, ``_0002`` and so on. A formatter whose own
+                ``max_bytes`` is lower keeps that.
+            clock: Seconds from a monotonic clock, for the write schedule and
+                the elapsed time. Injectable for tests.
 
         Raises:
             InvalidFormatter: No formatter has that name.
-            DatasetError: The save path can't be created.
+            DatasetError: ``max_size_mb`` is out of range, or the save path
+                can't be created.
             DatasetExistsError: The file already exists.
         """
         self._dead = False
@@ -111,8 +121,6 @@ class DatasetWriter:
         self._state_lock = threading.Lock()
         # When the writer fell behind, or None while it keeps up.
         self._behind_since: Optional[float] = None
-        # A subdivision that fell due while the writer was busy.
-        self._subdivide_due = False
 
         self.name = name
 
@@ -138,14 +146,23 @@ class DatasetWriter:
         self.filename = filename + self.formatter_cls.ext
         self.base_file_name = filename
 
-        if subdivide_interval <= 0:
-            self.subdivide_interval = DatasetWriter.CONTINUOUS
-        elif subdivide_interval < DatasetWriter.MIN_INTERVAL:
-            self.subdivide_interval = DatasetWriter.MIN_INTERVAL
-        elif subdivide_interval > DatasetWriter.MAX_INTERVAL:
-            self.subdivide_interval = DatasetWriter.MAX_INTERVAL
-        else:
-            self.subdivide_interval = subdivide_interval
+        if subdivide_interval:
+            warnings.warn(
+                "subdivide_interval is deprecated and ignored; files are split "
+                "by size, with max_size_mb.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        # Deprecated: always continuous now.
+        self.subdivide_interval = DatasetWriter.CONTINUOUS
+
+        if not 1 <= max_size_mb <= cd.DATASET_MAX_SIZE_MB:
+            raise DatasetError(
+                self.name,
+                f"max_size_mb must be from 1 to {cd.DATASET_MAX_SIZE_MB}, "
+                f"not {max_size_mb}.",
+            )
+        self.max_size_mb = max_size_mb
 
         # Placeholder for type checking purposes
         if "b" in self.formatter_cls.mode:
@@ -175,8 +192,6 @@ class DatasetWriter:
         self.ref_time = -1.0
         self.start_time = -1.0
 
-        self.subdivide_flag = False
-        self.next_subdivide = math.inf
         self.sub_index = 0
 
         self.error_event = threading.Event()
@@ -230,7 +245,7 @@ class DatasetWriter:
         Returns:
             True if the dataset was paused and is now recording. False if it
             wasn't paused; nothing changes then, so its elapsed time and
-            subdivide schedule carry on.
+            write schedule carry on.
         """
         if not self._recording or not self._paused:
             return False
@@ -310,6 +325,11 @@ class DatasetWriter:
 
         try:
             formatter = self.formatter_cls(fd)
+            # The dataset's limit, unless the formatter's own is lower.
+            formatter.max_bytes = min(
+                type(formatter).max_bytes,
+                self.max_size_mb * DatasetWriter.BYTES_PER_MB,
+            )
         except Exception as e:
             # The file was created above, so it holds nothing of anyone's.
             with contextlib.suppress(OSError):
@@ -342,9 +362,6 @@ class DatasetWriter:
 
         # Reset some tracking vars
         self.sub_index = 0
-        self.subdivide_flag = False
-        self._subdivide_due = False
-        self.next_subdivide = self.subdivide_interval
 
         self.start_time = self._clock()
         self.ref_time = self.start_time
@@ -383,17 +400,12 @@ class DatasetWriter:
                 self.rbuf.append(msg)
 
         elapsed = self.elapsed_time
-        if elapsed > self.next_subdivide:
-            self.next_subdivide = elapsed + self.subdivide_interval
-            self._subdivide_due = True
-
-        if not (self._subdivide_due or elapsed > self.next_write):
+        if not elapsed > self.next_write:
             return
 
         if self.write_to_disk.is_set():
-            # The last write hasn't finished. Keep buffering; the write and
-            # any subdivision stay due until the writer is free, so messages
-            # still go to the file they arrived for.
+            # The last write hasn't finished. Keep buffering; the write
+            # stays due until the writer is free.
             if self._behind_since is None:
                 self._behind_since = self._clock()
                 self.logger.warning(
@@ -411,9 +423,6 @@ class DatasetWriter:
             self._behind_since = None
 
         self.next_write = elapsed + DatasetWriter.WRITE_PERIOD
-        # Set while the writer is idle, so it applies to this batch only.
-        self.subdivide_flag = self._subdivide_due
-        self._subdivide_due = False
         self.stage_for_write()
 
     def store_saved(self):
@@ -454,8 +463,8 @@ class DatasetWriter:
     def subdivide(self):
         """Finish the current file and continue in the next one.
 
-        Used both for the subdivide interval and when a file is full; both
-        share the file numbering.
+        Used when a file is full. The next file is numbered ``_0001``,
+        ``_0002`` and so on.
         """
         self.sub_index += 1
         self.formatter.finalize([])
@@ -545,10 +554,6 @@ class DatasetWriter:
                 if self.write_to_disk.wait(0.5):
                     self._write_batch(self.wbuf)
                     self.wbuf.clear()
-
-                    if not self.stopped and self.subdivide_flag:
-                        self.subdivide_flag = False
-                        self.subdivide()
 
                     self.write_to_disk.clear()
                     self.write_finished.set()

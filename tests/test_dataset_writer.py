@@ -221,16 +221,19 @@ class TestWriterFailure:
     def test_dataset_error_in_writer_stops_recording(
         self,
         make_writer: Callable[..., DatasetWriter],
+        stub_formatter: type[StubFormatter],
         clock: FakeClock,
         tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         (tmp_path / "rec_0001.txt").write_text("in the way", encoding="utf-8")
-        writer = make_writer(subdivide_interval=DatasetWriter.MIN_INTERVAL)
+        monkeypatch.setattr(stub_formatter, "max_bytes", TWO_LINES)
+        writer = make_writer()
         writer.start()
-        writer.update(message("a"))
+        for text in "abc":
+            writer.update(message(text))
 
-        clock.advance(DatasetWriter.MIN_INTERVAL + 1)
-        writer.update(None)
+        write_now(writer, clock)
         wait_dead(writer)
 
         assert not writer.recording
@@ -240,7 +243,7 @@ class TestWriterFailure:
         assert "rec_0001.txt" in writer.error.msg
         assert writer.saved_files == [tmp_path / "rec.txt"]
         assert writer.file_saved.is_set()
-        assert lines(tmp_path / "rec.txt") == ["header", "a", "footer"]
+        assert lines(tmp_path / "rec.txt") == ["header", "a", "b", "footer"]
         assert lines(tmp_path / "rec_0001.txt") == ["in the way"]
 
     def test_error_text_fits_its_fields(
@@ -322,35 +325,6 @@ class TestSlowWrites:
         assert "behind" in warnings[0].getMessage()
         assert len(caught_up) == 1
 
-    def test_subdivide_waits_for_busy_writer(
-        self,
-        make_writer: Callable[..., DatasetWriter],
-        stub_formatter: type[StubFormatter],
-        clock: FakeClock,
-        tmp_path: Path,
-    ) -> None:
-        stub_formatter.gate.clear()
-        writer = make_writer(subdivide_interval=DatasetWriter.MIN_INTERVAL)
-        writer.start()
-        writer.update(message("a"))
-        write_now(writer, clock)
-        assert wait_for(stub_formatter.write_started.is_set)
-
-        # The subdivision falls due while the writer is still busy with "a".
-        writer.update(message("b"))
-        write_now(writer, clock)
-        stub_formatter.gate.set()
-        wait_written(writer)
-        writer.update(None)
-        wait_written(writer)
-        writer.update(message("c"))
-        writer.stop()
-        wait_dead(writer)
-
-        assert not writer.error_event.is_set()
-        assert lines(tmp_path / "rec.txt") == ["header", "a", "b", "footer"]
-        assert lines(tmp_path / "rec_0001.txt") == ["header", "c", "footer"]
-
     def test_stop_while_behind_writes_everything(
         self,
         make_writer: Callable[..., DatasetWriter],
@@ -382,9 +356,7 @@ class TestPauseResume:
         stub_formatter: type[StubFormatter],
         clock: FakeClock,
     ) -> None:
-        # The closed gate holds the writer before it acts on the subdivision.
-        stub_formatter.gate.clear()
-        writer = make_writer(subdivide_interval=DatasetWriter.MIN_INTERVAL)
+        writer = make_writer()
         writer.start()
         clock.advance(10)
 
@@ -392,9 +364,9 @@ class TestPauseResume:
 
         assert writer.elapsed_time == pytest.approx(10)
         assert result is False
-        clock.advance(DatasetWriter.MIN_INTERVAL - 10 + 1)
+        clock.advance(DatasetWriter.WRITE_PERIOD - 10 + 1)
         writer.update(None)
-        assert writer.subdivide_flag
+        assert wait_for(stub_formatter.write_started.is_set)
 
     def test_pause_before_start_does_nothing(
         self, make_writer: Callable[..., DatasetWriter]
@@ -550,36 +522,57 @@ class TestRollover:
         assert all((tmp_path / n).stat().st_size <= TWO_LINES for n in names)
         assert not writer.error_event.is_set()
 
-    def test_rollover_shares_numbering_with_subdivision(
+    def test_subdivide_interval_is_ignored(
         self,
         make_writer: Callable[..., DatasetWriter],
-        stub_formatter: type[StubFormatter],
         clock: FakeClock,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setattr(stub_formatter, "max_bytes", TWO_LINES)
-        writer = make_writer(subdivide_interval=DatasetWriter.MIN_INTERVAL)
+        with pytest.warns(DeprecationWarning, match="max_size_mb"):
+            writer = make_writer(subdivide_interval=30)
         writer.start()
-        for text in "abc":
-            writer.update(message(text))
-        write_now(writer, clock)
-        wait_written(writer)
+        writer.update(message("a"))
 
-        clock.advance(DatasetWriter.MIN_INTERVAL)
-        writer.update(message("d"))
-        wait_written(writer)
-        writer.update(message("e"))
+        clock.advance(10 * 60)
+        writer.update(message("b"))
         writer.stop()
         wait_dead(writer)
 
-        assert [p.name for p in writer.saved_files] == [
-            "rec.txt",
-            "rec_0001.txt",
-            "rec_0002.txt",
-        ]
-        assert lines(tmp_path / "rec_0001.txt")[1:-1] == ["c", "d"]
-        assert lines(tmp_path / "rec_0002.txt")[1:-1] == ["e"]
+        assert writer.saved_files == [tmp_path / "rec.txt"]
+        assert lines(tmp_path / "rec.txt") == ["header", "a", "b", "footer"]
+
+    def test_max_size_mb_sets_the_file_limit(
+        self, make_writer: Callable[..., DatasetWriter]
+    ) -> None:
+        writer = make_writer(max_size_mb=20)
+        writer.start()
+
+        assert writer.max_size_mb == 20
+        assert writer.formatter.max_bytes == 20_000_000
+
+    def test_formatter_limit_below_max_size_mb_wins(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        stub_formatter: type[StubFormatter],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(stub_formatter, "max_bytes", 1000)
+        writer = make_writer(max_size_mb=20)
+        writer.start()
+
+        assert writer.formatter.max_bytes == 1000
+
+    @pytest.mark.parametrize("size", [0, -1, cd.DATASET_MAX_SIZE_MB + 1])
+    def test_max_size_mb_outside_its_range_is_refused(
+        self, make_writer: Callable[..., DatasetWriter], size: int
+    ) -> None:
+        with pytest.raises(DatasetError, match="max_size_mb"):
+            make_writer(max_size_mb=size)
+
+    def test_default_max_size_is_500_mb(
+        self, make_writer: Callable[..., DatasetWriter]
+    ) -> None:
+        assert make_writer().max_size_mb == cd.DATASET_MAX_SIZE_MB == 500
 
     def test_rolled_over_quicklogger_files_all_read(
         self,

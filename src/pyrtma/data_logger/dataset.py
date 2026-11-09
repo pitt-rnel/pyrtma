@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import textwrap
+import warnings
 import pyrtma
 import pyrtma.core_defs as cd
 from pyrtma.data_logger.exceptions import NoClientError
@@ -42,7 +43,46 @@ class Dataset:
         status_interval: float = 5.0,
         create_client: bool = True,
         definitions: MessageDefinitions | None = None,
+        *,
+        max_size_mb: int = cd.DATASET_MAX_SIZE_MB,
     ):
+        """Describe a dataset for the data logger to record.
+
+        Args:
+            name: The dataset's name.
+            save_path: The folder the data logger saves to.
+            filename: The file name, without the formatter's extension.
+            formatter: The formatter's name, such as ``"quicklogger"``.
+            subdivide_interval: Deprecated and ignored: files are split by
+                size, with ``max_size_mb``. A nonzero value warns.
+            msg_types: The message types to record; None records all.
+            mm_ip: The manager's ``host:port``, for a client of its own.
+            status_interval: Seconds between status requests in ``poll()``.
+            create_client: Connect a client of its own; otherwise call
+                ``register_client()``.
+            definitions: The message definitions; the core ones by default.
+            max_size_mb: The largest file, in MB of 1,000,000 bytes, from 1 to
+                ``DATASET_MAX_SIZE_MB``. A full file continues in a new one.
+
+        Raises:
+            ValueError: ``max_size_mb`` is out of range.
+        """
+        # Set first, so close() works if this constructor raises.
+        self._managed_client = False
+        self._client = None
+        if not 1 <= max_size_mb <= cd.DATASET_MAX_SIZE_MB:
+            raise ValueError(
+                f"max_size_mb must be from 1 to {cd.DATASET_MAX_SIZE_MB}, "
+                f"not {max_size_mb}."
+            )
+        if subdivide_interval:
+            warnings.warn(
+                "subdivide_interval is deprecated and ignored; files are split "
+                "by size, with max_size_mb.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        self._max_size_mb = max_size_mb
         self._definitions = definitions or cd.get_message_definitions()
 
         if create_client:
@@ -89,7 +129,7 @@ class Dataset:
         name         = {self.name}
         filename     = {self.filename}
         formatter    = {self.formatter}
-        subdivide    = {self.subdivide_interval}
+        max_size_mb  = {self.max_size_mb}
         msg_types    = {self.msg_names}
         added        = {self.added}
         started      = {self.started}
@@ -135,7 +175,13 @@ class Dataset:
 
     @property
     def subdivide_interval(self) -> int:
+        """Deprecated and ignored; see :py:attr:`max_size_mb`."""
         return self._subdivide_interval
+
+    @property
+    def max_size_mb(self) -> int:
+        """The largest file the data logger writes for this dataset, in MB."""
+        return self._max_size_mb
 
     @property
     def msg_types(self) -> tuple[int, ...]:
@@ -258,7 +304,7 @@ class Dataset:
         msg.dataset.filename = self.filename
         msg.dataset.formatter = self.formatter
         msg.dataset.msg_types[: len(self.msg_types)] = self.msg_types
-        msg.dataset.subdivide_interval = self.subdivide_interval
+        msg.dataset.max_size_mb = self.max_size_mb
 
         if self._client:
             self._client.send_message(msg)

@@ -184,8 +184,10 @@ def add_request(
     filename: str = "rec",
     formatter: str = "json",
     msg_types: tuple[int, ...] = (cd.ALL_MESSAGE_TYPES,),
+    max_size_mb: int = cd.DATASET_MAX_SIZE_MB,
 ) -> cd.MDF_DATASET_ADD:
     msg = cd.MDF_DATASET_ADD()
+    msg.dataset.max_size_mb = max_size_mb
     msg.dataset.name = name
     msg.dataset.save_path = str(save_path)
     msg.dataset.filename = filename
@@ -391,6 +393,30 @@ class TestRequests:
         config = wait_reply(controller, cd.MT_DATA_LOGGER_CONFIG)[-1]
 
         assert config.data.num_datasets == 0
+
+    @pytest.mark.parametrize(
+        ("requested", "used", "warned"),
+        [(20, 20, False), (0, 500, True), (-5, 500, True), (900, 500, True)],
+        ids=["in_range", "zero", "negative", "too_large"],
+    )
+    def test_max_size_mb_from_the_request(
+        self,
+        controller: Client,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+        requested: int,
+        used: int,
+        warned: bool,
+    ) -> None:
+        caplog.set_level(logging.WARNING)
+
+        controller.send_message(add_request("ds", tmp_path, max_size_mb=requested))
+        wait_reply(controller, cd.MT_DATASET_ADDED, "ds")
+        controller.send_signal(cd.MT_DATA_LOGGER_CONFIG_REQUEST)
+        config = wait_reply(controller, cd.MT_DATA_LOGGER_CONFIG)[-1]
+
+        assert config.data.datasets[0].max_size_mb == used
+        assert ("max_size_mb" in caplog.text) == warned
 
     def test_full_logger_refuses_before_creating_folders(
         self, controller: Client, tmp_path: Path

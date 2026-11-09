@@ -293,9 +293,7 @@ class DataLogger:
             d.filename = ds.filename
             d.formatter = ds.formatter_cls.name
             d.msg_types[: len(ds.msg_types)] = ds.msg_types
-            d.subdivide_interval = (
-                0 if isinstance(ds.subdivide_interval, float) else ds.subdivide_interval
-            )
+            d.max_size_mb = ds.max_size_mb
 
         self.client.send_message(msg, dest_mod_id=dest_mod_id)
 
@@ -443,6 +441,32 @@ class DataLogger:
                     name, f"Dataset '{other.name}' already records to {existing}"
                 )
 
+    def _max_size_mb(self, name: str, requested: int) -> int:
+        """Return the file size limit to use for a dataset.
+
+        A value outside 1 to ``DATASET_MAX_SIZE_MB`` is replaced by
+        ``DATASET_MAX_SIZE_MB``, with a warning, rather than refused. A client
+        compiled before ``max_size_mb`` replaced ``subdivide_interval`` sends
+        the same bytes, most often 0 for one continuous file, so refusing
+        would stop it recording.
+
+        Args:
+            name: The dataset's name.
+            requested: The ``max_size_mb`` in the request.
+
+        Returns:
+            The limit in MB.
+        """
+        if 1 <= requested <= cd.DATASET_MAX_SIZE_MB:
+            return requested
+        self.logger.warning(
+            f"Dataset '{name}': max_size_mb {requested} is outside 1 to "
+            f"{cd.DATASET_MAX_SIZE_MB}; using {cd.DATASET_MAX_SIZE_MB}. A client "
+            "built before max_size_mb replaced subdivide_interval sends its "
+            "interval here; rebuild it."
+        )
+        return cd.DATASET_MAX_SIZE_MB
+
     def add_dataset(self, msg: cd.MDF_DATASET_ADD, dest_mod_id: int = 0):
         """Add a dataset.
 
@@ -479,7 +503,8 @@ class DataLogger:
             filename=msg.dataset.filename,
             msg_types=msg.dataset.msg_types[:],
             formatter=msg.dataset.formatter,
-            subdivide_interval=msg.dataset.subdivide_interval,
+            subdivide_interval=0,
+            max_size_mb=self._max_size_mb(name, msg.dataset.max_size_mb),
             clock=self._clock,
         )
 
