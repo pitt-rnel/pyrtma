@@ -68,6 +68,15 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | `test_non_destination_module_is_not_counted_as_drop` | Manager routing: a subscriber that isn't the destination of a directed message gets no drop and causes no `FAILED_MESSAGE`, even when it isn't writable. | A directed message to one writable fake, with an unwritable bystander and a `FAILED_MESSAGE` observer. |
 | `test_unwritable_destination_is_counted_as_drop` | Manager routing: an unwritable destination is still counted as a drop and reported with `FAILED_MESSAGE`. | A directed message to an unwritable fake; decodes the observer's `FAILED_MESSAGE`. |
 
+### TestRoutingCost
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_forward_debug_message_is_built_only_when_logged` | P3: the `FORWARD` debug line costs nothing while debug logging is off, and reads as before when it's on. | `Module.__str__` is wrapped to count calls; a message is processed with the manager at ERROR, then at DEBUG with a `RecordingHandler` on its logger. |
+| `test_routing_that_raises_still_ends` | P3: a forward that raises inside `_routing()` still ends, so a later removal closes its module at once. | Raises `RuntimeError` inside `with _routing()`, then removes a fake module. |
+| `test_each_subscriber_is_sent_one_copy` | P3: the subscriber snapshot sends once to each module subscribed by type or to `ALL_MESSAGE_TYPES`, and not to others. | Fakes subscribed to the type, to every type, and to another type. |
+| `test_message_nobody_subscribes_to_is_sent_nowhere` | P3: a message with no subscribers is sent to no one and adds no entry to the subscription table. | A fake subscribed to another type. |
+
 ### TestMsgCount
 
 | Test | Purpose | Approach |
@@ -1020,4 +1029,4 @@ The scripts aren't part of the package. The tests that run one start it with the
 | `test_summary_counts_missed_messages` | Benchmark: a run's summary has the mean publisher and subscriber rates, the slowest subscriber's rate, and the fraction of expected messages received. | One publisher and two subscribers, one of which got half its messages. |
 | `test_summary_without_subscribers` | Benchmark: with no subscribers, the summary has a publisher rate and no subscriber figures. | Two publishers with different rates. |
 | `test_report_gives_median_and_range` | Benchmark: the report names the configuration, gives each run's received percentage, and the median and range of both rates over the runs. | Three run summaries with known rates. |
-| `test_microbench_times_every_operation` | Benchmark: `pyrtma_microbench.py` runs from any directory and reports every operation, including send and read through its stand-in managers, and the raw `select()` and `send()` calls. | 200 operations, 2 repeats. |
+| `test_microbench_times_every_operation` | Benchmark: `pyrtma_microbench.py` runs from any directory and reports every operation, including send and read through its stand-in managers, the raw `select()` and `send()` calls, and the manager's routing with stub sockets. | 200 operations, 2 repeats. |

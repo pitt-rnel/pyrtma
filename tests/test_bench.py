@@ -153,6 +153,7 @@ def test_microbench_times_every_operation(tmp_path: Path) -> None:
         "send_message, 128 B",
         "select() for writability",
         "socket send(), 176 B",
+        "manager routing to 5, stub sockets",
         "read_message, 128 B",
     ):
         assert name in result.stdout

@@ -33,6 +33,7 @@ from .helpers import (
     DEFAULT_TIMEOUT,
     LOOPBACK,
     ManagerHarness,
+    RecordingHandler,
     deliver,
     manager_options,
     read_until,
@@ -721,6 +722,82 @@ class TestRouting:
         failed = sent_messages(observer)
         assert [h.msg_type for h, _ in failed] == [cd.MT_FAILED_MESSAGE]
         assert cd.MDF_FAILED_MESSAGE.from_buffer_copy(failed[0][1]).dest_mod_id == 102
+
+
+class TestRoutingCost:
+    def test_forward_debug_message_is_built_only_when_logged(
+        self, bare_manager: MessageManager, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        src = add_fake_module(bare_manager, 101)
+        add_fake_module(bare_manager, 102, subs=[USER_MSG_TYPE])
+        described: list[Module] = []
+        describe = Module.__str__
+
+        def counting_str(module: Module) -> str:
+            described.append(module)
+            return describe(module)
+
+        monkeypatch.setattr(Module, "__str__", counting_str)
+        recorder = RecordingHandler()
+        logger = bare_manager.logger
+        logger.logger.addHandler(recorder)
+        level = logger.level
+        header = make_header(bare_manager, USER_MSG_TYPE)
+        try:
+            bare_manager.process_message(src, header)
+            quiet = list(described)
+            logger.level = logging.DEBUG
+            bare_manager.process_message(src, header)
+        finally:
+            logger.level = level
+            logger.logger.removeHandler(recorder)
+
+        assert quiet == []
+        forwards = [
+            r.getMessage()
+            for r in recorder.records
+            if r.getMessage().startswith("FORWARD")
+        ]
+        assert forwards == [f"FORWARD - msg_type:{USER_MSG_TYPE} from {describe(src)}"]
+
+    def test_routing_that_raises_still_ends(self, bare_manager: MessageManager) -> None:
+        module = add_fake_module(bare_manager, 102)
+
+        with pytest.raises(RuntimeError):
+            with bare_manager._routing():
+                raise RuntimeError("raised while routing")
+        bare_manager.remove_module(module)
+
+        assert bare_manager._forward_depth == 0
+        assert fake_conn(module).close_count == 1
+
+    def test_each_subscriber_is_sent_one_copy(
+        self, bare_manager: MessageManager
+    ) -> None:
+        src = add_fake_module(bare_manager, 101)
+        by_type = add_fake_module(bare_manager, 102, subs=[USER_MSG_TYPE])
+        by_all = add_fake_module(bare_manager, 103, subs=[ALL_MESSAGE_TYPES])
+        other = add_fake_module(bare_manager, 104, subs=[USER_MSG_TYPE + 1])
+        payload = bytes(range(8))
+        header, expected = message_with_payload(bare_manager, payload)
+
+        bare_manager.forward_message(src, header, payload)
+
+        assert fake_conn(by_type).sent == [expected]
+        assert fake_conn(by_all).sent == [expected]
+        assert fake_conn(other).sent == []
+
+    def test_message_nobody_subscribes_to_is_sent_nowhere(
+        self, bare_manager: MessageManager
+    ) -> None:
+        src = add_fake_module(bare_manager, 101)
+        other = add_fake_module(bare_manager, 102, subs=[USER_MSG_TYPE + 1])
+        header, _ = message_with_payload(bare_manager, bytes(8))
+
+        bare_manager.forward_message(src, header, bytes(8))
+
+        assert fake_conn(other).sent == []
+        assert USER_MSG_TYPE not in bare_manager.subscriptions
 
 
 class TestMsgCount:

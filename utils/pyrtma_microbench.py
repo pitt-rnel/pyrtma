@@ -8,6 +8,8 @@ single operations instead, so a change to one of them shows up on its own:
 - ``Client.send_message`` to a stand-in manager that only drains the socket,
   and the ``select()`` and ``send()`` calls a send can be made of.
 - ``Client.read_message`` from a stand-in that streams ready-made messages.
+- The manager routing one message to five subscribers, with stub
+  connections, so the system calls are left out.
 
 The stand-ins run in their own process, accept one client, and answer its
 ``CONNECT_V2`` with an ACK. Each operation is timed ``-r`` times, ``-n``
@@ -310,6 +312,73 @@ def read_operation(number: int, repeat: int) -> list[float]:
         process.join(timeout=10)
 
 
+class _StubConnection:
+    """Stands in for a client socket that always has room."""
+
+    def send(self, data: Any) -> int:
+        return len(data)
+
+    def close(self) -> None:
+        pass
+
+
+def manager_operation(
+    number: int, repeat: int, subscribers: int = 5
+) -> tuple[str, list[float]]:
+    """Time the manager routing a ``WIRE_MSG``, with stub connections.
+
+    The manager is constructed but not run. Its modules have stub
+    connections whose ``send()`` takes everything at once, so this is the
+    manager's own work per message, without the system calls.
+
+    Args:
+        number: Messages per repeat.
+        repeat: Repeats.
+        subscribers: Modules subscribed to the message.
+
+    Returns:
+        ``(name, seconds per message for each repeat)``.
+    """
+    import logging
+
+    from pyrtma.manager import MessageManager, Module
+
+    manager = MessageManager(ip_address="127.0.0.1", port=0, log_level=logging.ERROR)
+    try:
+        defs = pyrtma.load_message_definitions(DEFS_PATH)
+        data = defs.MDF[WIRE_MSG].from_random()
+        modules = []
+        for n in range(subscribers + 1):
+            conn: Any = _StubConnection()
+            module = Module(
+                conn,
+                ("127.0.0.1", 20000 + n),
+                manager.header_cls,
+                name=f"stub{n}",
+                mod_id=100 + n,
+                connected=True,
+            )
+            manager.modules[conn] = module
+            if n:
+                manager.subscriptions[data.type_id].add(module)
+                module.subs.add(data.type_id)
+            modules.append(module)
+
+        header = pyrtma.MessageHeader()
+        header.msg_type = data.type_id
+        header.src_mod_id = modules[0].mod_id
+        header.num_data_bytes = data.type_size
+        manager.data_view[: data.type_size] = bytes(data)
+
+        def route() -> None:
+            manager.process_message(modules[0], header)
+
+        name = f"manager routing to {subscribers}, stub sockets"
+        return name, time_loop(route, number, repeat)
+    finally:
+        manager.listen_socket.close()
+
+
 def _duration(seconds: float) -> str:
     if seconds < 1e-6:
         return f"{seconds * 1e9:,.0f} ns"
@@ -380,6 +449,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     results = field_operations(args.number, args.repeat)
     results += send_operations(args.number, args.repeat)
+    results.append(manager_operation(args.number, args.repeat))
     size = WIRE_MSG.rsplit("_", 1)[1]
     results.append(
         (f"read_message, {size} B", read_operation(args.number, args.repeat))

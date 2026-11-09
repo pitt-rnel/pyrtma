@@ -11,22 +11,19 @@ import time
 import random
 import ctypes
 import os
-import struct
 import sys
-from contextlib import contextmanager
 
 
 from .client_logging import RTMALogger, ClientLike
 from .validators import disable_message_validation
 from .message import Message
-from .header import MessageHeader, get_header_cls
+from .header import MessageHeader, _field_struct, get_header_cls
 from .message_data import MessageData
 from .core_defs import ALL_MESSAGE_TYPES
 from . import core_defs as cd
 
-from typing import Deque, Dict, Iterator, List, Tuple, Set, Type, Union, Optional
+from typing import Any, Deque, Dict, List, Tuple, Set, Type, Union, Optional
 from typing import Sequence
-from itertools import chain
 from dataclasses import dataclass, field
 from collections import defaultdict, deque
 
@@ -38,13 +35,11 @@ _FIRST_USER_MSG_TYPE: int = cd.MAX_RTMA_MSG_TYPE + 1
 #: manager drops it.
 DEFAULT_STALL_TIMEOUT: float = 5.0
 
-# The header's num_data_bytes field, read straight from received bytes. The
-# read loop needs it for every message, and reading it through a header
-# object costs several times more, because MessageBase routes every field
-# access through Python code.
-_NUM_DATA_BYTES = struct.Struct("i")
-_NUM_DATA_BYTES_OFFSET: int = MessageHeader._num_data_bytes.offset  # type: ignore[attr-defined]
-assert ctypes.sizeof(ctypes.c_int) == _NUM_DATA_BYTES.size
+# The header's num_data_bytes field, read straight from the received bytes:
+# the read loop needs it for every message before there is a header object.
+_NUM_DATA_BYTES, _NUM_DATA_BYTES_OFFSET = _field_struct(
+    MessageHeader, "_num_data_bytes"
+)
 
 # What select() can watch. On Linux and macOS it can't take a descriptor
 # numbered FD_SETSIZE (1024) or higher; on Windows it takes at most 512
@@ -269,6 +264,32 @@ class Module:
         return self.conn.__hash__()
 
 
+class _Routing:
+    """The context ``MessageManager._routing()`` returns.
+
+    One per manager, entered again for each forward, so a forward costs no
+    new object. A forward that raises still ends, but doesn't finish
+    removals, as a generator-based context manager wouldn't either.
+
+    Args:
+        manager: The manager whose forwards it marks.
+    """
+
+    __slots__ = ("_manager",)
+
+    def __init__(self, manager: "MessageManager") -> None:
+        self._manager = manager
+
+    def __enter__(self) -> None:
+        self._manager._forward_depth += 1
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        manager = self._manager
+        manager._forward_depth -= 1
+        if exc_type is None:
+            manager._finish_removals()
+
+
 class MessageManager(ClientLike):
     """MessageManager class
 
@@ -400,6 +421,7 @@ class MessageManager(ClientLike):
         # forward is in progress, so a loop over subscribers never meets a
         # closed socket. See remove_module() and _routing().
         self._forward_depth = 0
+        self._router = _Routing(self)
         self._closing: List[Module] = []
         self._finishing_removals = False
 
@@ -615,22 +637,18 @@ class MessageManager(ClientLike):
         finally:
             self._finishing_removals = False
 
-    @contextmanager
-    def _routing(self) -> Iterator[None]:
+    def _routing(self) -> _Routing:
         """Mark a forward in progress, and finish removals when it ends.
 
         Forwards nest: a send failure logs an error and sends FAILED_MESSAGE,
         and both are forwarded too. Removals wait until the outermost one ends.
+        Use it as ``with self._routing():`` around the sends.
 
-        Yields:
-            Nothing; the body sends the message.
+        Returns:
+            The manager's one routing context, which can be entered again
+            while it's in use.
         """
-        self._forward_depth += 1
-        try:
-            yield
-        finally:
-            self._forward_depth -= 1
-        self._finish_removals()
+        return self._router
 
     def _drop_after_send_error(
         self, module: Module, header: Optional[MessageHeader], err: OSError
@@ -1078,24 +1096,32 @@ class MessageManager(ClientLike):
             )
             return
 
-        with self._routing():
-            # Subscriber list for this message type. It's a snapshot: modules
-            # removed while it's in use are skipped below.
-            # get(), not [], so that a type nobody subscribes to doesn't add
-            # an entry to the table.
-            subscribers = list(
-                chain(
-                    self.subscriptions.get(header.msg_type, ()),
-                    self.subscriptions.get(ALL_MESSAGE_TYPES, ()),
-                )
-            )
+        # The subscribers to this message type and to every type. get(), not
+        # [], so that a type nobody subscribes to doesn't add an entry to the
+        # table. The two sets never share a module: subscribing to
+        # ALL_MESSAGE_TYPES drops a module's other subscriptions.
+        by_type = self.subscriptions.get(header.msg_type)
+        by_all = self.subscriptions.get(ALL_MESSAGE_TYPES)
+        # A snapshot, as a tuple: a failed send removes modules from the sets,
+        # and modules removed while it's in use are skipped below.
+        if by_type and by_all:
+            subscribers: Tuple[Module, ...] = (*by_type, *by_all)
+        elif by_type:
+            subscribers = tuple(by_type)
+        elif by_all:
+            subscribers = tuple(by_all)
+        else:
+            return
 
+        modules = self.modules
+        with self._routing():
             # Header and payload in one buffer, built once and shared by every
             # recipient: one send per recipient instead of two.
             wire: Optional[bytes] = None
 
             for module in subscribers:
-                if not self._is_routed(module):
+                # As _is_routed(), without a call per recipient.
+                if modules.get(module.conn) is not module:
                     continue
 
                 # Only destinations of the message take part. Other modules
@@ -1398,7 +1424,8 @@ class MessageManager(ClientLike):
             return
 
         # Forward all messages that come through to MM
-        self.logger.debug(f"FORWARD - msg_type:{header.msg_type} from {src_module!s}")
+        # %-style arguments, so the text is only built when debug is on.
+        self.logger.debug("FORWARD - msg_type:%d from %s", header.msg_type, src_module)
         data = self.data_view[: header.num_data_bytes]
         self.forward_message(src_module, header, data)
 
