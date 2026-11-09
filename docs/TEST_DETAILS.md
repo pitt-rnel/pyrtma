@@ -971,3 +971,17 @@ Each test fills a structure with one scalar field and one 8-element array field 
 | `test_uint64_values_use_full_range` | Test helpers: uint64 fields get values beyond 32 bits. | Parametrized over `c_uint64` and `c_ulonglong`. |
 | `test_int_values_stay_in_range` | Test helpers: every integer type gets values inside its own range, reaching its upper half. | Parametrized over each ctypes integer type and alias. |
 | `test_float_values_include_negatives_and_large_values` | Test helpers: float and double fields get finite values, including negative ones and ones above 1. | Parametrized over `c_float` and `c_double`. |
+
+## test_bench.py — the benchmark scripts in `utils/` (needs: integration for the tests that run a script)
+
+The scripts aren't part of the package. The tests that run one start it with the test's interpreter, as a subprocess, from `tmp_path`, so they show it works outside `utils/`. The others load `pyrtma_bench.py` from its file with the `bench` fixture and call its reporting functions directly.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_bench_runs_from_another_directory` | Benchmark: `pyrtma_bench.py` finds the test definitions from any directory, starts its own manager with `--start-manager`, and reports every run and the median rates. | Two runs of 200 messages to two subscribers; expects two table rows at 100.0% received and a subscriber median line. |
+| `test_bench_fails_cleanly_without_a_manager` | Benchmark: with no manager at `-s`, the script exits with status 1 and a one-line error instead of a traceback. | Points `-s` at a free port that nothing listens on. |
+| `test_subscribers_expect_what_publishers_send` | Benchmark: when `-n` isn't a multiple of `-np`, subscribers wait for the messages the publishers actually send, not for `-n`. | `Settings` with 1000 messages and 3 publishers. |
+| `test_summary_counts_missed_messages` | Benchmark: a run's summary has the mean publisher and subscriber rates, the slowest subscriber's rate, and the fraction of expected messages received. | One publisher and two subscribers, one of which got half its messages. |
+| `test_summary_without_subscribers` | Benchmark: with no subscribers, the summary has a publisher rate and no subscriber figures. | Two publishers with different rates. |
+| `test_report_gives_median_and_range` | Benchmark: the report names the configuration, gives each run's received percentage, and the median and range of both rates over the runs. | Three run summaries with known rates. |
+| `test_microbench_times_every_operation` | Benchmark: `pyrtma_microbench.py` runs from any directory and reports every operation, including send and read through its stand-in managers. | 200 operations, 2 repeats. |
