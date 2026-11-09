@@ -434,6 +434,41 @@ Each `Dataset` is given a stand-in client that keeps what it would send.
 | `test_subdivide_interval_is_deprecated_and_ignored` | A nonzero `subdivide_interval` warns and isn't sent; the default size is. | `subdivide_interval=30`. |
 | `test_positional_subdivide_interval_still_accepted` | `subdivide_interval` is still accepted in its old position, so existing calls run. | Passes it as the fifth positional argument. |
 
+### TestProcessMsg
+
+Messages are passed straight to `process_msg()`, as `poll()` does with what it reads.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_error_for_this_dataset_is_returned` | C7: a `DATA_LOGGER_ERROR` naming this dataset is returned, rather than raising `AttributeError` on a `name` field the message doesn't have. | An error for `ds`. |
+| `test_error_for_another_dataset_is_ignored` | C7: an error naming another dataset is ignored. | An error for `other`. |
+| `test_error_for_no_dataset_is_returned` | C7: an error with no dataset name, which is about the data logger as a whole, is returned to every dataset. | An error with an empty `dataset_name`. |
+| `test_config_is_stored` | C7: a `DATA_LOGGER_CONFIG` is stored in `datalogger_config`, rather than raising `AttributeError` on a method that doesn't exist, and `process_msg()` returns None. | A config listing one dataset. |
+| `test_config_is_none_until_received` | `datalogger_config` is None until a config arrives. | A new dataset. |
+| `test_status_for_this_dataset_is_kept` | A status for this dataset is still kept. | A status with `is_recording` set. |
+
+## test_cli.py — the data logger control CLI (needs: none; `TestMain`: integration)
+
+`answer()` replaces `rich.prompt.Prompt.ask` with one that returns scripted answers in turn and records each prompt, returning the prompt's default for an empty answer as rich does. `add_dataset()` is given the `RecordingClient` from `test_dataset.py`, so nothing is sent.
+
+### TestAddDataset
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_uses_the_cli_client` | Data logger: `add_dataset()` sends through the client it is given, the CLI's own, rather than a `Dataset` client of its own on the default server that is never read. | Checks the `DATASET_ADD` the recording client received. |
+| `test_bad_message_types_are_asked_again` | Data logger: message types that record nothing or aren't IDs, such as spaces only, `0`, text or a negative number, are reported and asked again, rather than creating a dataset that records nothing or crashing. | Parametrized; the second answer, `1001, 1002`, also shows commas are accepted. |
+| `test_too_many_message_types_are_asked_again` | More message types than the 64 a dataset holds are asked again. | 65 IDs, then one. |
+| `test_bad_name_is_asked_again` | Data logger: a name too long for its field or not ASCII is asked again, rather than raising when the message is built. | Parametrized over 32 characters and `é`. |
+| `test_max_size_mb_is_asked_until_in_range` | `max_size_mb` is asked for, defaults to 500, and is asked again until it is a number from 1 to 500. | Parametrized over the default, a valid value, and invalid values before one. |
+
+### TestMain
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_add_uses_the_given_server` | Data logger: `add` uses the CLI's client, connected to the server given on the command line. | Replaces `add_dataset` with a stand-in that records its client, against the `manager` fixture. |
+| `test_bad_argument_is_reported_not_raised` | Data logger: a command whose dataset name is too long or isn't ASCII is reported, and the CLI carries on. | Parametrized over `remove` with 40 characters and `start é`, then `q`. |
+| `test_exits_cleanly_without_manager` | With no manager running, the CLI prints one line and exits with status 1, rather than a traceback. | A free port. |
+
 ## test_data_logger.py — `DataLogger` with a real manager, and its entry point (needs: integration)
 
 The `data_logger` fixture runs a `DataLogger` in a thread against the `manager` fixture, with the test definitions and a `FakeClock` for its datasets, and stops it with `stop()` at teardown; if `run()` raises, the `thread_exceptions` fixture fails the test. The `controller` fixture is a client subscribed to `Dataset.DATALOGGER_TYPES` that sends the requests. `wait_for_logger()` sends `DATA_LOGGER_CONFIG_REQUEST` until a `DATA_LOGGER_CONFIG` comes back, which shows the logger's and the client's subscriptions are in place; because the logger answers requests in order, the same exchange also serves as a barrier after other requests. Datasets record with the `json` formatter into `tmp_path`. `StaleTestStart` is `TEST_START` with 8 bytes instead of 4, as an out-of-date definition would send it, and `UnknownMessage` is type 7777, which the logger's definitions don't have. `events()` lists the dataset events (`DATA_LOGGER_ERROR`, `STARTED`, `STOPPED`, `SAVED`, `REMOVED`) about one dataset, in the order they arrived.

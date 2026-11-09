@@ -116,6 +116,8 @@ class Dataset:
 
         self.status_interval = status_interval
         self._last_request = time.time()
+        #: The last ``DATA_LOGGER_CONFIG`` received, or None.
+        self.datalogger_config: cd.MDF_DATA_LOGGER_CONFIG | None = None
 
     def close(self):
         if self._managed_client and self._client:
@@ -257,14 +259,19 @@ class Dataset:
             return self.process_msg(msg)
 
     def process_msg(self, msg: pyrtma.Message) -> cd.MDF_DATA_LOGGER_ERROR | None:
-        if msg.type_id in (
+        if msg.type_id == cd.MT_DATA_LOGGER_ERROR:
+            # An error names its dataset in dataset_name; one with no name is
+            # about the data logger as a whole, so every dataset gets it.
+            dataset_name = cast(cd.MDF_DATA_LOGGER_ERROR, msg.data).dataset_name
+            if dataset_name not in ("", self._name):
+                return
+        elif msg.type_id in (
             cd.MT_DATASET_STATUS,
             cd.MT_DATASET_ADDED,
             cd.MT_DATASET_STARTED,
             cd.MT_DATASET_STOPPED,
             cd.MT_DATASET_REMOVED,
             cd.MT_DATASET_SAVED,
-            cd.MT_DATA_LOGGER_ERROR,
         ):
             if msg.data.name != self._name:
                 return
@@ -286,16 +293,7 @@ class Dataset:
             case cd.MT_DATA_LOGGER_ERROR:
                 return cast(cd.MDF_DATA_LOGGER_ERROR, msg.data)
             case cd.MT_DATA_LOGGER_CONFIG:
-                definitions = (
-                    self._client.definitions
-                    if self._client is not None
-                    else self._definitions
-                )
-                # Known bug, fixed in Phase 6: this method doesn't exist.
-                self.datalogger_config = self.process_data_logger_config_msg(  # pyright: ignore[reportAttributeAccessIssue]
-                    cast(cd.MDF_DATA_LOGGER_CONFIG, msg.data),
-                    definitions=definitions,
-                )
+                self.datalogger_config = cast(cd.MDF_DATA_LOGGER_CONFIG, msg.data)
 
     def add(self) -> cd.MDF_DATASET_ADD:
         msg = cd.MDF_DATASET_ADD()

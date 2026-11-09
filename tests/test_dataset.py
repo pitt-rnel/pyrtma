@@ -5,6 +5,7 @@ The ``Dataset`` is given a stand-in client that records what it would send.
 
 from __future__ import annotations
 
+import ctypes
 from pathlib import Path
 from typing import Any, cast
 
@@ -13,6 +14,7 @@ import pytest
 import pyrtma
 from pyrtma import core_defs as cd
 from pyrtma.data_logger.dataset import Dataset
+from pyrtma.header import MessageHeader
 
 
 class RecordingClient:
@@ -70,3 +72,69 @@ def test_positional_subdivide_interval_still_accepted(tmp_path: Path) -> None:
         dataset = Dataset("ds", tmp_path, "rec", "json", 30, create_client=False)
 
     assert dataset.subdivide_interval == 30
+
+
+def logger_message(data: Any) -> pyrtma.Message:
+    header = MessageHeader()
+    header.msg_type = data.type_id
+    header.num_data_bytes = ctypes.sizeof(data)
+    return pyrtma.Message(header, data)
+
+
+def error(dataset: str) -> cd.MDF_DATA_LOGGER_ERROR:
+    data = cd.MDF_DATA_LOGGER_ERROR()
+    data.dataset_name = dataset
+    data.exc_type = "DatasetError"
+    data.msg = "something went wrong"
+    return data
+
+
+class TestProcessMsg:
+    def test_error_for_this_dataset_is_returned(self, tmp_path: Path) -> None:
+        dataset, _ = make(tmp_path)
+
+        result = dataset.process_msg(logger_message(error("ds")))
+
+        assert result is not None
+        assert result.exc_type == "DatasetError"
+
+    def test_error_for_another_dataset_is_ignored(self, tmp_path: Path) -> None:
+        dataset, _ = make(tmp_path)
+
+        assert dataset.process_msg(logger_message(error("other"))) is None
+
+    def test_error_for_no_dataset_is_returned(self, tmp_path: Path) -> None:
+        dataset, _ = make(tmp_path)
+
+        result = dataset.process_msg(logger_message(error("")))
+
+        assert result is not None
+        assert result.dataset_name == ""
+
+    def test_config_is_stored(self, tmp_path: Path) -> None:
+        dataset, _ = make(tmp_path)
+        config = cd.MDF_DATA_LOGGER_CONFIG()
+        config.num_datasets = 1
+        config.datasets[0].name = "ds"
+
+        result = dataset.process_msg(logger_message(config))
+
+        assert result is None
+        assert dataset.datalogger_config is not None
+        assert dataset.datalogger_config.num_datasets == 1
+        assert dataset.datalogger_config.datasets[0].name == "ds"
+
+    def test_config_is_none_until_received(self, tmp_path: Path) -> None:
+        dataset, _ = make(tmp_path)
+
+        assert dataset.datalogger_config is None
+
+    def test_status_for_this_dataset_is_kept(self, tmp_path: Path) -> None:
+        dataset, _ = make(tmp_path)
+        status = cd.MDF_DATASET_STATUS()
+        status.name = "ds"
+        status.is_recording = 1
+
+        dataset.process_msg(logger_message(status))
+
+        assert dataset.is_recording

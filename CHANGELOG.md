@@ -27,6 +27,7 @@ that makes them. The version number is chosen at release time.
 - `DatasetWriter.started`, and `pyrtma.data_logger.dataset_writer.error_message()`, which builds a `DATA_LOGGER_ERROR` that always fits its fields.
 - `DataFormatter.max_bytes`, 500,000,000 bytes by default: no file the data logger writes grows past it, whatever its formatter. When a file is full, the dataset continues in the next file, numbered `rec_0001`, `rec_0002` and so on; each file is complete and gets its own `DATASET_SAVED`. A file always holds at least one message. A lab can change the limit by subclassing a formatter.
 - `DataFormatter.write()` returns how many messages it wrote, and `DataFormatter.discard()`, which does nothing by default, releases what a formatter holds when writing fails. Formatters that override `write()` and return None are treated as having written everything and aren't split. A formatter that takes no messages even into a new file fails its dataset with `DatasetWriterError`.
+- `pyrtma.data_logger.cli.parse_msg_types()`, which parses message types as the CLI takes them: `all` or `*`, or IDs separated by spaces or commas. `cli.add_dataset()` takes the client to send with.
 
 ### Changed
 
@@ -93,6 +94,7 @@ that makes them. The version number is chosen at release time.
 - Files are split by size, not time. The `DATASET` struct's `subdivide_interval` field is replaced, in place, by `max_size_mb`: the largest file, in MB of 1,000,000 bytes, from 1 to the new constant `DATASET_MAX_SIZE_MB` (500). Every formatter keeps each file within it and continues in a new file when one is full. The bytes on the wire and every message's size and type hash are unchanged, so clients built before this keep working without rebuilding; their interval arrives as `max_size_mb`, and a value out of range, such as 0, is replaced by 500 with a warning. Rebuilt clients must set `max_size_mb`; code that sets `subdivide_interval` no longer compiles. Regenerate definitions with `build_all_msg_defs.sh` or `.bat`.
 - `Dataset(..., max_size_mb=...)` and `DatasetWriter(..., max_size_mb=...)`, keyword-only, default 500, set a dataset's size limit and raise `ValueError` and `DatasetError` respectively when it is out of range. Their `subdivide_interval` parameter is deprecated and ignored, with a `DeprecationWarning` when nonzero. `DATA_LOGGER_CONFIG` reports each dataset's `max_size_mb`.
 - `DataFormatter.max_bytes` is an ordinary class attribute, a ceiling that the data logger lowers per file to the dataset's `max_size_mb`.
+- The data logger CLI asks for `max_size_mb`, from 1 to 500 with 500 as the default, and accepts message types separated by commas as well as spaces.
 
 ### Fixed
 
@@ -148,3 +150,6 @@ that makes them. The version number is chosen at release time.
 - `pyrtma.utils.log_reader`, and with it `pyrtma.data_logger`, imports where `tkinter` isn't installed, such as on headless Linux. `tkinter` is imported only when a file dialog is needed, and its absence then raises `RuntimeError`.
 - A QuickLogger recording no longer loses its data once it passes 4 GiB (C9). Packing an offset past 4 GiB raised `OverflowError` before the data was copied in, and the header's 32-bit sizes wrapped. Files now stop at `max_bytes`, and a QuickLogger file is never allowed past the 4 GiB its format can describe even if `max_bytes` is raised.
 - `build_all_msg_defs.bat` builds the core definitions from `src/pyrtma/core_defs/rtma.defs`, and the examples from `example.defs`, as `build_all_msg_defs.sh` does; it pointed at a `core_defs.yaml` that doesn't exist.
+- `Dataset.poll()` and `process_msg()` handle `DATA_LOGGER_ERROR`, returning errors for their dataset and errors with no dataset name, and store `DATA_LOGGER_CONFIG` in the new `datalogger_config` attribute (C7). Both raised `AttributeError` before.
+- The data logger CLI's `add` sends with the CLI's own client, so it uses the server given on the command line; it used to create a second client on the default server, which nothing read.
+- The data logger CLI asks again for a name or other text that is too long or isn't ASCII, for message types that would record nothing or aren't IDs, and for more than 64 message types, instead of crashing or adding a dataset that records nothing. A command whose dataset name is too long or isn't ASCII is reported, and the CLI carries on. With no manager running, it prints one line and exits with status 1.
