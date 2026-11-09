@@ -18,27 +18,38 @@ running, or let it start its own with ``--start-manager``::
 
 With ``-r`` the benchmark is repeated, and the median and range of the rates
 are reported, since single runs vary by several percent.
+
+With ``--logger``, a data logger runs too, in its own process, and records
+each run's messages in a QuickLogger dataset, in a temporary folder deleted at
+the end. The manager waits for logger modules, so a logger that can't keep up
+slows every module down. The report adds the fraction of messages logged,
+read from the saved files' headers.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import ctypes
 import multiprocessing
 import platform
 import queue
 import socket
+import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 import pyrtma
+from pyrtma.data_logger.dataset import Dataset
 from pyrtma.definitions import MessageDefinitions
 from pyrtma.exceptions import MessageManagerNotFound
+from pyrtma.utils.log_reader import BinFileHeader
 
 DEFS_PATH = (
     Path(__file__).resolve().parent.parent / "tests" / "test_msg_defs" / "test_defs.py"
@@ -52,6 +63,8 @@ ABORT_TIMEOUT = 120.0
 IDLE_LIMIT = 1.0
 # How long a started manager has to accept connections.
 MANAGER_START_TIMEOUT = 10.0
+# How long the data logger has to start, or to answer a dataset request.
+LOGGER_TIMEOUT = 60.0
 
 
 @dataclass(frozen=True)
@@ -121,19 +134,26 @@ class RunSummary:
         slowest_subscriber_rate: The lowest subscriber rate, or None.
         received: The fraction of the expected messages that subscribers
             received, from 0 to 1, or None without subscribers.
+        logged: The fraction of the messages sent that the data logger
+            recorded, or None without ``--logger``.
     """
 
     publisher_rate: float
     subscriber_rate: Optional[float]
     slowest_subscriber_rate: Optional[float]
     received: Optional[float]
+    logged: Optional[float] = None
 
 
-def summarize_run(results: Sequence[RoleResult]) -> RunSummary:
+def summarize_run(
+    results: Sequence[RoleResult], logged: Optional[float] = None
+) -> RunSummary:
     """Combine one run's results.
 
     Args:
         results: Every publisher's and subscriber's result for the run.
+        logged: The fraction of the messages that the data logger recorded,
+            if one was recording.
 
     Returns:
         The run's summary.
@@ -142,13 +162,14 @@ def summarize_run(results: Sequence[RoleResult]) -> RunSummary:
     subscribers = [r for r in results if r.role == "subscriber"]
     publisher_rate = statistics.mean(r.rate for r in publishers) if publishers else 0.0
     if not subscribers:
-        return RunSummary(publisher_rate, None, None, None)
+        return RunSummary(publisher_rate, None, None, None, logged)
     expected = sum(r.expected for r in subscribers)
     return RunSummary(
         publisher_rate=publisher_rate,
         subscriber_rate=statistics.mean(r.rate for r in subscribers),
         slowest_subscriber_rate=min(r.rate for r in subscribers),
         received=sum(r.count for r in subscribers) / expected if expected else 1.0,
+        logged=logged,
     )
 
 
@@ -220,6 +241,10 @@ def publisher_loop(index: int, settings: Settings, results: Any) -> None:
         for _ in range(count):
             client.send_message(msg_data)
         toc = time.perf_counter()
+        # The manager handles a module's messages in order, so once this
+        # reaches the benchmark, it has forwarded every message, to the data
+        # logger too.
+        client.send_signal(mt["PUBLISHER_DONE"])
 
         client.disconnect()
         results.put(("publisher", index, count, count, toc - tic))
@@ -297,7 +322,7 @@ def run_once(settings: Settings) -> list[RoleResult]:
     control = _client(defs, settings.server)
     processes: list[Any] = []
     try:
-        control.subscribe([mt["PUBLISHER_READY"]])
+        control.subscribe([mt["PUBLISHER_READY"], mt["PUBLISHER_DONE"]])
         for n in range(1, settings.num_publishers + 1):
             processes.append(
                 ctx.Process(target=publisher_loop, args=(n, settings, results))
@@ -306,12 +331,17 @@ def run_once(settings: Settings) -> list[RoleResult]:
 
         deadline = time.monotonic() + ABORT_TIMEOUT
         ready = 0
+        # Without subscribers, a publisher can finish before the others are
+        # ready, so its PUBLISHER_DONE is counted here too.
+        done = 0
         while ready < settings.num_publishers:
             if time.monotonic() > deadline:
                 raise BenchmarkError("The publishers didn't connect in time.")
             msg = control.read_message(timeout=0.1)
             if msg is not None and msg.type_id == mt["PUBLISHER_READY"]:
                 ready += 1
+            elif msg is not None and msg.type_id == mt["PUBLISHER_DONE"]:
+                done += 1
             _raise_reported_error(results)
 
         for n in range(1, settings.num_subscribers + 1):
@@ -339,6 +369,15 @@ def run_once(settings: Settings) -> list[RoleResult]:
             if item[0] == "error":
                 raise BenchmarkError(item[2])
             collected.append(RoleResult(*item))
+
+        # Every publisher reported, so its PUBLISHER_DONE has been sent; wait
+        # for the manager to have handled them all before the run ends.
+        while done < settings.num_publishers:
+            if time.monotonic() > deadline:
+                raise BenchmarkError("The manager didn't pass on PUBLISHER_DONE.")
+            msg = control.read_message(timeout=0.1)
+            if msg is not None and msg.type_id == mt["PUBLISHER_DONE"]:
+                done += 1
         return sorted(collected, key=lambda r: (r.role, r.index))
     finally:
         for process in processes:
@@ -422,8 +461,185 @@ def start_manager() -> tuple[subprocess.Popen[bytes], str]:
     return process, server
 
 
+def count_logged(path: Path) -> int:
+    """Count the messages in a QuickLogger file, from its header alone.
+
+    Args:
+        path: The file.
+
+    Returns:
+        How many messages it holds.
+    """
+    with path.open("rb") as file:
+        header = BinFileHeader.from_buffer_copy(file.read(ctypes.sizeof(BinFileHeader)))
+    return header.num_messages
+
+
+class DataLoggerRecording:
+    """A data logger, in its own process, recording each run's messages.
+
+    Each run gets a QuickLogger dataset of the benchmark's message type,
+    started before the run and removed after it. Everything is written to a
+    temporary folder, which :meth:`close` deletes along with the process.
+
+    Args:
+        server: The manager's address.
+        msg_size: The benchmark's message size, which sets the type recorded.
+
+    Raises:
+        BenchmarkError: The data logger didn't start.
+    """
+
+    def __init__(self, server: str, msg_size: int) -> None:
+        self._server = server
+        self._defs = load_definitions()
+        self._msg_type = self._defs.MT[f"TEST_MSG_{msg_size}"]
+        self._runs = 0
+        self._folder = Path(tempfile.mkdtemp(prefix="pyrtma_bench_"))
+        self._process = subprocess.Popen(
+            [sys.executable, "-m", "pyrtma.data_logger"]
+            + ["-m", server, "-d", str(DEFS_PATH), "--log-level", "WARN"],
+            stdout=subprocess.DEVNULL,
+        )
+        try:
+            self._wait_until_ready()
+        except BaseException:
+            self.close()
+            raise
+
+    def __enter__(self) -> DataLoggerRecording:
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
+
+    def _dataset(self, name: str) -> Dataset:
+        return Dataset(
+            name=name,
+            save_path=self._folder,
+            filename=name,
+            formatter="quicklogger",
+            msg_types=[self._msg_type],
+            mm_ip=self._server,
+            definitions=self._defs,
+        )
+
+    def _wait_until_ready(self) -> None:
+        """Ask for the data logger's configuration until it answers.
+
+        Raises:
+            BenchmarkError: It exited, or didn't answer in time.
+        """
+        probe = self._dataset("bench_probe")
+        try:
+            deadline = time.monotonic() + LOGGER_TIMEOUT
+            next_request = 0.0
+            while probe.datalogger_config is None:
+                if self._process.poll() is not None:
+                    raise BenchmarkError("The data logger exited before it was ready.")
+                now = time.monotonic()
+                if now > deadline:
+                    raise BenchmarkError("The data logger didn't answer in time.")
+                if now >= next_request:
+                    probe.request_data_logger_config()
+                    next_request = now + 0.25
+                probe.poll(timeout=0.05)
+        finally:
+            probe.close()
+
+    def _wait(self, dataset: Dataset, done: Callable[[], bool], what: str) -> None:
+        """Read the data logger's replies until a dataset reaches a state.
+
+        Args:
+            dataset: The dataset.
+            done: Whether it has reached the state.
+            what: The state, for the error message.
+
+        Raises:
+            BenchmarkError: The data logger reported an error, exited, or
+                didn't reply in time.
+        """
+        deadline = time.monotonic() + LOGGER_TIMEOUT
+        while not done():
+            if self._process.poll() is not None:
+                raise BenchmarkError("The data logger exited.")
+            if time.monotonic() > deadline:
+                raise BenchmarkError(f"The data logger didn't report {what} in time.")
+            error = dataset.poll(timeout=0.1)
+            if error is not None:
+                raise BenchmarkError(
+                    f"The data logger reported {error.exc_type}: {error.msg}"
+                )
+
+    def start(self) -> Dataset:
+        """Add and start a dataset for the next run.
+
+        Raises:
+            BenchmarkError: As for :meth:`_wait`.
+
+        Returns:
+            The recording dataset.
+        """
+        self._runs += 1
+        dataset = self._dataset(f"bench{self._runs}")
+        try:
+            dataset.add()
+            self._wait(dataset, lambda: dataset.added, "the dataset added")
+            dataset.start()
+            self._wait(dataset, lambda: dataset.started, "the dataset started")
+        except BaseException:
+            dataset.close()
+            raise
+        return dataset
+
+    def finish(self, dataset: Dataset) -> int:
+        """Stop and remove a run's dataset, and count what it recorded.
+
+        The data logger reports a dataset removed only once its files are
+        finished, so they are complete when they're counted. They're deleted
+        once counted.
+
+        Args:
+            dataset: The run's dataset, from :meth:`start`.
+
+        Raises:
+            BenchmarkError: As for :meth:`_wait`.
+
+        Returns:
+            How many messages its files hold.
+        """
+        try:
+            dataset.stop()
+            self._wait(dataset, lambda: dataset.stopped, "the dataset stopped")
+            dataset.remove()
+            self._wait(dataset, lambda: dataset.removed, "the dataset removed")
+            count = 0
+            for saved in dataset.saved:
+                path = Path(saved)
+                count += count_logged(path)
+                path.unlink()
+            return count
+        finally:
+            dataset.close()
+
+    def close(self) -> None:
+        """Stop the data logger and delete what it wrote."""
+        if self._process.poll() is None:
+            self._process.terminate()
+            try:
+                self._process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self._process.kill()
+                self._process.wait()
+        shutil.rmtree(self._folder, ignore_errors=True)
+
+
 def _count(n: int, noun: str) -> str:
     return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
+
+
+def _percent(value: Optional[float]) -> str:
+    return "-" if value is None else f"{value:.1%}"
 
 
 def _rate(value: Optional[float]) -> str:
@@ -441,22 +657,28 @@ def report(settings: Settings, summaries: Sequence[RunSummary]) -> str:
         The report's lines.
     """
     wire = HEADER_SIZE + settings.msg_size
+    logging = any(s.logged is not None for s in summaries)
     lines = [
         f"{_count(settings.num_publishers, 'publisher')}, "
         f"{_count(settings.num_subscribers, 'subscriber')}, "
         f"{_count(settings.total, 'message')} of {settings.msg_size} bytes "
-        f"({wire} with the header), {_count(len(summaries), 'run')}",
+        f"({wire} with the header), {_count(len(summaries), 'run')}"
+        + (", with the data logger recording" if logging else ""),
         "",
         f"{'Run':>4}  {'Publisher msg/s':>15}  {'Subscriber msg/s':>16}"
-        f"  {'Slowest':>8}  {'MB/s':>7}  {'Received':>8}",
+        f"  {'Slowest':>8}  {'MB/s':>7}  {'Received':>8}"
+        + (f"  {'Logged':>8}" if logging else ""),
     ]
     for n, s in enumerate(summaries, start=1):
         mbps = (s.subscriber_rate or s.publisher_rate) * wire / 1e6
-        received = "-" if s.received is None else f"{s.received:.1%}"
-        lines.append(
+        line = (
             f"{n:>4}  {_rate(s.publisher_rate):>15}  {_rate(s.subscriber_rate):>16}"
-            f"  {_rate(s.slowest_subscriber_rate):>8}  {mbps:>7.1f}  {received:>8}"
+            f"  {_rate(s.slowest_subscriber_rate):>8}  {mbps:>7.1f}"
+            f"  {_percent(s.received):>8}"
         )
+        if logging:
+            line += f"  {_percent(s.logged):>8}"
+        lines.append(line)
     lines.append("")
     pub = median_and_range([s.publisher_rate for s in summaries])
     lines.append(
@@ -529,6 +751,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Start a message manager on a free loopback port for the benchmark.",
     )
+    parser.add_argument(
+        "--logger",
+        action="store_true",
+        help="Run a data logger that records each run in a QuickLogger dataset, "
+        "in a temporary folder, and report how much it recorded.",
+    )
     args = parser.parse_args(argv)
     for name in ("num_msgs", "num_publishers", "runs"):
         if getattr(args, name) < 1:
@@ -568,8 +796,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             f"{platform.system()}; manager at {server}, {where}"
         )
         summaries = []
-        for _ in range(args.runs):
-            summaries.append(summarize_run(run_once(settings)))
+        with contextlib.ExitStack() as stack:
+            recording: Optional[DataLoggerRecording] = None
+            if args.logger:
+                recording = stack.enter_context(
+                    DataLoggerRecording(server, args.msg_size)
+                )
+            for _ in range(args.runs):
+                if recording is None:
+                    summaries.append(summarize_run(run_once(settings)))
+                    continue
+                dataset = recording.start()
+                try:
+                    results = run_once(settings)
+                finally:
+                    logged = recording.finish(dataset)
+                summaries.append(summarize_run(results, logged / settings.total))
         print(report(settings, summaries))
         return 0
     except (BenchmarkError, MessageManagerNotFound) as e:
