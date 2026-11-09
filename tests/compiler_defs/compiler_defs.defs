@@ -1,0 +1,6 @@
+# Definitions that exercise the compilers: aliases of native types, of
+# structs and of aliases, struct and message fields, arrays of each, escaped
+# string constants, and reserved IDs in two files. See tests/test_compilers.py.
+index:
+  shapes: shapes.yaml
+  uses: uses.yaml

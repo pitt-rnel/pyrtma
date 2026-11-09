@@ -237,6 +237,12 @@ class AlignmentError(ParserError):
     pass
 
 
+class GeneratedSourceError(ParserError):
+    """The compiler generated code that isn't valid in its language."""
+
+    pass
+
+
 class InvalidMessageSize(ParserError):
     """Raised when a message is too large"""
 
@@ -1023,6 +1029,8 @@ class Parser:
                 length_expression=f'"{pad_len}"',
                 length_expanded=f'"{pad_len}"',
                 length=pad_len or None,
+                # It starts where the last field ends.
+                offset=ptr,
             )
 
             # Stride by an amount equal to the field size
@@ -1606,7 +1614,14 @@ class Parser:
         if data.get("message_defs") is not None:
             for name, mdf in data["message_defs"].items():
                 self.handle_message_def(name, mdf)
-            self.yaml_dict["message_defs"].update(data["message_defs"])
+            message_defs = dict(data["message_defs"])
+            # Each file may reserve IDs; keep them all for --combined output.
+            earlier = self.yaml_dict["message_defs"].get("_RESERVED_")
+            if earlier is not None and "_RESERVED_" in message_defs:
+                message_defs["_RESERVED_"] = {
+                    "id": list(earlier["id"]) + list(message_defs["_RESERVED_"]["id"])
+                }
+            self.yaml_dict["message_defs"].update(message_defs)
 
     def check_key_value_separation(self, text: str):
         for n, line in enumerate(text.splitlines(), start=1):

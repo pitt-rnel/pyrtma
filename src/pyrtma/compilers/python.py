@@ -2,6 +2,7 @@ import pathlib
 
 from textwrap import dedent
 from pyrtma.parser import (
+    GeneratedSourceError,
     Parser,
     ConstantExpr,
     ConstantString,
@@ -12,10 +13,9 @@ from pyrtma.parser import (
     MDF,
     SDF,
 )
-from typing import Union
+from typing import List, Union
 import subprocess
 import sys
-import os
 from pyrtma.__version__ import __version__
 
 # Field type name to ctypes
@@ -80,7 +80,6 @@ desctype_map = {
     "signed long long": "Int64",
     "unsigned long long": "Uint64",
 }
-DEFAULT_BLACK_LEN = 88  # preferred line length
 TAB = "    "
 
 
@@ -110,6 +109,17 @@ class PyDefCompiler:
             return f"{td.name} = {ftype}\n"
         else:
             return f"{td.name} = {td.type_name}\n"
+
+    def is_struct_alias(self, td: TypeAlias) -> bool:
+        """Whether an alias names a struct rather than a native type.
+
+        Args:
+            td: The alias.
+
+        Returns:
+            True for an alias of a struct, which has to follow its class.
+        """
+        return td.type_name not in type_map
 
     def get_descriptor(self, ftype: str, flen: int) -> str:
         if ftype in type_map.keys():
@@ -167,14 +177,8 @@ class PyDefCompiler:
             dstr += f"{'    ' * 3}{field.name}{desc}\n"
 
         msg_src = sdf.src.name
-        type_def_str = repr(sdf.raw)
-        type_def_rhs = 'type_def: ClassVar[str] = "'
-        type_def_end = '"'
-        type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
-        type_def_line_len = len(TAB) + len(type_def_line)
-        if type_def_line_len > DEFAULT_BLACK_LEN:
-            type_def_rhs = f'type_def: ClassVar[\n{TAB *4}str\n{TAB *3}] = "'
-            type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
+        # repr() gives a literal for any text; Black lays the line out.
+        type_def_line = f"type_def: ClassVar[str] = {repr(sdf.raw)}"
 
         template = f"""\
         class {sdf.name}(MessageBase, metaclass=MessageMeta):
@@ -196,14 +200,8 @@ class PyDefCompiler:
 
         msg_id = mdf.type_id
         msg_src = mdf.src.name
-        type_def_str = repr(mdf.raw)
-        type_def_rhs = 'type_def: ClassVar[str] = "'
-        type_def_end = '"'
-        type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
-        type_def_line_len = len(TAB) + len(type_def_line)
-        if type_def_line_len > DEFAULT_BLACK_LEN:
-            type_def_rhs = f'type_def: ClassVar[\n{TAB *4}str\n{TAB *3}] = "'
-            type_def_line = f"{type_def_rhs}{type_def_str}{type_def_end}"
+        # repr() gives a literal for any text; Black lays the line out.
+        type_def_line = f"type_def: ClassVar[str] = {repr(mdf.raw)}"
 
         template = f"""\
         class MDF_{mdf.name}(MessageData, metaclass=MessageMeta):
@@ -247,59 +245,107 @@ class PyDefCompiler:
         """
         return dedent(s)
 
+    def generate_source(self) -> str:
+        """Generate the definitions module's source, before formatting.
+
+        Returns:
+            The source.
+        """
+        parts: List[str] = []
+        parts.append(self.generate_docstr())
+        parts.append(self.generate_imports())
+        parts.append("\n")
+
+        # Version
+        parts.append(f'COMPILED_PYRTMA_VERSION: str = "{__version__}"\n')
+        parts.append("check_compiled_version(COMPILED_PYRTMA_VERSION)\n\n")
+
+        parts.append("# Constants\n")
+        obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
+        for obj in self.parser.constants.values():
+            parts.append(self.generate_constant(obj))
+        parts.append("\n")
+
+        parts.append("# String Constants\n")
+        for obj in self.parser.string_constants.values():
+            parts.append(self.generate_string_constant(obj))
+        parts.append("\n")
+
+        parts.append("# Type Aliases\n")
+        for obj in self.parser.aliases.values():
+            if not self.is_struct_alias(obj):
+                parts.append(self.generate_type_alias(obj))
+        parts.append("\n")
+
+        parts.append("# Host IDs\n")
+        for obj in self.parser.host_ids.values():
+            parts.append(self.generate_host_id(obj))
+        parts.append("\n")
+
+        parts.append("# Module IDs\n")
+        for obj in self.parser.module_ids.values():
+            parts.append(self.generate_module_id(obj))
+        parts.append("\n")
+
+        parts.append("# Message Type IDs\n")
+        for obj in self.parser.message_ids.values():
+            parts.append(self.generate_msg_type_id(obj))
+        parts.append("\n\n")
+
+        parts.append("# Struct Definitions\n")
+        for obj in self.parser.struct_defs.values():
+            parts.append(self.generate_struct(obj))
+            parts.append("\n\n")
+
+        # Aliases of structs name their classes, so they follow them. Fields
+        # use the struct's own name, so nothing before here needs them.
+        struct_aliases = [
+            a for a in self.parser.aliases.values() if self.is_struct_alias(a)
+        ]
+        if struct_aliases:
+            parts.append("# Struct Aliases\n")
+            for obj in struct_aliases:
+                parts.append(self.generate_type_alias(obj))
+            parts.append("\n\n")
+
+        parts.append("# Message Definitions\n")
+        for obj in self.parser.message_defs.values():
+            parts.append(self.generate_msg_def(obj))
+            parts.append("\n\n")
+
+        parts.append("# User Context\n")
+        parts.append(self.generate_context())
+        return "".join(parts)
+
     def generate(self, out_filepath: pathlib.Path):
-        with open(out_filepath, mode="w") as f:
-            f.write(self.generate_docstr())
-            f.write(self.generate_imports())
-            f.write("\n")
+        """Write the definitions module and format it with Black.
 
-            # Version
-            f.write(f'COMPILED_PYRTMA_VERSION: str = "{__version__}"\n')
-            f.write("check_compiled_version(COMPILED_PYRTMA_VERSION)\n\n")
+        Args:
+            out_filepath: The file to write.
 
-            f.write("# Constants\n")
-            obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
-            for obj in self.parser.constants.values():
-                f.write(self.generate_constant(obj))
-            f.write("\n")
+        Raises:
+            GeneratedSourceError: The generated source isn't valid Python.
+                Nothing is written.
+        """
+        source = self.generate_source()
+        try:
+            compile(source, str(out_filepath), "exec")
+        except SyntaxError as e:
+            raise GeneratedSourceError(
+                f"The Python generated for {out_filepath} is invalid, at line {e.lineno}: {(e.text or '').strip()} ({e.msg})"
+            ) from e
 
-            f.write("# String Constants\n")
-            for obj in self.parser.string_constants.values():
-                f.write(self.generate_string_constant(obj))
-            f.write("\n")
+        with open(out_filepath, mode="w", encoding="utf-8") as f:
+            f.write(source)
 
-            f.write("# Type Aliases\n")
-            for obj in self.parser.aliases.values():
-                f.write(self.generate_type_alias(obj))
-            f.write("\n")
-
-            f.write("# Host IDs\n")
-            for obj in self.parser.host_ids.values():
-                f.write(self.generate_host_id(obj))
-            f.write("\n")
-
-            f.write("# Module IDs\n")
-            for obj in self.parser.module_ids.values():
-                f.write(self.generate_module_id(obj))
-            f.write("\n")
-
-            f.write("# Message Type IDs\n")
-            for obj in self.parser.message_ids.values():
-                f.write(self.generate_msg_type_id(obj))
-            f.write("\n\n")
-
-            f.write("# Struct Definitions\n")
-            for obj in self.parser.struct_defs.values():
-                f.write(self.generate_struct(obj))
-                f.write("\n\n")
-
-            f.write("# Message Definitions\n")
-            for obj in self.parser.message_defs.values():
-                f.write(self.generate_msg_def(obj))
-                f.write("\n\n")
-
-            f.write("# User Context\n")
-            f.write(self.generate_context())
-
-        # run black formatter
-        subprocess.run([sys.executable, "-m", "black", out_filepath], cwd=os.getcwd())
+        # The file is valid without formatting, so a failure here only warns.
+        result = subprocess.run(
+            [sys.executable, "-m", "black", "-q", str(out_filepath)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()
+            self.parser.warning(
+                f"Black couldn't format {out_filepath}; it is valid but unformatted: {detail}"
+            )

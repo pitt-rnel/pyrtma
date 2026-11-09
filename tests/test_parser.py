@@ -1079,3 +1079,28 @@ class TestImports:
 
         assert parser.constants["X"].value == 1
         assert any("a.yml" in w for w in log.warnings)
+
+
+class TestPadding:
+    @pytest.mark.parametrize(
+        ("last", "pad"), [("int32", 4), ("int16", 6), ("int8", 7), ("int8[7]", 1)]
+    )
+    def test_trailing_padding_records_its_offset(
+        self, tmp_path: Path, last: str, pad: int
+    ) -> None:
+        text = f"""\
+            struct_defs:
+              S:
+                fields:
+                  d: double
+                  last: {last}
+            """
+        defs = write_definitions(tmp_path, {"m": text})
+
+        parser, _ = parse_definitions(defs)
+
+        fields = parser.struct_defs["S"].fields
+        padding = fields[-1]
+        assert padding.name.startswith("padding_")
+        assert (padding.offset, padding.size) == (16 - pad, pad)
+        assert [f.offset for f in fields] == sorted(f.offset for f in fields)

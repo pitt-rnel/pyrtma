@@ -6,7 +6,6 @@ import sys
 from typing import List, Union, Dict, Optional
 
 from .parser import Parser, ParserError, FileFormatError
-from rich.traceback import install
 import warnings
 from pyrtma.compilers.python import PyDefCompiler
 from pyrtma.compilers.javascript import JSDefCompiler
@@ -14,8 +13,6 @@ from pyrtma.compilers.matlab import MatlabDefCompiler
 from pyrtma.compilers.c99 import CDefCompiler
 from pyrtma.compilers.yaml import YAMLCompiler
 from pyrtma.compilers.info import InfoCompiler
-
-install(word_wrap=True, show_locals=True)
 
 
 def compile(
@@ -40,13 +37,15 @@ def compile(
         matlab (bool, optional): Output matlab .m file. Defaults to False.
         c_lang (bool, optional): Output C .h file. Defaults to False.
         info (bool, optional): Output info .txt file. Defaults to False.
-        combined (bool, optional): Output combined YAML file. Defaults to False.
+        combined (bool, optional): Output combined YAML file, and a compiler
+            index for it, ``<name>_combined.defs``. Defaults to False.
         debug (bool, optional): Debug mode. Defaults to False.
 
 
     Raises:
         FileFormatError: Issue with input file format
-        FileExistsError: Output file is not a directory
+        FileExistsError: The output location exists and is not a directory.
+        FileNotFoundError: The output directory's parent doesn't exist.
         RuntimeError: Invalid output filename
     """
     # determine if using v1 or v2 compiler
@@ -91,11 +90,13 @@ def compile(
     else:
         outpath = pathlib.Path(out_dir)
 
-    if not outpath.is_dir():
-        raise FileExistsError(f"The output location must be a directory.")
-
-    # Make the final output directory, but no anything above it.
-    outpath.mkdir(parents=False, exist_ok=True)
+    # Make the final output directory, but nothing above it.
+    try:
+        outpath.mkdir(parents=False, exist_ok=True)
+    except FileExistsError:
+        raise FileExistsError(
+            f"The output location must be a directory: {outpath}"
+        ) from None
 
     if out_name == "":
         filename = pathlib.Path(defs_file).stem
@@ -167,6 +168,11 @@ def compile(
 
 def main() -> None:
     import argparse
+
+    from rich.traceback import install
+
+    # Only the command line replaces the exception hook, not an import.
+    install(word_wrap=True, show_locals=True)
 
     # subparser for include file, to parse compiler options first
     argparser1 = argparse.ArgumentParser(

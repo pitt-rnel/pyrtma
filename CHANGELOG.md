@@ -31,6 +31,8 @@ that makes them. The version number is chosen at release time.
 - `signed char` fields work, as a one-byte signed integer: `c_int8` in Python, `signed char` in C, and `int8` in MATLAB. The parser listed the type but failed on it with `KeyError`.
 - `pyrtma.parser.MAX_REFERENCE_DEPTH` (16): how deeply constants may be defined in terms of other constants, and how long a chain of aliases may be. A constant of numbers only has depth 0, and one that uses other constants is one deeper than the deepest of them. Deeper definitions raise `RecurisionError`, which is now also a `RecursionError`, as before.
 - `ConstantString.text` holds a string constant's text. `ConstantString.value` is still the double-quoted literal, now escaped.
+- `pyrtma.parser.GeneratedSourceError`, a `ParserError`: the Python compiler raises it, and writes nothing, when the code it generated isn't valid Python.
+- `--combined` also writes `<name>_combined.defs`, an index for the combined YAML file with `import_coredefs: false`, since that file holds the core definitions already. `python -m pyrtma.compile -i <name>_combined.defs` compiles it.
 
 ### Changed
 
@@ -107,6 +109,12 @@ that makes them. The version number is chosen at release time.
 - A host ID above `MAX_HOSTS` (5) compiles with a warning: a client can send from it, but the client and manager don't accept it as a destination.
 - An unknown compiler option raises `RTMASyntaxError`; it used to be ignored silently.
 - Importing a `.yml` file still warns, but no longer waits for Enter, which hung non-interactive runs and raised `EOFError` without a terminal.
+- In generated JavaScript, every `RTMA.aliases` entry is a function that returns a new value, as `RTMA.SDF` and `RTMA.MDF` entries are. A native alias, such as `RTMA.aliases.MODULE_ID`, used to be the value `0`. An alias of a struct is `RTMA.aliases.<name>`; it was written to `RTMA.SDF` before that existed, and failed when the file loaded.
+- The compilers write their C, JavaScript, Python and MATLAB files as UTF-8, rather than in the platform's default encoding.
+- The `--combined` YAML file no longer has a `compiler_options` section, which the parser rejected when it was read back, and keeps the `_RESERVED_` IDs of every file rather than only the last file's.
+- The Python compiler checks Black's result: when Black fails, it warns with Black's message, and the file is left valid but unformatted. The failure used to go unnoticed.
+- `type_def` in generated Python holds the definition's text. It used to include the quotes of a `repr()` inside the string, as in `"'EXIT:\n  id: 0\n  fields: null'"`. `core_defs.py` and the test and example definitions are regenerated; nothing else in them changed.
+- Importing `pyrtma.compile` no longer installs `rich`'s traceback handler as the process's exception hook; the compiler's command line still does.
 
 ### Fixed
 
@@ -168,3 +176,9 @@ that makes them. The version number is chosen at release time.
 - The `msg_header` formatter's CSV rows no longer end with a comma. Each row had one more field than the header row, an empty one, which made `pandas.read_csv` label every column with the next column's values. Scripts that dropped that empty last column need updating.
 - `examples/data_log_example.py` stops sending when interrupted with Ctrl-C. With a packet count, its sending thread ignored the stop request and the script waited for every packet to be sent, at least 2 ms each.
 - Aliases of structs work in the parser (H11): an alias may name a struct from an imported file, or one later in the same file, and an alias of such an alias works too. A struct alias used to fail with `TypeError` while checking alignment, and one naming a struct in the same file couldn't be resolved.
+- Generated JavaScript constructs messages with alias fields (H10). Every message with one, including the core `CONNECT_V2`, `FAIL_SUBSCRIBE` and `FAILED_MESSAGE`, used to throw "is not a function".
+- The elements of struct and message arrays in generated JavaScript are distinct objects (H10). They used to be one shared object, so setting a field of one element set it in all of them.
+- Aliases of structs work in every target (H11). C typedefs and MATLAB assignments of an alias follow its struct, and Python aliases follow their class; they used to come before it and fail to compile, run or import.
+- A `char` alias array in generated JavaScript is a string, as a `char` array is.
+- The padding field the parser adds at the end of a struct records its offset, `Field.offset`, where the last field ends; it was left at -1. Layouts and generated code are unchanged.
+- `python -m pyrtma.compile -o <folder>` creates a missing output folder. It used to raise `FileExistsError` saying the output location must be a directory.

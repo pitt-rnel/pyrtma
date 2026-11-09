@@ -827,13 +827,69 @@ The pytest classes after `TestParser`, added in Phase 8, write their definitions
 |---|---|---|
 | `test_yml_import_warns_without_prompting` | Parser and compilers: importing a `.yml` file warns, naming it, without waiting for input. | `input` replaced by a function that fails the test. |
 
-## test_compilers.py — the compilers and the layouts they are built from (needs: none)
+### TestPadding
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_trailing_padding_records_its_offset` | Parser and compilers: the padding added at the end of a struct records its offset, where the last field ends, as other fields do; it used to be -1. | A `double` followed by fields that need 4, 6, 7 and 1 trailing bytes, the last a one-byte scalar. |
+
+## test_compilers.py — the compilers and the layouts they are built from (needs: none; `TestC`: toolchain, gcc; `TestJavaScript`: toolchain, node)
 
 `compiled_layouts_snapshot.json` records the core, test and example definitions as the parser computed them before Phase 8: each message's ID, and each message's and struct's hash, size and fields, as `name:type@offset` with aliases resolved. The snapshot is never edited to make a change pass.
 
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_definitions_keep_their_layouts` | Parser and compilers: parser changes leave every existing layout and hash as it was. | Parametrized over the three sets of definitions; lists each entry that differs. |
+
+The classes below compile into `tmp_path` with `pyrtma.compile.compile`. Most use `tests/compiler_defs/compiler_defs.defs`, the fixture: aliases of native types, of structs in the same and an imported file, and of aliases; struct and message fields and arrays of each; `signed char`; a core alias; a Windows path and a quoted word as string constants; and `_RESERVED_` IDs in both files. Tests parametrized over `fixture` and `test` also compile the test definitions. `TestC` uses `tests/compiler_defs/core_c.defs`, the core definitions under other index names, as a stand-in for `rtma.h`, since the C compiler leaves the core definitions out. `TestJavaScript` copies the output to `.mjs`, so node loads it as an ES module, and runs a script that prints JSON.
+
+### TestPython
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_classes_match_the_parser` | Parser and compilers: the generated Python loads, and every class's size, `type_size` and hash match the parser's. | Parametrized over the fixture and the test definitions; loaded with `load_message_definitions`. |
+| `test_struct_aliases_name_their_struct` | H11: aliases of structs, and of struct aliases, name the struct's class; they used to come before the class and raise `NameError`. | `PT`, `PTS` and `LINE_ALIAS` in the loaded `SDF` map. |
+| `test_string_constants_keep_their_text` | Parser and compilers: string constants with backslashes and quotes keep their text in Python. | The fixture's `PATH` and `QUOTE`. |
+| `test_type_def_is_the_definition_text` | Low (Python compiler): `type_def` holds the definition's text, without the quotes `repr()` used to leave inside it. | Compares a message's and a struct's `type_def` with the parser's `raw`. |
+| `test_invalid_output_raises_and_writes_nothing` | Low (Python compiler): generated source that isn't valid Python raises `GeneratedSourceError` naming the file, and nothing is written. | `generate_constant` replaced by one that returns a syntax error. |
+| `test_formatter_failure_warns` | Low (Python compiler): when Black fails, the compiler warns with Black's message and keeps the valid, unformatted file. | `subprocess.run` replaced by one that returns status 123; the file still loads. |
+
+### TestC
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_header_compiles_with_the_parser_layouts` | H11: the generated header compiles, struct aliases included, and every struct's and message's size and field offsets match the parser's, core definitions too; string constants have their text's length. | Parametrized over the fixture and the test definitions; `_Static_assert`s on `sizeof` and `offsetof`, compiled with `gcc -fsyntax-only -std=c11 -Wall -Werror`, so an unknown escape fails too. |
+
+### TestJavaScript
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_every_definition_constructs` | H10, H11: every struct and message constructs, including those with alias fields, and has the parser's fields in order. | Parametrized over the fixture and the test definitions; calls every `RTMA.SDF` and `RTMA.MDF` factory. |
+| `test_field_values_are_distinct_and_typed` | H10: the elements of struct and message arrays are distinct objects, each construction is new, alias fields get their type's default, and string constants keep their text. | Sets the first element of three arrays and reads all of them; checks an `int32` alias, a core alias, a `char` alias array, a `signed char` array, and `PATH` and `QUOTE`. |
+
+### TestMatlab
+
+MATLAB isn't available to the tests, so these check the generated text.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_struct_aliases_follow_their_struct` | H11: each alias of a struct is assigned after its struct's last field, and before the first field that uses it. | Compares line numbers in the generated `.m` file. |
+| `test_string_constants_are_escaped` | Parser and compilers: MATLAB string constants double their quotes and keep backslashes as they are. | The fixture's `PATH` and `QUOTE` lines. |
+
+### TestCombined
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_combined_output_reads_back` | Parser and compilers: `--combined` output, through the index written beside it, parses to the same layouts, IDs and hashes as the original definitions. | Parametrized over the fixture, whose struct alias ends up in the same file as its struct, and the test definitions. |
+| `test_combined_yaml_has_only_definitions_sections` | Parser and compilers: the combined YAML has no `compiler_options` section, and keeps the reserved IDs of every file. | The fixture reserves IDs in both of its files. |
+
+### TestCompileCommand
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_missing_output_folder_is_created` | Parser and compilers: `compile` creates a missing output folder instead of raising `FileExistsError`. | An output path under `tmp_path` that doesn't exist yet. |
+| `test_output_path_that_is_a_file_is_rejected` | Parser and compilers: an output path that is a file still raises `FileExistsError`. | An empty file as the output path. |
+| `test_import_leaves_the_exception_hook_alone` | Packaging and imports: importing `pyrtma.compile` no longer installs `rich`'s exception hook. | A fresh interpreter compares `sys.excepthook` before and after the import. |
 
 ## test_validators.py — field descriptors and validation (needs: none)
 

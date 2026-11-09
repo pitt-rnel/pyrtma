@@ -180,7 +180,7 @@ class RTMA_MSG_HEADER(MessageBase, metaclass=MessageMeta):
     type_size: ClassVar[int] = 48
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'RTMA_MSG_HEADER:\n  fields:\n    msg_type: MSG_TYPE\n    msg_count: MSG_COUNT\n    send_time: double\n    recv_time: double\n    src_host_id: HOST_ID\n    src_mod_id: MODULE_ID\n    dest_host_id: HOST_ID\n    dest_mod_id: MODULE_ID\n    num_data_bytes: int32\n    remaining_bytes: int32\n    is_dynamic: int32\n    reserved: uint32'"
+        "RTMA_MSG_HEADER:\n  fields:\n    msg_type: MSG_TYPE\n    msg_count: MSG_COUNT\n    send_time: double\n    recv_time: double\n    src_host_id: HOST_ID\n    src_mod_id: MODULE_ID\n    dest_host_id: HOST_ID\n    dest_mod_id: MODULE_ID\n    num_data_bytes: int32\n    remaining_bytes: int32\n    is_dynamic: int32\n    reserved: uint32"
     )
 
     msg_type: Int32 = Int32()
@@ -203,7 +203,7 @@ class DATASET(MessageBase, metaclass=MessageMeta):
     type_size: ClassVar[int] = 708
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET:\n  fields:\n    name: char[DATASET_NAME_LEN]\n    save_path: char[256]\n    filename: char[128]\n    formatter: char[32]\n    max_size_mb: int32\n    msg_types: int32[64]'"
+        "DATASET:\n  fields:\n    name: char[DATASET_NAME_LEN]\n    save_path: char[256]\n    filename: char[128]\n    formatter: char[32]\n    max_size_mb: int32\n    msg_types: int32[64]"
     )
 
     name: String = String(32)
@@ -220,7 +220,7 @@ class VALIDATOR_STRUCT(MessageBase, metaclass=MessageMeta):
     type_size: ClassVar[int] = 232
     type_source: ClassVar[str] = "test_defs_1"
     type_def: ClassVar[str] = (
-        "'VALIDATOR_STRUCT:\n  fields:\n    char_: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[4]\n    int16_arr: int16[4]\n    int32_arr: int32[4]\n    int64_arr: int64[4]\n    uint8_arr: uint8[4]\n    uint16_arr: uint16[4]\n    uint32_arr: uint32[4]\n    uint64_arr: uint64[4]\n    byte_: byte\n    byte_arr: byte[4]\n    string: char[4]\n    float_: float\n    double_: double\n    float_arr: float[4]\n    double_arr: double[4]'"
+        "VALIDATOR_STRUCT:\n  fields:\n    char_: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[4]\n    int16_arr: int16[4]\n    int32_arr: int32[4]\n    int64_arr: int64[4]\n    uint8_arr: uint8[4]\n    uint16_arr: uint16[4]\n    uint32_arr: uint32[4]\n    uint64_arr: uint64[4]\n    byte_: byte\n    byte_arr: byte[4]\n    string: char[4]\n    float_: float\n    double_: double\n    float_arr: float[4]\n    double_arr: double[4]"
     )
 
     char_: Char = Char()
@@ -260,7 +260,7 @@ class MDF_EXIT(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x095E0546
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "rtma_core"
-    type_def: ClassVar[str] = "'EXIT:\n  id: 0\n  fields: null'"
+    type_def: ClassVar[str] = "EXIT:\n  id: 0\n  fields: null"
 
 
 class MDF_KILL(MessageData, metaclass=MessageMeta):
@@ -269,7 +269,7 @@ class MDF_KILL(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x82FC702D
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "rtma_core"
-    type_def: ClassVar[str] = "'KILL:\n  id: 1\n  fields: null'"
+    type_def: ClassVar[str] = "KILL:\n  id: 1\n  fields: null"
 
 
 class MDF_ACKNOWLEDGE(MessageData, metaclass=MessageMeta):
@@ -278,7 +278,7 @@ class MDF_ACKNOWLEDGE(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xB725B581
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "rtma_core"
-    type_def: ClassVar[str] = "'ACKNOWLEDGE:\n  id: 2\n  fields: null'"
+    type_def: ClassVar[str] = "ACKNOWLEDGE:\n  id: 2\n  fields: null"
 
 
 class MDF_CONNECT_V2(MessageData, metaclass=MessageMeta):
@@ -288,7 +288,7 @@ class MDF_CONNECT_V2(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 44
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'CONNECT_V2:\n  id: 4\n  fields:\n    logger_status: int16\n    reserved: int16\n    reserved1: int16\n    mod_id: MODULE_ID\n    pid: int32\n    name: char[MAX_NAME_LEN]'"
+        "CONNECT_V2:\n  id: 4\n  fields:\n    logger_status: int16\n    reserved: int16\n    reserved1: int16\n    mod_id: MODULE_ID\n    pid: int32\n    name: char[MAX_NAME_LEN]"
     )
 
     logger_status: Int16 = Int16()
@@ -306,7 +306,7 @@ class MDF_FAIL_SUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 8
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'FAIL_SUBSCRIBE:\n  id: 6\n  fields:\n    mod_id: MODULE_ID\n    reserved: int16\n    msg_type: MSG_TYPE'"
+        "FAIL_SUBSCRIBE:\n  id: 6\n  fields:\n    mod_id: MODULE_ID\n    reserved: int16\n    msg_type: MSG_TYPE"
     )
 
     mod_id: Int16 = Int16()
@@ -321,7 +321,7 @@ class MDF_FAILED_MESSAGE(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 64
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'FAILED_MESSAGE:\n  id: 8\n  fields:\n    dest_mod_id: MODULE_ID\n    reserved: int16[3]\n    time_of_failure: double\n    msg_header: RTMA_MSG_HEADER'"
+        "FAILED_MESSAGE:\n  id: 8\n  fields:\n    dest_mod_id: MODULE_ID\n    reserved: int16[3]\n    time_of_failure: double\n    msg_header: RTMA_MSG_HEADER"
     )
 
     dest_mod_id: Int16 = Int16()
@@ -337,7 +337,7 @@ class MDF_CONNECT(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'CONNECT:\n  id: 13\n  fields:\n    logger_status: int16\n    daemon_status: int16'"
+        "CONNECT:\n  id: 13\n  fields:\n    logger_status: int16\n    daemon_status: int16"
     )
 
     logger_status: Int16 = Int16()
@@ -350,7 +350,7 @@ class MDF_DISCONNECT(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xD0126BF9
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "rtma_core"
-    type_def: ClassVar[str] = "'DISCONNECT:\n  id: 14\n  fields: null'"
+    type_def: ClassVar[str] = "DISCONNECT:\n  id: 14\n  fields: null"
 
 
 class MDF_SUBSCRIBE(MessageData, metaclass=MessageMeta):
@@ -359,9 +359,7 @@ class MDF_SUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xF5B437C8
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "rtma_core"
-    type_def: ClassVar[str] = (
-        "'SUBSCRIBE:\n  id: 15\n  fields:\n    msg_type: MSG_TYPE'"
-    )
+    type_def: ClassVar[str] = "SUBSCRIBE:\n  id: 15\n  fields:\n    msg_type: MSG_TYPE"
 
     msg_type: Int32 = Int32()
 
@@ -373,7 +371,7 @@ class MDF_UNSUBSCRIBE(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'UNSUBSCRIBE:\n  id: 16\n  fields:\n    msg_type: MSG_TYPE'"
+        "UNSUBSCRIBE:\n  id: 16\n  fields:\n    msg_type: MSG_TYPE"
     )
 
     msg_type: Int32 = Int32()
@@ -385,7 +383,7 @@ class MDF_MODULE_READY(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xFD0E0311
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "rtma_core"
-    type_def: ClassVar[str] = "'MODULE_READY:\n  id: 26\n  fields:\n    pid: int32'"
+    type_def: ClassVar[str] = "MODULE_READY:\n  id: 26\n  fields:\n    pid: int32"
 
     pid: Int32 = Int32()
 
@@ -396,7 +394,7 @@ class MDF_PING(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xCF05CA16
     type_size: ClassVar[int] = 2
     type_source: ClassVar[str] = "rtma_core"
-    type_def: ClassVar[str] = "'PING:\n  id: 29\n  fields:\n    dest_id: MODULE_ID'"
+    type_def: ClassVar[str] = "PING:\n  id: 29\n  fields:\n    dest_id: MODULE_ID"
 
     dest_id: Int16 = Int16()
 
@@ -407,7 +405,7 @@ class MDF_PONG(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xD07B7A7E
     type_size: ClassVar[int] = 2
     type_source: ClassVar[str] = "rtma_core"
-    type_def: ClassVar[str] = "'PONG:\n  id: 30\n  fields:\n    src_id: MODULE_ID'"
+    type_def: ClassVar[str] = "PONG:\n  id: 30\n  fields:\n    src_id: MODULE_ID"
 
     src_id: Int16 = Int16()
 
@@ -418,7 +416,7 @@ class MDF_INTRODUCE(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x6F4769E8
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "rtma_core"
-    type_def: ClassVar[str] = "'INTRODUCE:\n  id: 31\n  fields: null'"
+    type_def: ClassVar[str] = "INTRODUCE:\n  id: 31\n  fields: null"
 
 
 class MDF_HELLO(MessageData, metaclass=MessageMeta):
@@ -428,7 +426,7 @@ class MDF_HELLO(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 72
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'HELLO:\n  id: 32\n  fields:\n    pid: int32\n    mod_id: MODULE_ID\n    port: uint16\n    addr: char[MAX_NAME_LEN]\n    name: char[MAX_NAME_LEN]'"
+        "HELLO:\n  id: 32\n  fields:\n    pid: int32\n    mod_id: MODULE_ID\n    port: uint16\n    addr: char[MAX_NAME_LEN]\n    name: char[MAX_NAME_LEN]"
     )
 
     pid: Int32 = Int32()
@@ -445,7 +443,7 @@ class MDF_GOODBYE(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 72
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'GOODBYE:\n  id: 33\n  fields:\n    pid: int32\n    mod_id: MODULE_ID\n    port: uint16\n    addr: char[MAX_NAME_LEN]\n    name: char[MAX_NAME_LEN]'"
+        "GOODBYE:\n  id: 33\n  fields:\n    pid: int32\n    mod_id: MODULE_ID\n    port: uint16\n    addr: char[MAX_NAME_LEN]\n    name: char[MAX_NAME_LEN]"
     )
 
     pid: Int32 = Int32()
@@ -462,7 +460,7 @@ class MDF_CLIENT_SET_NAME(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'CLIENT_SET_NAME:\n  id: 34\n  fields:\n    name: char[MAX_NAME_LEN]'"
+        "CLIENT_SET_NAME:\n  id: 34\n  fields:\n    name: char[MAX_NAME_LEN]"
     )
 
     name: String = String(32)
@@ -475,7 +473,7 @@ class MDF_RTMA_LOG(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 1936
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'RTMA_LOG:\n  id: 40\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+        "RTMA_LOG:\n  id: 40\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]"
     )
 
     time: Double = Double()
@@ -494,7 +492,7 @@ class MDF_RTMA_LOG_CRITICAL(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 1936
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'RTMA_LOG_CRITICAL:\n  id: 41\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+        "RTMA_LOG_CRITICAL:\n  id: 41\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]"
     )
 
     time: Double = Double()
@@ -513,7 +511,7 @@ class MDF_RTMA_LOG_ERROR(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 1936
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'RTMA_LOG_ERROR:\n  id: 42\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+        "RTMA_LOG_ERROR:\n  id: 42\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]"
     )
 
     time: Double = Double()
@@ -532,7 +530,7 @@ class MDF_RTMA_LOG_WARNING(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 1936
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'RTMA_LOG_WARNING:\n  id: 43\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+        "RTMA_LOG_WARNING:\n  id: 43\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]"
     )
 
     time: Double = Double()
@@ -551,7 +549,7 @@ class MDF_RTMA_LOG_INFO(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 1936
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'RTMA_LOG_INFO:\n  id: 44\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+        "RTMA_LOG_INFO:\n  id: 44\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]"
     )
 
     time: Double = Double()
@@ -570,7 +568,7 @@ class MDF_RTMA_LOG_DEBUG(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 1936
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'RTMA_LOG_DEBUG:\n  id: 45\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]'"
+        "RTMA_LOG_DEBUG:\n  id: 45\n  fields:\n    time: double\n    level: int32\n    lineno: int32\n    name: char[128]\n    pathname: char[512]\n    funcname: char[256]\n    message: char[MAX_LOG_LENGTH]"
     )
 
     time: Double = Double()
@@ -589,7 +587,7 @@ class MDF_FORCE_DISCONNECT(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'FORCE_DISCONNECT:\n  id: 82\n  fields:\n    mod_id: int32'"
+        "FORCE_DISCONNECT:\n  id: 82\n  fields:\n    mod_id: int32"
     )
 
     mod_id: Int32 = Int32()
@@ -602,7 +600,7 @@ class MDF_PAUSE_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'PAUSE_SUBSCRIPTION:\n  id: 85\n  fields:\n    msg_type: MSG_TYPE'"
+        "PAUSE_SUBSCRIPTION:\n  id: 85\n  fields:\n    msg_type: MSG_TYPE"
     )
 
     msg_type: Int32 = Int32()
@@ -615,7 +613,7 @@ class MDF_RESUME_SUBSCRIPTION(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "rtma_core"
     type_def: ClassVar[str] = (
-        "'RESUME_SUBSCRIPTION:\n  id: 86\n  fields:\n    msg_type: MSG_TYPE'"
+        "RESUME_SUBSCRIPTION:\n  id: 86\n  fields:\n    msg_type: MSG_TYPE"
     )
 
     msg_type: Int32 = Int32()
@@ -628,7 +626,7 @@ class MDF_DATASET_STATUS_REQUEST(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET_STATUS_REQUEST:\n  id: 62\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+        "DATASET_STATUS_REQUEST:\n  id: 62\n  fields:\n    name: char[DATASET_NAME_LEN]"
     )
 
     name: String = String(32)
@@ -641,7 +639,7 @@ class MDF_DATASET_STATUS(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 56
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET_STATUS:\n  id: 63\n  fields:\n    name: char[DATASET_NAME_LEN]\n    timestamp: double\n    elapsed_time: double\n    is_recording: int32\n    is_paused: int32'"
+        "DATASET_STATUS:\n  id: 63\n  fields:\n    name: char[DATASET_NAME_LEN]\n    timestamp: double\n    elapsed_time: double\n    is_recording: int32\n    is_paused: int32"
     )
 
     name: String = String(32)
@@ -657,9 +655,7 @@ class MDF_DATASET_ADD(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xD94DA73E
     type_size: ClassVar[int] = 708
     type_source: ClassVar[str] = "data_logger"
-    type_def: ClassVar[str] = (
-        "'DATASET_ADD:\n  id: 64\n  fields:\n    dataset: DATASET'"
-    )
+    type_def: ClassVar[str] = "DATASET_ADD:\n  id: 64\n  fields:\n    dataset: DATASET"
 
     dataset: Struct[DATASET] = Struct(DATASET)
 
@@ -671,7 +667,7 @@ class MDF_DATASET_ADDED(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET_ADDED:\n  id: 65\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+        "DATASET_ADDED:\n  id: 65\n  fields:\n    name: char[DATASET_NAME_LEN]"
     )
 
     name: String = String(32)
@@ -684,7 +680,7 @@ class MDF_DATASET_REMOVE(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET_REMOVE:\n  id: 66\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+        "DATASET_REMOVE:\n  id: 66\n  fields:\n    name: char[DATASET_NAME_LEN]"
     )
 
     name: String = String(32)
@@ -697,7 +693,7 @@ class MDF_DATASET_REMOVED(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET_REMOVED:\n  id: 67\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+        "DATASET_REMOVED:\n  id: 67\n  fields:\n    name: char[DATASET_NAME_LEN]"
     )
 
     name: String = String(32)
@@ -709,7 +705,7 @@ class MDF_DATA_LOGGER_CONFIG_REQUEST(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x91598F0A
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "data_logger"
-    type_def: ClassVar[str] = "'DATA_LOGGER_CONFIG_REQUEST:\n  id: 68\n  fields: null'"
+    type_def: ClassVar[str] = "DATA_LOGGER_CONFIG_REQUEST:\n  id: 68\n  fields: null"
 
 
 class MDF_DATA_LOGGER_CONFIG(MessageData, metaclass=MessageMeta):
@@ -719,7 +715,7 @@ class MDF_DATA_LOGGER_CONFIG(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 4252
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATA_LOGGER_CONFIG:\n  id: 69\n  fields:\n    num_datasets: int32\n    datasets: DATASET[6]'"
+        "DATA_LOGGER_CONFIG:\n  id: 69\n  fields:\n    num_datasets: int32\n    datasets: DATASET[6]"
     )
 
     num_datasets: Int32 = Int32()
@@ -733,7 +729,7 @@ class MDF_DATASET_STARTED(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET_STARTED:\n  id: 70\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+        "DATASET_STARTED:\n  id: 70\n  fields:\n    name: char[DATASET_NAME_LEN]"
     )
 
     name: String = String(32)
@@ -746,7 +742,7 @@ class MDF_DATASET_STOPPED(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET_STOPPED:\n  id: 71\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+        "DATASET_STOPPED:\n  id: 71\n  fields:\n    name: char[DATASET_NAME_LEN]"
     )
 
     name: String = String(32)
@@ -759,7 +755,7 @@ class MDF_DATASET_SAVED(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 1056
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET_SAVED:\n  id: 72\n  fields:\n    name: char[DATASET_NAME_LEN]\n    filepath: char[1024]'"
+        "DATASET_SAVED:\n  id: 72\n  fields:\n    name: char[DATASET_NAME_LEN]\n    filepath: char[1024]"
     )
 
     name: String = String(32)
@@ -773,7 +769,7 @@ class MDF_DATASET_START(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET_START:\n  id: 73\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+        "DATASET_START:\n  id: 73\n  fields:\n    name: char[DATASET_NAME_LEN]"
     )
 
     name: String = String(32)
@@ -786,7 +782,7 @@ class MDF_DATASET_STOP(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET_STOP:\n  id: 74\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+        "DATASET_STOP:\n  id: 74\n  fields:\n    name: char[DATASET_NAME_LEN]"
     )
 
     name: String = String(32)
@@ -799,7 +795,7 @@ class MDF_DATASET_PAUSE(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET_PAUSE:\n  id: 75\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+        "DATASET_PAUSE:\n  id: 75\n  fields:\n    name: char[DATASET_NAME_LEN]"
     )
 
     name: String = String(32)
@@ -812,7 +808,7 @@ class MDF_DATASET_RESUME(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATASET_RESUME:\n  id: 76\n  fields:\n    name: char[DATASET_NAME_LEN]'"
+        "DATASET_RESUME:\n  id: 76\n  fields:\n    name: char[DATASET_NAME_LEN]"
     )
 
     name: String = String(32)
@@ -824,7 +820,7 @@ class MDF_DATA_LOGGER_RESET(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x1EB32BEB
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "data_logger"
-    type_def: ClassVar[str] = "'DATA_LOGGER_RESET:\n  id: 77\n  fields: null'"
+    type_def: ClassVar[str] = "DATA_LOGGER_RESET:\n  id: 77\n  fields: null"
 
 
 class MDF_DATA_LOGGER_ERROR(MessageData, metaclass=MessageMeta):
@@ -834,7 +830,7 @@ class MDF_DATA_LOGGER_ERROR(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 608
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATA_LOGGER_ERROR:\n  id: 78\n  fields:\n    dataset_name: char[DATASET_NAME_LEN]\n    exc_type: char[64]\n    msg: char[512]'"
+        "DATA_LOGGER_ERROR:\n  id: 78\n  fields:\n    dataset_name: char[DATASET_NAME_LEN]\n    exc_type: char[64]\n    msg: char[512]"
     )
 
     dataset_name: String = String(32)
@@ -849,7 +845,7 @@ class MDF_DATA_LOG_TEST_2048(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 2048
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "'DATA_LOG_TEST_2048:\n  id: 79\n  fields:\n    raw: char[2048]'"
+        "DATA_LOG_TEST_2048:\n  id: 79\n  fields:\n    raw: char[2048]"
     )
 
     raw: String = String(2048)
@@ -862,7 +858,7 @@ class MDF_LM_STATUS(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 32
     type_source: ClassVar[str] = "quick_logger"
     type_def: ClassVar[str] = (
-        "'LM_STATUS:\n  id: 54\n  fields:\n    is_logging: uint32\n    max_msgs: uint32\n    hdr_bufsz: uint32\n    data_bufsz: uint32\n    msg_count: uint32\n    hdr_total: uint32\n    data_total: uint32\n    ofs_total: uint32'"
+        "LM_STATUS:\n  id: 54\n  fields:\n    is_logging: uint32\n    max_msgs: uint32\n    hdr_bufsz: uint32\n    data_bufsz: uint32\n    msg_count: uint32\n    hdr_total: uint32\n    data_total: uint32\n    ofs_total: uint32"
     )
 
     is_logging: Uint32 = Uint32()
@@ -881,7 +877,7 @@ class MDF_LM_EXIT(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x35DD547B
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "quick_logger"
-    type_def: ClassVar[str] = "'LM_EXIT:\n  id: 55\n  fields: null'"
+    type_def: ClassVar[str] = "LM_EXIT:\n  id: 55\n  fields: null"
 
 
 class MDF_SAVE_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
@@ -891,7 +887,7 @@ class MDF_SAVE_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 260
     type_source: ClassVar[str] = "quick_logger"
     type_def: ClassVar[str] = (
-        "'SAVE_MESSAGE_LOG:\n  id: 56\n  fields:\n    pathname: char[MAX_LOGGER_FILENAME_LENGTH]\n    pathname_length: int32'"
+        "SAVE_MESSAGE_LOG:\n  id: 56\n  fields:\n    pathname: char[MAX_LOGGER_FILENAME_LENGTH]\n    pathname_length: int32"
     )
 
     pathname: String = String(256)
@@ -904,7 +900,7 @@ class MDF_MESSAGE_LOG_SAVED(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x66E84AE5
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "quick_logger"
-    type_def: ClassVar[str] = "'MESSAGE_LOG_SAVED:\n  id: 57\n  fields: null'"
+    type_def: ClassVar[str] = "MESSAGE_LOG_SAVED:\n  id: 57\n  fields: null"
 
 
 class MDF_PAUSE_MESSAGE_LOGGING(MessageData, metaclass=MessageMeta):
@@ -913,7 +909,7 @@ class MDF_PAUSE_MESSAGE_LOGGING(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x20C1E922
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "quick_logger"
-    type_def: ClassVar[str] = "'PAUSE_MESSAGE_LOGGING:\n  id: 58\n  fields: null'"
+    type_def: ClassVar[str] = "PAUSE_MESSAGE_LOGGING:\n  id: 58\n  fields: null"
 
 
 class MDF_RESUME_MESSAGE_LOGGING(MessageData, metaclass=MessageMeta):
@@ -922,7 +918,7 @@ class MDF_RESUME_MESSAGE_LOGGING(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x0D1A3E77
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "quick_logger"
-    type_def: ClassVar[str] = "'RESUME_MESSAGE_LOGGING:\n  id: 59\n  fields: null'"
+    type_def: ClassVar[str] = "RESUME_MESSAGE_LOGGING:\n  id: 59\n  fields: null"
 
 
 class MDF_RESET_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
@@ -931,7 +927,7 @@ class MDF_RESET_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x68EC4AAB
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "quick_logger"
-    type_def: ClassVar[str] = "'RESET_MESSAGE_LOG:\n  id: 60\n  fields: null'"
+    type_def: ClassVar[str] = "RESET_MESSAGE_LOG:\n  id: 60\n  fields: null"
 
 
 class MDF_DUMP_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
@@ -940,7 +936,7 @@ class MDF_DUMP_MESSAGE_LOG(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xF9D7E2BF
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "quick_logger"
-    type_def: ClassVar[str] = "'DUMP_MESSAGE_LOG:\n  id: 61\n  fields: null'"
+    type_def: ClassVar[str] = "DUMP_MESSAGE_LOG:\n  id: 61\n  fields: null"
 
 
 class MDF_LM_READY(MessageData, metaclass=MessageMeta):
@@ -949,7 +945,7 @@ class MDF_LM_READY(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x4863B960
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "quick_logger"
-    type_def: ClassVar[str] = "'LM_READY:\n  id: 96\n  fields: null'"
+    type_def: ClassVar[str] = "LM_READY:\n  id: 96\n  fields: null"
 
 
 class MDF_RESERVED_004300(MessageData, metaclass=MessageMeta):
@@ -958,7 +954,7 @@ class MDF_RESERVED_004300(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x2FB5544D
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004300:\n  id: 4300\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004300:\n  id: 4300\n  fields: null"
 
 
 class MDF_RESERVED_004360(MessageData, metaclass=MessageMeta):
@@ -967,7 +963,7 @@ class MDF_RESERVED_004360(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x323B7BC7
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004360:\n  id: 4360\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004360:\n  id: 4360\n  fields: null"
 
 
 class MDF_RESERVED_004361(MessageData, metaclass=MessageMeta):
@@ -976,7 +972,7 @@ class MDF_RESERVED_004361(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xCEA6EA95
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004361:\n  id: 4361\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004361:\n  id: 4361\n  fields: null"
 
 
 class MDF_RESERVED_004362(MessageData, metaclass=MessageMeta):
@@ -985,7 +981,7 @@ class MDF_RESERVED_004362(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x02A36526
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004362:\n  id: 4362\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004362:\n  id: 4362\n  fields: null"
 
 
 class MDF_RESERVED_004363(MessageData, metaclass=MessageMeta):
@@ -994,7 +990,7 @@ class MDF_RESERVED_004363(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xECC4954A
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004363:\n  id: 4363\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004363:\n  id: 4363\n  fields: null"
 
 
 class MDF_RESERVED_004364(MessageData, metaclass=MessageMeta):
@@ -1003,7 +999,7 @@ class MDF_RESERVED_004364(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x7910FD63
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004364:\n  id: 4364\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004364:\n  id: 4364\n  fields: null"
 
 
 class MDF_RESERVED_004365(MessageData, metaclass=MessageMeta):
@@ -1012,7 +1008,7 @@ class MDF_RESERVED_004365(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x935F393E
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004365:\n  id: 4365\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004365:\n  id: 4365\n  fields: null"
 
 
 class MDF_RESERVED_004366(MessageData, metaclass=MessageMeta):
@@ -1021,7 +1017,7 @@ class MDF_RESERVED_004366(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xD519DA6B
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004366:\n  id: 4366\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004366:\n  id: 4366\n  fields: null"
 
 
 class MDF_RESERVED_004367(MessageData, metaclass=MessageMeta):
@@ -1030,7 +1026,7 @@ class MDF_RESERVED_004367(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x08E1386F
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004367:\n  id: 4367\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004367:\n  id: 4367\n  fields: null"
 
 
 class MDF_RESERVED_004368(MessageData, metaclass=MessageMeta):
@@ -1039,7 +1035,7 @@ class MDF_RESERVED_004368(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x99F64A37
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004368:\n  id: 4368\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004368:\n  id: 4368\n  fields: null"
 
 
 class MDF_RESERVED_004369(MessageData, metaclass=MessageMeta):
@@ -1048,7 +1044,7 @@ class MDF_RESERVED_004369(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xF4B70AB4
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004369:\n  id: 4369\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004369:\n  id: 4369\n  fields: null"
 
 
 class MDF_RESERVED_004370(MessageData, metaclass=MessageMeta):
@@ -1057,7 +1053,7 @@ class MDF_RESERVED_004370(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xE46A53AF
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004370:\n  id: 4370\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004370:\n  id: 4370\n  fields: null"
 
 
 class MDF_RESERVED_004371(MessageData, metaclass=MessageMeta):
@@ -1066,7 +1062,7 @@ class MDF_RESERVED_004371(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x177FBC2F
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004371:\n  id: 4371\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004371:\n  id: 4371\n  fields: null"
 
 
 class MDF_RESERVED_004372(MessageData, metaclass=MessageMeta):
@@ -1075,7 +1071,7 @@ class MDF_RESERVED_004372(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x01736936
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004372:\n  id: 4372\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004372:\n  id: 4372\n  fields: null"
 
 
 class MDF_RESERVED_004373(MessageData, metaclass=MessageMeta):
@@ -1084,7 +1080,7 @@ class MDF_RESERVED_004373(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x72CF2D3F
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004373:\n  id: 4373\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004373:\n  id: 4373\n  fields: null"
 
 
 class MDF_RESERVED_004374(MessageData, metaclass=MessageMeta):
@@ -1093,7 +1089,7 @@ class MDF_RESERVED_004374(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xEC101B55
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004374:\n  id: 4374\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004374:\n  id: 4374\n  fields: null"
 
 
 class MDF_RESERVED_004375(MessageData, metaclass=MessageMeta):
@@ -1102,7 +1098,7 @@ class MDF_RESERVED_004375(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xB41F9FC1
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004375:\n  id: 4375\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004375:\n  id: 4375\n  fields: null"
 
 
 class MDF_RESERVED_004376(MessageData, metaclass=MessageMeta):
@@ -1111,7 +1107,7 @@ class MDF_RESERVED_004376(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xEBC7B874
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004376:\n  id: 4376\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004376:\n  id: 4376\n  fields: null"
 
 
 class MDF_RESERVED_004377(MessageData, metaclass=MessageMeta):
@@ -1120,7 +1116,7 @@ class MDF_RESERVED_004377(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x4DCCD750
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004377:\n  id: 4377\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004377:\n  id: 4377\n  fields: null"
 
 
 class MDF_RESERVED_004378(MessageData, metaclass=MessageMeta):
@@ -1129,7 +1125,7 @@ class MDF_RESERVED_004378(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x75FB28B0
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'RESERVED_004378:\n  id: 4378\n  fields: null'"
+    type_def: ClassVar[str] = "RESERVED_004378:\n  id: 4378\n  fields: null"
 
 
 class MDF_VALIDATOR_A(MessageData, metaclass=MessageMeta):
@@ -1139,7 +1135,7 @@ class MDF_VALIDATOR_A(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 1392
     type_source: ClassVar[str] = "test_defs_1"
     type_def: ClassVar[str] = (
-        "'VALIDATOR_A:\n  id: 5000\n  fields:\n    char_: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[SZ_A]\n    int16_arr: int16[SZ_A]\n    int32_arr: int32[SZ_A]\n    int64_arr: int64[SZ_A]\n    uint8_arr: uint8[SZ_A]\n    uint16_arr: uint16[SZ_A]\n    uint32_arr: uint32[SZ_A]\n    uint64_arr: uint64[SZ_A]\n    byte_: byte\n    byte_arr: byte[SZ_A]\n    string: char[SZ_A]\n    float_: float\n    double_: double\n    float_arr: float[SZ_A]\n    double_arr: double[SZ_A]\n    struct_: VALIDATOR_STRUCT\n    struct_arr: VALIDATOR_STRUCT[SZ_A]'"
+        "VALIDATOR_A:\n  id: 5000\n  fields:\n    char_: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[SZ_A]\n    int16_arr: int16[SZ_A]\n    int32_arr: int32[SZ_A]\n    int64_arr: int64[SZ_A]\n    uint8_arr: uint8[SZ_A]\n    uint16_arr: uint16[SZ_A]\n    uint32_arr: uint32[SZ_A]\n    uint64_arr: uint64[SZ_A]\n    byte_: byte\n    byte_arr: byte[SZ_A]\n    string: char[SZ_A]\n    float_: float\n    double_: double\n    float_arr: float[SZ_A]\n    double_arr: double[SZ_A]\n    struct_: VALIDATOR_STRUCT\n    struct_arr: VALIDATOR_STRUCT[SZ_A]"
     )
 
     char_: Char = Char()
@@ -1181,7 +1177,7 @@ class MDF_VALIDATOR_B(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 2488
     type_source: ClassVar[str] = "test_defs_1"
     type_def: ClassVar[str] = (
-        "'VALIDATOR_B:\n  id: 5001\n  fields:\n    char_: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[SZ_B]\n    int16_arr: int16[SZ_B]\n    int32_arr: int32[SZ_B]\n    int64_arr: int64[SZ_B]\n    uint8_arr: uint8[SZ_B]\n    uint16_arr: uint16[SZ_B]\n    uint32_arr: uint32[SZ_B]\n    uint64_arr: uint64[SZ_B]\n    byte_: byte\n    byte_arr: byte[SZ_B]\n    string: char[SZ_B]\n    float_: float\n    double_: double\n    float_arr: float[SZ_B]\n    double_arr: double[SZ_B]\n    struct_: VALIDATOR_STRUCT\n    struct_arr: VALIDATOR_STRUCT[SZ_B]'"
+        "VALIDATOR_B:\n  id: 5001\n  fields:\n    char_: char\n    int8: int8\n    int16: int16\n    int32: int32\n    int64: int64\n    uint8: uint8\n    uint16: uint16\n    uint32: uint32\n    uint64: uint64\n    int8_arr: int8[SZ_B]\n    int16_arr: int16[SZ_B]\n    int32_arr: int32[SZ_B]\n    int64_arr: int64[SZ_B]\n    uint8_arr: uint8[SZ_B]\n    uint16_arr: uint16[SZ_B]\n    uint32_arr: uint32[SZ_B]\n    uint64_arr: uint64[SZ_B]\n    byte_: byte\n    byte_arr: byte[SZ_B]\n    string: char[SZ_B]\n    float_: float\n    double_: double\n    float_arr: float[SZ_B]\n    double_arr: double[SZ_B]\n    struct_: VALIDATOR_STRUCT\n    struct_arr: VALIDATOR_STRUCT[SZ_B]"
     )
 
     char_: Char = Char()
@@ -1221,7 +1217,7 @@ class MDF_TEST_MSG_128(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 128
     type_source: ClassVar[str] = "test_defs_1"
     type_def: ClassVar[str] = (
-        "'TEST_MSG_128:\n  id: 5002\n  fields:\n    blob: uint8[128]'"
+        "TEST_MSG_128:\n  id: 5002\n  fields:\n    blob: uint8[128]"
     )
 
     blob: IntArray[Uint8] = IntArray(Uint8, 128)
@@ -1234,7 +1230,7 @@ class MDF_TEST_MSG_256(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 256
     type_source: ClassVar[str] = "test_defs_1"
     type_def: ClassVar[str] = (
-        "'TEST_MSG_256:\n  id: 5003\n  fields:\n    blob: uint8[256]'"
+        "TEST_MSG_256:\n  id: 5003\n  fields:\n    blob: uint8[256]"
     )
 
     blob: IntArray[Uint8] = IntArray(Uint8, 256)
@@ -1247,7 +1243,7 @@ class MDF_TEST_MSG_512(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 512
     type_source: ClassVar[str] = "test_defs_1"
     type_def: ClassVar[str] = (
-        "'TEST_MSG_512:\n  id: 5004\n  fields:\n    blob: uint8[512]'"
+        "TEST_MSG_512:\n  id: 5004\n  fields:\n    blob: uint8[512]"
     )
 
     blob: IntArray[Uint8] = IntArray(Uint8, 512)
@@ -1260,7 +1256,7 @@ class MDF_TEST_MSG_1024(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 1024
     type_source: ClassVar[str] = "test_defs_1"
     type_def: ClassVar[str] = (
-        "'TEST_MSG_1024:\n  id: 5005\n  fields:\n    blob: uint8[1024]'"
+        "TEST_MSG_1024:\n  id: 5005\n  fields:\n    blob: uint8[1024]"
     )
 
     blob: IntArray[Uint8] = IntArray(Uint8, 1024)
@@ -1273,7 +1269,7 @@ class MDF_TEST_MSG_2048(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 2048
     type_source: ClassVar[str] = "test_defs_1"
     type_def: ClassVar[str] = (
-        "'TEST_MSG_2048:\n  id: 5006\n  fields:\n    blob: uint8[2048]'"
+        "TEST_MSG_2048:\n  id: 5006\n  fields:\n    blob: uint8[2048]"
     )
 
     blob: IntArray[Uint8] = IntArray(Uint8, 2048)
@@ -1286,7 +1282,7 @@ class MDF_TEST_MSG_4096(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 4096
     type_source: ClassVar[str] = "test_defs_1"
     type_def: ClassVar[str] = (
-        "'TEST_MSG_4096:\n  id: 5007\n  fields:\n    blob: uint8[4096]'"
+        "TEST_MSG_4096:\n  id: 5007\n  fields:\n    blob: uint8[4096]"
     )
 
     blob: IntArray[Uint8] = IntArray(Uint8, 4096)
@@ -1299,7 +1295,7 @@ class MDF_TEST_MSG_8192(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 8192
     type_source: ClassVar[str] = "test_defs_1"
     type_def: ClassVar[str] = (
-        "'TEST_MSG_8192:\n  id: 5008\n  fields:\n    blob: uint8[8192]'"
+        "TEST_MSG_8192:\n  id: 5008\n  fields:\n    blob: uint8[8192]"
     )
 
     blob: IntArray[Uint8] = IntArray(Uint8, 8192)
@@ -1311,7 +1307,7 @@ class MDF_SUBSCRIBER_READY(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x0434D478
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'SUBSCRIBER_READY:\n  id: 5009\n  fields: null'"
+    type_def: ClassVar[str] = "SUBSCRIBER_READY:\n  id: 5009\n  fields: null"
 
 
 class MDF_PUBLISHER_READY(MessageData, metaclass=MessageMeta):
@@ -1320,7 +1316,7 @@ class MDF_PUBLISHER_READY(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xFF322781
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'PUBLISHER_READY:\n  id: 5010\n  fields: null'"
+    type_def: ClassVar[str] = "PUBLISHER_READY:\n  id: 5010\n  fields: null"
 
 
 class MDF_SUBSCRIBER_DONE(MessageData, metaclass=MessageMeta):
@@ -1329,7 +1325,7 @@ class MDF_SUBSCRIBER_DONE(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xB0A085C1
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'SUBSCRIBER_DONE:\n  id: 5011\n  fields: null'"
+    type_def: ClassVar[str] = "SUBSCRIBER_DONE:\n  id: 5011\n  fields: null"
 
 
 class MDF_PUBLISHER_DONE(MessageData, metaclass=MessageMeta):
@@ -1338,7 +1334,7 @@ class MDF_PUBLISHER_DONE(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0xF53323C6
     type_size: ClassVar[int] = 0
     type_source: ClassVar[str] = "test_defs_1"
-    type_def: ClassVar[str] = "'PUBLISHER_DONE:\n  id: 5012\n  fields: null'"
+    type_def: ClassVar[str] = "PUBLISHER_DONE:\n  id: 5012\n  fields: null"
 
 
 class MDF_ARRAY_OF_ONE(MessageData, metaclass=MessageMeta):
@@ -1348,7 +1344,7 @@ class MDF_ARRAY_OF_ONE(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 288
     type_source: ClassVar[str] = "test_defs_1"
     type_def: ClassVar[str] = (
-        "'ARRAY_OF_ONE:\n  id: 5013\n  fields:\n    u8: uint8[1]\n    u16: uint16[1]\n    u32: uint32[1]\n    u64: uint64[1]\n    i8: int8[1]\n    i16: int16[1]\n    i32: int32[1]\n    i64: int64[1]\n    f32: float[1]\n    f64: double[1]\n    c: char\n    c1: char[1]\n    s2: char[2]\n    b: byte\n    ba: byte[1]\n    sa: VALIDATOR_STRUCT[1]'"
+        "ARRAY_OF_ONE:\n  id: 5013\n  fields:\n    u8: uint8[1]\n    u16: uint16[1]\n    u32: uint32[1]\n    u64: uint64[1]\n    i8: int8[1]\n    i16: int16[1]\n    i32: int32[1]\n    i64: int64[1]\n    f32: float[1]\n    f64: double[1]\n    c: char\n    c1: char[1]\n    s2: char[2]\n    b: byte\n    ba: byte[1]\n    sa: VALIDATOR_STRUCT[1]"
     )
 
     u8: IntArray[Uint8] = IntArray(Uint8, 1)
@@ -1380,7 +1376,7 @@ class MDF_ALIAS_TEST(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 132
     type_source: ClassVar[str] = "test_defs_2"
     type_def: ClassVar[str] = (
-        "'ALIAS_TEST:\n  id: 6000\n  fields:\n    timestamp: TIMESTAMP_TYPE\n    times: TIMESTAMP_TYPE[32]'"
+        "ALIAS_TEST:\n  id: 6000\n  fields:\n    timestamp: TIMESTAMP_TYPE\n    times: TIMESTAMP_TYPE[32]"
     )
 
     timestamp: Uint32 = Uint32()
@@ -1393,7 +1389,7 @@ class MDF_TEST_START(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x29D1BF0F
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "test_defs_2"
-    type_def: ClassVar[str] = "'TEST_START:\n  id: 6001\n  fields:\n    id: int32'"
+    type_def: ClassVar[str] = "TEST_START:\n  id: 6001\n  fields:\n    id: int32"
 
     id: Int32 = Int32()
 
@@ -1404,7 +1400,7 @@ class MDF_TEST_END(MessageData, metaclass=MessageMeta):
     type_hash: ClassVar[int] = 0x0573591A
     type_size: ClassVar[int] = 4
     type_source: ClassVar[str] = "test_defs_2"
-    type_def: ClassVar[str] = "'TEST_END:\n  id: 6002\n  fields:\n    id: int32'"
+    type_def: ClassVar[str] = "TEST_END:\n  id: 6002\n  fields:\n    id: int32"
 
     id: Int32 = Int32()
 
@@ -1416,7 +1412,7 @@ class MDF_TEST_METADATA(MessageData, metaclass=MessageMeta):
     type_size: ClassVar[int] = 132
     type_source: ClassVar[str] = "test_defs_2"
     type_def: ClassVar[str] = (
-        "'TEST_METADATA:\n  id: 1904\n  fields:\n    id: int32\n    note: char[128]'"
+        "TEST_METADATA:\n  id: 1904\n  fields:\n    id: int32\n    note: char[128]"
     )
 
     id: Int32 = Int32()
