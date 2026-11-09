@@ -93,6 +93,15 @@ def test_failed_constructor_leaves_no_unraisable_exception(
     assert unraisable == []
 
 
+@pytest.mark.parametrize(
+    ("host_id", "error"),
+    [(2**15, ValueError), (-(2**15) - 1, ValueError), (1.5, TypeError)],
+)
+def test_host_id_must_fit_the_header(host_id: Any, error: type[Exception]) -> None:
+    with pytest.raises(error, match="host_id"):
+        Client(host_id=host_id, definitions=td.get_message_definitions())
+
+
 def start_message(test_id: int) -> bytes:
     """Build a ``TEST_START`` message as the manager sends it.
 
@@ -186,6 +195,20 @@ def readable(client: Client) -> bool:
 
 @pytest.mark.integration
 class TestReceive:
+    def test_read_sets_recv_time(
+        self, scripted_client: Client, scripted_manager: ScriptedManager
+    ) -> None:
+        scripted_client.subscribe([td.MT_TEST_START])
+        before = time.perf_counter()
+
+        scripted_manager.send(start_message(1))
+        msg = scripted_client.read_message(timeout=DEFAULT_TIMEOUT)
+        after = time.perf_counter()
+
+        assert msg is not None
+        assert before <= msg.header.recv_time <= after
+        assert msg.header.msg_type == td.MT_TEST_START
+
     def test_unsubscribed_stream_does_not_extend_timeout(
         self, scripted_client: Client, scripted_manager: ScriptedManager
     ) -> None:
@@ -571,6 +594,96 @@ class TestSend:
         header = MessageHeader()
         header.msg_type = cd.MT_LM_READY
         assert scripted_client.forward_message(header) is True
+
+    def test_message_header_has_every_field(
+        self, scripted_client: Client, scripted_manager: ScriptedManager
+    ) -> None:
+        msg = td.MDF_TEST_START()
+        msg.id = 42
+        count = scripted_client.msg_count
+        before = time.perf_counter()
+
+        scripted_client.send_message(msg, dest_mod_id=7, dest_host_id=3)
+        after = time.perf_counter()
+        received = scripted_manager.receive(HEADER_SIZE + msg.type_size)
+
+        header = MessageHeader.from_buffer_copy(received)
+        assert (header.msg_type, header.msg_count) == (td.MT_TEST_START, count)
+        assert before <= header.send_time <= after
+        assert header.recv_time == 0
+        assert (header.src_host_id, header.src_mod_id) == (
+            0,
+            scripted_client.module_id,
+        )
+        assert (header.dest_host_id, header.dest_mod_id) == (3, 7)
+        assert header.num_data_bytes == msg.type_size
+        assert (header.remaining_bytes, header.is_dynamic) == (0, 0)
+        assert header.version == td.MDF_TEST_START.type_hash
+        assert received[HEADER_SIZE:] == bytes(msg)
+
+    def test_signal_header_has_every_field(
+        self, scripted_client: Client, scripted_manager: ScriptedManager
+    ) -> None:
+        count = scripted_client.msg_count
+        before = time.perf_counter()
+
+        scripted_client.send_signal(cd.MT_LM_READY, dest_mod_id=7, dest_host_id=3)
+        after = time.perf_counter()
+        received = scripted_manager.receive(HEADER_SIZE)
+
+        header = MessageHeader.from_buffer_copy(received)
+        assert (header.msg_type, header.msg_count) == (cd.MT_LM_READY, count)
+        assert before <= header.send_time <= after
+        assert header.recv_time == 0
+        assert (header.src_host_id, header.src_mod_id) == (
+            0,
+            scripted_client.module_id,
+        )
+        assert (header.dest_host_id, header.dest_mod_id) == (3, 7)
+        assert (header.num_data_bytes, header.remaining_bytes) == (0, 0)
+        assert (header.is_dynamic, header.version) == (0, 0)
+
+    @pytest.mark.parametrize("method", ["send_message", "send_signal"])
+    def test_msg_count_past_int32_wraps(
+        self, scripted_client: Client, scripted_manager: ScriptedManager, method: str
+    ) -> None:
+        # The count a client reaches after 2**31 sends.
+        scripted_client._msg_count = 2**31
+
+        if method == "send_message":
+            scripted_client.send_message(cd.MDF_LM_READY())
+        else:
+            scripted_client.send_signal(cd.MT_LM_READY)
+        received = scripted_manager.receive(HEADER_SIZE)
+
+        header = MessageHeader.from_buffer_copy(received)
+        assert header.msg_count == -(2**31)
+        assert scripted_client.msg_count == 2**31 + 1
+
+    @pytest.mark.parametrize(
+        ("signal_type", "error"), [("5", TypeError), (2**31, ValueError)]
+    )
+    def test_signal_type_is_checked(
+        self, scripted_client: Client, signal_type: Any, error: type[Exception]
+    ) -> None:
+        with pytest.raises(error):
+            scripted_client.send_signal(signal_type)
+
+    @pytest.mark.parametrize("method", ["send_message", "send_signal"])
+    def test_destinations_must_be_ints(
+        self, scripted_client: Client, method: str
+    ) -> None:
+        if method == "send_message":
+            send = lambda: scripted_client.send_message(
+                cd.MDF_LM_READY(), dest_mod_id=1.0  # type: ignore[arg-type]
+            )
+        else:
+            send = lambda: scripted_client.send_signal(
+                cd.MT_LM_READY, dest_mod_id=1.0  # type: ignore[arg-type]
+            )
+
+        with pytest.raises(TypeError):
+            send()
 
     def test_unwritable_socket_reports_a_dropped_send(
         self, capsys: pytest.CaptureFixture[str]

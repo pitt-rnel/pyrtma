@@ -234,11 +234,13 @@ Most receive tests use `scripted_client`, a client connected to the `scripted_ma
 | `test_options_after_host_id_are_keyword_only` | Timecode removal: `Client` and `client_context` arguments after `host_id` are keyword-only, so an old positional call that passed `timecode` fails instead of shifting the arguments after it. | Parametrized over both; a third positional argument for `Client`, a fifth for `client_context`. |
 | `test_timecode_argument_is_rejected` | Timecode removal: `Client` and `client_context` no longer accept `timecode`. | Parametrized over both; passes `timecode=True` and expects a `TypeError` naming it. |
 | `test_failed_constructor_leaves_no_unraisable_exception` | Client `__del__`: a `Client` whose constructor raises is collected without an exception from `__del__`. | Parametrized over module IDs -1 and 10000, both out of range; `sys.unraisablehook` is replaced to collect what `__del__` raises. |
+| `test_host_id_must_fit_the_header` | Client: `Client` refuses a `host_id` that its 16-bit header field can't hold, or that isn't an `int`, when it is constructed, since headers are now packed with `struct`, which can't truncate. | Parametrized over 2¹⁵, -2¹⁵ - 1 and 1.5. |
 
 ### TestReceive
 
 | Test | Purpose | Approach |
 |---|---|---|
+| `test_read_sets_recv_time` | P1: a read message's `recv_time` is set when it's read, now through `MessageHeader._set_recv_time`. | The stand-in sends a `TEST_START`; the time must fall between clocks taken before the send and after the read. |
 | `test_unsubscribed_stream_does_not_extend_timeout` | H2: messages the client isn't subscribed to use up the timeout rather than restarting it, so `read_message(0.3)` returns within it. | A thread has the stand-in send an ACK every 50 ms for 3 s; the client is subscribed to `TEST_START` only. |
 | `test_partial_message_does_not_block_past_timeout` | C1 (client side): with part of a message received, `read_message` returns None within its timeout, including a timeout of 0. | Parametrized over a split in the header and in the payload, and timeouts 0 and 0.2 s; the rest is never sent. |
 | `test_partial_message_completes_on_a_later_read` | C1 (client side): the bytes of a partial message are kept, and a later read returns the whole message. | Sends part of a `TEST_START`, reads with timeout 0, sends the rest, and reads again; parametrized over the same splits. |
@@ -265,6 +267,11 @@ Most receive tests use `scripted_client`, a client connected to the `scripted_ma
 | `test_all_hosts_is_accepted` | H4: `send_message` and `send_signal` accept `ALL_HOSTS`, and the manager forwards the message instead of rejecting it. | Parametrized over both methods; resends `LM_READY` to `ALL_HOSTS` until the receiver reads it, and checks its header. |
 | `test_invalid_destinations_are_rejected` | H4: both methods still reject module IDs below 0 or above `MAX_MODULE_ID`, and host IDs outside 0 to `MAX_HOSTS` other than `ALL_HOSTS`. | Parametrized over both methods and five destinations, including `ALL_HOSTS - 1`, on `scripted_client`. |
 | `test_sends_report_success` | Client Low (silent dropped packet): the three send methods return `True` when they send. | `send_message`, `send_signal` with `timeout=0`, and `forward_message`, on `scripted_client`. |
+| `test_message_header_has_every_field` | P1: the header `send_message` packs has every field as before: type, count, send time, no receive time, source and destination, size, and the message's hash as its version. | A `TEST_START` with a destination of module 7 on host 3; the stand-in reads the header and payload back. |
+| `test_signal_header_has_every_field` | P1: the header `send_signal` packs has every field as before, with no size and no version. | `LM_READY` to module 7 on host 3, read back by the stand-in. |
+| `test_msg_count_past_int32_wraps` | Client: past 2³¹ messages, the header's `msg_count` wraps to -2³¹ as ctypes stored it, for both send methods, and `send_signal` no longer raises `ValueError`. | Parametrized over both methods; the client's private `_msg_count` is set to 2³¹, the count after that many sends. |
+| `test_signal_type_is_checked` | P1: `send_signal` still rejects a type that isn't an `int` with `TypeError`, and one outside 32 bits with `ValueError`, as the header field's validator did. | Parametrized over `"5"` and 2³¹. |
+| `test_destinations_must_be_ints` | P1: both send methods reject a destination that isn't an `int` with `TypeError`, as setting the header field did. | Parametrized over both methods, with `dest_mod_id=1.0`. |
 | `test_unwritable_socket_reports_a_dropped_send` | Client Low (silent dropped packet): when the socket isn't writable within the timeout, each send method returns `False`, prints nothing, and the client stays connected. | A stand-in that never reads; `fill_send_buffer()` writes raw bytes to the client's socket until `select()` reports it unwritable, then each method is called with `timeout=0`. |
 | `test_send_waits_for_room_in_the_socket` | Client receive: with the socket non-blocking, a send that finds the socket's buffer full waits and carries on, and every byte arrives in order. | A stand-in with a 4 KiB receive buffer and a client with a 4 KiB send buffer; a thread sends 4,000 `TEST_MSG_8192` messages, about 33 MB, while the stand-in reads them all, then each header and the payload's first byte are checked. Fails with a plain `sendall`. |
 
@@ -698,6 +705,21 @@ Each test starts a `MessageManager` on an unused loopback port in `setUp` and co
 |---|---|---|
 | `test_dict` | `to_dict()` and `from_dict()` round-trip every test-definition message. | `from_random()` data for each type; compares fields, bytes, and the dicts. |
 | `test_json` | `to_json()` and `from_json()` round-trip every test-definition message. | As above, comparing the JSON strings. |
+
+## test_header.py — the message header's packed layout (needs: none)
+
+Headers built field by field are the reference: random values span each field's whole range, and the packed bytes must match.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_layout_has_the_headers_size` | P1: the header's `struct` layout, built from its ctypes fields at import, is the header's size. | Compares `_LAYOUT.size` with `sizeof(MessageHeader)`. |
+| `test_packed_header_matches_one_set_field_by_field` | P1: `_pack_into` writes the same bytes as setting each field, so its parameters are the fields, by name and in order. | 200 sets of random values, passed by keyword. |
+| `test_layout_reads_back_in_field_order` | P1: unpacking a header gives its field values in `_fields_` order. | A header set field by field, unpacked. |
+| `test_pack_into_writes_only_its_bytes` | P1: `_pack_into` at an offset writes exactly the header's bytes there and leaves the rest of the buffer alone. | A buffer filled with `0xAA`, written at offset 8. |
+| `test_set_recv_time_changes_only_recv_time` | P1: `_set_recv_time` changes `recv_time` and no other byte. | Compares with a header set field by field with the new time. |
+| `test_layout_adds_the_structures_padding` | P1: the layout builder adds pad bytes wherever ctypes pads, so fields land at their offsets. | A structure of `int8`, `double` and `int16`, with padding inside and at the end. |
+| `test_layout_rejects_fields_struct_cannot_describe` | P1: a field `struct` can't describe raises `TypeError` naming it, so a header that changed that way fails at import. | Parametrized over a `char` array and a `char` pointer. |
+| `test_field_struct_finds_one_field` | P1: `_field_struct` gives one field's layout and offset, as the client's read path uses for `num_data_bytes`. | Reads `num_data_bytes` back from a header. |
 
 ## test_message_base.py — attribute access on message classes (needs: none)
 

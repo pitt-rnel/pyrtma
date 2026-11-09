@@ -6,7 +6,6 @@ Includes :py:class:`~Client` class and associated exception classes
 from shlex import split
 import socket
 import select
-import struct
 import time
 import os
 import ctypes
@@ -17,14 +16,14 @@ from contextlib import contextmanager
 
 from .message import Message
 from .message_data import MessageData
-from .header import MessageHeader, get_header_cls
+from .header import MessageHeader, _field_struct, get_header_cls
 from .core_defs import ALL_MESSAGE_TYPES
 from .definitions import MessageDefinitions
 from .loader import (
     is_message_definitions_module,
     get_message_definitions_from_module,
 )
-from .validators import disable_message_validation
+from .validators import Int32
 from .client_logging import RTMALogger, ClientLike
 from .exceptions import (
     InvalidMessageDefinition,
@@ -82,11 +81,19 @@ F = TypeVar("F", bound=Callable[..., Any])
 # announces more than this, or less than zero, means the stream is corrupt.
 _MAX_DATA_BYTES: int = 1024**2
 
-# Header fields read from the raw bytes rather than through the header's
-# attribute hooks, which cost several times as much.
-_INT32 = struct.Struct("i")
-_MSG_TYPE_OFFSET: int = MessageHeader._msg_type.offset  # type: ignore[attr-defined]
-_NUM_DATA_BYTES_OFFSET: int = MessageHeader._num_data_bytes.offset  # type: ignore[attr-defined]
+# Header fields the read path takes straight from the received bytes, before
+# deciding what to read next; cheaper than going through their validators.
+_MSG_TYPE, _MSG_TYPE_OFFSET = _field_struct(MessageHeader, "_msg_type")
+_NUM_DATA_BYTES, _NUM_DATA_BYTES_OFFSET = _field_struct(
+    MessageHeader, "_num_data_bytes"
+)
+
+# Checks a signal's type as the header's msg_type field would.
+_SIGNAL_TYPE = Int32()
+
+# The range of a header's 16-bit host ID fields.
+_MIN_INT16: int = -(2**15)
+_MAX_INT16: int = 2**15 - 1
 
 # A deadline that has always passed: a read given it takes only what has
 # already arrived.
@@ -154,9 +161,15 @@ def _check_destination(dest_mod_id: int, dest_host_id: int) -> None:
         dest_host_id: 0 to ``MAX_HOSTS``, or ``ALL_HOSTS``.
 
     Raises:
+        TypeError: An ID isn't an ``int``.
         InvalidDestinationModule: The module ID is out of range.
         InvalidDestinationHost: The host ID is out of range.
     """
+    if not isinstance(dest_mod_id, int) or not isinstance(dest_host_id, int):
+        raise TypeError(
+            f"Destination IDs must be int, not {type(dest_mod_id).__name__} "
+            f"and {type(dest_host_id).__name__}"
+        )
     if dest_mod_id < 0 or dest_mod_id > cd.MAX_MODULE_ID:
         raise InvalidDestinationModule(f"Invalid dest_mod_id of [{dest_mod_id}]")
 
@@ -164,6 +177,18 @@ def _check_destination(dest_mod_id: int, dest_host_id: int) -> None:
         dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS
     ):
         raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
+
+
+def _int32(value: int) -> int:
+    """Wrap an integer to 32 bits, as a ctypes ``c_int32`` field stores it.
+
+    Args:
+        value: Any integer, such as a message count past 2**31.
+
+    Returns:
+        The value from -2**31 to 2**31 - 1 with the same low 32 bits.
+    """
+    return (value + 0x80000000) % 0x100000000 - 0x80000000
 
 
 def requires_connection(func: F) -> F:
@@ -206,6 +231,13 @@ class Client(ClientLike):
     ):
         if module_id >= cd.DYN_MOD_ID_START or module_id < 0:
             raise ValueError(f"Module ID must be >= 0 and < {cd.DYN_MOD_ID_START}")
+        if not isinstance(host_id, int):
+            raise TypeError(f"host_id must be int, not {type(host_id).__name__}")
+        if not _MIN_INT16 <= host_id <= _MAX_INT16:
+            raise ValueError(
+                f"host_id must be from {_MIN_INT16} to {_MAX_INT16}, the range the "
+                f"message header holds, not {host_id}"
+            )
 
         self._module_id = module_id
         self._host_id = host_id
@@ -937,6 +969,7 @@ class Client(ClientLike):
             within the timeout and the signal was dropped.
         """
         _check_destination(dest_mod_id, dest_host_id)
+        _SIGNAL_TYPE.validate_one(signal_type)
 
         if timeout >= 0:
             readfds, writefds, exceptfds = select.select([], [self._sock], [], timeout)
@@ -946,18 +979,23 @@ class Client(ClientLike):
             )  # blocking
 
         if writefds:
-            header = self._header_cls()
-            header.msg_type = signal_type
-            header.msg_count = self._msg_count
-            header.send_time = time.perf_counter()
-            header.recv_time = 0.0
-            header.src_host_id = self._host_id
-            header.src_mod_id = self._module_id
-            header.dest_host_id = dest_host_id
-            header.dest_mod_id = dest_mod_id
-            header.num_data_bytes = 0
-            header.remaining_bytes = 0
-            header.reserved = 0
+            header = bytearray(self._header_size)
+            self._header_cls._pack_into(
+                header,
+                0,
+                signal_type,
+                _int32(self._msg_count),
+                time.perf_counter(),
+                0.0,  # recv_time
+                self._host_id,
+                self._module_id,
+                dest_host_id,
+                dest_mod_id,
+                0,  # num_data_bytes
+                0,  # remaining_bytes
+                0,  # is_dynamic
+                0,  # reserved: a signal has no version
+            )
 
             self._sendall(header, self._header_size)
 
@@ -1010,21 +1048,26 @@ class Client(ClientLike):
             )  # blocking
 
         if writefds:
-            with disable_message_validation():
-                header = self._header_cls()
-                header.msg_type = msg_data.type_id
-                header.msg_count = self._msg_count
-                header.send_time = time.perf_counter()
-                header.recv_time = 0.0
-                header.src_host_id = self._host_id
-                header.src_mod_id = self._module_id
-                header.dest_host_id = dest_host_id
-                header.dest_mod_id = dest_mod_id
-                num_data_bytes = ctypes.sizeof(msg_data)
-                header.num_data_bytes = num_data_bytes
-                header.remaining_bytes = 0
-                header.reserved = 0
-                header.version = msg_data.type_hash
+            num_data_bytes = ctypes.sizeof(msg_data)
+            header = bytearray(self._header_size)
+            # Every value fits its field: the count and hash are wrapped to 32
+            # bits as ctypes would store them, and the IDs are checked.
+            self._header_cls._pack_into(
+                header,
+                0,
+                msg_data.type_id,
+                _int32(self._msg_count),
+                time.perf_counter(),
+                0.0,  # recv_time
+                self._host_id,
+                self._module_id,
+                dest_host_id,
+                dest_mod_id,
+                num_data_bytes,
+                0,  # remaining_bytes
+                0,  # is_dynamic
+                msg_data.type_hash & 0xFFFFFFFF,  # reserved: the version
+            )
 
             self._sendall(header, self._header_size)
             if num_data_bytes > 0:
@@ -1304,9 +1347,11 @@ class Client(ClientLike):
 
             header = self._rx_header
             assert header is not None
-            (msg_type,) = _INT32.unpack_from(header, _MSG_TYPE_OFFSET)
+            (msg_type,) = _MSG_TYPE.unpack_from(header, _MSG_TYPE_OFFSET)
             if target is header:
-                (data_size,) = _INT32.unpack_from(header, _NUM_DATA_BYTES_OFFSET)
+                (data_size,) = _NUM_DATA_BYTES.unpack_from(
+                    header, _NUM_DATA_BYTES_OFFSET
+                )
                 if data_size < 0 or data_size > _MAX_DATA_BYTES:
                     self._connection_lost()
                     raise ConnectionLost(
@@ -1323,7 +1368,7 @@ class Client(ClientLike):
 
             payload = self._rx_payload
             assert payload is not None
-            header.recv_time = time.perf_counter()
+            header._set_recv_time(time.perf_counter())
             self._reset_receive()
             return msg_type, header, payload
 

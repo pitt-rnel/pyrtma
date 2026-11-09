@@ -118,6 +118,9 @@ that makes them. The version number is chosen at release time.
 - The Python compiler checks Black's result: when Black fails, it warns with Black's message, and the file is left valid but unformatted. The failure used to go unnoticed.
 - `type_def` in generated Python holds the definition's text. It used to include the quotes of a `repr()` inside the string, as in `"'EXIT:\n  id: 0\n  fields: null'"`. `core_defs.py` and the test and example definitions are regenerated; nothing else in them changed.
 - Importing `pyrtma.compile` no longer installs `rich`'s traceback handler as the process's exception hook; the compiler's command line still does.
+- `Client.send_message` and `send_signal` build each header with one `struct` call, `MessageHeader._pack_into`, and the client sets each received header's `recv_time` the same way, instead of setting the fields one by one through their validators. The bytes sent are the same. In a sandbox, the Python work of a send fell from about 3.8 µs to 1.0 µs.
+- `Client` checks `host_id` when it is constructed: an `int` from -32768 to 32767, the range the header holds, or it raises `TypeError` or `ValueError`. Before, `send_signal` raised `ValueError` for a host ID outside that range, and `send_message` sent it truncated.
+- `send_message` and `send_signal` raise `TypeError` for a destination ID that isn't an `int` before waiting for the socket, rather than while building the header. `send_signal` checks `signal_type` before waiting too, and also inside `disable_message_validation()`, where a type outside 32 bits used to be truncated.
 
 ### Fixed
 
@@ -185,3 +188,4 @@ that makes them. The version number is chosen at release time.
 - A `char` alias array in generated JavaScript is a string, as a `char` array is.
 - The padding field the parser adds at the end of a struct records its offset, `Field.offset`, where the last field ends; it was left at -1. Layouts and generated code are unchanged.
 - `python -m pyrtma.compile -o <folder>` creates a missing output folder. It used to raise `FileExistsError` saying the output location must be a directory.
+- `send_signal` raised `ValueError` once a client had sent 2³¹ messages, about 15 hours at 40,000 a second, because it set its header's `msg_count` with validation on. The count wraps to 32 bits in every header now, as it always did in `send_message`'s.
