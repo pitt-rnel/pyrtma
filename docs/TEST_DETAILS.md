@@ -261,6 +261,7 @@ Most receive tests use `scripted_client`, a client connected to the `scripted_ma
 | `test_timecode_argument_is_rejected` | Timecode removal: `Client` and `client_context` no longer accept `timecode`. | Parametrized over both; passes `timecode=True` and expects a `TypeError` naming it. |
 | `test_failed_constructor_leaves_no_unraisable_exception` | Client `__del__`: a `Client` whose constructor raises is collected without an exception from `__del__`. | Parametrized over module IDs -1 and 10000, both out of range; `sys.unraisablehook` is replaced to collect what `__del__` raises. |
 | `test_host_id_must_fit_the_header` | Client: `Client` refuses a `host_id` that its 16-bit header field can't hold, or that isn't an `int`, when it is constructed, since headers are now packed with `struct`, which can't truncate. | Parametrized over 2¹⁵, -2¹⁵ - 1 and 1.5. |
+| `test_unconnected_client_closes_its_socket_when_collected` | Data logger writer: a `Client` that never connected closes its socket when it is garbage collected, rather than leaving it to raise `ResourceWarning`. | Keeps a reference to `client.sock`, deletes the client and runs `gc.collect()`; the socket's `fileno()` is -1. |
 
 ### TestReceive
 
@@ -553,6 +554,7 @@ Each writer saves to `tmp_path` with a stand-in formatter registered as `stub` f
 
 | Test | Purpose | Approach |
 |---|---|---|
+| `test_collected_writer_leaves_no_open_socket` | Data logger writer: a `DatasetWriter` no longer leaks the socket of the unconnected client it makes for logging. | Constructs a writer directly, not through `make_writer`, which keeps it alive; deletes it and runs `gc.collect()`. |
 | `test_formatter_that_takes_nothing_fails_the_dataset` | C9: a formatter that takes no messages even into a new file fails the dataset with `DatasetWriterError`, instead of making new files forever. | A formatter whose `write()` always returns 0. |
 
 ### TestWriterFailure

@@ -8,6 +8,7 @@ advances, so write periods and subdivisions need no waiting.
 from __future__ import annotations
 
 import errno
+import gc
 import logging
 import os
 import threading
@@ -190,6 +191,25 @@ def wait_dead(writer: DatasetWriter) -> None:
 
 def lines(path: Path) -> list[str]:
     return path.read_text(encoding="utf-8").splitlines()
+
+
+def test_collected_writer_leaves_no_open_socket(
+    tmp_path: Path, stub_formatter: type[StubFormatter]
+) -> None:
+    writer = DatasetWriter(
+        name="ds",
+        save_path=str(tmp_path),
+        filename="rec",
+        formatter="stub",
+        subdivide_interval=0,
+        msg_types=[cd.ALL_MESSAGE_TYPES],
+    )
+    sock = writer.client.sock
+
+    del writer
+    gc.collect()
+
+    assert sock.fileno() == -1
 
 
 class TestWriterFailure:

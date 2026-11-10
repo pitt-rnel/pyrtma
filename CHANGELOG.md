@@ -196,3 +196,4 @@ that makes them. The version number is chosen at release time.
 - `send_signal` raised `ValueError` once a client had sent 2³¹ messages, about 15 hours at 40,000 a second, because it set its header's `msg_count` with validation on. The count wraps to 32 bits in every header now, as it always did in `send_message`'s.
 - `python -m pyrtma.manager -d` allows address reuse: `SO_REUSEADDR` is set before the listening socket is bound. It used to be set afterwards, when it has no effect.
 - A `MessageManager` whose listening socket can't be bound, such as when the port is in use, closes the socket before raising `OSError`. It used to be left open.
+- A `Client` that never connected closes its socket when it is garbage collected. Every such client, including the one each `DatasetWriter` makes for logging, used to leave its socket open, reported as `ResourceWarning: unclosed <socket...>`.

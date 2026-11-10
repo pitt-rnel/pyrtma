@@ -430,6 +430,12 @@ class Client(ClientLike):
             except Exception:
                 """Silently ignore any errors at this point."""
                 pass
+        # A client that never connected still holds the socket the constructor
+        # made, which would otherwise be left to raise ResourceWarning.
+        # Closing a closed socket does nothing.
+        sock = getattr(self, "_sock", None)
+        if sock is not None:
+            sock.close()
 
     def _socket_connect(self, server_name: str, deadline: Optional[float] = None):
         """Open the TCP connection to the message manager.

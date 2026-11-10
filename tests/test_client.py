@@ -102,6 +102,16 @@ def test_host_id_must_fit_the_header(host_id: Any, error: type[Exception]) -> No
         Client(host_id=host_id, definitions=td.get_message_definitions())
 
 
+def test_unconnected_client_closes_its_socket_when_collected() -> None:
+    client = Client(definitions=td.get_message_definitions())
+    sock = client.sock
+
+    del client
+    gc.collect()
+
+    assert sock.fileno() == -1
+
+
 def start_message(test_id: int) -> bytes:
     """Build a ``TEST_START`` message as the manager sends it.
 
