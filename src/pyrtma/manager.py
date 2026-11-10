@@ -92,6 +92,9 @@ class Module:
     _outbox: Deque[memoryview] = field(
         default_factory=deque, init=False, repr=False, compare=False
     )
+    # Whether an ACK to it was dropped and none has got through since, so the
+    # manager warns once per run of dropped ACKs.
+    _ack_dropped: bool = field(default=False, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self._rx_header_size = ctypes.sizeof(self.header_cls)
@@ -331,6 +334,8 @@ class MessageManager(ClientLike):
             RuntimeError: The listening socket's descriptor is beyond what
                 ``select()`` can watch, because the process has too many
                 files open.
+            OSError: The listening socket couldn't be bound or set up, for
+                example because the port is in use. The socket is closed.
         """
         for name, value in (
             ("stall_timeout", stall_timeout),
@@ -380,19 +385,27 @@ class MessageManager(ClientLike):
             raise RuntimeError(
                 f"The listening socket's descriptor ({listen_fd}) is beyond what select() can watch (below {self._max_fd}). Start the manager with fewer files open."
             )
-        self.listen_socket.bind((ip_address, port))
-        self.listen_socket.listen(socket.SOMAXCONN)
+        try:
+            # Address reuse is allowed for testing. It must be set before
+            # bind() to have any effect.
+            if debug:
+                self.listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.listen_socket.bind((ip_address, port))
+            self.listen_socket.listen(socket.SOMAXCONN)
+            # Disable Nagle Algorithm
+            self.listen_socket.setsockopt(
+                socket.getprotobyname("tcp"), socket.TCP_NODELAY, 1
+            )
+        except BaseException:
+            # The manager won't exist, so nothing else would close it.
+            self.listen_socket.close()
+            raise
         self.modules: Dict[socket.socket, Module] = {}
         self.logger_modules: Set[Module] = set()
 
         self.subscriptions: Dict[int, Set[Module]] = defaultdict(set)
         self.sockets = [self.listen_socket]
         self.start_time = time.time()
-
-        # Disable Nagle Algorithm
-        self.listen_socket.setsockopt(
-            socket.getprotobyname("tcp"), socket.TCP_NODELAY, 1
-        )
 
         # Unused since sends became non-blocking; kept for compatibility.
         self.wlist: List[socket.socket] = []
@@ -425,10 +438,6 @@ class MessageManager(ClientLike):
         self._closing: List[Module] = []
         self._finishing_removals = False
 
-        # Address Reuse allowed for testing
-        if debug:
-            self.listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
         self.logger.info("Message Manager Initialized.")
 
     @property
@@ -448,7 +457,7 @@ class MessageManager(ClientLike):
         Returns:
             int: module ID
         """
-        current_ids = [mod.mod_id for mod in self.modules.values()]
+        current_ids = {mod.mod_id for mod in self.modules.values()}
 
         for mod_id in range(cd.DYN_MOD_ID_START, cd.MAX_MODULE_ID):
             # check if mod id is already used, if it is, continue looping until we find an unused one
@@ -664,7 +673,6 @@ class MessageManager(ClientLike):
         """
         self.remove_module(module)
         self.logger.error(f"Connection Error on write to {module!s} - {err!s}")
-        print("x", end="", flush=True)
         if header is not None:
             # This could recurse: send_failed_message returns early when the
             # failed message is itself a FAILED_MESSAGE or a log message.
@@ -1152,7 +1160,6 @@ class MessageManager(ClientLike):
                     # A module that can't take the message now misses it; it
                     # isn't waited for and isn't dropped.
                     module.drops += 1
-                    print("x", end="", flush=True)
                     self.send_failed_message(module, header, time.perf_counter())
 
     def send_to_loggers(
@@ -1218,17 +1225,51 @@ class MessageManager(ClientLike):
         header.num_data_bytes = 0
         header.msg_count = 0  # messages from the manager carry no count
 
-        # Queued behind anything not yet sent rather than dropped: the client
-        # is waiting for it.
-        try:
-            src_module.send_message(header, b"")
-        except OSError as err:
-            self._drop_after_send_error(src_module, header, err)
+        wire = bytes(header)
+        with self._routing():
+            if src_module.is_logger:
+                # Loggers are waited for, as for every message they're sent.
+                self._send_to_logger(src_module, header, wire)
+            else:
+                self._try_send_ack(src_module, header, wire)
 
-        # Always forward to logger modules, except the requester: a logger
-        # sent its own ACK twice would take the copy as the reply to its next
-        # request.
-        self.send_to_loggers(header, b"", exclude=src_module)
+            # Always forward to logger modules, except the requester: a logger
+            # sent its own ACK twice would take the copy as the reply to its
+            # next request.
+            self.send_to_loggers(header, b"", exclude=src_module)
+
+    def _try_send_ack(self, module: Module, header: MessageHeader, wire: bytes) -> None:
+        """Send an ACK to a module that isn't a logger, whole or not at all.
+
+        An ACK the module has no room for is dropped, counted and reported
+        with ``FAILED_MESSAGE``, as a forwarded message is, so a module that
+        never reads can't make the manager queue ACKs without limit. Its first
+        dropped ACK is logged as a warning; later ones aren't, until one gets
+        through again.
+
+        Args:
+            module: The module that made the request.
+            header: The ACK's header.
+            wire: The ACK's bytes.
+        """
+        try:
+            sent = module.try_send(wire)
+        except OSError as err:
+            self._drop_after_send_error(module, header, err)
+            return
+
+        if sent:
+            module.drops = 0
+            module._ack_dropped = False
+            return
+
+        module.drops += 1
+        if not module._ack_dropped:
+            module._ack_dropped = True
+            self.logger.warning(
+                f"{module!s} - Dropped an ACK because its connection is full; it may not be reading. Further dropped ACKs aren't logged until one gets through."
+            )
+        self.send_failed_message(module, header, time.perf_counter())
 
     def send_failed_message(
         self,
@@ -1491,9 +1532,11 @@ class MessageManager(ClientLike):
             if msg_hdr is not None:
                 self.process_message(src, msg_hdr)
         except ConnectionError as err:
-            self.disconnect_module(src)
-            self.logger.error(
-                f"Connection Error on read, disconnecting  {src!s} - {err!s}"
+            # Routine in a lab, such as a killed process, so a warning. Logged
+            # before the GOODBYE, as the other drop paths are.
+            self._drop_quietly(
+                src,
+                f"DROPPING - {src!s} - Closed its connection without disconnecting: {err!s}",
             )
         except Exception:
             self.logger.exception(

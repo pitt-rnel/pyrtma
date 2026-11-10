@@ -63,7 +63,8 @@ class FakeConnection:
     Receiving: ``feed()`` queues chunks. ``recv_into`` returns at most the bytes
     asked for from the first chunk and keeps the rest, as the kernel's buffer
     does. An empty chunk reads as the peer closing, and with nothing queued it
-    raises ``BlockingIOError``.
+    raises ``BlockingIOError``. A ``read_error`` that is set is raised by every
+    read, as a reset peer makes a socket raise ``ConnectionResetError``.
 
     Any connection raises ``OSError(EBADF)`` once it's closed, as a real one
     does. There is no ``sendall``: the manager must not block on a client.
@@ -77,6 +78,7 @@ class FakeConnection:
         self.accept = accept
         self.sent: list[bytes] = []
         self.incoming: list[bytes] = []
+        self.read_error: OSError | None = None
         self.close_count = 0
 
     def _check_open(self) -> None:
@@ -100,6 +102,8 @@ class FakeConnection:
 
     def recv_into(self, buffer: Any, nbytes: int = 0) -> int:
         self._check_open()
+        if self.read_error is not None:
+            raise self.read_error
         if not self.incoming:
             raise BlockingIOError(errno.EAGAIN, "Resource temporarily unavailable")
         chunk = self.incoming[0]
@@ -500,6 +504,43 @@ def assert_still_routes(sender: Client, observer: Client) -> None:
     assert received.data.id == 7
 
 
+class OrderRecordingSocket(socket.socket):
+    """A real socket that records its ``setsockopt`` and ``bind`` calls in order.
+
+    Installed in place of ``socket.socket`` by ``record_sockets()``.
+    """
+
+    made: list[OrderRecordingSocket] = []
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.calls: list[tuple[Any, ...]] = []
+        type(self).made.append(self)
+
+    def setsockopt(self, level: int, option: int, value: Any, *rest: Any) -> None:
+        self.calls.append(("setsockopt", level, option))
+        super().setsockopt(level, option, value, *rest)
+
+    def bind(self, address: Any) -> None:
+        self.calls.append(("bind",))
+        super().bind(address)
+
+
+def record_sockets(monkeypatch: pytest.MonkeyPatch) -> list[OrderRecordingSocket]:
+    """Make new sockets ``OrderRecordingSocket`` objects until the test ends.
+
+    Args:
+        monkeypatch: The test's ``monkeypatch`` fixture.
+
+    Returns:
+        The list each new socket is added to, in the order they're made.
+    """
+    made: list[OrderRecordingSocket] = []
+    monkeypatch.setattr(OrderRecordingSocket, "made", made)
+    monkeypatch.setattr(socket, "socket", OrderRecordingSocket)
+    return made
+
+
 class TestConstructor:
     def test_options_after_port_are_keyword_only(self) -> None:
         args: tuple[Any, ...] = (LOOPBACK, 0, logging.ERROR)
@@ -524,6 +565,37 @@ class TestConstructor:
 
         with pytest.raises(ValueError, match=option):
             MessageManager(ip_address=LOOPBACK, port=0, **kwargs)
+
+    def test_debug_sets_reuseaddr_before_binding(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        made = record_sockets(monkeypatch)
+
+        manager = MessageManager(
+            ip_address=LOOPBACK, port=0, debug=True, log_level=logging.ERROR
+        )
+        manager.listen_socket.close()
+
+        calls = made[0].calls
+        reuse = ("setsockopt", socket.SOL_SOCKET, socket.SO_REUSEADDR)
+        assert calls.index(reuse) < calls.index(("bind",))
+
+    def test_failed_bind_closes_the_listening_socket(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        with socket.socket() as taken:
+            taken.bind((LOOPBACK, 0))
+            taken.listen()
+            made = record_sockets(monkeypatch)
+
+            with pytest.raises(OSError):
+                MessageManager(
+                    ip_address=LOOPBACK,
+                    port=taken.getsockname()[1],
+                    log_level=logging.ERROR,
+                )
+
+        assert made[0].fileno() == -1
 
 
 class TestHeaderValidation:
@@ -1150,9 +1222,12 @@ class TestSending:
         assert dest.drops == 0
         assert not dest.has_pending
 
-    def test_ack_waits_behind_a_remainder(self, bare_manager: MessageManager) -> None:
+    def test_ack_is_dropped_behind_a_remainder(
+        self, bare_manager: MessageManager
+    ) -> None:
         src = add_fake_module(bare_manager, 101)
         dest = add_fake_module(bare_manager, 102, subs=[USER_MSG_TYPE], accept=60)
+        observer = add_fake_module(bare_manager, 103, subs=[cd.MT_FAILED_MESSAGE])
         first, _ = message_with_payload(bare_manager, b"\x01" * 100)
 
         bare_manager.forward_message(src, first, b"\x01" * 100)
@@ -1160,9 +1235,44 @@ class TestSending:
         fake_conn(dest).accept = None
         bare_manager._flush_module(dest)
 
-        received = sent_messages(dest)
-        assert [h.msg_type for h, _ in received] == [USER_MSG_TYPE, cd.MT_ACKNOWLEDGE]
-        assert dest.drops == 0
+        assert [h.msg_type for h, _ in sent_messages(dest)] == [USER_MSG_TYPE]
+        assert dest.drops == 1
+        assert is_routed(bare_manager, dest)
+        failed = sent_messages(observer)
+        assert [h.msg_type for h, _ in failed] == [cd.MT_FAILED_MESSAGE]
+        report = cd.MDF_FAILED_MESSAGE.from_buffer_copy(failed[0][1])
+        assert report.dest_mod_id == 102
+        assert report.msg_header.msg_type == cd.MT_ACKNOWLEDGE
+
+    @pytest.mark.manager_options(log_level=logging.WARNING)
+    def test_acks_to_a_module_that_never_reads_queue_nothing(
+        self, bare_manager: MessageManager, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        module = add_fake_module(bare_manager, 101, writable=False)
+
+        for _ in range(100):
+            handle(bare_manager, module, subscribe_message(td.MT_TEST_START))
+
+        assert not module.has_pending
+        assert module.drops == 100
+        assert is_routed(bare_manager, module)
+        assert len(ack_warnings(caplog)) == 1
+
+    @pytest.mark.manager_options(log_level=logging.WARNING)
+    def test_dropped_acks_warn_again_after_one_gets_through(
+        self, bare_manager: MessageManager, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        module = add_fake_module(bare_manager, 101, writable=False)
+
+        handle(bare_manager, module, subscribe_message(td.MT_TEST_START))
+        handle(bare_manager, module, subscribe_message(td.MT_TEST_START))
+        fake_conn(module).writable = True
+        handle(bare_manager, module, subscribe_message(td.MT_TEST_START))
+        fake_conn(module).writable = False
+        handle(bare_manager, module, subscribe_message(td.MT_TEST_START))
+
+        assert [h.msg_type for h, _ in sent_messages(module)] == [cd.MT_ACKNOWLEDGE]
+        assert len(ack_warnings(caplog)) == 2
 
     def test_send_error_while_flushing_drops_module(
         self, bare_manager: MessageManager
@@ -1243,6 +1353,25 @@ class TestLoggers:
         assert waits == [None]
         assert b"".join(fake_conn(logger).sent) == expected
         assert is_routed(bare_manager, logger)
+
+    def test_logger_waits_for_its_own_ack(
+        self, bare_manager: MessageManager, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        logger = add_fake_module(bare_manager, 103, is_logger=True, writable=False)
+        waits: list[float | None] = []
+
+        def wait(module: Module, timeout: float | None) -> bool:
+            waits.append(timeout)
+            fake_conn(module).writable = True
+            return True
+
+        monkeypatch.setattr(bare_manager, "_wait_writable", wait)
+
+        handle(bare_manager, logger, subscribe_message(td.MT_TEST_START))
+
+        assert waits == [None]
+        assert [h.msg_type for h, _ in sent_messages(logger)] == [cd.MT_ACKNOWLEDGE]
+        assert not logger.has_pending
 
     @pytest.mark.manager_options(logger_timeout=0.25)
     def test_logger_timeout_drops_hung_logger(
@@ -1528,6 +1657,22 @@ def subscribe_message(msg_type: int, unsubscribe: bool = False) -> bytes:
     )
 
 
+def ack_warnings(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    """Return the warnings the manager logged about dropping an ACK.
+
+    Args:
+        caplog: The test's ``caplog`` fixture.
+
+    Returns:
+        The matching records, in order.
+    """
+    return [
+        r
+        for r in caplog.records
+        if r.levelno == logging.WARNING and "ACK" in r.getMessage()
+    ]
+
+
 class TestConnectRequired:
     @pytest.mark.parametrize(
         "msg_type", [cd.MT_SUBSCRIBE, USER_MSG_TYPE, cd.MT_MODULE_READY]
@@ -1592,6 +1737,50 @@ class TestForwardingAfterDrop:
 
         assert not is_routed(bare_manager, leaving)
         assert [h.msg_type for h, _ in sent_messages(observer)] == [cd.MT_DISCONNECT]
+
+
+class TestVanishedClient:
+    @pytest.mark.manager_options(log_level=logging.WARNING)
+    def test_reset_connection_is_a_warning_before_its_goodbye(
+        self, bare_manager: MessageManager, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        vanished = add_fake_module(bare_manager, 101)
+        observer = add_fake_module(
+            bare_manager,
+            102,
+            subs=[cd.MT_RTMA_LOG_WARNING, cd.MT_RTMA_LOG_ERROR, cd.MT_GOODBYE],
+        )
+        fake_conn(vanished).read_error = ConnectionResetError(
+            errno.ECONNRESET, "Connection reset by peer"
+        )
+
+        bare_manager._handle_client(vanished.conn, vanished)
+
+        assert not is_routed(bare_manager, vanished)
+        assert [h.msg_type for h, _ in sent_messages(observer)] == [
+            cd.MT_RTMA_LOG_WARNING,
+            cd.MT_GOODBYE,
+        ]
+        records = [r for r in caplog.records if "fake101" in r.getMessage()]
+        assert [r.levelno for r in records] == [logging.WARNING]
+        assert "Closed its connection without disconnecting" in records[0].getMessage()
+        assert "  " not in records[0].getMessage()
+
+
+class TestConsoleOutput:
+    @pytest.mark.manager_options(log_level=logging.CRITICAL)
+    def test_drops_and_send_errors_print_nothing(
+        self, bare_manager: MessageManager, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        src = add_fake_module(bare_manager, 101)
+        full = add_fake_module(bare_manager, 102, subs=[USER_MSG_TYPE], writable=False)
+        failing = add_fake_module(bare_manager, 103, subs=[USER_MSG_TYPE], fail=True)
+
+        bare_manager.forward_message(src, make_header(bare_manager, USER_MSG_TYPE), b"")
+
+        assert full.drops == 1
+        assert not is_routed(bare_manager, failing)
+        assert capsys.readouterr() == ("", "")
 
 
 class TestAcknowledgements:

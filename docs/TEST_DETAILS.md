@@ -33,7 +33,7 @@ The layout:
 
 ## test_manager.py — the message manager (needs: integration)
 
-Tests that route real messages use the `manager` fixture, a raw socket from `raw_connection` whose headers carry `src_mod_id` 123, and `watcher()`. `watcher()` connects a sender and an observer that subscribes to `GOODBYE`, then to `TEST_START`. It then resends `TEST_START` with `deliver()` until it arrives, which shows the earlier subscriptions are in place. Tests that need conditions real sockets can't produce on demand drive a constructed, never-run manager (`bare_manager`) with `FakeConnection` stand-ins, which behave like non-blocking sockets. A fake records what each `send()` call takes; `accept` limits how many more bytes it takes, so a send can be partial, and a full or unwritable fake raises `BlockingIOError`. A failing fake raises `ConnectionResetError` like a reset peer. Bytes given to `feed()` are returned by `recv_into` no more than asked for at a time, an empty chunk reads as the peer closing, and with nothing fed it raises `BlockingIOError`. Every fake raises `OSError(EBADF)` after it's closed, like a real socket, and none has `sendall`, so the manager can't block on one. `read_once()` gives a fake module one read turn, as `run()` does when its socket is readable. The `manager_options` marker passes options such as `stall_timeout` to both `manager` and `bare_manager`.
+Tests that route real messages use the `manager` fixture, a raw socket from `raw_connection` whose headers carry `src_mod_id` 123, and `watcher()`. `watcher()` connects a sender and an observer that subscribes to `GOODBYE`, then to `TEST_START`. It then resends `TEST_START` with `deliver()` until it arrives, which shows the earlier subscriptions are in place. Tests that need conditions real sockets can't produce on demand drive a constructed, never-run manager (`bare_manager`) with `FakeConnection` stand-ins, which behave like non-blocking sockets. A fake records what each `send()` call takes; `accept` limits how many more bytes it takes, so a send can be partial, and a full or unwritable fake raises `BlockingIOError`. A failing fake raises `ConnectionResetError` like a reset peer. Bytes given to `feed()` are returned by `recv_into` no more than asked for at a time, an empty chunk reads as the peer closing, and with nothing fed it raises `BlockingIOError`; a `read_error` that is set is raised by every read. Every fake raises `OSError(EBADF)` after it's closed, like a real socket, and none has `sendall`, so the manager can't block on one. `read_once()` gives a fake module one read turn, as `run()` does when its socket is readable. The `manager_options` marker passes options such as `stall_timeout` to both `manager` and `bare_manager`.
 
 ### TestConstructor
 
@@ -43,6 +43,8 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | `test_timecode_argument_is_rejected` | Timecode removal: `MessageManager` no longer accepts `timecode`. | Passes `timecode=True` and expects a `TypeError` naming it. |
 | `test_default_timeouts` | C1: by default a client stalled mid-message is dropped after 5 s, and logger modules are waited for without a limit. | Reads both settings from a default manager. |
 | `test_timeouts_must_be_positive` | C1: a stall or logger timeout of zero or less is rejected, with an error naming the option. | Parametrized over both options and 0 and -1. |
+| `test_debug_sets_reuseaddr_before_binding` | Manager, second pass: with `debug`, `SO_REUSEADDR` is set before the listening socket is bound, where it takes effect. | `record_sockets()` replaces `socket.socket` with `OrderRecordingSocket`, a real socket that records its `setsockopt` and `bind` calls in order. |
+| `test_failed_bind_closes_the_listening_socket` | Manager, second pass: a manager whose port is in use raises `OSError` and closes its listening socket. | A plain socket listens on a loopback port first; the recorded socket's `fileno()` is -1 afterwards. |
 
 ### TestHeaderValidation
 
@@ -117,7 +119,9 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | `test_message_is_sent_as_one_buffer` | P2: a forwarded message's header and payload go out in one send, and the bytes are the same as before. | Compares the fake's list of sends with the header bytes followed by the payload. |
 | `test_partial_send_is_finished_before_anything_else` | Manager routing: when a connection takes only part of a message, the rest is sent first and nothing is interleaved, and a message forwarded meanwhile is counted as a drop with `FAILED_MESSAGE` instead. The module stays connected. | A fake that takes 60 bytes of a 148-byte message, then a second message, then room. |
 | `test_remainder_is_finished_before_the_next_message` | Manager routing: once a connection has room again, the next forward finishes the queued remainder and then sends, with no drop. | As above, but the room comes before the second message. |
-| `test_ack_waits_behind_a_remainder` | Manager routing: an ACK to a module with a remainder queued is sent after it instead of being dropped. | A partial message, then `send_ack`, then room. |
+| `test_ack_is_dropped_behind_a_remainder` | Manager, second pass: an ACK to a module that can't take it now, here because a remainder is still queued, is dropped, counted and reported with `FAILED_MESSAGE` naming the ACK, and the module stays connected. | A partial message, then `send_ack`, then room; decodes the observer's `FAILED_MESSAGE`. |
+| `test_acks_to_a_module_that_never_reads_queue_nothing` | Manager, second pass: requests from a module that never reads don't make the manager queue their ACKs; each is a drop, one warning is logged, and the module stays connected. | 100 `SUBSCRIBE`s from an unwritable fake. |
+| `test_dropped_acks_warn_again_after_one_gets_through` | Manager, second pass: dropped ACKs are warned about once per run, and again after an ACK gets through. | Two `SUBSCRIBE`s while unwritable, one with room, one more without. |
 | `test_send_error_while_flushing_drops_module` | Manager routing: a connection that fails while its queued bytes are sent is dropped with a `GOODBYE`, and nothing escapes. | A partial message, then a fake that resets. |
 | `test_slow_consumer_is_not_dropped` | Manager routing: a client that stops reading misses messages, reported with `FAILED_MESSAGE`, but stays connected; the manager keeps routing for others; and once the client reads again, its stream is whole. | Floods a non-reading subscriber with `TEST_MSG_8192` until a `FAILED_MESSAGE` names it, then drains it and delivers a marked message. |
 
@@ -125,6 +129,7 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 
 | Test | Purpose | Approach |
 |---|---|---|
+| `test_logger_waits_for_its_own_ack` | Manager, second pass: a logger's own ACK is waited for, like every message a logger is sent, and nothing is left queued. | An unwritable logger fake sends `SUBSCRIBE`; the patched wait records its timeout and makes room. |
 | `test_logger_gets_whole_message_after_waiting` | Manager routing: by default the manager waits for a logger module that can't take a message, with no limit, and the logger gets the whole message. | A logger fake that takes 10 bytes; the patched wait records its timeout and makes room. |
 | `test_logger_timeout_drops_hung_logger` | Manager routing: with a logger timeout, a logger that can't take a message within it is dropped with an error, a `FAILED_MESSAGE` and then a `GOODBYE`, and other modules still get the message. | A 0.25 s timeout; an unwritable logger fake; the patched wait times out. |
 | `test_hung_logger_is_dropped_after_logger_timeout` | Manager routing: a real logger client that stops reading is dropped after the logger timeout, and the manager keeps routing. | A 0.5 s timeout; floods `TEST_MSG_8192` until the `GOODBYE` for the logger arrives. |
@@ -178,6 +183,18 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 |---|---|---|
 | `test_refused_connect_is_not_forwarded` | Manager, second pass: a `CONNECT` refused for a duplicate ID isn't passed on to subscribers. | A `CONNECT_V2` asking for ID 50, which another module holds; the observer subscribes to `CONNECT_V2`. |
 | `test_disconnect_is_still_forwarded` | Manager, second pass: `DISCONNECT` is still passed on, although handling it drops its sender. | The observer subscribes to `DISCONNECT`. |
+
+### TestVanishedClient
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_reset_connection_is_a_warning_before_its_goodbye` | Manager, second pass: a client whose connection resets is dropped with one warning, "Closed its connection without disconnecting" with no doubled space, logged before its `GOODBYE`. | A fake whose `read_error` is `ConnectionResetError`, given one turn with `_handle_client`; an observer subscribed to warnings, errors and `GOODBYE`. |
+
+### TestConsoleOutput
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_drops_and_send_errors_print_nothing` | Low: the manager prints nothing to the console for a slow-consumer drop or a failed send. | One forward to an unwritable fake and a failing fake, with logging at CRITICAL; `capsys` captures nothing. |
 
 ### TestAcknowledgements
 
