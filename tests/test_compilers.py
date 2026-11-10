@@ -44,6 +44,9 @@ from .helpers import parse_definitions, quiet_parser
 REPO = Path(__file__).resolve().parents[1]
 SNAPSHOT_PATH = Path(__file__).with_name("compiled_layouts_snapshot.json")
 
+# The compiled example definitions that the scripts in examples/ import.
+EXAMPLE_MESSAGES = REPO / "examples" / "msg_defs" / "example_messages.py"
+
 # The compiler index files whose layouts the snapshot records.
 DEFINITIONS = {
     "core": REPO / "src" / "pyrtma" / "core_defs" / "rtma.defs",
@@ -237,6 +240,19 @@ class TestPython:
             assert cls.type_hash == int(mdf.hash[:8], 16), name
         for name, sdf in parser.struct_defs.items():
             assert ctypes.sizeof(defs.SDF[name]) == sdf.size, name
+
+    def test_committed_example_definitions_are_current(self) -> None:
+        parser = parse_definitions(DEFINITIONS["examples"])[0]
+
+        defs = load_message_definitions(EXAMPLE_MESSAGES)
+
+        assert set(defs.MDF) == set(parser.message_defs)
+        for name, mdf in parser.message_defs.items():
+            cls = defs.MDF[name]
+            expected = (mdf.type_id, mdf.size, int(mdf.hash[:8], 16))
+            assert (cls.type_id, cls.type_size, cls.type_hash) == expected, name
+        for name, sdf in parser.struct_defs.items():
+            assert defs.SDF[name].type_hash == int(sdf.hash[:8], 16), name
 
     def test_struct_aliases_name_their_struct(self, tmp_path: Path) -> None:
         compile_defs(FIXTURE, tmp_path, "out", python=True)

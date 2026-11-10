@@ -932,6 +932,7 @@ The classes below compile into `tmp_path` with `pyrtma.compile.compile`. Most us
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_classes_match_the_parser` | Parser and compilers: the generated Python loads, and every class's size, `type_size` and hash match the parser's. | Parametrized over the fixture and the test definitions; loaded with `load_message_definitions`. |
+| `test_committed_example_definitions_are_current` | Low (examples): `examples/msg_defs/example_messages.py`, which the example scripts import, is compiled from `example.defs` as it is now: the same messages, and each message's ID, size and hash and each struct's hash match the parser's. It used to be stale, with hashes from before Phase 9. | Parses `example.defs` and loads the committed file with `load_message_definitions`. |
 | `test_struct_aliases_name_their_struct` | H11: aliases of structs, and of struct aliases, name the struct's class; they used to come before the class and raise `NameError`. | `PT`, `PTS` and `LINE_ALIAS` in the loaded `SDF` map. |
 | `test_string_constants_keep_their_text` | Parser and compilers: string constants with backslashes and quotes keep their text in Python. | The fixture's `PATH` and `QUOTE`. |
 | `test_type_def_is_the_definition_text` | Low (Python compiler): `type_def` holds the definition's text, without the quotes `repr()` used to leave inside it. | Compares a message's and a struct's `type_def` with the parser's `raw`. |
