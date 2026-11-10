@@ -214,8 +214,10 @@ def field_operations(number: int, repeat: int) -> list[tuple[str, list[float]]]:
         "start": defs.MDF["TEST_START"](),
         "blob": defs.MDF[WIRE_MSG]().blob,
         "time": time,
+        "buf": bytearray(ctypes.sizeof(pyrtma.MessageHeader) + 128),
     }
-    # What send_message does, with validation off as it has it.
+    # A header filled field by field, with validation off. send_message packs
+    # its header with one call instead, timed by the next row.
     fill = (
         "hh = H(); hh.msg_type = 5002; hh.msg_count = 1; "
         "hh.send_time = time.perf_counter(); hh.recv_time = 0.0; "
@@ -232,8 +234,19 @@ def field_operations(number: int, repeat: int) -> list[tuple[str, list[float]]]:
     ]
     with disable_message_validation():
         results.append(
-            ("header fill, as sent", time_statement(fill, namespace, number, repeat))
+            (
+                "header fill, field by field",
+                time_statement(fill, namespace, number, repeat),
+            )
         )
+    # What send_message does: the whole header with one struct call.
+    pack = (
+        "H._pack_into(buf, 0, 5002, 1, time.perf_counter(), 0.0, "
+        "0, 10000, 0, 0, 128, 0, 0, 77)"
+    )
+    results.append(
+        ("header pack, as sent", time_statement(pack, namespace, number, repeat))
+    )
     results += [
         (
             "message int32 field write",

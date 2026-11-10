@@ -12,7 +12,7 @@ from pyrtma.header import MessageHeader
 from pyrtma.message import Message
 from pyrtma.validators import disable_message_validation
 
-# Import message defs to add to pyrtma.msg_defs map
+# The test definitions, whose classes these tests use.
 from .test_msg_defs.test_defs import *
 
 

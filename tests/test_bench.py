@@ -217,7 +217,8 @@ def test_microbench_times_every_operation(tmp_path: Path) -> None:
     for name in (
         "header field read",
         "header field write, validated",
-        "header fill, as sent",
+        "header fill, field by field",
+        "header pack, as sent",
         "message int32 field write",
         "array element write",
         "send_message, 128 B",

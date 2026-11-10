@@ -64,6 +64,10 @@ class RTMAWebSocketHandler(WebSocketHandler):
         # Initialize RTMA Proxy connection
         self.mm_ip = server.mm_ip
         self.proxy = Client(definitions=server.definitions)
+        # The proxy's records propagate to the root logger, which main() gives
+        # a console handler, so its own console handler would print each of
+        # them a second time.
+        self.proxy.logger.enable_console = False
 
         WebSocketHandler.__init__(self, socket, addr, server)
 

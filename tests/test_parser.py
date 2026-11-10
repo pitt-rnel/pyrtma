@@ -63,7 +63,7 @@ class TestParser(unittest.TestCase):
         self.tmp = TempDefFile()
         self.tmp2 = TempDefFile()
 
-    def TearDown(self) -> None:
+    def tearDown(self) -> None:
         del self.tmp
         del self.tmp2
 

@@ -11,9 +11,10 @@ import socket
 import subprocess
 import sys
 import threading
+import types
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, cast
 
 import pytest
 
@@ -25,7 +26,14 @@ from pyrtma.header import MessageHeader
 from pyrtma.message import Message
 from pyrtma.message_data import MessageData
 
-from .helpers import DEFAULT_TIMEOUT, LOOPBACK, ManagerHarness, deliver, read_until
+from .helpers import (
+    DEFAULT_TIMEOUT,
+    LOOPBACK,
+    ManagerHarness,
+    RecordingHandler,
+    deliver,
+    read_until,
+)
 from .test_msg_defs import test_defs as td
 
 DEFS_FILE = Path(td.__file__)
@@ -108,6 +116,23 @@ def test_defs_option_is_required(capsys: pytest.CaptureFixture[str]) -> None:
 
     assert raised.value.code == 2
     assert "--defs" in capsys.readouterr().err
+
+
+def test_proxy_records_are_printed_once(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = RecordingHandler()
+    monkeypatch.setattr(logging.getLogger(), "handlers", [root])
+    monkeypatch.setattr(wm.WebSocketHandler, "__init__", lambda self, *args: None)
+    server = types.SimpleNamespace(
+        mm_ip=LOOPBACK, definitions=cd.get_message_definitions()
+    )
+
+    handler = wm.RTMAWebSocketHandler(cast(Any, None), (LOOPBACK, 0), cast(Any, server))
+    handler.proxy.warning("proxy-hello")
+
+    assert [r.getMessage() for r in root.records] == ["proxy-hello"]
+    assert "proxy-hello" not in "".join(capsys.readouterr())
 
 
 def test_definitions_are_loaded_once(
