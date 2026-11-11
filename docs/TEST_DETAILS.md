@@ -513,6 +513,8 @@ The `data_logger` fixture runs a `DataLogger` in a thread against the `manager` 
 
 | Test | Purpose | Approach |
 |---|---|---|
+| `test_main_passes_fsync` | `python -m pyrtma.data_logger --fsync` makes the logger fsync its datasets' files; without the flag it doesn't. | Parametrized with and without `--fsync`; replaces `DataLogger` with a stand-in that records its arguments and raises `MessageManagerNotFound`. |
+| `test_fsync_reaches_the_datasets` | `DataLogger(fsync=True)` passes `fsync` to the datasets it adds. | A logger made with `fsync=True` adds and starts a dataset; checks the dataset's `fsync`. |
 | `test_main_exits_cleanly_without_manager` | Low: `python -m pyrtma.data_logger` with no manager running exits with status 1 and a one-line error, rather than a traceback. | Calls `main()` with `-m` set to a free port and `-d` the test definitions, and checks `SystemExit` and stderr. |
 
 ### TestUndecodableMessages
@@ -608,6 +610,16 @@ The stand-in's limit is set, through its class's `max_bytes`, with room for its 
 | `test_rolled_over_quicklogger_files_all_read` | C9: QuickLogger files from a rollover are each within the limit and together read back every message, in order. | The real `quicklogger` formatter with room for three messages, and seven messages. |
 | `test_crash_keeps_finished_files_readable` | C9: if the logger dies while recording, the files it finished read completely, and the one it was writing loads nothing with `throw=False` rather than raising. | Reads both files after a rollover, while the second is still open. |
 | `test_formatter_without_a_count_is_not_split` | A formatter written before `write()` returned a count, whose `write()` returns None, still writes everything to one file. | A formatter overriding `write()` the old way, with a small limit. |
+
+### TestFsync
+
+The `syncs` fixture replaces `os.fsync` and the writer's folder sync with recorders.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_files_are_not_synced_by_default` | Without `fsync`, a writer makes no `fsync()` calls on its files or folder, leaving write-back to the operating system as before. | One message, a write, then `stop()`. |
+| `test_fsync_syncs_after_each_write_and_before_close` | With `fsync=True`, each write is synced, the file is synced again before it is closed, and the folder is synced once when the file is created. | One message, a write, then `stop()`; counts the calls after each. |
+| `test_fsync_syncs_each_full_file_and_its_folder` | With `fsync=True`, a file that fills is synced before it is closed, the write continuing in the next file is synced, and each new file's folder is synced. | The stand-in's two-line limit and three messages in one write. |
 
 ## test_data_formatter.py — formatter registration and the file size limit (needs: none)
 

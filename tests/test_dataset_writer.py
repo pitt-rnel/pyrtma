@@ -664,6 +664,78 @@ class TestRollover:
         assert lines(tmp_path / "rec.txt")[1:-1] == list("abcde")
 
 
+class TestFsync:
+    @pytest.fixture
+    def syncs(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
+        """Record ``os.fsync()`` calls on files, and folder syncs, separately."""
+        seen: dict[str, list[Any]] = {"files": [], "folders": []}
+        monkeypatch.setattr(dataset_writer.os, "fsync", seen["files"].append)
+        monkeypatch.setattr(dataset_writer, "_fsync_dir", seen["folders"].append)
+        return seen
+
+    def test_files_are_not_synced_by_default(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        clock: FakeClock,
+        syncs: dict[str, list[Any]],
+    ) -> None:
+        writer = make_writer()
+        writer.start()
+        writer.update(message("a"))
+
+        write_now(writer, clock)
+        wait_written(writer)
+        writer.stop()
+        wait_dead(writer)
+
+        assert syncs == {"files": [], "folders": []}
+
+    def test_fsync_syncs_after_each_write_and_before_close(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        clock: FakeClock,
+        tmp_path: Path,
+        syncs: dict[str, list[Any]],
+    ) -> None:
+        writer = make_writer(fsync=True)
+        writer.start()
+        writer.update(message("a"))
+
+        write_now(writer, clock)
+        wait_written(writer)
+        after_write = len(syncs["files"])
+        writer.stop()
+        wait_dead(writer)
+
+        assert after_write == 1
+        assert len(syncs["files"]) == 2
+        assert syncs["folders"] == [tmp_path]
+        assert lines(tmp_path / "rec.txt") == ["header", "a", "footer"]
+
+    def test_fsync_syncs_each_full_file_and_its_folder(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        stub_formatter: type[StubFormatter],
+        clock: FakeClock,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        syncs: dict[str, list[Any]],
+    ) -> None:
+        monkeypatch.setattr(stub_formatter, "max_bytes", TWO_LINES)
+        writer = make_writer(fsync=True)
+        writer.start()
+        for text in "abc":
+            writer.update(message(text))
+
+        write_now(writer, clock)
+        wait_written(writer)
+
+        # rec.txt is synced when it fills, before it is closed; then the write
+        # that continued in rec_0001.txt is synced.
+        assert len(syncs["files"]) == 2
+        assert syncs["folders"] == [tmp_path, tmp_path]
+
+
 class StubbornFormatter(DataFormatter):
     """A formatter that never takes a message, even into a new file."""
 

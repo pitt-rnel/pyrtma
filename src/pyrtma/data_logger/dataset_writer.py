@@ -1,6 +1,7 @@
 """DataSet class used internally by data_logger"""
 
 import contextlib
+import os
 import pathlib
 import warnings
 import io
@@ -63,6 +64,22 @@ def _exclusive_mode(mode: str) -> str:
     return mode.replace("w", "x")
 
 
+def _fsync_dir(path: pathlib.Path) -> None:
+    """Make the directory entries in ``path`` durable.
+
+    ``fsync()`` of a new file doesn't cover its name in the directory, so
+    after a power loss the file's data could be on disk but unreachable.
+    POSIX only: NTFS keeps a created file's entry without this.
+    """
+    if os.name != "posix":
+        return
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 class DatasetWriter:
     # Deprecated: files are no longer split by time. Kept so existing
     # references still resolve.
@@ -84,6 +101,7 @@ class DatasetWriter:
         *,
         max_size_mb: int = cd.DATASET_MAX_SIZE_MB,
         clock: Callable[[], float] = time.monotonic,
+        fsync: bool = False,
     ):
         """Set up a dataset; nothing is recorded until :py:meth:`start`.
 
@@ -102,6 +120,11 @@ class DatasetWriter:
                 ``max_bytes`` is lower keeps that.
             clock: Seconds from a monotonic clock, for the write schedule and
                 the elapsed time. Injectable for tests.
+            fsync: After every write and before closing a file, flush it and
+                ``os.fsync()`` it, and sync its folder when a file is created,
+                so a power loss costs at most one write period of messages. By
+                default the operating system decides when to write its buffers
+                to disk.
 
         Raises:
             InvalidFormatter: No formatter has that name.
@@ -115,6 +138,7 @@ class DatasetWriter:
         self._close = False
         self._elapsed_time = 0.0
         self._clock = clock
+        self.fsync = fsync
         self._started = False
         self._failed = False
         # Guards _failed, so only the first failure is reported.
@@ -324,6 +348,16 @@ class DatasetWriter:
             raise DatasetError(self.name, f"Can't create {path}: {e}") from e
 
         try:
+            if self.fsync:
+                _fsync_dir(path.parent)
+        except OSError as e:
+            with contextlib.suppress(OSError):
+                fd.close()
+            with contextlib.suppress(OSError):
+                path.unlink()
+            raise DatasetError(self.name, f"Can't sync {path.parent}: {e}") from e
+
+        try:
             formatter = self.formatter_cls(fd)
             # The dataset's limit, unless the formatter's own is lower.
             formatter.max_bytes = min(
@@ -460,6 +494,16 @@ class DatasetWriter:
             self.subdivide()
             fresh = True
 
+    def _sync(self) -> None:
+        """With ``fsync``, push everything written so far through to the disk.
+
+        Without it, nothing is done: the operating system writes its buffers
+        when it decides to.
+        """
+        if self.fsync and self.fd is not None:
+            self.fd.flush()
+            os.fsync(self.fd.fileno())
+
     def subdivide(self):
         """Finish the current file and continue in the next one.
 
@@ -468,6 +512,7 @@ class DatasetWriter:
         """
         self.sub_index += 1
         self.formatter.finalize([])
+        self._sync()
 
         if self.fd:
             self.fd.close()
@@ -553,6 +598,7 @@ class DatasetWriter:
             while True:
                 if self.write_to_disk.wait(0.5):
                     self._write_batch(self.wbuf)
+                    self._sync()
                     self.wbuf.clear()
 
                     self.write_to_disk.clear()
@@ -561,6 +607,7 @@ class DatasetWriter:
                     self.stage_for_write()
                     self._write_batch(self.wbuf)
                     self.formatter.finalize([])
+                    self._sync()
                     if self.fd is not None:
                         self.fd.close()
                         self.store_saved()

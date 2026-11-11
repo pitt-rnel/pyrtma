@@ -9,6 +9,7 @@ def main():
     import pyrtma
     from ..exceptions import ConnectionLost, MessageManagerNotFound
     from .data_logger import DataLogger
+    from .dataset_writer import DatasetWriter
 
     parser = argparse.ArgumentParser(description="Packet Data Logger")
 
@@ -38,6 +39,17 @@ def main():
         help="Logging Level (defaults to INFO)",
     )
 
+    parser.add_argument(
+        "--fsync",
+        action="store_true",
+        help=(
+            "Flush and fsync each dataset file after every write and before "
+            "closing it, so a power loss costs at most one write period "
+            f"({DatasetWriter.WRITE_PERIOD:g} s). By default the operating system "
+            "decides when to write its buffers to disk."
+        ),
+    )
+
     args = parser.parse_args()
 
     if args.log_level == "DEBUG":
@@ -55,7 +67,9 @@ def main():
     definitions = pyrtma.load_message_definitions(args.defs_file)
 
     try:
-        d = DataLogger(args.mm_ip, log_level=level, definitions=definitions)
+        d = DataLogger(
+            args.mm_ip, log_level=level, definitions=definitions, fsync=args.fsync
+        )
     except MessageManagerNotFound as e:
         print(f"MessageManagerNotFound: {e}", file=sys.stderr)
         sys.exit(1)
