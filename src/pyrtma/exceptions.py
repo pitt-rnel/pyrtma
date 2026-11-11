@@ -36,6 +36,12 @@ class InvalidMessageDefinition(RTMAMessageError):
     pass
 
 
+class RawFormatError(Exception):
+    """Raised when a file isn't a raw data logger file this pyrtma can read."""
+
+    pass
+
+
 class VersionMismatchWarning(UserWarning):
     """Raised when import message defs were compiled with a different pyrtma version"""
 

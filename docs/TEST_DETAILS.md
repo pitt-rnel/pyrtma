@@ -671,6 +671,41 @@ Files are written to a `BytesIO` by a `RawFormatter`, or by a `DatasetWriter` in
 | `test_no_trailer_without_finalize` | A file that isn't finalized, as when the logger dies, has no trailer. | One message written, no `finalize()`. |
 | `test_full_file_counts_only_its_records` | When a file fills, its trailer counts the records it holds, not those left for the next file, and the trailer fits within the limit. | Room for two records and the trailer, and five messages. |
 
+## test_raw_reader.py — `RawFile` and the raw file command line (needs: none)
+
+Files are written by a `DatasetWriter` with the `raw` formatter into `tmp_path`: `write()` records `DATASET_STATUS` messages from source 20 with `msg_count` 1, 2, 3, ..., and the `written` fixture is a finished file of 1000. The `damaged` fixture copies it with an edit applied; `record_offset()` gives where a record starts.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_command_line_summary` | `python -m pyrtma.utils.raw_reader` reports a finished file as complete, with its record count and no `msg_count` gaps, and exits 0. | `main()` on a file of 10 records; reads stdout with `capsys`. |
+
+### TestReading
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_intact_file_reads_completely` | A finished file reads every record, has a trailer that counts them, no damage, and its metadata; records decode with the definitions. | The 1000-record file; decodes record 42. |
+| `test_parts_continue_without_gaps` | Each part of a dataset split by size is complete and numbered in its metadata, and `msg_count` continues across them with no gaps or restarts. | 1.5 MB of records with `max_size_mb=1`. |
+| `test_gaps_and_restarts_per_source` | `source_gaps()` reports a jump in a source's `msg_count` as a gap, with the messages missing, and a drop as a restart. | Headers with counts 1, 2, 5, 6, 1, 2. |
+
+### TestDamage
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_file_cut_short_mid_record` | A file cut short in the middle of a record, as by a power loss, reads every whole record before the cut, reports the rest as damage, and isn't complete. | Truncates 30 bytes into record 600. |
+| `test_zero_filled_tail_gives_no_records` | A zero-filled tail, which some filesystems leave after a power loss, is reported as damage and yields no records; before framing it read as `EXIT` messages from module 0. | Replaces the trailer with 4096 zero bytes. |
+| `test_flipped_length_bit_loses_one_record` | A flipped bit in a record's length costs that record only: reading resumes at the next, and the file isn't complete although its trailer is intact. | Flips a bit in record 10's `num_data_bytes`. |
+| `test_flipped_payload_bit_loses_one_record` | A flipped bit in a payload fails its record's CRC, so that record is dropped rather than returned with wrong data. | Flips a bit inside record 501. |
+| `test_garbage_with_a_false_sync_word_is_skipped` | Garbage between records, even starting with the sync word, is skipped as one damaged range and every record is read. | Inserts the sync word and 1 KB of bytes before record 300. |
+| `test_damaged_file_header_raises` | A file whose magic is wrong, whose file header fails its CRC, or that is too short for a file header raises `RawFormatError`. | Parametrized over each damage. |
+| `test_header_size_mismatch_raises` | A file whose records have RTMA headers of another size than this pyrtma's raises `RawFormatError`, rather than misreading them. | Rewrites the header size field and the file header's CRC. |
+
+### TestDefinitions
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_decode_with_mismatched_definitions_raises` | Decoding a record with definitions whose size for its type differs raises `InvalidMessageDefinition`. | Stand-in definitions that give every type 4 bytes. |
+| `test_definition_mismatches_name_the_type` | `definition_mismatches()` finds nothing for the definitions that wrote the file, and names a type whose size differs. | Stand-in definitions with `DATASET_STATUS` 8 bytes larger. |
+
 ## test_quicklogger.py — the QuickLogger formatter (needs: none)
 
 `tests/ql_files.py` builds QuickLogger version 1 files by hand from the layout the existing readers use, MATLAB's included: a file header of six 32-bit fields, every message header, a 32-bit offset per message, then the data, in native byte order. It doesn't use the formatter, so comparing against it checks that the format is unchanged. The messages are `TEST_START`s with increasing IDs and receive times.
