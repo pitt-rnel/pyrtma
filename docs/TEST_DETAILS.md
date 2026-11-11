@@ -721,6 +721,31 @@ Files are written by a `DatasetWriter` with the `raw` formatter into `tmp_path`:
 | `test_undecoded_records_are_marked` | Records the logger wrote undecoded read back marked `undecoded`, with their payload as received, in a complete file; they still fail to decode with the logger's definitions. | Two messages and one `UndecodedMessage`. |
 | `test_definition_mismatches_name_the_type` | `definition_mismatches()` finds nothing for the definitions that wrote the file, and names a type whose size differs. | Stand-in definitions with `DATASET_STATUS` 8 bytes larger. |
 
+## test_raw_to_ql.py — raw files converted to QuickLogger files (needs: none)
+
+Raw files are written by a `DatasetWriter` with the `raw` formatter into `tmp_path`, from `TEST_START` messages whose headers come from source 20 with `msg_count` and receive time 1, 2, 3, ...; `UndecodedMessage`s stand for records the logger couldn't decode. The QuickLogger files are read back with `LogReader`, both with the test definitions.
+
+### TestConvert
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_every_message_converts_with_its_header` | Every message of a raw file is in the QuickLogger file, in order, with its header exactly as received, and the conversion reports nothing wrong. | 100 messages; compares IDs and header bytes. |
+| `test_undecodable_records_are_left_out_and_counted` | Records that don't decode with the definitions are left out of the QuickLogger file, which stays readable, and counted by type. | A stale-size `TEST_START` and an unknown type between two good messages. |
+| `test_undecoded_record_that_decodes_is_kept` | A record the logger marked undecoded is converted if it decodes with the definitions given, as with the sending module's. | An undecoded record with a valid `TEST_START` payload. |
+| `test_file_cut_short_converts_what_is_readable` | A raw file cut short mid-record, as by a power loss, converts every whole record before the cut and reports the rest as damage. | Truncates 5 bytes into record 7. |
+| `test_existing_destination_is_refused_unless_overwrite` | An existing QuickLogger file isn't touched unless `overwrite` is given, and then it is replaced. | A placeholder destination, converted to without and with `overwrite=True`. |
+| `test_failure_leaves_no_partial_files` | A conversion that fails partway leaves no QuickLogger, partial or spill file behind. | `QLFormatter.write` replaced with one that raises `OSError`. |
+| `test_data_past_the_spill_threshold_converts` | Message data past the QuickLogger formatter's spill threshold, written in several batches, converts completely, and the spill file is removed. | A 100-byte threshold, batches of 7, and 50 messages. |
+| `test_too_much_for_one_quicklogger_file_raises` | Messages that don't fit in one QuickLogger file raise `OverflowError` rather than being split or cut, and leave no file. | The limit lowered to 200 bytes. |
+| `test_not_a_raw_file_raises` | A file that isn't a raw file raises `RawFormatError` and leaves nothing behind. | A short text file. |
+
+### TestCommandLine
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_converts_each_file_into_the_output_folder` | `python -m pyrtma.utils.raw_to_ql` converts each file to a `.bin` of the same name in the output folder, reports each, and exits 0. | Two part files and `-o`; reads both results together. |
+| `test_problems_are_reported_and_set_the_status` | Left-out records and files that can't be converted are reported, the other files are still converted, and the status is 1. | A file with an unknown-type record and a missing file. |
+
 ## test_quicklogger.py — the QuickLogger formatter (needs: none)
 
 `tests/ql_files.py` builds QuickLogger version 1 files by hand from the layout the existing readers use, MATLAB's included: a file header of six 32-bit fields, every message header, a 32-bit offset per message, then the data, in native byte order. It doesn't use the formatter, so comparing against it checks that the format is unchanged. The messages are `TEST_START`s with increasing IDs and receive times.
