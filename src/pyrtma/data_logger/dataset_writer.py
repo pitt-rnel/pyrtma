@@ -81,12 +81,31 @@ def _fsync_dir(path: pathlib.Path) -> None:
         os.close(fd)
 
 
+def check_write_period(seconds: float) -> float:
+    """Check a write period.
+
+    Args:
+        seconds: Seconds between writes.
+
+    Returns:
+        ``seconds``, as a float.
+
+    Raises:
+        ValueError: It isn't a finite number greater than 0.
+    """
+    period = float(seconds)
+    if not math.isfinite(period) or period <= 0:
+        raise ValueError(f"The write period must be more than 0 s, not {seconds!r}.")
+    return period
+
+
 class DatasetWriter:
     # Deprecated: files are no longer split by time. Kept so existing
     # references still resolve.
     MIN_INTERVAL = 30
     MAX_INTERVAL = 600
     CONTINUOUS = math.inf
+    #: The default seconds between writes; see ``write_period``.
     WRITE_PERIOD = 15.0
     #: Bytes in one MB of ``max_size_mb``.
     BYTES_PER_MB = 1_000_000
@@ -104,6 +123,7 @@ class DatasetWriter:
         clock: Callable[[], float] = time.monotonic,
         fsync: bool = False,
         definitions: Optional[MessageDefinitions] = None,
+        write_period: float = WRITE_PERIOD,
     ):
         """Set up a dataset; nothing is recorded until :py:meth:`start`.
 
@@ -129,8 +149,14 @@ class DatasetWriter:
                 to disk.
             definitions: The data logger's message definitions, passed to
                 formatters that want a :py:class:`FileContext`.
+            write_period: Seconds between writes of the buffered messages to
+                the file. A shorter period loses less if the logger dies or the
+                power fails, and makes more, smaller writes (and syncs, with
+                ``fsync``). Writes are checked each time the logger reads, at
+                least every 0.1 s.
 
         Raises:
+            ValueError: ``write_period`` isn't a number greater than 0.
             InvalidFormatter: No formatter has that name.
             DatasetError: ``max_size_mb`` is out of range, or the save path
                 can't be created.
@@ -144,6 +170,7 @@ class DatasetWriter:
         self._clock = clock
         self.fsync = fsync
         self.definitions = definitions
+        self.write_period = check_write_period(write_period)
         #: (message type, error) pairs recorded undecoded and reported.
         self.undecoded_reported: set[tuple[int, str]] = set()
         self._started = False
@@ -427,7 +454,7 @@ class DatasetWriter:
         self.start_time = self._clock()
         self.ref_time = self.start_time
 
-        self.next_write = DatasetWriter.WRITE_PERIOD
+        self.next_write = self.write_period
         self._recording = True
         self._paused = False
 
@@ -483,7 +510,7 @@ class DatasetWriter:
             )
             self._behind_since = None
 
-        self.next_write = elapsed + DatasetWriter.WRITE_PERIOD
+        self.next_write = elapsed + self.write_period
         self.stage_for_write()
 
     def store_saved(self):

@@ -565,7 +565,57 @@ def test_main_passes_fsync(
     assert [kwargs["fsync"] for kwargs in created] == [fsync]
 
 
-def test_fsync_reaches_the_datasets(
+@pytest.mark.parametrize(
+    ("flags", "period"), [([], 15.0), (["--write-period", "2.5"], 2.5)]
+)
+def test_main_passes_write_period(
+    flags: list[str],
+    period: float,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    created: list[dict[str, Any]] = []
+
+    def no_manager(*args: Any, **kwargs: Any) -> DataLogger:
+        created.append(kwargs)
+        raise MessageManagerNotFound("no manager in this test")
+
+    monkeypatch.setattr(data_logger_module, "DataLogger", no_manager)
+    monkeypatch.setattr(sys, "argv", ["data_logger", "-d", td.__file__, *flags])
+
+    with pytest.raises(SystemExit):
+        main()
+
+    assert [kwargs["write_period"] for kwargs in created] == [period]
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "inf", "soon"])
+def test_main_refuses_a_bad_write_period(
+    value: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    argv = ["data_logger", "-d", td.__file__, "--write-period", value]
+    monkeypatch.setattr(sys, "argv", argv)
+
+    with pytest.raises(SystemExit) as exited:
+        main()
+
+    assert exited.value.code == 2
+    assert "--write-period" in capsys.readouterr().err
+
+
+def test_bad_write_period_raises_before_connecting(free_port: int) -> None:
+    with pytest.raises(ValueError, match="write period"):
+        DataLogger(
+            f"127.0.0.1:{free_port}",
+            logging.INFO,
+            definitions=td.get_message_definitions(),
+            write_period=0,
+        )
+
+
+def test_options_reach_the_datasets(
     manager: ManagerHarness,
     client_factory: Callable[..., Client],
     clock: FakeClock,
@@ -577,6 +627,7 @@ def test_fsync_reaches_the_datasets(
         definitions=td.get_message_definitions(),
         clock=clock,
         fsync=True,
+        write_period=2.5,
     )
     thread = threading.Thread(target=logger.run, name="data-logger", daemon=True)
     thread.start()
@@ -587,7 +638,8 @@ def test_fsync_reaches_the_datasets(
 
         add_and_start(client, add_request("ds", tmp_path))
 
-        assert logger.datasets["ds"].fsync
+        dataset = logger.datasets["ds"]
+        assert (dataset.fsync, dataset.write_period) == (True, 2.5)
     finally:
         logger.stop()
         thread.join(DEFAULT_TIMEOUT)

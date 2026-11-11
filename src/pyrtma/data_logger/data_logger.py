@@ -21,7 +21,7 @@ from pyrtma.exceptions import (
 )
 
 from .data_formatter import UndecodedMessage, get_formatter
-from .dataset_writer import DatasetWriter, error_message
+from .dataset_writer import DatasetWriter, check_write_period, error_message
 from .exceptions import *
 
 from typing import Callable, Optional, cast
@@ -53,6 +53,7 @@ class DataLogger:
         *,
         clock: Callable[[], float] = time.monotonic,
         fsync: bool = False,
+        write_period: float = DatasetWriter.WRITE_PERIOD,
     ):
         """Connect to the message manager as the data logger.
 
@@ -66,14 +67,18 @@ class DataLogger:
                 each write and before closing it; see ``DatasetWriter``. By
                 default the operating system decides when to write its
                 buffers to disk.
+            write_period: Seconds between each dataset's writes of its
+                buffered messages; see ``DatasetWriter``.
 
         Raises:
+            ValueError: ``write_period`` isn't a number greater than 0.
             MessageManagerNotFound: The manager can't be reached.
         """
         self.mm_ip = rtma_server_ip
         self.definitions = definitions
         self._clock = clock
         self.fsync = fsync
+        self.write_period = check_write_period(write_period)
         self._stop_requested = threading.Event()
         # Message types that couldn't be decoded and that no dataset was
         # recording, by type and error, so each is warned about once.
@@ -513,6 +518,7 @@ class DataLogger:
             max_size_mb=self._max_size_mb(name, msg.dataset.max_size_mb),
             clock=self._clock,
             fsync=self.fsync,
+            write_period=self.write_period,
             definitions=self.definitions,
         )
 

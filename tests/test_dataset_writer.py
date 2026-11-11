@@ -736,6 +736,43 @@ class TestFsync:
         assert syncs["folders"] == [tmp_path, tmp_path]
 
 
+class TestWritePeriod:
+    def test_write_period_sets_the_schedule(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        clock: FakeClock,
+        tmp_path: Path,
+    ) -> None:
+        writer = make_writer(write_period=2.0)
+        writer.start()
+        writer.update(message("a"))
+
+        clock.advance(1.9)
+        writer.update(None)
+        early = writer.write_to_disk.is_set() or writer.write_finished.is_set()
+        clock.advance(0.2)
+        writer.update(None)
+        wait_written(writer)
+
+        assert not early
+        assert lines(tmp_path / "rec.txt") == ["header", "a"]
+        assert writer.next_write == pytest.approx(4.1)
+
+    def test_default_write_period_is_15_s(
+        self, make_writer: Callable[..., DatasetWriter]
+    ) -> None:
+        writer = make_writer()
+
+        assert writer.write_period == DatasetWriter.WRITE_PERIOD == 15.0
+
+    @pytest.mark.parametrize("period", [0, -1, float("inf"), float("nan")])
+    def test_write_period_must_be_positive(
+        self, make_writer: Callable[..., DatasetWriter], period: float
+    ) -> None:
+        with pytest.raises(ValueError, match="write period"):
+            make_writer(write_period=period)
+
+
 class ContextFormatter(StubFormatter):
     """A stand-in that asks for a ``FileContext`` and records each one."""
 

@@ -515,7 +515,10 @@ The `data_logger` fixture runs a `DataLogger` in a thread against the `manager` 
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_main_passes_fsync` | `python -m pyrtma.data_logger --fsync` makes the logger fsync its datasets' files; without the flag it doesn't. | Parametrized with and without `--fsync`; replaces `DataLogger` with a stand-in that records its arguments and raises `MessageManagerNotFound`. |
-| `test_fsync_reaches_the_datasets` | `DataLogger(fsync=True)` passes `fsync` to the datasets it adds. | A logger made with `fsync=True` adds and starts a dataset; checks the dataset's `fsync`. |
+| `test_main_passes_write_period` | `python -m pyrtma.data_logger --write-period SECONDS` sets the logger's write period; without it the period is 15 s. | Parametrized with and without `--write-period 2.5`; the same `DataLogger` stand-in. |
+| `test_main_refuses_a_bad_write_period` | A write period that isn't a number greater than 0 is refused as a usage error naming the option, before anything starts. | Parametrized over `0`, `-1`, `inf` and `soon`; checks exit status 2 and stderr. |
+| `test_bad_write_period_raises_before_connecting` | `DataLogger(write_period=0)` raises `ValueError` before it tries to connect. | A free port with no manager, so connecting would raise `MessageManagerNotFound` instead. |
+| `test_options_reach_the_datasets` | `DataLogger(fsync=True, write_period=...)` passes both to the datasets it adds. | A logger made with `fsync=True` and `write_period=2.5` adds and starts a dataset; checks the dataset's attributes. |
 | `test_main_exits_cleanly_without_manager` | Low: `python -m pyrtma.data_logger` with no manager running exits with status 1 and a one-line error, rather than a traceback. | Calls `main()` with `-m` set to a free port and `-d` the test definitions, and checks `SystemExit` and stderr. |
 
 ### TestUndecodableMessages
@@ -622,6 +625,14 @@ The `syncs` fixture replaces `os.fsync` and the writer's folder sync with record
 | `test_files_are_not_synced_by_default` | Without `fsync`, a writer makes no `fsync()` calls on its files or folder, leaving write-back to the operating system as before. | One message, a write, then `stop()`. |
 | `test_fsync_syncs_after_each_write_and_before_close` | With `fsync=True`, each write is synced, the file is synced again before it is closed, and the folder is synced once when the file is created. | One message, a write, then `stop()`; counts the calls after each. |
 | `test_fsync_syncs_each_full_file_and_its_folder` | With `fsync=True`, a file that fills is synced before it is closed, the write continuing in the next file is synced, and each new file's folder is synced. | The stand-in's two-line limit and three messages in one write. |
+
+### TestWritePeriod
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_write_period_sets_the_schedule` | A writer's `write_period` sets when its buffered messages are written: not before the period has passed, then again one period after that write. | A 2 s period, a message, then the clock at 1.9 s and 2.1 s. |
+| `test_default_write_period_is_15_s` | Without `write_period`, a writer writes every `WRITE_PERIOD`, 15 s, as before. | A writer with the defaults. |
+| `test_write_period_must_be_positive` | A write period that isn't a finite number greater than 0 raises `ValueError` when the writer is made. | Parametrized over 0, -1, infinity and NaN. |
 
 ### TestFormatterContext
 
