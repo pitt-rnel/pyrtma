@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from pyrtma import core_defs as cd
-from pyrtma.data_logger.data_formatter import FileContext
+from pyrtma.data_logger.data_formatter import FileContext, UndecodedMessage
 from pyrtma.data_logger.dataset_writer import DatasetWriter
 from pyrtma.data_logger.formatters import raw
 from pyrtma.header import MessageHeader
@@ -158,6 +158,19 @@ class TestRecords:
         assert record[4 + HEADER_SIZE : body_end] == bytes(msg.data)
         assert crc == zlib.crc32(record[2:body_end])
         assert len(record) == body_end + raw.CRC.size
+
+    def test_undecoded_message_is_flagged(self) -> None:
+        buf = io.BytesIO()
+        formatter = raw.RawFormatter(buf)
+        start = len(buf.getvalue())
+        header = message().header
+        header.num_data_bytes = 3
+
+        formatter.write([UndecodedMessage(header, b"\x01\x02\x03")])
+
+        record = buf.getvalue()[start:]
+        assert raw.RECORD_PREFIX.unpack_from(record)[1] == raw.FLAG_UNDECODED
+        assert record[4 + HEADER_SIZE : 4 + HEADER_SIZE + 3] == b"\x01\x02\x03"
 
     def test_framing_counts_toward_the_size_limit(self) -> None:
         formatter = raw.RawFormatter(io.BytesIO())

@@ -34,6 +34,7 @@ from typing import Any, Iterable, Iterator, Optional
 from pyrtma.data_logger.formatters.raw import (
     CRC,
     FILE_HEADER_PREFIX,
+    FLAG_UNDECODED,
     FILE_MAGIC,
     FORMAT_VERSION,
     RECORD_PREFIX,
@@ -64,6 +65,14 @@ class RawRecord:
     flags: int
     header: MessageHeader
     payload: bytes
+
+    @property
+    def undecoded(self) -> bool:
+        """The logger couldn't decode this message and recorded it as received.
+
+        It may decode with the sending module's definitions.
+        """
+        return bool(self.flags & FLAG_UNDECODED)
 
     def decode(self, definitions: Any) -> Message:
         """Decode the payload with ``definitions``.
@@ -382,9 +391,12 @@ def main(argv: Optional[list[str]] = None) -> int:
             continue
         with f:
             types: collections.Counter = collections.Counter()
+            undecoded: collections.Counter = collections.Counter()
             gaps = gaps or SourceGaps()
             for rec in f.records():
                 types[rec.header.msg_type] += 1
+                if rec.undecoded:
+                    undecoded[rec.header.msg_type] += 1
                 gaps.add(rec.header)
             meta = f.metadata
             state = (
@@ -402,6 +414,9 @@ def main(argv: Optional[list[str]] = None) -> int:
             for off, length in f.damage:
                 print(f"  damage: {length} bytes at offset {off}")
             print("  types: " + ", ".join(f"{t}x{n}" for t, n in sorted(types.items())))
+            if undecoded:
+                listed = ", ".join(f"{t}x{n}" for t, n in sorted(undecoded.items()))
+                print(f"  undecoded (the logger's definitions didn't match): {listed}")
             if definitions is not None:
                 for line in f.definition_mismatches(definitions):
                     print(f"  definitions: {line}")

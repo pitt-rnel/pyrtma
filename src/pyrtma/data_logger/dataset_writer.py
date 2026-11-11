@@ -17,7 +17,7 @@ from ..core_defs import ALL_MESSAGE_TYPES
 from .data_formatter import get_formatter
 from typing import Callable, Type, Optional, IO, Any, List
 
-from .data_formatter import DataFormatter, FileContext
+from .data_formatter import DataFormatter, FileContext, Recordable
 from ..definitions import MessageDefinitions
 from .exceptions import (
     DatasetError,
@@ -144,6 +144,8 @@ class DatasetWriter:
         self._clock = clock
         self.fsync = fsync
         self.definitions = definitions
+        #: (message type, error) pairs recorded undecoded and reported.
+        self.undecoded_reported: set[tuple[int, str]] = set()
         self._started = False
         self._failed = False
         # Guards _failed, so only the first failure is reported.
@@ -201,8 +203,8 @@ class DatasetWriter:
             0,
         )
 
-        self.rbuf: List[Message] = []
-        self.wbuf: List[Message] = []
+        self.rbuf: List[Recordable] = []
+        self.wbuf: List[Recordable] = []
 
         self.fd: Optional[IO[Any]] = None
 
@@ -432,7 +434,7 @@ class DatasetWriter:
         # Start the write thread
         self.write_thread.start()
 
-    def update(self, msg: Optional[Message]):
+    def update(self, msg: Optional[Recordable]):
         """Buffer a message, and hand the buffer to the writer when it's due.
 
         Never raises for a failed or slow writer: a failed one has stopped
@@ -493,7 +495,7 @@ class DatasetWriter:
         self.saved_files.append(self.file_path)
         self.last_saved = self.file_path
 
-    def _write_batch(self, batch: List[Message]) -> None:
+    def _write_batch(self, batch: List[Recordable]) -> None:
         """Write messages, continuing in new files when one is full.
 
         Args:

@@ -15,6 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from pyrtma import core_defs as cd
+from pyrtma.data_logger.data_formatter import UndecodedMessage
 from pyrtma.data_logger.dataset_writer import DatasetWriter
 from pyrtma.data_logger.formatters import raw
 from pyrtma.exceptions import InvalidMessageDefinition, RawFormatError
@@ -44,8 +45,16 @@ def message(i: int) -> Message:
 RECORD_SIZE: int = len(raw.encode_record(message(1).header, message(1).data))
 
 
-def write(tmp_path: Path, count: int, max_size_mb: int = 500) -> list[Path]:
+def write(
+    tmp_path: Path, count: int, max_size_mb: int = 500, undecoded: int = 0
+) -> list[Path]:
     """Record messages 1 to ``count`` to ``rec*.dat`` and finish the files.
+
+    Args:
+        tmp_path: The folder.
+        count: Messages to record.
+        max_size_mb: The dataset's file size limit.
+        undecoded: Undecoded 3-byte messages to record after them.
 
     Returns:
         The files, in order.
@@ -64,6 +73,10 @@ def write(tmp_path: Path, count: int, max_size_mb: int = 500) -> list[Path]:
     writer.start()
     for i in range(1, count + 1):
         writer.update(message(i))
+    for i in range(undecoded):
+        header = message(count + 1 + i).header
+        header.num_data_bytes = 3
+        writer.update(UndecodedMessage(header, b"\xaa\xbb\xcc"))
     writer.stop()
     assert wait_for(lambda: writer.dead), "the write thread didn't end"
     return sorted(tmp_path.glob("rec*.dat"))
@@ -240,6 +253,15 @@ class TestDefinitions:
         with pytest.raises(InvalidMessageDefinition):
             record.decode(definitions)
 
+    def test_undecoded_records_are_marked(self, tmp_path: Path) -> None:
+        f, records = read(write(tmp_path, 2, undecoded=1)[0])
+
+        assert f.complete
+        assert [r.undecoded for r in records] == [False, False, True]
+        assert records[2].payload == b"\xaa\xbb\xcc"
+        with pytest.raises(InvalidMessageDefinition):
+            records[2].decode(DEFS)
+
     def test_definition_mismatches_name_the_type(self, tmp_path: Path) -> None:
         status = cd.MDF_DATASET_STATUS
         changed = SimpleNamespace(
@@ -270,3 +292,17 @@ def test_command_line_summary(
     assert status == 0
     assert "10 records, complete" in out
     assert "0 gap(s)" in out
+    assert "undecoded" not in out
+
+
+def test_command_line_lists_undecoded_records(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (path,) = write(tmp_path, 2, undecoded=2)
+
+    raw_reader.main([str(path)])
+
+    status_type = cd.MDF_DATASET_STATUS.type_id
+    assert f"undecoded (the logger's definitions didn't match): {status_type}x2" in (
+        capsys.readouterr().out
+    )

@@ -523,6 +523,7 @@ The `data_logger` fixture runs a `DataLogger` in a thread against the `manager` 
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_stops_only_datasets_that_record_it` | C5: a message the logger's definitions can't decode doesn't stop the logger. A dataset that records it is stopped and reported, in order, with `DATA_LOGGER_ERROR` naming the type and error, `DATASET_STOPPED`, `DATASET_SAVED` and `DATASET_REMOVED`, and its file is kept. A dataset that doesn't record that type keeps recording. | Parametrized over a stale `TEST_START` and an unknown type; one dataset records everything, one only `TEST_END`, which is sent afterwards and must be in its file. |
+| `test_raw_dataset_records_it_undecoded` | A `raw` dataset keeps recording a message the logger's definitions can't decode: it is recorded as received, marked undecoded, and reported once with `DATA_LOGGER_ERROR` naming the error, while a `json` dataset recording everything is stopped as before. | Parametrized over a stale `TEST_START` and an unknown type, sent twice; reads the raw file back with `RawFile`. |
 | `test_unrecorded_type_is_warned_about_once` | C5: messages that can't be decoded and that no dataset records are warned about once per type and error, not once each, and recording carries on. | Three stale `TEST_START`s with only a `TEST_END` dataset recording; counts the warnings with `caplog` and asks for the dataset's status. |
 
 ### TestDatasetFailures
@@ -659,6 +660,7 @@ Files are written to a `BytesIO` by a `RawFormatter`, or by a `DatasetWriter` in
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_record_is_framed` | Each record is the sync word, flags of 0, the header and payload as received, and a CRC-32 of the flags, header and payload. | One message; takes the record apart. |
+| `test_undecoded_message_is_flagged` | A message the logger couldn't decode is written as received, with `FLAG_UNDECODED` set. | An `UndecodedMessage` with a 3-byte payload. |
 | `test_framing_counts_toward_the_size_limit` | The size limit counts each record with its framing. | A limit with room for exactly two framed records and the trailer, and five messages. |
 
 ### TestTrailer
@@ -677,7 +679,8 @@ Files are written by a `DatasetWriter` with the `raw` formatter into `tmp_path`:
 
 | Test | Purpose | Approach |
 |---|---|---|
-| `test_command_line_summary` | `python -m pyrtma.utils.raw_reader` reports a finished file as complete, with its record count and no `msg_count` gaps, and exits 0. | `main()` on a file of 10 records; reads stdout with `capsys`. |
+| `test_command_line_summary` | `python -m pyrtma.utils.raw_reader` reports a finished file as complete, with its record count and no `msg_count` gaps or undecoded records, and exits 0. | `main()` on a file of 10 records; reads stdout with `capsys`. |
+| `test_command_line_lists_undecoded_records` | The summary lists undecoded records by type, and a file without any doesn't mention them. | Two messages and two undecoded `DATASET_STATUS` records. |
 
 ### TestReading
 
@@ -704,6 +707,7 @@ Files are written by a `DatasetWriter` with the `raw` formatter into `tmp_path`:
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_decode_with_mismatched_definitions_raises` | Decoding a record with definitions whose size for its type differs raises `InvalidMessageDefinition`. | Stand-in definitions that give every type 4 bytes. |
+| `test_undecoded_records_are_marked` | Records the logger wrote undecoded read back marked `undecoded`, with their payload as received, in a complete file; they still fail to decode with the logger's definitions. | Two messages and one `UndecodedMessage`. |
 | `test_definition_mismatches_name_the_type` | `definition_mismatches()` finds nothing for the definitions that wrote the file, and names a type whose size differs. | Stand-in definitions with `DATASET_STATUS` 8 bytes larger. |
 
 ## test_quicklogger.py — the QuickLogger formatter (needs: none)

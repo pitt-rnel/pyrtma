@@ -29,6 +29,7 @@ from pyrtma.data_logger.data_logger import DataLogger
 from pyrtma.data_logger.dataset import Dataset
 from pyrtma.data_logger.dataset_writer import DatasetWriter
 from pyrtma.exceptions import MessageManagerNotFound
+from pyrtma.utils.raw_reader import RawFile
 from pyrtma.message import Message
 from pyrtma.message_base import MessageMeta
 from pyrtma.message_data import MessageData
@@ -264,6 +265,48 @@ class TestUndecodableMessages:
         ]
         assert (tmp_path / "all.jsonl").exists()
         assert td.MT_TEST_END in recorded_types(tmp_path / "ends.jsonl")
+
+    @pytest.mark.parametrize(
+        ("message", "exc_type"),
+        [
+            (StaleTestStart(), "InvalidMessageDefinition"),
+            (UnknownMessage(), "UnknownMessageType"),
+        ],
+        ids=["stale", "unknown"],
+    )
+    def test_raw_dataset_records_it_undecoded(
+        self,
+        controller: Client,
+        tmp_path: Path,
+        message: MessageData,
+        exc_type: str,
+    ) -> None:
+        raw_set = add_request("raw", tmp_path, filename="raw", formatter="raw")
+        json_set = add_request("json", tmp_path, filename="all")
+        add_and_start(controller, raw_set, json_set)
+
+        controller.send_message(message)
+        controller.send_message(message)
+        seen = wait_reply(controller, cd.MT_DATASET_REMOVED, "json")
+        controller.send_message(td.MDF_TEST_END())
+        seen += stop_and_wait_saved(controller, "raw")
+
+        # Reported once for both messages, and stopped only by the request.
+        assert events(seen, "raw") == [
+            cd.MT_DATA_LOGGER_ERROR,
+            cd.MT_DATASET_STOPPED,
+            cd.MT_DATASET_SAVED,
+        ]
+        error = next(m for m in seen if is_type(cd.MT_DATA_LOGGER_ERROR, "raw")(m))
+        assert error.data.exc_type == exc_type
+        assert "Recording undecoded" in error.data.msg
+        with RawFile(tmp_path / "raw.dat") as f:
+            records = list(f.records())
+        undecoded = [r for r in records if r.undecoded]
+        assert [(r.header.msg_type, r.payload) for r in undecoded] == [
+            (message.type_id, bytes(message))
+        ] * 2
+        assert td.MT_TEST_END in [r.header.msg_type for r in records if not r.undecoded]
 
     def test_unrecorded_type_is_warned_about_once(
         self,

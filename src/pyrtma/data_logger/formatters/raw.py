@@ -19,7 +19,9 @@ File layout::
 
     Record (integers little-endian)
         sync         u16       RECORD_SYNC, the bytes A5 5A
-        flags        u16       reserved, 0
+        flags        u16       bit 0, FLAG_UNDECODED: the data logger's
+                               definitions couldn't decode the message, so
+                               it was recorded as received; other bits 0
         header       header_size bytes: the RTMA message header as received
         payload      header.num_data_bytes bytes
         crc          u32       CRC-32 of flags, header and payload
@@ -68,7 +70,7 @@ from typing import IO, Any, Callable, ClassVar, Optional
 import pyrtma
 from pyrtma.header import get_header_cls
 
-from ..data_formatter import DataFormatter, FileContext
+from ..data_formatter import DataFormatter, FileContext, Recordable
 
 FORMAT_VERSION: int = 1
 FILE_MAGIC: bytes = b"RTMARAW\x00"
@@ -76,6 +78,7 @@ FILE_MAGIC: bytes = b"RTMARAW\x00"
 FILE_HEADER_PREFIX: struct.Struct = struct.Struct("<8sHHI")
 CRC: struct.Struct = struct.Struct("<I")
 RECORD_SYNC: int = 0x5AA5
+FLAG_UNDECODED: int = 0x0001
 #: sync, flags
 RECORD_PREFIX: struct.Struct = struct.Struct("<HH")
 _FLAGS: struct.Struct = struct.Struct("<H")
@@ -178,6 +181,7 @@ class RawFormatter(DataFormatter):
     mode: ClassVar[str] = "wb"
     ext: ClassVar[str] = ".dat"
     wants_context: ClassVar[bool] = True
+    accepts_undecoded: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -204,5 +208,6 @@ class RawFormatter(DataFormatter):
         body = TRAILER_PREFIX.pack(TRAILER_MAGIC, self.messages_written)
         return body + CRC.pack(zlib.crc32(body))
 
-    def format_message(self, msg: pyrtma.Message) -> bytes:
-        return encode_record(msg.header, msg.data)
+    def format_message(self, msg: Recordable) -> bytes:
+        flags = FLAG_UNDECODED if getattr(msg, "undecoded", False) else 0
+        return encode_record(msg.header, msg.data, flags)

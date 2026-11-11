@@ -20,7 +20,7 @@ from pyrtma.exceptions import (
     UnknownMessageType,
 )
 
-from .data_formatter import get_formatter
+from .data_formatter import UndecodedMessage, get_formatter
 from .dataset_writer import DatasetWriter, error_message
 from .exceptions import *
 
@@ -578,10 +578,13 @@ class DataLogger:
     def _undecodable(self, exc: RTMAMessageError) -> None:
         """Handle a received message that the definitions can't decode.
 
-        Every dataset that would have recorded it is stopped and reported:
-        its recording is missing data until the definitions are fixed. The
-        file keeps what was recorded until then. When no dataset records the
-        type, it is warned about once per type and error.
+        A dataset whose formatter accepts undecoded messages, as ``raw`` does,
+        records it as received and keeps recording; the first such message
+        of each type and error is reported for that dataset. Every other
+        dataset that would have recorded it is stopped and reported: its
+        recording is missing data until the definitions are fixed. The file
+        keeps what was recorded until then. When no dataset records the type,
+        it is warned about once per type and error.
 
         Args:
             exc: The client's error. Its ``header`` names the message type.
@@ -608,6 +611,25 @@ class DataLogger:
                     f"{detail} Later ones like it aren't reported."
                 )
             return
+
+        if header is not None and exc.payload is not None:
+            undecoded = UndecodedMessage(header, exc.payload)
+            keeping = [ds for ds in affected if ds.formatter_cls.accepts_undecoded]
+            affected = [ds for ds in affected if ds not in keeping]
+            for ds in keeping:
+                ds.update(undecoded)
+                key = (-1 if msg_type is None else msg_type, reason)
+                if key in ds.undecoded_reported:
+                    continue
+                ds.undecoded_reported.add(key)
+                text = (
+                    f"Recording undecoded: a message {label} can't be decoded "
+                    f"with the logger's definitions; it is recorded as received "
+                    f"and marked undecoded. Later ones like it aren't reported. "
+                    f"{detail}"
+                )
+                self.logger.warning(f"Dataset '{ds.name}': {text}")
+                self._send_error(ds.name, reason, text)
 
         text = (
             f"Stopped recording: a message {label} can't be decoded with the "
