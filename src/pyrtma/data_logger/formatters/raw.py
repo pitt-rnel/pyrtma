@@ -6,7 +6,7 @@ the message definitions and decoded later with the right ones.
 
 File layout::
 
-    File       = FileHeader Record*
+    File       = FileHeader Record* [Trailer]
 
     FileHeader (integers little-endian)
         magic        8 bytes   FILE_MAGIC, b"RTMARAW" and a zero byte
@@ -23,6 +23,12 @@ File layout::
         header       header_size bytes: the RTMA message header as received
         payload      header.num_data_bytes bytes
         crc          u32       CRC-32 of flags, header and payload
+
+    Trailer (integers little-endian), written only when the file is closed
+    normally, so its absence marks a file cut short by a crash or power loss
+        magic        8 bytes   TRAILER_MAGIC, b"RTMAEND" and a zero byte
+        records      u64       records in the file
+        crc          u32       CRC-32 of magic and records
 
 The sync word and CRC let a reader reject a damaged record, and a zero-filled
 or garbled region, instead of misreading everything after it. It resumes at
@@ -74,6 +80,10 @@ RECORD_SYNC: int = 0x5AA5
 RECORD_PREFIX: struct.Struct = struct.Struct("<HH")
 _FLAGS: struct.Struct = struct.Struct("<H")
 _SYNC_BYTES: bytes = _FLAGS.pack(RECORD_SYNC)
+TRAILER_MAGIC: bytes = b"RTMAEND\x00"
+#: magic, records
+TRAILER_PREFIX: struct.Struct = struct.Struct("<8sQ")
+TRAILER_SIZE: int = TRAILER_PREFIX.size + CRC.size
 
 
 def file_metadata(
@@ -189,6 +199,10 @@ class RawFormatter(DataFormatter):
 
     def format_header(self) -> bytes:
         return encode_file_header(file_metadata(self.context, **self._metadata_sources))
+
+    def format_footer(self) -> bytes:
+        body = TRAILER_PREFIX.pack(TRAILER_MAGIC, self.messages_written)
+        return body + CRC.pack(zlib.crc32(body))
 
     def format_message(self, msg: pyrtma.Message) -> bytes:
         return encode_record(msg.header, msg.data)

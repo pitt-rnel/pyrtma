@@ -162,8 +162,52 @@ class TestRecords:
     def test_framing_counts_toward_the_size_limit(self) -> None:
         formatter = raw.RawFormatter(io.BytesIO())
         size = len(raw.encode_record(message().header, message().data))
-        formatter.max_bytes = formatter.bytes_written + 2 * size
+        # Room for two records and the trailer, which is reserved like a footer.
+        formatter.max_bytes = formatter.bytes_written + 2 * size + raw.TRAILER_SIZE
 
         written = formatter.write([message(i) for i in range(5)])
 
         assert written == 2
+
+
+def trailer(data: bytes) -> tuple[bytes, int, bool]:
+    """Take apart what would be a raw file's trailer.
+
+    Returns:
+        The magic, record count, and whether the CRC matches.
+    """
+    magic, records = raw.TRAILER_PREFIX.unpack_from(data, len(data) - raw.TRAILER_SIZE)
+    (crc,) = raw.CRC.unpack_from(data, len(data) - raw.CRC.size)
+    body = data[-raw.TRAILER_SIZE : -raw.CRC.size]
+    return magic, records, crc == zlib.crc32(body)
+
+
+class TestTrailer:
+    def test_trailer_written_on_finalize(self) -> None:
+        buf = io.BytesIO()
+        formatter = raw.RawFormatter(buf)
+        formatter.write([message(i) for i in range(3)])
+
+        formatter.finalize([message(9)])
+
+        assert trailer(buf.getvalue()) == (raw.TRAILER_MAGIC, 4, True)
+
+    def test_no_trailer_without_finalize(self) -> None:
+        buf = io.BytesIO()
+        formatter = raw.RawFormatter(buf)
+
+        formatter.write([message(1)])
+
+        assert trailer(buf.getvalue())[0] != raw.TRAILER_MAGIC
+
+    def test_full_file_counts_only_its_records(self) -> None:
+        buf = io.BytesIO()
+        formatter = raw.RawFormatter(buf)
+        size = len(raw.encode_record(message().header, message().data))
+        formatter.max_bytes = formatter.bytes_written + 2 * size + raw.TRAILER_SIZE
+        formatter.write([message(i) for i in range(5)])
+
+        formatter.finalize([])
+
+        assert trailer(buf.getvalue())[1] == 2
+        assert len(buf.getvalue()) == formatter.max_bytes

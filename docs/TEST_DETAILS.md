@@ -659,7 +659,17 @@ Files are written to a `BytesIO` by a `RawFormatter`, or by a `DatasetWriter` in
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_record_is_framed` | Each record is the sync word, flags of 0, the header and payload as received, and a CRC-32 of the flags, header and payload. | One message; takes the record apart. |
-| `test_framing_counts_toward_the_size_limit` | The size limit counts each record with its framing. | A limit with room for exactly two framed records, and five messages. |
+| `test_framing_counts_toward_the_size_limit` | The size limit counts each record with its framing. | A limit with room for exactly two framed records and the trailer, and five messages. |
+
+### TestTrailer
+
+`trailer()` reads the last bytes of a file as a trailer.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_trailer_written_on_finalize` | A file that is finalized ends with the trailer magic, its record count and a matching CRC. | Three messages written, one more at `finalize()`. |
+| `test_no_trailer_without_finalize` | A file that isn't finalized, as when the logger dies, has no trailer. | One message written, no `finalize()`. |
+| `test_full_file_counts_only_its_records` | When a file fills, its trailer counts the records it holds, not those left for the next file, and the trailer fits within the limit. | Room for two records and the trailer, and five messages. |
 
 ## test_quicklogger.py — the QuickLogger formatter (needs: none)
 
