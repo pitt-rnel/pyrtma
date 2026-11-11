@@ -8,10 +8,14 @@ class RTMAMessageError(Exception):
         header: The header of the received message that caused the error, when
             a client raised it while reading; otherwise None. A data logger
             uses it to tell which message type it couldn't record.
+        payload: The received message's payload bytes, when a client raised
+            it while reading; otherwise None. A data logger can record them
+            undecoded.
     """
 
     # Typed as Any to avoid importing the header module here.
     header: Optional[Any] = None
+    payload: Optional[bytes] = None
 
 
 class UnknownMessageType(RTMAMessageError):
