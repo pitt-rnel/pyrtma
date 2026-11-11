@@ -513,6 +513,7 @@ class DataLogger:
             max_size_mb=self._max_size_mb(name, msg.dataset.max_size_mb),
             clock=self._clock,
             fsync=self.fsync,
+            definitions=self.definitions,
         )
 
         self.datasets[dataset.name] = dataset

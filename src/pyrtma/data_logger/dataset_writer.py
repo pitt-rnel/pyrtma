@@ -17,7 +17,8 @@ from ..core_defs import ALL_MESSAGE_TYPES
 from .data_formatter import get_formatter
 from typing import Callable, Type, Optional, IO, Any, List
 
-from .data_formatter import DataFormatter
+from .data_formatter import DataFormatter, FileContext
+from ..definitions import MessageDefinitions
 from .exceptions import (
     DatasetError,
     InvalidFormatter,
@@ -102,6 +103,7 @@ class DatasetWriter:
         max_size_mb: int = cd.DATASET_MAX_SIZE_MB,
         clock: Callable[[], float] = time.monotonic,
         fsync: bool = False,
+        definitions: Optional[MessageDefinitions] = None,
     ):
         """Set up a dataset; nothing is recorded until :py:meth:`start`.
 
@@ -125,6 +127,8 @@ class DatasetWriter:
                 so a power loss costs at most one write period of messages. By
                 default the operating system decides when to write its buffers
                 to disk.
+            definitions: The data logger's message definitions, passed to
+                formatters that want a :py:class:`FileContext`.
 
         Raises:
             InvalidFormatter: No formatter has that name.
@@ -139,6 +143,7 @@ class DatasetWriter:
         self._elapsed_time = 0.0
         self._clock = clock
         self.fsync = fsync
+        self.definitions = definitions
         self._started = False
         self._failed = False
         # Guards _failed, so only the first failure is reported.
@@ -189,10 +194,12 @@ class DatasetWriter:
         self.max_size_mb = max_size_mb
 
         # Placeholder for type checking purposes
-        if "b" in self.formatter_cls.mode:
-            self.formatter = self.formatter_cls(io.BytesIO())
-        else:
-            self.formatter = self.formatter_cls(io.StringIO())
+        placeholder = io.BytesIO() if "b" in self.formatter_cls.mode else io.StringIO()
+        self.formatter = self._new_formatter(
+            placeholder,
+            pathlib.Path(save_path) / (filename + self.formatter_cls.ext),
+            0,
+        )
 
         self.rbuf: List[Message] = []
         self.wbuf: List[Message] = []
@@ -321,6 +328,24 @@ class DatasetWriter:
         """
         return self._failed
 
+    def _new_formatter(
+        self, fd: IO[Any], path: pathlib.Path, part: int
+    ) -> DataFormatter:
+        """Create the formatter for a file, with a context if it wants one.
+
+        Args:
+            fd: The open file.
+            path: The file's path.
+            part: The file's part number: 0, then 1, 2, ... after rollovers.
+
+        Returns:
+            The formatter.
+        """
+        if self.formatter_cls.wants_context:
+            context = FileContext(self.name, path, part, self.definitions)
+            return self.formatter_cls(fd, context=context)
+        return self.formatter_cls(fd)
+
     def _open(self, path: pathlib.Path) -> tuple[IO[Any], DataFormatter]:
         """Create a dataset file and its formatter.
 
@@ -358,7 +383,7 @@ class DatasetWriter:
             raise DatasetError(self.name, f"Can't sync {path.parent}: {e}") from e
 
         try:
-            formatter = self.formatter_cls(fd)
+            formatter = self._new_formatter(fd, path, self.sub_index)
             # The dataset's limit, unless the formatter's own is lower.
             formatter.max_bytes = min(
                 type(formatter).max_bytes,

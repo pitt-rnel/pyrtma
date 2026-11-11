@@ -622,6 +622,13 @@ The `syncs` fixture replaces `os.fsync` and the writer's folder sync with record
 | `test_fsync_syncs_after_each_write_and_before_close` | With `fsync=True`, each write is synced, the file is synced again before it is closed, and the folder is synced once when the file is created. | One message, a write, then `stop()`; counts the calls after each. |
 | `test_fsync_syncs_each_full_file_and_its_folder` | With `fsync=True`, a file that fills is synced before it is closed, the write continuing in the next file is synced, and each new file's folder is synced. | The stand-in's two-line limit and three messages in one write. |
 
+### TestFormatterContext
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_context_describes_each_file` | A formatter that sets `wants_context` is created with a `FileContext` naming the dataset, the file and its part number, with the writer's definitions, for the first file and each one after a rollover. | A stand-in that records its contexts, the two-line limit, and three messages in one write. |
+| `test_formatters_without_it_get_only_the_file` | A formatter that doesn't set `wants_context` is still created with the file alone, even when the writer has definitions. | The plain stand-in, whose constructor takes only the file. |
+
 ## test_data_formatter.py — formatter registration and the file size limit (needs: none)
 
 `starts()` from `tests/ql_files.py` supplies `TEST_START` messages with increasing IDs.

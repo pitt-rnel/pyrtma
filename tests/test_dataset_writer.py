@@ -22,7 +22,7 @@ import pytest
 from pyrtma import core_defs as cd
 from pyrtma.client_logging import TRUNCATED_MARKER
 from pyrtma.data_logger import data_formatter, dataset_writer
-from pyrtma.data_logger.data_formatter import DataFormatter
+from pyrtma.data_logger.data_formatter import DataFormatter, FileContext
 from pyrtma.data_logger.dataset_writer import DatasetWriter
 from pyrtma.data_logger.formatters.quicklogger import QLFormatter
 from pyrtma.header import MessageHeader
@@ -734,6 +734,60 @@ class TestFsync:
         # that continued in rec_0001.txt is synced.
         assert len(syncs["files"]) == 2
         assert syncs["folders"] == [tmp_path, tmp_path]
+
+
+class ContextFormatter(StubFormatter):
+    """A stand-in that asks for a ``FileContext`` and records each one."""
+
+    wants_context: ClassVar[bool] = True
+    contexts: ClassVar[list[FileContext]]
+
+    def __init__(self, fd: Any, *, context: FileContext) -> None:
+        type(self).contexts.append(context)
+        super().__init__(fd)
+
+
+class TestFormatterContext:
+    def test_context_describes_each_file(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        stub_formatter: type[StubFormatter],
+        clock: FakeClock,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        cls = type("Ctx", (ContextFormatter, stub_formatter), {"contexts": []})
+        monkeypatch.setattr(cls, "max_bytes", TWO_LINES)
+        monkeypatch.setitem(data_formatter._formatter_map, "stub", cls)
+        definitions = cd.get_message_definitions()
+        writer = make_writer(definitions=definitions)
+        writer.start()
+        for text in "abc":
+            writer.update(message(text))
+
+        write_now(writer, clock)
+        wait_written(writer)
+
+        # The first context is the constructor's placeholder, for the same file.
+        files = [(c.dataset, c.path, c.part) for c in cls.contexts[1:]]
+        assert files == [
+            ("ds", tmp_path / "rec.txt", 0),
+            ("ds", tmp_path / "rec_0001.txt", 1),
+        ]
+        assert all(c.definitions is definitions for c in cls.contexts)
+
+    def test_formatters_without_it_get_only_the_file(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        stub_formatter: type[StubFormatter],
+        tmp_path: Path,
+    ) -> None:
+        writer = make_writer(definitions=cd.get_message_definitions())
+
+        writer.start()
+
+        assert not stub_formatter.wants_context
+        assert (tmp_path / "rec.txt").exists()
 
 
 class StubbornFormatter(DataFormatter):

@@ -1,10 +1,13 @@
 """DataFormatter abstract base class and formatter registration functions"""
 
 import os
+import pathlib
+from dataclasses import dataclass
 
 import pyrtma
 from typing import Type, Optional, ClassVar, IO, Any, Union, List, Dict
 from abc import ABC
+from pyrtma.definitions import MessageDefinitions
 from .exceptions import InvalidFormatter, DataFormatterKeyError
 
 
@@ -27,10 +30,33 @@ def _size_on_disk(chunk: Union[str, bytes]) -> int:
     return size + chunk.count("\n") * (len(os.linesep) - 1)
 
 
+@dataclass(frozen=True)
+class FileContext:
+    """What the data logger tells a formatter about the file it writes.
+
+    Attributes:
+        dataset: The dataset's name.
+        path: The file being written.
+        part: 0 for a dataset's first file, then 1, 2, ... for the files it
+            continues in when one is full.
+        definitions: The data logger's message definitions, or None if the
+            dataset was created without them.
+    """
+
+    dataset: str
+    path: pathlib.Path
+    part: int
+    definitions: Optional[MessageDefinitions]
+
+
 class DataFormatter(ABC):
     name: ClassVar[str] = "base"
     mode: ClassVar[str] = "wt"
     ext: ClassVar[str] = ".txt"
+    #: If true, the data logger creates the formatter with a ``context``
+    #: keyword argument, a :py:class:`FileContext`. Formatters that don't
+    #: set it are created with the file only, as before.
+    wants_context: ClassVar[bool] = False
     #: The most bytes a file may hold. The data logger continues a dataset in
     #: a new file before a message would pass it. A file always holds at
     #: least one message, even one larger than this. The class value is a
