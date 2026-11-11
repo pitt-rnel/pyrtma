@@ -101,6 +101,7 @@ class DatasetWriter:
         *,
         max_size_mb: int = cd.DATASET_MAX_SIZE_MB,
         clock: Callable[[], float] = time.monotonic,
+        fsync: bool = False,
     ):
         """Set up a dataset; nothing is recorded until :py:meth:`start`.
 
@@ -119,6 +120,11 @@ class DatasetWriter:
                 ``max_bytes`` is lower keeps that.
             clock: Seconds from a monotonic clock, for the write schedule and
                 the elapsed time. Injectable for tests.
+            fsync: After every write and before closing a file, flush it and
+                ``os.fsync()`` it, and sync its folder when a file is created,
+                so a power loss costs at most one write period of messages. By
+                default the operating system decides when to write its buffers
+                to disk.
 
         Raises:
             InvalidFormatter: No formatter has that name.
@@ -132,6 +138,7 @@ class DatasetWriter:
         self._close = False
         self._elapsed_time = 0.0
         self._clock = clock
+        self.fsync = fsync
         self._started = False
         self._failed = False
         # Guards _failed, so only the first failure is reported.
@@ -341,7 +348,8 @@ class DatasetWriter:
             raise DatasetError(self.name, f"Can't create {path}: {e}") from e
 
         try:
-            _fsync_dir(path.parent)
+            if self.fsync:
+                _fsync_dir(path.parent)
         except OSError as e:
             with contextlib.suppress(OSError):
                 fd.close()
@@ -487,11 +495,12 @@ class DatasetWriter:
             fresh = True
 
     def _sync(self) -> None:
-        """Push everything written so far through to the disk.
+        """With ``fsync``, push everything written so far through to the disk.
 
-        Forces the OS to immediately write to disk.
+        Without it, nothing is done: the operating system writes its buffers
+        when it decides to.
         """
-        if self.fd is not None:
+        if self.fsync and self.fd is not None:
             self.fd.flush()
             os.fsync(self.fd.fileno())
 

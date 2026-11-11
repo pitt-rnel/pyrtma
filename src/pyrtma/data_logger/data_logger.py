@@ -52,6 +52,7 @@ class DataLogger:
         definitions: MessageDefinitions,
         *,
         clock: Callable[[], float] = time.monotonic,
+        fsync: bool = False,
     ):
         """Connect to the message manager as the data logger.
 
@@ -61,6 +62,10 @@ class DataLogger:
             definitions: The message definitions to decode and record with.
             clock: The datasets' clock, for their write and subdivide
                 schedules. Injectable for tests.
+            fsync: Make every dataset flush and ``os.fsync()`` its file after
+                each write and before closing it; see ``DatasetWriter``. By
+                default the operating system decides when to write its
+                buffers to disk.
 
         Raises:
             MessageManagerNotFound: The manager can't be reached.
@@ -68,6 +73,7 @@ class DataLogger:
         self.mm_ip = rtma_server_ip
         self.definitions = definitions
         self._clock = clock
+        self.fsync = fsync
         self._stop_requested = threading.Event()
         # Message types that couldn't be decoded and that no dataset was
         # recording, by type and error, so each is warned about once.
@@ -506,6 +512,7 @@ class DataLogger:
             subdivide_interval=0,
             max_size_mb=self._max_size_mb(name, msg.dataset.max_size_mb),
             clock=self._clock,
+            fsync=self.fsync,
         )
 
         self.datasets[dataset.name] = dataset

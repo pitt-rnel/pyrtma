@@ -22,11 +22,13 @@ import pytest
 from pyrtma import core_defs as cd
 from pyrtma.client import Client
 from pyrtma.data_logger import data_formatter
+from pyrtma.data_logger import data_logger as data_logger_module
 from pyrtma.data_logger.__main__ import main
 from pyrtma.data_logger.data_formatter import DataFormatter
 from pyrtma.data_logger.data_logger import DataLogger
 from pyrtma.data_logger.dataset import Dataset
 from pyrtma.data_logger.dataset_writer import DatasetWriter
+from pyrtma.exceptions import MessageManagerNotFound
 from pyrtma.message import Message
 from pyrtma.message_base import MessageMeta
 from pyrtma.message_data import MessageData
@@ -496,6 +498,56 @@ class TestRemoval:
 
         assert events(seen, "ds") == [cd.MT_DATASET_STOPPED, cd.MT_DATASET_SAVED]
         assert recorded_types(tmp_path / "rec.jsonl")
+
+
+@pytest.mark.parametrize(("flags", "fsync"), [([], False), (["--fsync"], True)])
+def test_main_passes_fsync(
+    flags: list[str],
+    fsync: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    created: list[dict[str, Any]] = []
+
+    def no_manager(*args: Any, **kwargs: Any) -> DataLogger:
+        created.append(kwargs)
+        raise MessageManagerNotFound("no manager in this test")
+
+    monkeypatch.setattr(data_logger_module, "DataLogger", no_manager)
+    monkeypatch.setattr(sys, "argv", ["data_logger", "-d", td.__file__, *flags])
+
+    with pytest.raises(SystemExit):
+        main()
+
+    assert [kwargs["fsync"] for kwargs in created] == [fsync]
+
+
+def test_fsync_reaches_the_datasets(
+    manager: ManagerHarness,
+    client_factory: Callable[..., Client],
+    clock: FakeClock,
+    tmp_path: Path,
+) -> None:
+    logger = DataLogger(
+        manager.address,
+        logging.INFO,
+        definitions=td.get_message_definitions(),
+        clock=clock,
+        fsync=True,
+    )
+    thread = threading.Thread(target=logger.run, name="data-logger", daemon=True)
+    thread.start()
+    try:
+        client = client_factory(name="controller")
+        client.subscribe(Dataset.DATALOGGER_TYPES)
+        wait_for_logger(client)
+
+        add_and_start(client, add_request("ds", tmp_path))
+
+        assert logger.datasets["ds"].fsync
+    finally:
+        logger.stop()
+        thread.join(DEFAULT_TIMEOUT)
 
 
 def test_main_exits_cleanly_without_manager(
