@@ -641,6 +641,19 @@ The `syncs` fixture replaces `os.fsync` and the writer's folder sync with record
 | `test_first_message_is_written_even_past_the_limit` | An empty file always takes one message. | A limit of 1 byte. |
 | `test_limit_counts_encoded_bytes` | The limit counts UTF-8 bytes on disk, not characters. | Lines of `é`, two bytes each, and a limit that fits exactly two. |
 
+## test_raw.py — the raw formatter's file format (needs: none)
+
+Files are written to a `BytesIO` by a `RawFormatter`, or by a `DatasetWriter` into `tmp_path`, and taken apart with the format's constants, independently of `raw_reader`. `message()` makes a `DATASET_STATUS` from source 20.
+
+### TestFileHeader
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_header_fields` | A raw file starts with the magic, the format version, the RTMA header size and CRC-checked metadata naming the dataset, file and part, with the wall and `perf_counter()` clocks read together, the host and the byte order. | A `FileContext` for part 2, and injected clocks and host name. |
+| `test_types_table_lists_the_definitions` | The metadata lists every message type in the logger's definitions with its ID, name, size and type hash, and the definitions' compiled version. | The core definitions; checks `DATASET_STATUS`'s entry and the count. |
+| `test_header_without_context` | A raw formatter made without a context, as outside the data logger, still writes a valid header, with no dataset, file or definitions. | `RawFormatter(BytesIO())`. |
+| `test_dataset_writer_writes_the_header` | Through a `DatasetWriter`, the file's header names its dataset and file, and the records follow it. | The `raw` formatter, one message, then `stop()`. |
+
 ## test_quicklogger.py — the QuickLogger formatter (needs: none)
 
 `tests/ql_files.py` builds QuickLogger version 1 files by hand from the layout the existing readers use, MATLAB's included: a file header of six 32-bit fields, every message header, a 32-bit offset per message, then the data, in native byte order. It doesn't use the formatter, so comparing against it checks that the format is unchanged. The messages are `TEST_START`s with increasing IDs and receive times.
