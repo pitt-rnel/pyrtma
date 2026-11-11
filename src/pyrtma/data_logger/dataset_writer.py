@@ -1,6 +1,7 @@
 """DataSet class used internally by data_logger"""
 
 import contextlib
+import os
 import pathlib
 import warnings
 import io
@@ -61,6 +62,22 @@ def _exclusive_mode(mode: str) -> str:
         ``FileExistsError`` instead of truncating another dataset's file.
     """
     return mode.replace("w", "x")
+
+
+def _fsync_dir(path: pathlib.Path) -> None:
+    """Make the directory entries in ``path`` durable.
+
+    ``fsync()`` of a new file doesn't cover its name in the directory, so
+    after a power loss the file's data could be on disk but unreachable.
+    POSIX only: NTFS keeps a created file's entry without this.
+    """
+    if os.name != "posix":
+        return
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
 
 
 class DatasetWriter:
@@ -324,6 +341,15 @@ class DatasetWriter:
             raise DatasetError(self.name, f"Can't create {path}: {e}") from e
 
         try:
+            _fsync_dir(path.parent)
+        except OSError as e:
+            with contextlib.suppress(OSError):
+                fd.close()
+            with contextlib.suppress(OSError):
+                path.unlink()
+            raise DatasetError(self.name, f"Can't sync {path.parent}: {e}") from e
+
+        try:
             formatter = self.formatter_cls(fd)
             # The dataset's limit, unless the formatter's own is lower.
             formatter.max_bytes = min(
@@ -460,6 +486,15 @@ class DatasetWriter:
             self.subdivide()
             fresh = True
 
+    def _sync(self) -> None:
+        """Push everything written so far through to the disk.
+
+        Forces the OS to immediately write to disk.
+        """
+        if self.fd is not None:
+            self.fd.flush()
+            os.fsync(self.fd.fileno())
+
     def subdivide(self):
         """Finish the current file and continue in the next one.
 
@@ -468,6 +503,7 @@ class DatasetWriter:
         """
         self.sub_index += 1
         self.formatter.finalize([])
+        self._sync()
 
         if self.fd:
             self.fd.close()
@@ -553,6 +589,7 @@ class DatasetWriter:
             while True:
                 if self.write_to_disk.wait(0.5):
                     self._write_batch(self.wbuf)
+                    self._sync()
                     self.wbuf.clear()
 
                     self.write_to_disk.clear()
@@ -561,6 +598,7 @@ class DatasetWriter:
                     self.stage_for_write()
                     self._write_batch(self.wbuf)
                     self.formatter.finalize([])
+                    self._sync()
                     if self.fd is not None:
                         self.fd.close()
                         self.store_saved()
