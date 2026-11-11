@@ -137,3 +137,33 @@ class TestFileHeader:
         assert crc_ok
         assert (meta["dataset"], meta["file"]) == ("ds", "rec.dat")
         assert len(data) > start
+
+
+class TestRecords:
+    def test_record_is_framed(self) -> None:
+        buf = io.BytesIO()
+        formatter = raw.RawFormatter(buf)
+        start = len(buf.getvalue())
+        msg = message(7)
+
+        written = formatter.write([msg])
+
+        record = buf.getvalue()[start:]
+        sync, flags = raw.RECORD_PREFIX.unpack_from(record)
+        body_end = raw.RECORD_PREFIX.size + HEADER_SIZE + msg.data.type_size
+        (crc,) = raw.CRC.unpack_from(record, body_end)
+        assert written == 1
+        assert (record[:2], sync, flags) == (b"\xa5\x5a", raw.RECORD_SYNC, 0)
+        assert record[4 : 4 + HEADER_SIZE] == bytes(msg.header)
+        assert record[4 + HEADER_SIZE : body_end] == bytes(msg.data)
+        assert crc == zlib.crc32(record[2:body_end])
+        assert len(record) == body_end + raw.CRC.size
+
+    def test_framing_counts_toward_the_size_limit(self) -> None:
+        formatter = raw.RawFormatter(io.BytesIO())
+        size = len(raw.encode_record(message().header, message().data))
+        formatter.max_bytes = formatter.bytes_written + 2 * size
+
+        written = formatter.write([message(i) for i in range(5)])
+
+        assert written == 2

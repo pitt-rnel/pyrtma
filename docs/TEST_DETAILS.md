@@ -654,6 +654,13 @@ Files are written to a `BytesIO` by a `RawFormatter`, or by a `DatasetWriter` in
 | `test_header_without_context` | A raw formatter made without a context, as outside the data logger, still writes a valid header, with no dataset, file or definitions. | `RawFormatter(BytesIO())`. |
 | `test_dataset_writer_writes_the_header` | Through a `DatasetWriter`, the file's header names its dataset and file, and the records follow it. | The `raw` formatter, one message, then `stop()`. |
 
+### TestRecords
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_record_is_framed` | Each record is the sync word, flags of 0, the header and payload as received, and a CRC-32 of the flags, header and payload. | One message; takes the record apart. |
+| `test_framing_counts_toward_the_size_limit` | The size limit counts each record with its framing. | A limit with room for exactly two framed records, and five messages. |
+
 ## test_quicklogger.py — the QuickLogger formatter (needs: none)
 
 `tests/ql_files.py` builds QuickLogger version 1 files by hand from the layout the existing readers use, MATLAB's included: a file header of six 32-bit fields, every message header, a 32-bit offset per message, then the data, in native byte order. It doesn't use the formatter, so comparing against it checks that the format is unchanged. The messages are `TEST_START`s with increasing IDs and receive times.

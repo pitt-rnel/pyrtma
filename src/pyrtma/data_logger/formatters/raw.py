@@ -17,9 +17,16 @@ File layout::
         header_crc   u32       CRC-32 (zlib.crc32) of every file header byte
                                before it
 
-    Record
+    Record (integers little-endian)
+        sync         u16       RECORD_SYNC, the bytes A5 5A
+        flags        u16       reserved, 0
         header       header_size bytes: the RTMA message header as received
         payload      header.num_data_bytes bytes
+        crc          u32       CRC-32 of flags, header and payload
+
+The sync word and CRC let a reader reject a damaged record, and a zero-filled
+or garbled region, instead of misreading everything after it. It resumes at
+the next sync word whose record passes its CRC.
 
 The RTMA header and payload are in the logging machine's byte order, recorded
 as ``byte_order`` in the metadata. Metadata keys:
@@ -62,6 +69,11 @@ FILE_MAGIC: bytes = b"RTMARAW\x00"
 #: magic, version, header_size, meta_length
 FILE_HEADER_PREFIX: struct.Struct = struct.Struct("<8sHHI")
 CRC: struct.Struct = struct.Struct("<I")
+RECORD_SYNC: int = 0x5AA5
+#: sync, flags
+RECORD_PREFIX: struct.Struct = struct.Struct("<HH")
+_FLAGS: struct.Struct = struct.Struct("<H")
+_SYNC_BYTES: bytes = _FLAGS.pack(RECORD_SYNC)
 
 
 def file_metadata(
@@ -117,6 +129,21 @@ def file_metadata(
     }
 
 
+def encode_record(header: Any, payload: Any, flags: int = 0) -> bytes:
+    """Encode one framed record.
+
+    Args:
+        header: The RTMA message header.
+        payload: The payload, as a message data object or bytes.
+        flags: The record's flags.
+
+    Returns:
+        The record's bytes.
+    """
+    body = _FLAGS.pack(flags) + bytes(header) + bytes(payload)
+    return _SYNC_BYTES + body + CRC.pack(zlib.crc32(body))
+
+
 def encode_file_header(metadata: dict[str, Any]) -> bytes:
     """Encode a raw file's header.
 
@@ -164,4 +191,4 @@ class RawFormatter(DataFormatter):
         return encode_file_header(file_metadata(self.context, **self._metadata_sources))
 
     def format_message(self, msg: pyrtma.Message) -> bytes:
-        return bytes(msg.header) + bytes(msg.data)
+        return encode_record(msg.header, msg.data)
