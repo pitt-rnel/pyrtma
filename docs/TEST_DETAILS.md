@@ -277,6 +277,7 @@ Most receive tests use `scripted_client`, a client connected to the `scripted_ma
 | `test_subscribed_message_of_unknown_type_raises` | Client receive: a subscribed message of an unknown type still raises `UnknownMessageType` with its raw payload, and the next message reads correctly. Already right before the fix. | Subscribes to the unknown type and `TEST_START`, and sends one of each. |
 | `test_subscribed_message_of_wrong_size_raises` | Client receive: a subscribed message whose size doesn't match its definition still raises `InvalidMessageDefinition`, and the next message reads correctly. Already right before the fix. | A `TEST_START` with an 8-byte payload instead of 4, then a correct one. |
 | `test_decode_errors_carry_the_header` | C5: `UnknownMessageType` and `InvalidMessageDefinition` raised while reading carry the message's header, so a data logger can tell which type it couldn't record. | Parametrized over a type the definitions don't have and a `TEST_START` of 8 bytes; checks `header.msg_type` on the exception. |
+| `test_decode_errors_carry_the_payload` | `UnknownMessageType` and `InvalidMessageDefinition` raised while reading carry the message's payload bytes, so a data logger can record a message it can't decode. | Parametrized over an unknown type, a `TEST_START` of 8 bytes, and a `TEST_START` whose header version doesn't match its hash, read with `sync_check=True`; compares `payload` with the bytes sent. |
 | `test_discard_messages_empties_the_queue` | H1: `discard_messages()` discards every message that has arrived, subscribed or not, of any type, and returns True. | Ten rounds of an ACK, a `TEST_START` and an unknown-type message; afterwards the socket must have nothing to read. |
 | `test_discard_messages_reports_messages_left_at_its_timeout` | H1: `discard_messages()` returns False when its timeout ends with messages still waiting, and True once they're gone. | 200 ACKs; `discard_messages(timeout=0)`, then `discard_messages()`. |
 | `test_reset_subscriptions_leaves_nothing_queued` | H1: `reset_subscriptions()` unsubscribes from everything and leaves nothing queued. | 25 rounds of an ACK and a `TEST_START`; the stand-in doesn't ACK the unsubscribes, so anything left was queued before the reset. |
@@ -514,7 +515,10 @@ The `data_logger` fixture runs a `DataLogger` in a thread against the `manager` 
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_main_passes_fsync` | `python -m pyrtma.data_logger --fsync` makes the logger fsync its datasets' files; without the flag it doesn't. | Parametrized with and without `--fsync`; replaces `DataLogger` with a stand-in that records its arguments and raises `MessageManagerNotFound`. |
-| `test_fsync_reaches_the_datasets` | `DataLogger(fsync=True)` passes `fsync` to the datasets it adds. | A logger made with `fsync=True` adds and starts a dataset; checks the dataset's `fsync`. |
+| `test_main_passes_write_period` | `python -m pyrtma.data_logger --write-period SECONDS` sets the logger's write period; without it the period is 15 s. | Parametrized with and without `--write-period 2.5`; the same `DataLogger` stand-in. |
+| `test_main_refuses_a_bad_write_period` | A write period that isn't a number greater than 0 is refused as a usage error naming the option, before anything starts. | Parametrized over `0`, `-1`, `inf` and `soon`; checks exit status 2 and stderr. |
+| `test_bad_write_period_raises_before_connecting` | `DataLogger(write_period=0)` raises `ValueError` before it tries to connect. | A free port with no manager, so connecting would raise `MessageManagerNotFound` instead. |
+| `test_options_reach_the_datasets` | `DataLogger(fsync=True, write_period=...)` passes both to the datasets it adds. | A logger made with `fsync=True` and `write_period=2.5` adds and starts a dataset; checks the dataset's attributes. |
 | `test_main_exits_cleanly_without_manager` | Low: `python -m pyrtma.data_logger` with no manager running exits with status 1 and a one-line error, rather than a traceback. | Calls `main()` with `-m` set to a free port and `-d` the test definitions, and checks `SystemExit` and stderr. |
 
 ### TestUndecodableMessages
@@ -522,6 +526,7 @@ The `data_logger` fixture runs a `DataLogger` in a thread against the `manager` 
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_stops_only_datasets_that_record_it` | C5: a message the logger's definitions can't decode doesn't stop the logger. A dataset that records it is stopped and reported, in order, with `DATA_LOGGER_ERROR` naming the type and error, `DATASET_STOPPED`, `DATASET_SAVED` and `DATASET_REMOVED`, and its file is kept. A dataset that doesn't record that type keeps recording. | Parametrized over a stale `TEST_START` and an unknown type; one dataset records everything, one only `TEST_END`, which is sent afterwards and must be in its file. |
+| `test_raw_dataset_records_it_undecoded` | A `raw` dataset keeps recording a message the logger's definitions can't decode: it is recorded as received, marked undecoded, and reported once with `DATA_LOGGER_ERROR` naming the error, while a `json` dataset recording everything is stopped as before. | Parametrized over a stale `TEST_START` and an unknown type, sent twice; reads the raw file back with `RawFile`. |
 | `test_unrecorded_type_is_warned_about_once` | C5: messages that can't be decoded and that no dataset records are warned about once per type and error, not once each, and recording carries on. | Three stale `TEST_START`s with only a `TEST_END` dataset recording; counts the warnings with `caplog` and asks for the dataset's status. |
 
 ### TestDatasetFailures
@@ -621,6 +626,21 @@ The `syncs` fixture replaces `os.fsync` and the writer's folder sync with record
 | `test_fsync_syncs_after_each_write_and_before_close` | With `fsync=True`, each write is synced, the file is synced again before it is closed, and the folder is synced once when the file is created. | One message, a write, then `stop()`; counts the calls after each. |
 | `test_fsync_syncs_each_full_file_and_its_folder` | With `fsync=True`, a file that fills is synced before it is closed, the write continuing in the next file is synced, and each new file's folder is synced. | The stand-in's two-line limit and three messages in one write. |
 
+### TestWritePeriod
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_write_period_sets_the_schedule` | A writer's `write_period` sets when its buffered messages are written: not before the period has passed, then again one period after that write. | A 2 s period, a message, then the clock at 1.9 s and 2.1 s. |
+| `test_default_write_period_is_15_s` | Without `write_period`, a writer writes every `WRITE_PERIOD`, 15 s, as before. | A writer with the defaults. |
+| `test_write_period_must_be_positive` | A write period that isn't a finite number greater than 0 raises `ValueError` when the writer is made. | Parametrized over 0, -1, infinity and NaN. |
+
+### TestFormatterContext
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_context_describes_each_file` | A formatter that sets `wants_context` is created with a `FileContext` naming the dataset, the file and its part number, with the writer's definitions, for the first file and each one after a rollover. | A stand-in that records its contexts, the two-line limit, and three messages in one write. |
+| `test_formatters_without_it_get_only_the_file` | A formatter that doesn't set `wants_context` is still created with the file alone, even when the writer has definitions. | The plain stand-in, whose constructor takes only the file. |
+
 ## test_data_formatter.py — formatter registration and the file size limit (needs: none)
 
 `starts()` from `tests/ql_files.py` supplies `TEST_START` messages with increasing IDs.
@@ -632,6 +652,99 @@ The `syncs` fixture replaces `os.fsync` and the writer's folder sync with record
 | `test_write_leaves_room_for_the_footer` | `write()` takes only the messages that leave room for the footer within `max_bytes`, and returns how many it took. | A text formatter with a 7-character header and footer, and a limit that fits three one-digit lines. Sizes count each newline as the platform's line ending. |
 | `test_first_message_is_written_even_past_the_limit` | An empty file always takes one message. | A limit of 1 byte. |
 | `test_limit_counts_encoded_bytes` | The limit counts UTF-8 bytes on disk, not characters. | Lines of `é`, two bytes each, and a limit that fits exactly two. |
+
+## test_raw.py — the raw formatter's file format (needs: none)
+
+Files are written to a `BytesIO` by a `RawFormatter`, or by a `DatasetWriter` into `tmp_path`, and taken apart with the format's constants, independently of `raw_reader`. `message()` makes a `DATASET_STATUS` from source 20.
+
+### TestFileHeader
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_header_fields` | A raw file starts with the magic, the format version, the RTMA header size and CRC-checked metadata naming the dataset, file and part, with the wall and `perf_counter()` clocks read together, the host and the byte order. | A `FileContext` for part 2, and injected clocks and host name. |
+| `test_types_table_lists_the_definitions` | The metadata lists every message type in the logger's definitions with its ID, name, size and type hash, and the definitions' compiled version. | The core definitions; checks `DATASET_STATUS`'s entry and the count. |
+| `test_header_without_context` | A raw formatter made without a context, as outside the data logger, still writes a valid header, with no dataset, file or definitions. | `RawFormatter(BytesIO())`. |
+| `test_dataset_writer_writes_the_header` | Through a `DatasetWriter`, the file's header names its dataset and file, and the records follow it. | The `raw` formatter, one message, then `stop()`. |
+
+### TestRecords
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_record_is_framed` | Each record is the sync word, flags of 0, the header and payload as received, and a CRC-32 of the flags, header and payload. | One message; takes the record apart. |
+| `test_undecoded_message_is_flagged` | A message the logger couldn't decode is written as received, with `FLAG_UNDECODED` set. | An `UndecodedMessage` with a 3-byte payload. |
+| `test_framing_counts_toward_the_size_limit` | The size limit counts each record with its framing. | A limit with room for exactly two framed records and the trailer, and five messages. |
+
+### TestTrailer
+
+`trailer()` reads the last bytes of a file as a trailer.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_trailer_written_on_finalize` | A file that is finalized ends with the trailer magic, its record count and a matching CRC. | Three messages written, one more at `finalize()`. |
+| `test_no_trailer_without_finalize` | A file that isn't finalized, as when the logger dies, has no trailer. | One message written, no `finalize()`. |
+| `test_full_file_counts_only_its_records` | When a file fills, its trailer counts the records it holds, not those left for the next file, and the trailer fits within the limit. | Room for two records and the trailer, and five messages. |
+
+## test_raw_reader.py — `RawFile` and the raw file command line (needs: none)
+
+Files are written by a `DatasetWriter` with the `raw` formatter into `tmp_path`: `write()` records `DATASET_STATUS` messages from source 20 with `msg_count` 1, 2, 3, ..., and the `written` fixture is a finished file of 1000. The `damaged` fixture copies it with an edit applied; `record_offset()` gives where a record starts.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_command_line_summary` | `python -m pyrtma.utils.raw_reader` reports a finished file as complete, with its record count and no `msg_count` gaps or undecoded records, and exits 0. | `main()` on a file of 10 records; reads stdout with `capsys`. |
+| `test_command_line_lists_undecoded_records` | The summary lists undecoded records by type, and a file without any doesn't mention them. | Two messages and two undecoded `DATASET_STATUS` records. |
+
+### TestReading
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_intact_file_reads_completely` | A finished file reads every record, has a trailer that counts them, no damage, and its metadata; records decode with the definitions. | The 1000-record file; decodes record 42. |
+| `test_parts_continue_without_gaps` | Each part of a dataset split by size is complete and numbered in its metadata, and `msg_count` continues across them with no gaps or restarts. | 1.5 MB of records with `max_size_mb=1`. |
+| `test_gaps_and_restarts_per_source` | `source_gaps()` reports a jump in a source's `msg_count` as a gap, with the messages missing, and a drop as a restart. | Headers with counts 1, 2, 5, 6, 1, 2. |
+
+### TestDamage
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_file_cut_short_mid_record` | A file cut short in the middle of a record, as by a power loss, reads every whole record before the cut, reports the rest as damage, and isn't complete. | Truncates 30 bytes into record 600. |
+| `test_zero_filled_tail_gives_no_records` | A zero-filled tail, which some filesystems leave after a power loss, is reported as damage and yields no records; before framing it read as `EXIT` messages from module 0. | Replaces the trailer with 4096 zero bytes. |
+| `test_flipped_length_bit_loses_one_record` | A flipped bit in a record's length costs that record only: reading resumes at the next, and the file isn't complete although its trailer is intact. | Flips a bit in record 10's `num_data_bytes`. |
+| `test_flipped_payload_bit_loses_one_record` | A flipped bit in a payload fails its record's CRC, so that record is dropped rather than returned with wrong data. | Flips a bit inside record 501. |
+| `test_garbage_with_a_false_sync_word_is_skipped` | Garbage between records, even starting with the sync word, is skipped as one damaged range and every record is read. | Inserts the sync word and 1 KB of bytes before record 300. |
+| `test_damaged_file_header_raises` | A file whose magic is wrong, whose file header fails its CRC, or that is too short for a file header raises `RawFormatError`. | Parametrized over each damage. |
+| `test_header_size_mismatch_raises` | A file whose records have RTMA headers of another size than this pyrtma's raises `RawFormatError`, rather than misreading them. | Rewrites the header size field and the file header's CRC. |
+
+### TestDefinitions
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_decode_with_mismatched_definitions_raises` | Decoding a record with definitions whose size for its type differs raises `InvalidMessageDefinition`. | Stand-in definitions that give every type 4 bytes. |
+| `test_undecoded_records_are_marked` | Records the logger wrote undecoded read back marked `undecoded`, with their payload as received, in a complete file; they still fail to decode with the logger's definitions. | Two messages and one `UndecodedMessage`. |
+| `test_definition_mismatches_name_the_type` | `definition_mismatches()` finds nothing for the definitions that wrote the file, and names a type whose size differs. | Stand-in definitions with `DATASET_STATUS` 8 bytes larger. |
+
+## test_raw_to_ql.py — raw files converted to QuickLogger files (needs: none)
+
+Raw files are written by a `DatasetWriter` with the `raw` formatter into `tmp_path`, from `TEST_START` messages whose headers come from source 20 with `msg_count` and receive time 1, 2, 3, ...; `UndecodedMessage`s stand for records the logger couldn't decode. The QuickLogger files are read back with `LogReader`, both with the test definitions.
+
+### TestConvert
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_every_message_converts_with_its_header` | Every message of a raw file is in the QuickLogger file, in order, with its header exactly as received, and the conversion reports nothing wrong. | 100 messages; compares IDs and header bytes. |
+| `test_undecodable_records_are_left_out_and_counted` | Records that don't decode with the definitions are left out of the QuickLogger file, which stays readable, and counted by type. | A stale-size `TEST_START` and an unknown type between two good messages. |
+| `test_undecoded_record_that_decodes_is_kept` | A record the logger marked undecoded is converted if it decodes with the definitions given, as with the sending module's. | An undecoded record with a valid `TEST_START` payload. |
+| `test_file_cut_short_converts_what_is_readable` | A raw file cut short mid-record, as by a power loss, converts every whole record before the cut and reports the rest as damage. | Truncates 5 bytes into record 7. |
+| `test_existing_destination_is_refused_unless_overwrite` | An existing QuickLogger file isn't touched unless `overwrite` is given, and then it is replaced. | A placeholder destination, converted to without and with `overwrite=True`. |
+| `test_failure_leaves_no_partial_files` | A conversion that fails partway leaves no QuickLogger, partial or spill file behind. | `QLFormatter.write` replaced with one that raises `OSError`. |
+| `test_data_past_the_spill_threshold_converts` | Message data past the QuickLogger formatter's spill threshold, written in several batches, converts completely, and the spill file is removed. | A 100-byte threshold, batches of 7, and 50 messages. |
+| `test_too_much_for_one_quicklogger_file_raises` | Messages that don't fit in one QuickLogger file raise `OverflowError` rather than being split or cut, and leave no file. | The limit lowered to 200 bytes. |
+| `test_not_a_raw_file_raises` | A file that isn't a raw file raises `RawFormatError` and leaves nothing behind. | A short text file. |
+
+### TestCommandLine
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_converts_each_file_into_the_output_folder` | `python -m pyrtma.utils.raw_to_ql` converts each file to a `.bin` of the same name in the output folder, reports each, and exits 0. | Two part files and `-o`; reads both results together. |
+| `test_problems_are_reported_and_set_the_status` | Left-out records and files that can't be converted are reported, the other files are still converted, and the status is 1. | A file with an unknown-type record and a missing file. |
 
 ## test_quicklogger.py — the QuickLogger formatter (needs: none)
 

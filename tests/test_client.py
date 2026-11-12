@@ -457,6 +457,33 @@ class TestReceive:
         assert raised.value.header is not None
         assert raised.value.header.msg_type == msg_type
 
+    @pytest.mark.parametrize("case", ["unknown", "wrong_size", "stale_version"])
+    def test_decode_errors_carry_the_payload(
+        self, scripted_client: Client, scripted_manager: ScriptedManager, case: str
+    ) -> None:
+        data = td.MDF_TEST_START()
+        data.id = 3
+        if case == "unknown":
+            subscribe_to, payload = UNKNOWN_TYPE, b"\x01\x02\x03\x04"
+            wire = frame(UNKNOWN_TYPE, payload)
+        elif case == "wrong_size":
+            subscribe_to, payload = td.MT_TEST_START, b"\x05" * 8
+            wire = frame(td.MT_TEST_START, payload)
+        else:
+            subscribe_to, payload = td.MT_TEST_START, bytes(data)
+            header = MessageHeader()
+            header.msg_type = td.MT_TEST_START
+            header.num_data_bytes = len(payload)
+            header.version = (data.type_hash + 1) & 0xFFFFFFFF
+            wire = bytes(header) + payload
+        scripted_client.subscribe([subscribe_to])
+        scripted_manager.send(wire)
+
+        with pytest.raises((UnknownMessageType, InvalidMessageDefinition)) as raised:
+            scripted_client.read_message(timeout=DEFAULT_TIMEOUT, sync_check=True)
+
+        assert raised.value.payload == payload
+
     def test_discard_messages_empties_the_queue(
         self, scripted_client: Client, scripted_manager: ScriptedManager
     ) -> None:

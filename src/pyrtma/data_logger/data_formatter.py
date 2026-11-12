@@ -1,10 +1,13 @@
 """DataFormatter abstract base class and formatter registration functions"""
 
 import os
+import pathlib
+from dataclasses import dataclass
 
 import pyrtma
-from typing import Type, Optional, ClassVar, IO, Any, Union, List, Dict
+from typing import Type, Optional, ClassVar, IO, Any, Union, List, Dict, Sequence
 from abc import ABC
+from pyrtma.definitions import MessageDefinitions
 from .exceptions import InvalidFormatter, DataFormatterKeyError
 
 
@@ -27,10 +30,63 @@ def _size_on_disk(chunk: Union[str, bytes]) -> int:
     return size + chunk.count("\n") * (len(os.linesep) - 1)
 
 
+@dataclass(frozen=True)
+class FileContext:
+    """What the data logger tells a formatter about the file it writes.
+
+    Attributes:
+        dataset: The dataset's name.
+        path: The file being written.
+        part: 0 for a dataset's first file, then 1, 2, ... for the files it
+            continues in when one is full.
+        definitions: The data logger's message definitions, or None if the
+            dataset was created without them.
+    """
+
+    dataset: str
+    path: pathlib.Path
+    part: int
+    definitions: Optional[MessageDefinitions]
+
+
+@dataclass(frozen=True)
+class UndecodedMessage:
+    """A received message the data logger's definitions can't decode.
+
+    Only formatters with ``accepts_undecoded`` are given these.
+
+    Attributes:
+        header: The message's RTMA header.
+        data: The payload as received.
+    """
+
+    header: Any
+    data: bytes
+    undecoded: ClassVar[bool] = True
+
+    @property
+    def type_id(self) -> int:
+        """The message type, from the header."""
+        return self.header.msg_type
+
+
+#: What a formatter is given to write: a decoded message, or, only if it sets
+#: ``accepts_undecoded``, an :py:class:`UndecodedMessage`.
+Recordable = Union[pyrtma.Message, UndecodedMessage]
+
+
 class DataFormatter(ABC):
     name: ClassVar[str] = "base"
     mode: ClassVar[str] = "wt"
     ext: ClassVar[str] = ".txt"
+    #: If true, the data logger creates the formatter with a ``context``
+    #: keyword argument, a :py:class:`FileContext`. Formatters that don't
+    #: set it are created with the file only, as before.
+    wants_context: ClassVar[bool] = False
+    #: If true, the formatter can record messages the data logger's
+    #: definitions can't decode, given as :py:class:`UndecodedMessage`, and
+    #: the data logger keeps its datasets recording instead of stopping them.
+    accepts_undecoded: ClassVar[bool] = False
     #: The most bytes a file may hold. The data logger continues a dataset in
     #: a new file before a message would pass it. A file always holds at
     #: least one message, even one larger than this. The class value is a
@@ -57,7 +113,7 @@ class DataFormatter(ABC):
     def format_footer(self) -> Optional[Union[bytes, str]]:
         return None
 
-    def format_message(self, msg: pyrtma.Message) -> Optional[Union[str, bytes]]:
+    def format_message(self, msg: Recordable) -> Optional[Union[str, bytes]]:
         return None
 
     def _fits(self, size: int, written: int) -> bool:
@@ -74,7 +130,7 @@ class DataFormatter(ABC):
             self._footer_size = _size_on_disk(footer) if footer else 0
         return self.bytes_written + size + self._footer_size <= self.max_bytes
 
-    def write(self, wbuf: List[pyrtma.Message]) -> int:
+    def write(self, wbuf: Sequence[Recordable]) -> int:
         """Write messages, as many as fit within :py:attr:`max_bytes`.
 
         Args:
@@ -101,7 +157,7 @@ class DataFormatter(ABC):
         self.messages_written += count
         return count
 
-    def finalize(self, wbuf: List[pyrtma.Message]):
+    def finalize(self, wbuf: Sequence[Recordable]):
         """Write the last messages and the footer.
 
         Every message given is written, even past :py:attr:`max_bytes`; the

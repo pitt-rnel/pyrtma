@@ -17,7 +17,8 @@ from ..core_defs import ALL_MESSAGE_TYPES
 from .data_formatter import get_formatter
 from typing import Callable, Type, Optional, IO, Any, List
 
-from .data_formatter import DataFormatter
+from .data_formatter import DataFormatter, FileContext, Recordable
+from ..definitions import MessageDefinitions
 from .exceptions import (
     DatasetError,
     InvalidFormatter,
@@ -80,12 +81,31 @@ def _fsync_dir(path: pathlib.Path) -> None:
         os.close(fd)
 
 
+def check_write_period(seconds: float) -> float:
+    """Check a write period.
+
+    Args:
+        seconds: Seconds between writes.
+
+    Returns:
+        ``seconds``, as a float.
+
+    Raises:
+        ValueError: It isn't a finite number greater than 0.
+    """
+    period = float(seconds)
+    if not math.isfinite(period) or period <= 0:
+        raise ValueError(f"The write period must be more than 0 s, not {seconds!r}.")
+    return period
+
+
 class DatasetWriter:
     # Deprecated: files are no longer split by time. Kept so existing
     # references still resolve.
     MIN_INTERVAL = 30
     MAX_INTERVAL = 600
     CONTINUOUS = math.inf
+    #: The default seconds between writes; see ``write_period``.
     WRITE_PERIOD = 15.0
     #: Bytes in one MB of ``max_size_mb``.
     BYTES_PER_MB = 1_000_000
@@ -102,6 +122,8 @@ class DatasetWriter:
         max_size_mb: int = cd.DATASET_MAX_SIZE_MB,
         clock: Callable[[], float] = time.monotonic,
         fsync: bool = False,
+        definitions: Optional[MessageDefinitions] = None,
+        write_period: float = WRITE_PERIOD,
     ):
         """Set up a dataset; nothing is recorded until :py:meth:`start`.
 
@@ -125,8 +147,16 @@ class DatasetWriter:
                 so a power loss costs at most one write period of messages. By
                 default the operating system decides when to write its buffers
                 to disk.
+            definitions: The data logger's message definitions, passed to
+                formatters that want a :py:class:`FileContext`.
+            write_period: Seconds between writes of the buffered messages to
+                the file. A shorter period loses less if the logger dies or the
+                power fails, and makes more, smaller writes (and syncs, with
+                ``fsync``). Writes are checked each time the logger reads, at
+                least every 0.1 s.
 
         Raises:
+            ValueError: ``write_period`` isn't a number greater than 0.
             InvalidFormatter: No formatter has that name.
             DatasetError: ``max_size_mb`` is out of range, or the save path
                 can't be created.
@@ -139,6 +169,10 @@ class DatasetWriter:
         self._elapsed_time = 0.0
         self._clock = clock
         self.fsync = fsync
+        self.definitions = definitions
+        self.write_period = check_write_period(write_period)
+        #: (message type, error) pairs recorded undecoded and reported.
+        self.undecoded_reported: set[tuple[int, str]] = set()
         self._started = False
         self._failed = False
         # Guards _failed, so only the first failure is reported.
@@ -189,13 +223,15 @@ class DatasetWriter:
         self.max_size_mb = max_size_mb
 
         # Placeholder for type checking purposes
-        if "b" in self.formatter_cls.mode:
-            self.formatter = self.formatter_cls(io.BytesIO())
-        else:
-            self.formatter = self.formatter_cls(io.StringIO())
+        placeholder = io.BytesIO() if "b" in self.formatter_cls.mode else io.StringIO()
+        self.formatter = self._new_formatter(
+            placeholder,
+            pathlib.Path(save_path) / (filename + self.formatter_cls.ext),
+            0,
+        )
 
-        self.rbuf: List[Message] = []
-        self.wbuf: List[Message] = []
+        self.rbuf: List[Recordable] = []
+        self.wbuf: List[Recordable] = []
 
         self.fd: Optional[IO[Any]] = None
 
@@ -321,6 +357,24 @@ class DatasetWriter:
         """
         return self._failed
 
+    def _new_formatter(
+        self, fd: IO[Any], path: pathlib.Path, part: int
+    ) -> DataFormatter:
+        """Create the formatter for a file, with a context if it wants one.
+
+        Args:
+            fd: The open file.
+            path: The file's path.
+            part: The file's part number: 0, then 1, 2, ... after rollovers.
+
+        Returns:
+            The formatter.
+        """
+        if self.formatter_cls.wants_context:
+            context = FileContext(self.name, path, part, self.definitions)
+            return self.formatter_cls(fd, context=context)
+        return self.formatter_cls(fd)
+
     def _open(self, path: pathlib.Path) -> tuple[IO[Any], DataFormatter]:
         """Create a dataset file and its formatter.
 
@@ -358,7 +412,7 @@ class DatasetWriter:
             raise DatasetError(self.name, f"Can't sync {path.parent}: {e}") from e
 
         try:
-            formatter = self.formatter_cls(fd)
+            formatter = self._new_formatter(fd, path, self.sub_index)
             # The dataset's limit, unless the formatter's own is lower.
             formatter.max_bytes = min(
                 type(formatter).max_bytes,
@@ -400,14 +454,14 @@ class DatasetWriter:
         self.start_time = self._clock()
         self.ref_time = self.start_time
 
-        self.next_write = DatasetWriter.WRITE_PERIOD
+        self.next_write = self.write_period
         self._recording = True
         self._paused = False
 
         # Start the write thread
         self.write_thread.start()
 
-    def update(self, msg: Optional[Message]):
+    def update(self, msg: Optional[Recordable]):
         """Buffer a message, and hand the buffer to the writer when it's due.
 
         Never raises for a failed or slow writer: a failed one has stopped
@@ -456,7 +510,7 @@ class DatasetWriter:
             )
             self._behind_since = None
 
-        self.next_write = elapsed + DatasetWriter.WRITE_PERIOD
+        self.next_write = elapsed + self.write_period
         self.stage_for_write()
 
     def store_saved(self):
@@ -468,7 +522,7 @@ class DatasetWriter:
         self.saved_files.append(self.file_path)
         self.last_saved = self.file_path
 
-    def _write_batch(self, batch: List[Message]) -> None:
+    def _write_batch(self, batch: List[Recordable]) -> None:
         """Write messages, continuing in new files when one is full.
 
         Args:

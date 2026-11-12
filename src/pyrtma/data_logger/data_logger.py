@@ -20,8 +20,8 @@ from pyrtma.exceptions import (
     UnknownMessageType,
 )
 
-from .data_formatter import get_formatter
-from .dataset_writer import DatasetWriter, error_message
+from .data_formatter import UndecodedMessage, get_formatter
+from .dataset_writer import DatasetWriter, check_write_period, error_message
 from .exceptions import *
 
 from typing import Callable, Optional, cast
@@ -53,6 +53,7 @@ class DataLogger:
         *,
         clock: Callable[[], float] = time.monotonic,
         fsync: bool = False,
+        write_period: float = DatasetWriter.WRITE_PERIOD,
     ):
         """Connect to the message manager as the data logger.
 
@@ -66,14 +67,18 @@ class DataLogger:
                 each write and before closing it; see ``DatasetWriter``. By
                 default the operating system decides when to write its
                 buffers to disk.
+            write_period: Seconds between each dataset's writes of its
+                buffered messages; see ``DatasetWriter``.
 
         Raises:
+            ValueError: ``write_period`` isn't a number greater than 0.
             MessageManagerNotFound: The manager can't be reached.
         """
         self.mm_ip = rtma_server_ip
         self.definitions = definitions
         self._clock = clock
         self.fsync = fsync
+        self.write_period = check_write_period(write_period)
         self._stop_requested = threading.Event()
         # Message types that couldn't be decoded and that no dataset was
         # recording, by type and error, so each is warned about once.
@@ -513,6 +518,8 @@ class DataLogger:
             max_size_mb=self._max_size_mb(name, msg.dataset.max_size_mb),
             clock=self._clock,
             fsync=self.fsync,
+            write_period=self.write_period,
+            definitions=self.definitions,
         )
 
         self.datasets[dataset.name] = dataset
@@ -577,10 +584,13 @@ class DataLogger:
     def _undecodable(self, exc: RTMAMessageError) -> None:
         """Handle a received message that the definitions can't decode.
 
-        Every dataset that would have recorded it is stopped and reported:
-        its recording is missing data until the definitions are fixed. The
-        file keeps what was recorded until then. When no dataset records the
-        type, it is warned about once per type and error.
+        A dataset whose formatter accepts undecoded messages, as ``raw`` does,
+        records it as received and keeps recording; the first such message
+        of each type and error is reported for that dataset. Every other
+        dataset that would have recorded it is stopped and reported: its
+        recording is missing data until the definitions are fixed. The file
+        keeps what was recorded until then. When no dataset records the type,
+        it is warned about once per type and error.
 
         Args:
             exc: The client's error. Its ``header`` names the message type.
@@ -607,6 +617,25 @@ class DataLogger:
                     f"{detail} Later ones like it aren't reported."
                 )
             return
+
+        if header is not None and exc.payload is not None:
+            undecoded = UndecodedMessage(header, exc.payload)
+            keeping = [ds for ds in affected if ds.formatter_cls.accepts_undecoded]
+            affected = [ds for ds in affected if ds not in keeping]
+            for ds in keeping:
+                ds.update(undecoded)
+                key = (-1 if msg_type is None else msg_type, reason)
+                if key in ds.undecoded_reported:
+                    continue
+                ds.undecoded_reported.add(key)
+                text = (
+                    f"Recording undecoded: a message {label} can't be decoded "
+                    f"with the logger's definitions; it is recorded as received "
+                    f"and marked undecoded. Later ones like it aren't reported. "
+                    f"{detail}"
+                )
+                self.logger.warning(f"Dataset '{ds.name}': {text}")
+                self._send_error(ds.name, reason, text)
 
         text = (
             f"Stopped recording: a message {label} can't be decoded with the "

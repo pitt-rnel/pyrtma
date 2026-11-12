@@ -1466,6 +1466,7 @@ class Client(ClientLike):
                     bytes(payload),
                 )
                 unknown.header = header
+                unknown.payload = bytes(payload)
                 raise unknown from e
 
             type_size = msg_cls.type_size
@@ -1474,6 +1475,7 @@ class Client(ClientLike):
                     f"Received message header indicating a message data size ({header.num_data_bytes}) that does not match the expected size ({type_size}) of message type {msg_cls.type_name}. Message definitions may be out of sync across systems."
                 )
                 invalid.header = header
+                invalid.payload = bytes(payload)
                 raise invalid
             data = msg_cls.from_buffer_copy(payload)
         else:
@@ -1486,6 +1488,7 @@ class Client(ClientLike):
                 f"Received message header indicating a message version that does not match the expected version of message type {data.type_name}. Message definitions may be out of sync across systems."
             )
             invalid.header = header
+            invalid.payload = bytes(data)
             raise invalid
 
         return Message(header, data)
