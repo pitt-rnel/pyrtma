@@ -3,7 +3,6 @@
 Includes :py:class:`~Client` class and associated exception classes
 """
 
-from shlex import split
 import socket
 import select
 import time

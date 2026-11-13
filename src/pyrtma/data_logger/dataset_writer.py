@@ -12,7 +12,6 @@ import pyrtma
 
 import pyrtma.core_defs as cd
 from ..client_logging import TRUNCATED_MARKER, _ascii_field, _field_size
-from ..message import Message
 from .data_formatter import DataFormatter, FileContext, Recordable, get_formatter
 from typing import Callable, IO, Any
 

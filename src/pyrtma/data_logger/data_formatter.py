@@ -8,7 +8,7 @@ import pyrtma
 from typing import ClassVar, IO, Any, Sequence
 from abc import ABC
 from pyrtma.definitions import MessageDefinitions
-from .exceptions import InvalidFormatter, DataFormatterKeyError
+from .exceptions import DataFormatterKeyError
 
 
 def _size_on_disk(chunk: str | bytes) -> int:
