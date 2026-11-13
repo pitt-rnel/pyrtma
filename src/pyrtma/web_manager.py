@@ -38,7 +38,8 @@ from websocket_server import (  # type: ignore
     OPCODE_TEXT,
 )
 
-from typing import Callable, Any, Sequence, cast
+from collections.abc import Callable, Sequence
+from typing import Any, cast
 
 
 class RTMAWebSocketHandler(WebSocketHandler):

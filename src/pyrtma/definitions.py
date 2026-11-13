@@ -3,7 +3,8 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass
 from types import MappingProxyType, ModuleType
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 from .exceptions import UnknownMessageType, MessageDefinitionsLoadError
 from .message_base import MessageBase

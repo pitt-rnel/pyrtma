@@ -5,7 +5,8 @@ import pathlib
 from dataclasses import dataclass
 
 import pyrtma
-from typing import ClassVar, IO, Any, Sequence
+from collections.abc import Sequence
+from typing import ClassVar, IO, Any
 from abc import ABC
 from pyrtma.definitions import MessageDefinitions
 from .exceptions import DataFormatterKeyError

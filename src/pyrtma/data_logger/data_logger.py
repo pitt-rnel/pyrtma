@@ -30,7 +30,8 @@ from .exceptions import (
     DatasetNotFound,
 )
 
-from typing import Callable, cast
+from collections.abc import Callable
+from typing import cast
 
 
 def _file_key(path: pathlib.Path) -> str:

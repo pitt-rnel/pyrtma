@@ -29,7 +29,8 @@ import struct
 import sys
 import zlib
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Iterator
+from collections.abc import Iterable, Iterator
+from typing import Any
 
 from pyrtma.data_logger.formatters.raw import (
     CRC,

@@ -65,7 +65,8 @@ import sys
 import time
 import zlib
 from datetime import datetime, timezone
-from typing import IO, Any, Callable, ClassVar
+from collections.abc import Callable
+from typing import IO, Any, ClassVar
 
 import pyrtma
 from pyrtma.header import get_header_cls

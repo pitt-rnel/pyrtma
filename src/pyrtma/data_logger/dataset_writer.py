@@ -13,7 +13,8 @@ import pyrtma
 import pyrtma.core_defs as cd
 from ..client_logging import TRUNCATED_MARKER, _ascii_field, _field_size
 from .data_formatter import DataFormatter, FileContext, Recordable, get_formatter
-from typing import Callable, IO, Any
+from collections.abc import Callable
+from typing import IO, Any
 
 from ..definitions import MessageDefinitions
 from .exceptions import (

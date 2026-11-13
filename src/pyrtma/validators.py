@@ -4,15 +4,13 @@ import ctypes
 import collections.abc as abc
 import math
 
+from collections.abc import Iterable, Sequence, Iterator
 from typing import (
     Any,
     ClassVar,
     Generic,
     TypeVar,
-    Iterable,
     overload,
-    Sequence,
-    Iterator,
 )
 from abc import abstractmethod, ABCMeta
 from contextlib import contextmanager

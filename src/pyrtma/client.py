@@ -42,7 +42,8 @@ from .exceptions import (
 from . import core_defs as cd
 
 from functools import wraps
-from typing import Iterable, Iterator, Callable, Any, TypeVar, cast
+from collections.abc import Iterable, Iterator, Callable
+from typing import Any, TypeVar, cast
 from types import ModuleType
 
 from warnings import warn
