@@ -12,12 +12,10 @@ import pyrtma
 
 import pyrtma.core_defs as cd
 from ..client_logging import TRUNCATED_MARKER, _ascii_field, _field_size
-from ..message import Message
-from ..core_defs import ALL_MESSAGE_TYPES
-from .data_formatter import get_formatter
-from typing import Callable, Type, Optional, IO, Any, List
+from .data_formatter import DataFormatter, FileContext, Recordable, get_formatter
+from collections.abc import Callable
+from typing import IO, Any
 
-from .data_formatter import DataFormatter, FileContext, Recordable
 from ..definitions import MessageDefinitions
 from .exceptions import (
     DatasetError,
@@ -117,12 +115,12 @@ class DatasetWriter:
         filename: str,
         formatter: str,
         subdivide_interval: int,
-        msg_types: List[int],
+        msg_types: list[int],
         *,
         max_size_mb: int = cd.DATASET_MAX_SIZE_MB,
         clock: Callable[[], float] = time.monotonic,
         fsync: bool = False,
-        definitions: Optional[MessageDefinitions] = None,
+        definitions: MessageDefinitions | None = None,
         write_period: float = WRITE_PERIOD,
     ):
         """Set up a dataset; nothing is recorded until :py:meth:`start`.
@@ -178,7 +176,7 @@ class DatasetWriter:
         # Guards _failed, so only the first failure is reported.
         self._state_lock = threading.Lock()
         # When the writer fell behind, or None while it keeps up.
-        self._behind_since: Optional[float] = None
+        self._behind_since: float | None = None
 
         self.name = name
 
@@ -192,7 +190,7 @@ class DatasetWriter:
         self.save_path = pathlib.Path(save_path)
 
         self.formatter_name = formatter
-        formatter_cls: Optional[Type[DataFormatter]] = get_formatter(formatter)
+        formatter_cls: type[DataFormatter] | None = get_formatter(formatter)
         if formatter_cls is None:
             raise InvalidFormatter(
                 self.name, f"No DataFormatter class named {formatter}"
@@ -230,10 +228,10 @@ class DatasetWriter:
             0,
         )
 
-        self.rbuf: List[Recordable] = []
-        self.wbuf: List[Recordable] = []
+        self.rbuf: list[Recordable] = []
+        self.wbuf: list[Recordable] = []
 
-        self.fd: Optional[IO[Any]] = None
+        self.fd: IO[Any] | None = None
 
         self.write_to_disk = threading.Event()
         self.write_finished = threading.Event()
@@ -244,7 +242,7 @@ class DatasetWriter:
         self.write_thread = threading.Thread(target=self.write)
 
         self.msg_types = [m for m in msg_types if m > 0]
-        if ALL_MESSAGE_TYPES in msg_types:
+        if cd.ALL_MESSAGE_TYPES in msg_types:
             self.all_sub = True
         else:
             self.all_sub = False
@@ -461,7 +459,7 @@ class DatasetWriter:
         # Start the write thread
         self.write_thread.start()
 
-    def update(self, msg: Optional[Recordable]):
+    def update(self, msg: Recordable | None):
         """Buffer a message, and hand the buffer to the writer when it's due.
 
         Never raises for a failed or slow writer: a failed one has stopped
@@ -522,7 +520,7 @@ class DatasetWriter:
         self.saved_files.append(self.file_path)
         self.last_saved = self.file_path
 
-    def _write_batch(self, batch: List[Recordable]) -> None:
+    def _write_batch(self, batch: list[Recordable]) -> None:
         """Write messages, continuing in new files when one is full.
 
         Args:

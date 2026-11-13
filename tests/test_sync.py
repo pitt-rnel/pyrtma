@@ -7,7 +7,6 @@ import pyrtma
 import pyrtma.exceptions
 from .helpers import bound_port
 from .test_msg_defs import test_defs as td
-import time
 from pyrtma.client import client_context
 from pyrtma.message import *
 from pyrtma.manager import MessageManager

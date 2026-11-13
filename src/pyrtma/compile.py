@@ -3,7 +3,6 @@
 import pathlib
 import re
 import sys
-from typing import List, Union, Dict, Optional
 
 from .parser import Parser, ParserError, FileFormatError
 from pyrtma.compilers.python import PyDefCompiler
@@ -15,7 +14,7 @@ from pyrtma.compilers.info import InfoCompiler
 
 
 def compile(
-    defs_files: List[str],
+    defs_files: list[str],
     out_dir: str,
     out_name: str,
     python: bool = False,
@@ -29,7 +28,7 @@ def compile(
     """compile message defs
 
     Args:
-        defs_files (List[str]): A list holding the root YAML message
+        defs_files (list[str]): A list holding the root YAML message
             definition file to parse. C header (.h) files are no longer
             accepted.
         out_dir (str): Output directory for compiled files.
@@ -99,14 +98,14 @@ def compile(
     if re.search(r"[^a-zA-Z0-9_-]", filename):
         raise RuntimeError(f"Invalid out filename: {filename}")
 
-    compiler: Union[
-        PyDefCompiler,
-        JSDefCompiler,
-        MatlabDefCompiler,
-        CDefCompiler,
-        YAMLCompiler,
-        InfoCompiler,
-    ]
+    compiler: (
+        PyDefCompiler
+        | JSDefCompiler
+        | MatlabDefCompiler
+        | CDefCompiler
+        | YAMLCompiler
+        | InfoCompiler
+    )
     if python:
         print("Building python message definitions...")
 

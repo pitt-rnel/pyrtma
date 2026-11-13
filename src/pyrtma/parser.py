@@ -1,5 +1,7 @@
 """Message definition YAML parser"""
 
+from __future__ import annotations
+
 import re
 import json
 import pathlib
@@ -15,18 +17,7 @@ from ruamel.yaml import YAML
 
 from copy import copy
 from hashlib import sha256
-from typing import (
-    List,
-    Optional,
-    Any,
-    Union,
-    Tuple,
-    Dict,
-    Type,
-    Literal,
-    cast,
-    TYPE_CHECKING,
-)
+from typing import Any, Literal, cast, TYPE_CHECKING
 from dataclasses import dataclass, field, fields, is_dataclass, asdict
 
 if TYPE_CHECKING:
@@ -55,10 +46,6 @@ other constants is one deeper than the deepest of them. An alias of a native
 type or a struct has depth 1, and an alias of an alias is one deeper than it.
 Deeper definitions raise `RecurisionError`.
 """
-
-import os
-import re
-from typing import Optional
 
 
 def expand_env_variables(input_string: str) -> str:
@@ -149,7 +136,7 @@ supported_types = {
 # The name each native type has in a type hash, so that spellings of the same
 # type, such as ``int`` and ``int32``, hash the same. ``char`` stays distinct
 # from ``int8``, since the targets decode them differently.
-CANONICAL_TYPE_NAMES: Dict[str, str] = {
+CANONICAL_TYPE_NAMES: dict[str, str] = {
     "char": "char",
     "signed char": "int8",
     "unsigned char": "uint8",
@@ -299,7 +286,7 @@ class MsgDefIndex:
 @dataclass
 class Metadata:
     name: str
-    value: Union[int, float, bool, str]
+    value: int | float | bool | str
     src: MsgDefIndex
 
 
@@ -314,8 +301,8 @@ class Import:
 class ConstantExpr:
     name: str
     expression: str
-    expanded: Optional[str]
-    value: Union[str, int, float]
+    expanded: str | None
+    value: str | int | float
     src: MsgDefIndex
     depth: int = 0
 
@@ -364,7 +351,7 @@ class HID:
 class TypeAlias:
     name: str
     type_name: str
-    type_obj: Union[NativeType, "SDF"]
+    type_obj: NativeType | SDF
     src: MsgDefIndex
     depth: int = 1
 
@@ -388,10 +375,10 @@ class TypeAlias:
 class Field:
     name: str
     type_name: str
-    type_obj: Union[NativeType, TypeAlias, "MDF", "SDF"]
-    length_expression: Optional[str] = None
-    length_expanded: Optional[str] = None
-    length: Optional[int] = None
+    type_obj: NativeType | TypeAlias | MDF | SDF
+    length_expression: str | None = None
+    length_expanded: str | None = None
+    length: int | None = None
     offset: int = -1
     # True for the padding fields the parser inserts for alignment.
     padding: bool = False
@@ -426,7 +413,7 @@ class MDF:
     name: str
     type_id: int
     src: MsgDefIndex
-    fields: List[Field] = field(default_factory=list)
+    fields: list[Field] = field(default_factory=list)
     alignment: int = 8
 
     @property
@@ -452,7 +439,7 @@ class SDF:
     hash: str
     name: str
     src: MsgDefIndex
-    fields: List[Field] = field(default_factory=list)
+    fields: list[Field] = field(default_factory=list)
     alignment: int = 8
 
     @property
@@ -468,7 +455,7 @@ class SDF:
         return s
 
 
-RTMAObject = Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, MDF, SDF, Field]
+RTMAObject = ConstantExpr | ConstantString | HID | MID | TypeAlias | MDF | SDF | Field
 
 
 class Parser:
@@ -486,12 +473,12 @@ class Parser:
         Args:
             debug (bool, optional): Flag for debug mode. Defaults to False.
         """
-        self.included_files: List[MsgDefIndex] = []
+        self.included_files: list[MsgDefIndex] = []
         self.current_index = MsgDefIndex("", "", pathlib.Path())
         self.debug = debug
         Parser._instance_count += 1
 
-        self.yaml_dict: Dict[str, Dict[str, Any]] = dict(
+        self.yaml_dict: dict[str, dict[str, Any]] = dict(
             metadata={},
             imports={},
             constants={},
@@ -504,24 +491,24 @@ class Parser:
         )
 
         # Compiler File Data:
-        self.index: Dict[str, MsgDefIndex] = {}
+        self.index: dict[str, MsgDefIndex] = {}
         self.compiler_options = CompilerOptions()
         self.deps: list[MsgDefIndex] = []
 
-        self.metadata: Dict[str, Metadata] = {}
-        self.imports: List[Import] = []
-        self.constants: Dict[str, ConstantExpr] = {}
-        self.string_constants: Dict[str, ConstantString] = {}
-        self.aliases: Dict[str, TypeAlias] = {}
-        self.host_ids: Dict[str, HID] = {}
-        self.module_ids: Dict[str, MID] = {}
-        self.struct_defs: Dict[str, SDF] = {}
-        self.message_ids: Dict[str, MT] = {}
-        self.message_defs: Dict[str, MDF] = {}
+        self.metadata: dict[str, Metadata] = {}
+        self.imports: list[Import] = []
+        self.constants: dict[str, ConstantExpr] = {}
+        self.string_constants: dict[str, ConstantString] = {}
+        self.aliases: dict[str, TypeAlias] = {}
+        self.host_ids: dict[str, HID] = {}
+        self.module_ids: dict[str, MID] = {}
+        self.struct_defs: dict[str, SDF] = {}
+        self.message_ids: dict[str, MT] = {}
+        self.message_defs: dict[str, MDF] = {}
 
         # Aliases of structs defined later in the file being parsed, by name,
         # with the struct each names. They are resolved as the structs are.
-        self._pending_aliases: Dict[str, str] = {}
+        self._pending_aliases: dict[str, str] = {}
 
         self.logger = logging.getLogger(f"pyrtma.parser ({self._instance_count})")
         self.logger.propagate = False
@@ -592,7 +579,7 @@ class Parser:
         self._pending_aliases = {}
 
     def check_duplicate_name(
-        self, section: str, name: str, namespaces: Tuple[str, ...]
+        self, section: str, name: str, namespaces: tuple[str, ...]
     ):
         """Check namespaces for conflicting names."""
         for namespace in namespaces:
@@ -603,7 +590,7 @@ class Parser:
                         f"Duplicate name conflict found: \n\n1: {namespace} -> {o.name} -> {o.src.file.absolute()}\n2: {section} -> {name} -> {self.current_file}\n"
                     )
 
-    def expand_expression(self, name: str, expr: str) -> Tuple[str, Any]:
+    def expand_expression(self, name: str, expr: str) -> tuple[str, Any]:
         """Replace the constants in an expression with their values, and evaluate it.
 
         Every constant an expression uses must be defined before it, and
@@ -702,7 +689,7 @@ class Parser:
 
         self.parse_index(fname)
 
-    def handle_metadata(self, name: str, value: Union[int, float, bool, str]):
+    def handle_metadata(self, name: str, value: int | float | bool | str):
         self.check_name(name)
         self.check_duplicate_name(
             "metadata",
@@ -721,7 +708,7 @@ class Parser:
             src=self.current_index,
         )
 
-    def handle_compiler_options(self, name: str, value: Union[int, float, bool, str]):
+    def handle_compiler_options(self, name: str, value: int | float | bool | str):
         self.check_name(name)
         # setattr() on the dataclass accepts any name, so check it first.
         known = [f.name for f in fields(CompilerOptions)]
@@ -731,7 +718,7 @@ class Parser:
             )
         setattr(self.compiler_options, name, value)
 
-    def handle_expression(self, name: str, expression: Union[int, float, str]):
+    def handle_expression(self, name: str, expression: int | float | str):
         self.check_name(name)
         self.check_duplicate_name(
             "constants",
@@ -958,7 +945,7 @@ class Parser:
 
         self.module_ids[name] = MID(name, int(value), src=self.current_index)
 
-    def check_alignment(self, s: Union[SDF, MDF]):
+    def check_alignment(self, s: SDF | MDF):
         """Confirm 64 bit alignment of structures"""
         PADDING_BYTE_TYPE = "byte"
 
@@ -968,7 +955,7 @@ class Parser:
         npad = 0  # padding field count
         n = 0  # field index
 
-        pad_len: Union[int, Literal[""]]
+        pad_len: int | Literal[""]
 
         # Loop over all fields in struct
         while n < len(s.fields):
@@ -1100,7 +1087,7 @@ class Parser:
             s
         ), f"{s.name} is not 64-bit aligned. s.size = {s.size}, struct size = {self.get_ctype_size(s)}."
 
-    def get_ctype_cls(self, s: Union[MDF, SDF]) -> Type[ctypes.Structure]:
+    def get_ctype_cls(self, s: MDF | SDF) -> type[ctypes.Structure]:
         # Field type name to ctypes
         type_map = {
             "char": ctypes.c_char,
@@ -1154,7 +1141,7 @@ class Parser:
 
         return type(s.name, (ctypes.Structure,), {"_fields_": f})
 
-    def get_ctype_size(self, s: Union[MDF, SDF]) -> int:
+    def get_ctype_size(self, s: MDF | SDF) -> int:
         return ctypes.sizeof(self.get_ctype_cls(s))
 
     def validate_msg_id(self, name: str, msg_id: int):
@@ -1224,7 +1211,7 @@ class Parser:
             )
         return int(value)
 
-    def add_fields(self, mdf: Union[SDF, MDF], fields: Union[Dict, str]):
+    def add_fields(self, mdf: SDF | MDF, fields: dict | str):
         # Pattern to parse field specs
         FIELD_REGEX = r"\s*(?P<ftype>[\s\w]*)(\[(?P<len_str>.*)\])?\s*"
 
@@ -1278,7 +1265,7 @@ class Parser:
                     )
 
                 # Check for a valid type
-                ftype_obj: Union[NativeType, TypeAlias, MDF, SDF]
+                ftype_obj: NativeType | TypeAlias | MDF | SDF
                 if ftype in supported_types.keys():
                     ftype_obj = supported_types[ftype]
                 elif ftype in self.aliases.keys():
@@ -1372,7 +1359,7 @@ class Parser:
         return f"{fld.name}: {final}{length}{suffix}"
 
     @classmethod
-    def definition_hash(cls, df: Union["MDF", "SDF"]) -> Tuple[str, str]:
+    def definition_hash(cls, df: MDF | SDF) -> tuple[str, str]:
         """Build a struct's or message's hashed text and its type hash.
 
         The text has the layout the hash has always been taken over: the
@@ -1396,7 +1383,7 @@ class Parser:
         raw = "\n".join(lines)
         return raw, sha256(raw.encode()).hexdigest()
 
-    def handle_signal(self, name: str, mdf: Dict[str, Any]):
+    def handle_signal(self, name: str, mdf: dict[str, Any]):
         # Create a string representation of the defintion to hash
         raw = f"{name}:\n  id: {mdf['id']}\n  fields: null"
         raw = textwrap.dedent(raw)
@@ -1414,7 +1401,7 @@ class Parser:
         self.message_defs[name] = obj
         return
 
-    def handle_struct(self, name: str, sdf: Dict[str, Any]):
+    def handle_struct(self, name: str, sdf: dict[str, Any]):
         # Check for valid name
         self.check_name(name)
 
@@ -1463,7 +1450,7 @@ class Parser:
                 f"Invalid name {name} in {self.current_file}. Names can only start with letters"
             )
 
-    def handle_message_def(self, name: str, mdf: Dict[str, Any]):
+    def handle_message_def(self, name: str, mdf: dict[str, Any]):
         # Check for valid name
         self.check_name(name)
 
@@ -1516,7 +1503,7 @@ class Parser:
         # Store the new defintion
         self.message_defs[name] = obj
 
-    def handle_reserve(self, name: str, mdf: Dict[str, List]):
+    def handle_reserve(self, name: str, mdf: dict[str, list]):
         for section in mdf.keys():
             if section not in ("id",):
                 raise RTMASyntaxError(
@@ -1555,7 +1542,7 @@ class Parser:
             name = f"RESERVED_{id:06d}"
             self.handle_signal(name, dict(id=id, fields=None))
 
-    def names_later_struct(self, ftype: Any, file_structs: Dict[str, Any]) -> bool:
+    def names_later_struct(self, ftype: Any, file_structs: dict[str, Any]) -> bool:
         """Whether an alias's type is a struct defined later in this file.
 
         Args:
@@ -1572,7 +1559,7 @@ class Parser:
             ftype in file_structs and ftype not in self.struct_defs
         )
 
-    def defer_alias(self, alias: str, ftype: str, file_structs: Dict[str, Any]):
+    def defer_alias(self, alias: str, ftype: str, file_structs: dict[str, Any]):
         """Check an alias now, and resolve it once the struct it names is defined.
 
         Args:

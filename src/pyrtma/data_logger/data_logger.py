@@ -22,9 +22,16 @@ from pyrtma.exceptions import (
 
 from .data_formatter import UndecodedMessage, get_formatter
 from .dataset_writer import DatasetWriter, check_write_period, error_message
-from .exceptions import *
+from .exceptions import (
+    DataLoggerError,
+    DataLoggerFullError,
+    DatasetExistsError,
+    DatasetInProgress,
+    DatasetNotFound,
+)
 
-from typing import Callable, Optional, cast
+from collections.abc import Callable
+from typing import cast
 
 
 def _file_key(path: pathlib.Path) -> str:
@@ -564,7 +571,7 @@ class DataLogger:
         """
         self.client.send_message(error_message(dataset, exc_type, text))
 
-    def _type_label(self, msg_type: Optional[int]) -> str:
+    def _type_label(self, msg_type: int | None) -> str:
         """Describe a message type by number, and name where it is known.
 
         Args:
@@ -596,7 +603,7 @@ class DataLogger:
             exc: The client's error. Its ``header`` names the message type.
         """
         header = exc.header
-        msg_type: Optional[int] = header.msg_type if header is not None else None
+        msg_type: int | None = header.msg_type if header is not None else None
         label = self._type_label(msg_type)
         reason = type(exc).__name__
         detail = str(exc.args[0]) if exc.args else str(exc)

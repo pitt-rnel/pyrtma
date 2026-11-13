@@ -7,10 +7,8 @@ if version_info[:2] < (3, 8):
 import tempfile
 import pyrtma.parser
 import textwrap
-import pathlib
 from pathlib import Path
 import logging
-import unittest
 
 
 class TempDefFile:
@@ -19,14 +17,14 @@ class TempDefFile:
             "w", suffix=".defs", delete=False
         )
         self.compiler_file.close()
-        self.compiler_path = pathlib.Path(self.compiler_file.name)
+        self.compiler_path = Path(self.compiler_file.name)
 
         self.msg_file = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False)
         self.msg_file.close()
-        self.msg_path = pathlib.Path(self.msg_file.name)
+        self.msg_path = Path(self.msg_file.name)
 
     @property
-    def path(self) -> pathlib.Path:
+    def path(self) -> Path:
         return self.compiler_path
 
     def __del__(self):

@@ -13,7 +13,6 @@ from pyrtma.parser import (
     MDF,
     SDF,
 )
-from typing import List, Union
 import subprocess
 import sys
 from pyrtma.__version__ import __version__
@@ -251,7 +250,7 @@ class PyDefCompiler:
         Returns:
             The source.
         """
-        parts: List[str] = []
+        parts: list[str] = []
         parts.append(self.generate_docstr())
         parts.append(self.generate_imports())
         parts.append("\n")
@@ -261,7 +260,7 @@ class PyDefCompiler:
         parts.append("check_compiled_version(COMPILED_PYRTMA_VERSION)\n\n")
 
         parts.append("# Constants\n")
-        obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
+        obj: ConstantExpr | ConstantString | HID | MID | TypeAlias | SDF | MT | MDF
         for obj in self.parser.constants.values():
             parts.append(self.generate_constant(obj))
         parts.append("\n")

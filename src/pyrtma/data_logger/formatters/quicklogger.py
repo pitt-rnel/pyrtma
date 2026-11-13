@@ -20,7 +20,7 @@ import pyrtma
 
 from pyrtma.utils.log_reader import BinFileHeader
 from ..data_formatter import DataFormatter
-from typing import ClassVar, IO, List, Optional
+from typing import ClassVar, IO
 
 # The array type code for 32-bit unsigned offsets, as the format stores them.
 _OFFSET_TYPECODE = next(t for t in "IL" if array.array(t).itemsize == 4)
@@ -39,7 +39,7 @@ class _SpillBuffer:
     simply replaced; the recording it belonged to can't be finished.
     """
 
-    def __init__(self, path: Optional[pathlib.Path], threshold: int):
+    def __init__(self, path: pathlib.Path | None, threshold: int):
         """Start an empty buffer.
 
         Args:
@@ -49,8 +49,8 @@ class _SpillBuffer:
         """
         self._path = path
         self._threshold = threshold
-        self._memory: Optional[io.BytesIO] = io.BytesIO()
-        self._file: Optional[IO[bytes]] = None
+        self._memory: io.BytesIO | None = io.BytesIO()
+        self._file: IO[bytes] | None = None
 
     @property
     def spilled(self) -> bool:
@@ -144,7 +144,7 @@ class QLFormatter(DataFormatter):
         # Initially add a placeholder for the
         return bytes(self.ql_header)
 
-    def write(self, wbuf: List[pyrtma.Message]) -> int:
+    def write(self, wbuf: list[pyrtma.Message]) -> int:
         """Write messages' headers, and buffer their data.
 
         The file's size is known exactly as it grows, so a message is left
@@ -196,7 +196,7 @@ class QLFormatter(DataFormatter):
         self.fd.write(bytes(self.ql_header))
         self.fd.seek(0, os.SEEK_END)
 
-    def finalize(self, wbuf: List[pyrtma.Message]):
+    def finalize(self, wbuf: list[pyrtma.Message]):
         """Write the last messages, the offsets and the data.
 
         Args:

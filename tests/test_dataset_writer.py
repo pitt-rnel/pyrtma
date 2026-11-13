@@ -32,7 +32,6 @@ from pyrtma.data_logger.exceptions import (
     DatasetExistsError,
     DatasetInProgress,
 )
-from pyrtma.header import MessageHeader
 from pyrtma.message import Message
 
 from .helpers import DEFAULT_TIMEOUT, FakeClock, wait_for

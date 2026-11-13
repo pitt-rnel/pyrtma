@@ -7,7 +7,7 @@ are finite, with random sign and magnitude.
 import ctypes
 import random
 import string
-from typing import Any, List, TypeVar
+from typing import Any, TypeVar
 
 # ctypes simple-type codes for signed and unsigned integers. Types are matched
 # by code and size rather than by class, because ctypes aliases differ between
@@ -36,7 +36,7 @@ def _random_str(length: int) -> str:
     return "".join(random.choice(string.printable) for _ in range(length))
 
 
-def _random_int_array(length: int, min: int = 0, max: int = 9) -> List[int]:
+def _random_int_array(length: int, min: int = 0, max: int = 9) -> list[int]:
     """Utility to generate random int array
 
     Args:
@@ -45,7 +45,7 @@ def _random_int_array(length: int, min: int = 0, max: int = 9) -> List[int]:
         max (int, optional): Maximum value. Defaults to 9.
 
     Returns:
-        List[int]: List of random ints
+        list[int]: List of random ints
     """
     return [random.randint(min, max) for _ in range(length)]
 
@@ -85,7 +85,7 @@ def _random_real(exponents: tuple[int, int]) -> float:
     return random.choice((-1.0, 1.0)) * magnitude
 
 
-def _random_float_array(length: int) -> List[float]:
+def _random_float_array(length: int) -> list[float]:
     """Utility to generate random float array
 
     Restricted to values that a 32-bit float can hold without overflowing.
@@ -94,12 +94,12 @@ def _random_float_array(length: int) -> List[float]:
         length (int): Array length
 
     Returns:
-        List[float]: List of random floats
+        list[float]: List of random floats
     """
     return [_random_real(_FLOAT_EXPONENTS) for _ in range(length)]
 
 
-def _random_double_array(length: int) -> List[float]:
+def _random_double_array(length: int) -> list[float]:
     """Utility to generate random float array
 
     Values are of double (64-bit) precision
@@ -108,7 +108,7 @@ def _random_double_array(length: int) -> List[float]:
         length (int): Array length
 
     Returns:
-        List[float]: List of random floats
+        list[float]: List of random floats
     """
     return [_random_real(_DOUBLE_EXPONENTS) for _ in range(length)]
 

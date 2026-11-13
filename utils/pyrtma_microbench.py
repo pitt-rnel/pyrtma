@@ -32,7 +32,7 @@ import threading
 import time
 import timeit
 from pathlib import Path
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Sequence
 
 import pyrtma
 import pyrtma.core_defs as cd
@@ -420,7 +420,7 @@ def report(results: Sequence[tuple[str, list[float]]]) -> str:
     return "\n".join(lines)
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse the command line.
 
     Args:
@@ -446,7 +446,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return args
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Time every operation and print the report.
 
     Args:

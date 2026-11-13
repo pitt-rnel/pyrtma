@@ -9,16 +9,16 @@ from .client import Client
 from . import core_defs as cd
 from .client_logging import RTMALogger
 from .exceptions import ClientError, ConnectionLost
-from typing import Optional, Union, cast
+from typing import cast
 
-RTMA_LOG_MSG = Union[
-    cd.MDF_RTMA_LOG,
-    cd.MDF_RTMA_LOG_DEBUG,
-    cd.MDF_RTMA_LOG_INFO,
-    cd.MDF_RTMA_LOG_WARNING,
-    cd.MDF_RTMA_LOG_ERROR,
-    cd.MDF_RTMA_LOG_CRITICAL,
-]
+RTMA_LOG_MSG = (
+    cd.MDF_RTMA_LOG
+    | cd.MDF_RTMA_LOG_DEBUG
+    | cd.MDF_RTMA_LOG_INFO
+    | cd.MDF_RTMA_LOG_WARNING
+    | cd.MDF_RTMA_LOG_ERROR
+    | cd.MDF_RTMA_LOG_CRITICAL
+)
 
 
 #: Log level names accepted by ``--log-level``. ``logging.getLevelNamesMapping``
@@ -47,11 +47,11 @@ class RTMA_UnifiedLog(object):
     def __init__(
         self,
         log_level: int = logging.INFO,
-        server: Optional[str] = None,
+        server: str | None = None,
         *,
         retry_delay: float = 0.5,
         max_retry_delay: float = 5.0,
-        sleep: Optional[Callable[[float], object]] = None,
+        sleep: Callable[[float], object] | None = None,
     ):
         """Create the unified log's client and loggers.
 
@@ -241,7 +241,7 @@ class RTMA_UnifiedLog(object):
             self.mod.info("Exiting")
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse the command line.
 
     Args:
@@ -284,7 +284,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return args
 
 
-def main(argv: Optional[Sequence[str]] = None) -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     """Run the unified console log from the command line.
 
     Args:

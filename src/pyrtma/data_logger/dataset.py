@@ -11,7 +11,7 @@ from pyrtma.data_logger.exceptions import NoClientError
 from pyrtma.definitions import MessageDefinitions
 from pyrtma.exceptions import UnknownMessageType
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Any, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 if TYPE_CHECKING:
     from _typeshed import StrPath
@@ -38,7 +38,7 @@ class Dataset:
         filename: str,
         formatter: str,
         subdivide_interval: int = 0,
-        msg_types: List[int] | None = None,
+        msg_types: list[int] | None = None,
         mm_ip: str = "127.0.0.1:7111",
         status_interval: float = 5.0,
         create_client: bool = True,

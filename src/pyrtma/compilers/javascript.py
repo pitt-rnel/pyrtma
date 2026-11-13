@@ -1,6 +1,5 @@
 import pathlib
 
-from typing import Union
 from pyrtma.parser import (
     Parser,
     ConstantExpr,
@@ -76,7 +75,7 @@ class JSDefCompiler:
     def generate_module_id(self, mid: MID) -> str:
         return f"RTMA.MID.{mid.name} = {mid.value};\n"
 
-    def generate_hash_id(self, mdf: Union[MDF, SDF]) -> str:
+    def generate_hash_id(self, mdf: MDF | SDF) -> str:
         return f'RTMA.HASH.{mdf.name} = "{mdf.hash[:8]}";\n'
 
     def generate_type_alias(self, td: TypeAlias) -> str:
@@ -113,7 +112,7 @@ class JSDefCompiler:
             return alias.type_name
         return type_name
 
-    def generate_obj(self, struct: Union[SDF, MDF]) -> str:
+    def generate_obj(self, struct: SDF | MDF) -> str:
         if isinstance(struct, MDF):
             top_field = "MDF"
         elif isinstance(struct, SDF):
@@ -193,7 +192,7 @@ class JSDefCompiler:
             # RTMA.constants
             f.write("// Constants\n")
             f.write("RTMA.constants =  {};\n")
-            obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
+            obj: ConstantExpr | ConstantString | HID | MID | TypeAlias | SDF | MT | MDF
             for obj in self.parser.constants.values():
                 f.write(self.generate_constant(obj))
             f.write("\n")

@@ -6,7 +6,8 @@ import time
 
 from concurrent.futures import ThreadPoolExecutor
 from types import ModuleType
-from typing import Generator, Any, Iterable
+from collections.abc import Generator, Iterable
+from typing import Any
 
 from pyrtma.header import MessageHeader
 from pyrtma.message import Message
