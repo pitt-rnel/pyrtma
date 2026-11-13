@@ -47,9 +47,6 @@ type or a struct has depth 1, and an alias of an alias is one deeper than it.
 Deeper definitions raise `RecurisionError`.
 """
 
-import os
-import re
-
 
 def expand_env_variables(input_string: str) -> str:
     """

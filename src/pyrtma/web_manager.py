@@ -21,7 +21,6 @@ from pyrtma import (
 )
 from pyrtma.exceptions import RTMAMessageError
 
-from socket import error as SocketError
 from socketserver import TCPServer
 from websocket_server import (  # type: ignore
     WebsocketServer,
@@ -301,7 +300,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         """
         try:
             b1, b2 = self.read_bytes(2)
-        except SocketError as e:  # to be replaced with ConnectionResetError for py3
+        except OSError as e:  # to be replaced with ConnectionResetError for py3
             if e.errno == errno.ECONNRESET:
                 logger.info("Client closed connection.")
                 self.keep_alive = 0

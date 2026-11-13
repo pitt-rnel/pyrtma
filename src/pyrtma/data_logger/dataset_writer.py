@@ -13,11 +13,9 @@ import pyrtma
 import pyrtma.core_defs as cd
 from ..client_logging import TRUNCATED_MARKER, _ascii_field, _field_size
 from ..message import Message
-from ..core_defs import ALL_MESSAGE_TYPES
-from .data_formatter import get_formatter
+from .data_formatter import DataFormatter, FileContext, Recordable, get_formatter
 from typing import Callable, IO, Any
 
-from .data_formatter import DataFormatter, FileContext, Recordable
 from ..definitions import MessageDefinitions
 from .exceptions import (
     DatasetError,
@@ -244,7 +242,7 @@ class DatasetWriter:
         self.write_thread = threading.Thread(target=self.write)
 
         self.msg_types = [m for m in msg_types if m > 0]
-        if ALL_MESSAGE_TYPES in msg_types:
+        if cd.ALL_MESSAGE_TYPES in msg_types:
             self.all_sub = True
         else:
             self.all_sub = False

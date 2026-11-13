@@ -22,8 +22,7 @@ from .message_data import MessageData
 from .core_defs import ALL_MESSAGE_TYPES
 from . import core_defs as cd
 
-from typing import Any
-from typing import Sequence
+from typing import Any, Sequence
 from dataclasses import dataclass, field
 from collections import defaultdict, deque
 
