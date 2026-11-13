@@ -13,7 +13,7 @@ from pyrtma.parser import (
 )
 from pyrtma.__version__ import __version__
 
-from typing import Any, Union
+from typing import Any
 from textwrap import dedent
 
 # Field type name to matlab types
@@ -84,7 +84,7 @@ class MatlabDefCompiler:
         name = name.replace(f"{top_field}_", "", 1)  # strip top_field from fieldname
         return f"{self.struct_name}.{top_field}.{name} = {value};\n"
 
-    def generate_constant(self, c: Union[ConstantExpr, HID, MID, MT]) -> str:
+    def generate_constant(self, c: ConstantExpr | HID | MID | MT) -> str:
         if isinstance(c, ConstantExpr):
             prefix = ""
         elif isinstance(c, HID):
@@ -128,9 +128,7 @@ class MatlabDefCompiler:
 
         raise RuntimeError(f"No type found for alias: {name}")
 
-    def generate_struct(
-        self, struct: Union[SDF, MDF], top_field: str = "typedefs"
-    ) -> str:
+    def generate_struct(self, struct: SDF | MDF, top_field: str = "typedefs") -> str:
         f = []
 
         name = struct.name
@@ -236,7 +234,7 @@ class MatlabDefCompiler:
 
             # RTMA.constants
             f.write("% Constants\n")
-            obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
+            obj: ConstantExpr | ConstantString | HID | MID | TypeAlias | SDF | MT | MDF
             for obj in self.parser.constants.values():
                 f.write(self.generate_constant(obj))
             for obj in self.parser.host_ids.values():

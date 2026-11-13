@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 
 class RTMAMessageError(Exception):
@@ -14,8 +14,8 @@ class RTMAMessageError(Exception):
     """
 
     # Typed as Any to avoid importing the header module here.
-    header: Optional[Any] = None
-    payload: Optional[bytes] = None
+    header: Any | None = None
+    payload: bytes | None = None
 
 
 class UnknownMessageType(RTMAMessageError):

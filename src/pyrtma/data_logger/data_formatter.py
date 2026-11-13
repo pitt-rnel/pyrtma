@@ -5,13 +5,13 @@ import pathlib
 from dataclasses import dataclass
 
 import pyrtma
-from typing import Type, Optional, ClassVar, IO, Any, Union, List, Dict, Sequence
+from typing import ClassVar, IO, Any, Sequence
 from abc import ABC
 from pyrtma.definitions import MessageDefinitions
 from .exceptions import InvalidFormatter, DataFormatterKeyError
 
 
-def _size_on_disk(chunk: Union[str, bytes]) -> int:
+def _size_on_disk(chunk: str | bytes) -> int:
     """Return how many bytes a chunk takes once written.
 
     Text is encoded as UTF-8, and each newline counted as the platform's line
@@ -46,7 +46,7 @@ class FileContext:
     dataset: str
     path: pathlib.Path
     part: int
-    definitions: Optional[MessageDefinitions]
+    definitions: MessageDefinitions | None
 
 
 @dataclass(frozen=True)
@@ -72,7 +72,7 @@ class UndecodedMessage:
 
 #: What a formatter is given to write: a decoded message, or, only if it sets
 #: ``accepts_undecoded``, an :py:class:`UndecodedMessage`.
-Recordable = Union[pyrtma.Message, UndecodedMessage]
+Recordable = pyrtma.Message | UndecodedMessage
 
 
 class DataFormatter(ABC):
@@ -102,18 +102,18 @@ class DataFormatter(ABC):
         self.messages_written = 0
         # Off while finalizing, which writes whatever it is given.
         self._limit_enabled = True
-        self._footer_size: Optional[int] = None
+        self._footer_size: int | None = None
         if hdr := self.format_header():
             self.fd.write(hdr)
             self.bytes_written += _size_on_disk(hdr)
 
-    def format_header(self) -> Optional[Union[bytes, str]]:
+    def format_header(self) -> bytes | str | None:
         return None
 
-    def format_footer(self) -> Optional[Union[bytes, str]]:
+    def format_footer(self) -> bytes | str | None:
         return None
 
-    def format_message(self, msg: Recordable) -> Optional[Union[str, bytes]]:
+    def format_message(self, msg: Recordable) -> str | bytes | None:
         return None
 
     def _fits(self, size: int, written: int) -> bool:
@@ -142,7 +142,7 @@ class DataFormatter(ABC):
             writes the rest to a new file. A subclass that overrides this
             and returns None is treated as having written them all.
         """
-        chunks: list[Union[str, bytes]] = []
+        chunks: list[str | bytes] = []
         count = 0
         for msg in wbuf:
             chunk = self.format_message(msg)
@@ -182,10 +182,10 @@ class DataFormatter(ABC):
         """
 
 
-_formatter_map: Dict[str, Type[DataFormatter]] = {}
+_formatter_map: dict[str, type[DataFormatter]] = {}
 
 
-def add_formatter(fmt_cls: Type[DataFormatter]):
+def add_formatter(fmt_cls: type[DataFormatter]):
     assert issubclass(fmt_cls, DataFormatter)
     if _formatter_map.get(fmt_cls.name) is not None:
         raise DataFormatterKeyError(
@@ -195,5 +195,5 @@ def add_formatter(fmt_cls: Type[DataFormatter]):
     _formatter_map[fmt_cls.name] = fmt_cls
 
 
-def get_formatter(name: str) -> Type[DataFormatter] | None:
+def get_formatter(name: str) -> type[DataFormatter] | None:
     return _formatter_map.get(name)

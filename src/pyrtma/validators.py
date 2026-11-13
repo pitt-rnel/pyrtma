@@ -6,16 +6,11 @@ import math
 
 from typing import (
     Any,
-    List,
     ClassVar,
-    Type,
     Generic,
     TypeVar,
-    Union,
     Iterable,
-    Optional,
     overload,
-    Type,
     Sequence,
     Iterator,
 )
@@ -105,7 +100,7 @@ class FieldValidator(Generic[_P, _V], metaclass=ABCMeta):
     """Abstract base class for all message field validator descriptors"""
 
     def __init__(self) -> None:
-        self._ctype: Type[ctypes._CDataType]
+        self._ctype: type[ctypes._CDataType]
 
     def __set_name__(self, owner: _P, name: str):
         self._owner = owner
@@ -130,17 +125,17 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P, _C], metaclass=A
 
     @abstractmethod
     def __init__(self, *args) -> None:
-        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_float
+        self._ctype: type[ctypes._SimpleCData] = ctypes.c_float
 
     def __get__(self, obj: _P, objtype=None) -> float:
         return getattr(obj, self._private_name)
 
-    def __set__(self, obj: _P, value: Union[float, int, _C]):
+    def __set__(self, obj: _P, value: float | int | _C):
         if _VALIDATION_ENABLED.get():
             self.validate_one(value)
         setattr(obj, self._private_name, value)
 
-    def validate_one(self, value: Union[float, int, _C]):
+    def validate_one(self, value: float | int | _C):
         """Validate a float value
 
         Args:
@@ -162,7 +157,7 @@ class FloatValidatorBase(FieldValidator[_P, float], Generic[_P, _C], metaclass=A
                 f"The {value} can not be represented as a {type(self).__name__}"
             )
 
-    def validate_many(self, value: Iterable[Union[float, int]]):
+    def validate_many(self, value: Iterable[float | int]):
         """Validate multiple float values
 
         Args:
@@ -194,14 +189,14 @@ class Float(FloatValidatorBase[_P, ctypes.c_float], Generic[_P]):
     """32-bit Float validator class"""
 
     def __init__(self, *args) -> None:
-        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_float
+        self._ctype: type[ctypes._SimpleCData] = ctypes.c_float
 
 
 class Double(FloatValidatorBase[_P, ctypes.c_double], Generic[_P]):
     """Double (64-bit float) validator class"""
 
     def __init__(self, *args) -> None:
-        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_double
+        self._ctype: type[ctypes._SimpleCData] = ctypes.c_double
 
 
 # Base Class for int validator fields
@@ -235,12 +230,12 @@ class IntValidatorBase(FieldValidator[_P, int], Generic[_P, _C], metaclass=ABCMe
     def __get__(self, obj: _P, objtype=None) -> int:
         return getattr(obj, self._private_name)
 
-    def __set__(self, obj: _P, value: Union[int, _C]):
+    def __set__(self, obj: _P, value: int | _C):
         if _VALIDATION_ENABLED.get():
             self.validate_one(value)
         setattr(obj, self._private_name, value)
 
-    def validate_one(self, value: Union[int, _C]):
+    def validate_one(self, value: int | _C):
         """Validate an integer value
 
         Args:
@@ -297,7 +292,7 @@ class Int8(IntValidatorBase[_P, ctypes.c_int8], Generic[_P]):
     _max: ClassVar[int] = 2**7 - 1
 
     def __init__(self, *args) -> None:
-        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int8
+        self._ctype: type[ctypes._SimpleCData] = ctypes.c_int8
 
 
 class Int16(IntValidatorBase[_P, ctypes.c_int16], Generic[_P]):
@@ -309,7 +304,7 @@ class Int16(IntValidatorBase[_P, ctypes.c_int16], Generic[_P]):
     _max: ClassVar[int] = 2**15 - 1
 
     def __init__(self, *args) -> None:
-        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int16
+        self._ctype: type[ctypes._SimpleCData] = ctypes.c_int16
 
 
 class Int32(IntValidatorBase[_P, ctypes.c_int32], Generic[_P]):
@@ -321,7 +316,7 @@ class Int32(IntValidatorBase[_P, ctypes.c_int32], Generic[_P]):
     _max: ClassVar[int] = 2**31 - 1
 
     def __init__(self, *args) -> None:
-        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int32
+        self._ctype: type[ctypes._SimpleCData] = ctypes.c_int32
 
 
 class Int64(IntValidatorBase[_P, ctypes.c_int64], Generic[_P]):
@@ -333,7 +328,7 @@ class Int64(IntValidatorBase[_P, ctypes.c_int64], Generic[_P]):
     _max: ClassVar[int] = 2**63 - 1
 
     def __init__(self, *args) -> None:
-        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_int64
+        self._ctype: type[ctypes._SimpleCData] = ctypes.c_int64
 
 
 class Uint8(IntValidatorBase[_P, ctypes.c_uint8], Generic[_P]):
@@ -345,7 +340,7 @@ class Uint8(IntValidatorBase[_P, ctypes.c_uint8], Generic[_P]):
     _max: ClassVar[int] = 2**8 - 1
 
     def __init__(self, *args) -> None:
-        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint8
+        self._ctype: type[ctypes._SimpleCData] = ctypes.c_uint8
 
 
 class Uint16(IntValidatorBase[_P, ctypes.c_uint16], Generic[_P]):
@@ -357,7 +352,7 @@ class Uint16(IntValidatorBase[_P, ctypes.c_uint16], Generic[_P]):
     _max: ClassVar[int] = 2**16 - 1
 
     def __init__(self, *args) -> None:
-        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint16
+        self._ctype: type[ctypes._SimpleCData] = ctypes.c_uint16
 
 
 class Uint32(IntValidatorBase[_P, ctypes.c_uint32], Generic[_P]):
@@ -369,7 +364,7 @@ class Uint32(IntValidatorBase[_P, ctypes.c_uint32], Generic[_P]):
     _max: ClassVar[int] = 2**32 - 1
 
     def __init__(self, *args) -> None:
-        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint32
+        self._ctype: type[ctypes._SimpleCData] = ctypes.c_uint32
 
 
 class Uint64(IntValidatorBase[_P, ctypes.c_uint64], Generic[_P]):
@@ -381,7 +376,7 @@ class Uint64(IntValidatorBase[_P, ctypes.c_uint64], Generic[_P]):
     _max: ClassVar[int] = 2**64 - 1
 
     def __init__(self, *args) -> None:
-        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_uint64
+        self._ctype: type[ctypes._SimpleCData] = ctypes.c_uint64
 
 
 class Byte(FieldValidator[_P, int], Generic[_P]):
@@ -393,7 +388,7 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
     _max: ClassVar[int] = 2**8 - 1
 
     def __init__(self, *args) -> None:
-        self._ctype: Type[ctypes._SimpleCData] = ctypes.c_ubyte
+        self._ctype: type[ctypes._SimpleCData] = ctypes.c_ubyte
 
     @property
     def size(self) -> int:
@@ -414,7 +409,7 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
     def __get__(self, obj: _P, objtype=None) -> int:
         return getattr(obj, self._private_name)
 
-    def __set__(self, obj: _P, value: Union[int, bytes, bytearray, ctypes.c_ubyte]):
+    def __set__(self, obj: _P, value: int | bytes | bytearray | ctypes.c_ubyte):
         if _VALIDATION_ENABLED.get():
             self.validate_one(value)
             if isinstance(value, (bytes, bytearray)):
@@ -423,11 +418,11 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
                 return
         setattr(obj, self._private_name, value)
 
-    def validate_one(self, value: Union[int, bytes, bytearray, ctypes.c_ubyte]):
+    def validate_one(self, value: int | bytes | bytearray | ctypes.c_ubyte):
         """validate a single byte value
 
         Args:
-            value (Union[int, bytes, bytearray]): Byte value to validate
+            value (int | bytes | bytearray): Byte value to validate
 
         Raises:
             ValueError: Value out of range
@@ -450,11 +445,11 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
         if len(value) != 1:
             raise ValueError(f"Expected {value!r} to be no longer than 1")
 
-    def validate_many(self, value: Union[Iterable[int], bytes, bytearray]):
+    def validate_many(self, value: Iterable[int] | bytes | bytearray):
         """Validate multiple byte values
 
         Args:
-            value (Union[Iterable[int], bytes, bytearray]): Byte values to validate
+            value (Iterable[int] | bytes | bytearray): Byte values to validate
 
         Raises:
             TypeError: Wrong type
@@ -547,13 +542,13 @@ class Char(String[_P], Generic[_P]):
         self._ctype = ctypes.c_char
         self.len = 1
 
-    def __set__(self, obj: _P, value: Union[str, ctypes.c_char]):
+    def __set__(self, obj: _P, value: str | ctypes.c_char):
         if isinstance(value, ctypes.c_char):
             setattr(obj, self._private_name, value)
         else:
             super().__set__(obj, value)
 
-    def validate_one(self, value: Union[str, ctypes.c_char]):
+    def validate_one(self, value: str | ctypes.c_char):
         """Validate a char value
 
         Args:
@@ -583,16 +578,16 @@ class Char(String[_P], Generic[_P]):
 class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
     """Array field validator base class"""
 
-    def __init__(self, validator: Type[_FV], len: int):
+    def __init__(self, validator: type[_FV], len: int):
         """Array field validator base class
 
         Args:
-            validator (Type[_FV]): Field validator class for datatype
+            validator (type[_FV]): Field validator class for datatype
             len (int): Field length
         """
         self._validator: FieldValidator = validator()
         self._len = len
-        self._bound_obj: Optional[MessageBase] = None
+        self._bound_obj: MessageBase | None = None
         self._ctype = self._validator._ctype * len
 
     @classmethod
@@ -612,7 +607,7 @@ class ArrayField(FieldValidator, abc.Sequence, Generic[_FV]):
         """Return an Array bound to a message obj instance."""
         return ArrayField._bound(self, obj)
 
-    def __set__(self, obj: MessageBase, value: Union[ArrayField[_FV], Sequence]):
+    def __set__(self, obj: MessageBase, value: ArrayField[_FV] | Sequence):
         if isinstance(value, ArrayField):
             if _VALIDATION_ENABLED.get():
                 self.validate_array(value)
@@ -721,16 +716,16 @@ _IV = TypeVar("_IV", bound=IntValidatorBase)
 class IntArray(ArrayField[_IV], Generic[_IV]):
     """IntArray validator class"""
 
-    def __init__(self, validator: Type[_IV], len: int):
+    def __init__(self, validator: type[_IV], len: int):
         """IntArray validator class
 
         Args:
-            validator (Type[IV]): Field validator class for Int type
+            validator (type[IV]): Field validator class for Int type
             len (int): Field length
         """
         self._validator = validator()
         self._len = len
-        self._bound_obj: Optional[MessageBase] = None
+        self._bound_obj: MessageBase | None = None
         self._ctype = self._validator._ctype * len
 
     @classmethod
@@ -753,7 +748,7 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
     def __set__(
         self,
         obj: MessageBase,
-        value: Union[ArrayField[_IV], Sequence[int], ctypes.Array],
+        value: ArrayField[_IV] | Sequence[int] | ctypes.Array,
     ):
         if isinstance(value, ArrayField):
             if _VALIDATION_ENABLED.get():
@@ -768,9 +763,9 @@ class IntArray(ArrayField[_IV], Generic[_IV]):
     def __getitem__(self, key: int) -> int: ...
 
     @overload
-    def __getitem__(self, key: slice) -> List[int]: ...
+    def __getitem__(self, key: slice) -> list[int]: ...
 
-    def __getitem__(self, key) -> Union[int, List[int]]:
+    def __getitem__(self, key) -> int | list[int]:
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
@@ -798,7 +793,7 @@ class ByteArray(ArrayField[Byte]):
         assert len >= 1
         self._validator = Byte()
         self._len = len
-        self._bound_obj: Optional[MessageBase] = None
+        self._bound_obj: MessageBase | None = None
         self._ctype = ctypes.c_ubyte * len
 
     @classmethod
@@ -820,7 +815,7 @@ class ByteArray(ArrayField[Byte]):
     def __set__(
         self,
         obj: MessageBase,
-        value: Union[ArrayField[Byte], Sequence[int], bytes, bytearray, ctypes.Array],
+        value: ArrayField[Byte] | Sequence[int] | bytes | bytearray | ctypes.Array,
     ):
         if isinstance(value, ArrayField):
             if _VALIDATION_ENABLED.get():
@@ -876,16 +871,16 @@ class ByteArray(ArrayField[Byte]):
 class FloatArray(ArrayField[_FPV], Generic[_FPV]):
     """Validator class for float arrays"""
 
-    def __init__(self, validator: Type[_FPV], len: int):
+    def __init__(self, validator: type[_FPV], len: int):
         """Validator class for float arrays
 
         Args:
-            validator (Type[_FPV]): Float type validator
+            validator (type[_FPV]): Float type validator
             len (int): Array length
         """
         self._validator = validator()
         self._len = len
-        self._bound_obj: Optional[MessageBase] = None
+        self._bound_obj: MessageBase | None = None
         self._ctype = self._validator._ctype * len
 
     @classmethod
@@ -908,7 +903,7 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
     def __set__(
         self,
         obj: MessageBase,
-        value: Union[ArrayField[_FPV], Sequence[float], ctypes.Array],
+        value: ArrayField[_FPV] | Sequence[float] | ctypes.Array,
     ):
         if isinstance(value, ArrayField):
             if _VALIDATION_ENABLED.get():
@@ -923,9 +918,9 @@ class FloatArray(ArrayField[_FPV], Generic[_FPV]):
     def __getitem__(self, key: int) -> float: ...
 
     @overload
-    def __getitem__(self, key: slice) -> List[float]: ...
+    def __getitem__(self, key: slice) -> list[float]: ...
 
-    def __getitem__(self, key) -> Union[float, List[float]]:
+    def __getitem__(self, key) -> float | list[float]:
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
 
@@ -944,7 +939,7 @@ _S = TypeVar("_S", bound=MessageBase)
 class Struct(FieldValidator, Generic[_S]):
     """Validator class for Structures"""
 
-    def __init__(self, _ctype: Type[_S]):
+    def __init__(self, _ctype: type[_S]):
         self._ctype = _ctype
 
     def __get__(self, obj, objtype=None) -> _S:
@@ -994,16 +989,16 @@ class Struct(FieldValidator, Generic[_S]):
 class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
     """Validator for structure arrays"""
 
-    def __init__(self, msg_struct: Type[_S], len: int):
+    def __init__(self, msg_struct: type[_S], len: int):
         """Validator for structure arrays
 
         Args:
-            msg_struct (Type[_S]): Structure class
+            msg_struct (type[_S]): Structure class
             len (int): Array length
         """
         self._validator = Struct(msg_struct)
         self._len = len
-        self._bound_obj: Optional[MessageBase] = None
+        self._bound_obj: MessageBase | None = None
         self._ctype = self._validator._ctype * len
 
     @classmethod
@@ -1023,7 +1018,7 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
         """Return an StructArray bound to a message obj instance."""
         return StructArray._bound(self, obj)
 
-    def __set__(self, obj, value: Union[StructArray, Sequence[_S], ctypes.Array[_S]]):
+    def __set__(self, obj, value: StructArray | Sequence[_S] | ctypes.Array[_S]):
         if isinstance(value, StructArray):
             if _VALIDATION_ENABLED.get():
                 self.validate_array(value)
@@ -1037,9 +1032,9 @@ class StructArray(FieldValidator, abc.Sequence, Generic[_S]):
     def __getitem__(self, key: int) -> _S: ...
 
     @overload
-    def __getitem__(self, key: slice) -> List[_S]: ...
+    def __getitem__(self, key: slice) -> list[_S]: ...
 
-    def __getitem__(self, key) -> Union[_S, List[_S]]:
+    def __getitem__(self, key) -> _S | list[_S]:
         if self._bound_obj is None:
             raise AttributeError("Array descriptor is not bound to an instance object.")
         return getattr(self._bound_obj, self._private_name)[key]

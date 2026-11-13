@@ -39,7 +39,7 @@ from websocket_server import (  # type: ignore
     OPCODE_TEXT,
 )
 
-from typing import Optional, List, Callable, Any, Dict, Sequence, cast
+from typing import Callable, Any, Sequence, cast
 
 
 class RTMAWebSocketHandler(WebSocketHandler):
@@ -293,11 +293,11 @@ class RTMAWebSocketHandler(WebSocketHandler):
             logger.error(e, stack_info=False)
             return
 
-    def read_ws_message(self) -> Optional[str]:
+    def read_ws_message(self) -> str | None:
         """Read websocket message
 
         Returns:
-            Optional[str]: Websocket message string
+            str | None: Websocket message string
         """
         try:
             b1, b2 = self.read_bytes(2)
@@ -393,7 +393,7 @@ class WebMessageManager(WebsocketServer):
         loglevel: int = logging.WARNING,
         key=None,
         cert=None,
-        definitions: Optional[MessageDefinitions] = None,
+        definitions: MessageDefinitions | None = None,
     ):
         """WebMessageManager class
 
@@ -404,7 +404,7 @@ class WebMessageManager(WebsocketServer):
             loglevel (int, optional): Loging level. Defaults to logging.WARNING.
             key (optional): Path to SSL key. Defaults to None.
             cert (optional): Path to SSL cert. Defaults to None.
-            definitions (Optional[MessageDefinitions], optional): MessageDefinitions object. Defaults to None.
+            definitions (MessageDefinitions | None, optional): MessageDefinitions object. Defaults to None.
         """
         self.definitions = definitions
 
@@ -427,7 +427,7 @@ class WebMessageManager(WebsocketServer):
         self.key = key
         self.cert = cert
 
-        self.clients: List[dict] = []
+        self.clients: list[dict] = []
         self.id_counter = 0
         self.thread = None
 
@@ -439,13 +439,13 @@ class WebMessageManager(WebsocketServer):
         self.mm_ip = mm_ip
 
 
-def ws_client_connect(client: Dict[str, Any], server: WebMessageManager):
+def ws_client_connect(client: dict[str, Any], server: WebMessageManager):
     """Websocket client connect
 
     Called for every client connecting (after handshake)
 
     Args:
-        client (Dict[str, Any]): Client dictionary
+        client (dict[str, Any]): Client dictionary
         server: WebMessageManager Server object
     """
     try:
@@ -454,13 +454,13 @@ def ws_client_connect(client: Dict[str, Any], server: WebMessageManager):
         pass
 
 
-def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
+def ws_client_disconnect(client: dict[str, Any], server: WebMessageManager):
     """Websocket client disconnect
 
     Called for every client disconnecting
 
     Args:
-        client (Dict[str, Any]): Client dictionary
+        client (dict[str, Any]): Client dictionary
         server: WebMessageManager Server object
     """
     try:
@@ -469,7 +469,7 @@ def ws_client_disconnect(client: Dict[str, Any], server: WebMessageManager):
         pass
 
 
-def configure_logging(root: Optional[logging.Logger] = None) -> None:
+def configure_logging(root: logging.Logger | None = None) -> None:
     """Send log records to the console through rich.
 
     Called by :func:`main` rather than at import, so importing this module
@@ -488,7 +488,7 @@ def configure_logging(root: Optional[logging.Logger] = None) -> None:
     root.addHandler(RichHandler())
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse the command line.
 
     Args:
@@ -566,7 +566,7 @@ def run(args: argparse.Namespace) -> None:
     websocket_server.run_forever()
 
 
-def main(argv: Optional[Sequence[str]] = None) -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     """Main function for starting web_manager
 
     Args:

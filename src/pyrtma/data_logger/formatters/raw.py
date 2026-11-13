@@ -65,7 +65,7 @@ import sys
 import time
 import zlib
 from datetime import datetime, timezone
-from typing import IO, Any, Callable, ClassVar, Optional
+from typing import IO, Any, Callable, ClassVar
 
 import pyrtma
 from pyrtma.header import get_header_cls
@@ -90,7 +90,7 @@ TRAILER_SIZE: int = TRAILER_PREFIX.size + CRC.size
 
 
 def file_metadata(
-    context: Optional[FileContext],
+    context: FileContext | None,
     *,
     wall_clock: Callable[[], float] = time.time,
     perf_clock: Callable[[], float] = time.perf_counter,
@@ -187,7 +187,7 @@ class RawFormatter(DataFormatter):
         self,
         fd: IO[bytes],
         *,
-        context: Optional[FileContext] = None,
+        context: FileContext | None = None,
         **metadata_sources: Any,
     ) -> None:
         """Start a raw file.

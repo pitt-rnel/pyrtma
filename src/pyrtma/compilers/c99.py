@@ -1,7 +1,6 @@
 import pathlib
 
 from textwrap import dedent
-from typing import List, Union
 from pyrtma.parser import (
     Parser,
     ConstantExpr,
@@ -74,7 +73,7 @@ class CDefCompiler:
     def generate_module_id(self, mid: MID) -> str:
         return f"#define MID_{mid.name:<48}{mid.value}\n"
 
-    def generate_hash_id(self, mdf: Union[MDF, SDF]) -> str:
+    def generate_hash_id(self, mdf: MDF | SDF) -> str:
         return f"#define HASH_{mdf.name:<48} 0x{mdf.hash[:8]}\n"
 
     def generate_type_alias(self, td: TypeAlias) -> str:
@@ -92,7 +91,7 @@ class CDefCompiler:
 
         raise RuntimeError(f"No type found for alias: {td.name}")
 
-    def struct_aliases(self, struct: SDF) -> List[TypeAlias]:
+    def struct_aliases(self, struct: SDF) -> list[TypeAlias]:
         """The aliases of a struct, which are defined right after it.
 
         Args:
@@ -107,7 +106,7 @@ class CDefCompiler:
             if a.type_obj is struct and a.src.name not in Parser.core_imports
         ]
 
-    def generate_struct(self, struct: Union[SDF, MDF]) -> str:
+    def generate_struct(self, struct: SDF | MDF) -> str:
         if isinstance(struct, MDF):
             prefix = "MDF_"
         elif isinstance(struct, SDF):
@@ -164,7 +163,7 @@ class CDefCompiler:
         s = ""
 
         s += "typedef struct {\n"
-        obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
+        obj: ConstantExpr | ConstantString | HID | MID | TypeAlias | SDF | MT | MDF
         for obj in self.parser.constants.values():
             if obj.src.name in Parser.core_imports:
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
@@ -242,7 +241,7 @@ class CDefCompiler:
     def generate_rtma_info_getter(self) -> str:
         s = "const RTMAInfo get_rtma_info() {\n"
         s += "    static RTMAInfo RTMA;\n"
-        obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
+        obj: ConstantExpr | ConstantString | HID | MID | TypeAlias | SDF | MT | MDF
         for obj in self.parser.constants.values():
             if obj.src.name in Parser.core_imports:
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
@@ -312,7 +311,7 @@ class CDefCompiler:
 
             # Constants
             f.write("// Constants\n")
-            obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
+            obj: ConstantExpr | ConstantString | HID | MID | TypeAlias | SDF | MT | MDF
             for obj in self.parser.constants.values():
                 # exclude core_defs.yaml, C clients will import rtma.h
                 if obj.src.name not in Parser.core_imports:

@@ -2,7 +2,7 @@
 
 import ctypes
 import struct
-from typing import ClassVar, Tuple, Type
+from typing import ClassVar
 
 from .message_base import MessageBase, MessageMeta
 from .validators import Int16, Double, Int32, Uint32
@@ -118,7 +118,7 @@ class MessageHeader(MessageBase, metaclass=MessageMeta):
         _RECV_TIME.pack_into(self, _RECV_TIME_OFFSET, value)
 
 
-def _field_code(cls: Type[ctypes.Structure], name: str, ctype: type) -> str:
+def _field_code(cls: type[ctypes.Structure], name: str, ctype: type) -> str:
     """Find the ``struct`` format code of a structure field.
 
     Args:
@@ -149,7 +149,7 @@ def _field_code(cls: Type[ctypes.Structure], name: str, ctype: type) -> str:
     return code
 
 
-def _layout_struct(cls: Type[ctypes.Structure]) -> struct.Struct:
+def _layout_struct(cls: type[ctypes.Structure]) -> struct.Struct:
     """Build a ``struct.Struct`` with the same layout as a ctypes structure.
 
     Each field gets its type's format code in native byte order and standard
@@ -183,7 +183,7 @@ def _layout_struct(cls: Type[ctypes.Structure]) -> struct.Struct:
     return struct.Struct(fmt)
 
 
-def _field_struct(cls: Type[ctypes.Structure], name: str) -> Tuple[struct.Struct, int]:
+def _field_struct(cls: type[ctypes.Structure], name: str) -> tuple[struct.Struct, int]:
     """Build a ``struct.Struct`` for one field of a ctypes structure.
 
     Args:
@@ -204,7 +204,7 @@ MessageHeader._LAYOUT = _layout_struct(MessageHeader)
 _RECV_TIME, _RECV_TIME_OFFSET = _field_struct(MessageHeader, "_recv_time")
 
 
-def get_header_cls() -> Type[MessageHeader]:
+def get_header_cls() -> type[MessageHeader]:
     """Get the message header class.
 
     There is one header class; this function is kept for existing callers.

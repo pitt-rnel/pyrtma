@@ -29,7 +29,7 @@ import struct
 import sys
 import zlib
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Iterator, Optional
+from typing import Any, Iterable, Iterator
 
 from pyrtma.data_logger.formatters.raw import (
     CRC,
@@ -137,7 +137,7 @@ class SourceGaps:
 
 
 def source_gaps(
-    records: Iterable[RawRecord], gaps: Optional[SourceGaps] = None
+    records: Iterable[RawRecord], gaps: SourceGaps | None = None
 ) -> SourceGaps:
     """Check ``msg_count`` continuity per source.
 
@@ -189,7 +189,7 @@ class RawFile:
         )
         self._header_cls = get_header_cls()
         self.damage: list[tuple[int, int]] = []
-        self.trailer_records: Optional[int] = None
+        self.trailer_records: int | None = None
         self.records_read = 0
         try:
             self._read_file_header()
@@ -240,7 +240,7 @@ class RawFile:
 
     # ------------------------------------------------------------------
 
-    def _record_at(self, p: int) -> Optional[RawRecord]:
+    def _record_at(self, p: int) -> RawRecord | None:
         """The verified record at ``p``, or None."""
         buf, hs = self._buf, self.header_size
         start = p + RECORD_PREFIX.size
@@ -259,7 +259,7 @@ class RawFile:
             return None
         return RawRecord(p, flags, header, bytes(buf[start + hs : end]))
 
-    def _trailer_at(self, p: int) -> Optional[int]:
+    def _trailer_at(self, p: int) -> int | None:
         """The trailer's record count if a valid trailer ends the file at ``p``."""
         buf = self._buf
         if (
@@ -272,7 +272,7 @@ class RawFile:
             return None
         return TRAILER_PREFIX.unpack_from(buf, p)[1]
 
-    def _resync(self, start: int) -> Optional[int]:
+    def _resync(self, start: int) -> int | None:
         """Offset of the next good record or trailer at or after ``start``."""
         buf = self._buf
         trailer_at = len(buf) - TRAILER_SIZE
@@ -357,7 +357,7 @@ class RawFile:
         return out
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Check and summarize raw files, printing one report per file.
 
     Args:
@@ -380,7 +380,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         import pyrtma
 
         definitions = pyrtma.load_message_definitions(args.defs)
-    gaps: Optional[SourceGaps] = None
+    gaps: SourceGaps | None = None
     status = 0
     for path in args.files:
         try:

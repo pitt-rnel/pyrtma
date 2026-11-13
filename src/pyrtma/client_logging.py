@@ -10,7 +10,6 @@ from .message import MessageData
 from abc import ABC, abstractmethod
 from .exceptions import ClientError, LoggingConfigurationError
 
-from typing import Union, Type, Dict, Optional, List
 from contextlib import contextmanager
 import traceback
 from rich.logging import RichHandler
@@ -113,20 +112,20 @@ def _field_size(msg: object, field: str) -> int:
     return getattr(type(msg), f"_{field}").size
 
 
-RTMA_LOG_MSG = Union[
-    cd.MDF_RTMA_LOG,
-    cd.MDF_RTMA_LOG_DEBUG,
-    cd.MDF_RTMA_LOG_INFO,
-    cd.MDF_RTMA_LOG_WARNING,
-    cd.MDF_RTMA_LOG_ERROR,
-    cd.MDF_RTMA_LOG_CRITICAL,
-]
+RTMA_LOG_MSG = (
+    cd.MDF_RTMA_LOG
+    | cd.MDF_RTMA_LOG_DEBUG
+    | cd.MDF_RTMA_LOG_INFO
+    | cd.MDF_RTMA_LOG_WARNING
+    | cd.MDF_RTMA_LOG_ERROR
+    | cd.MDF_RTMA_LOG_CRITICAL
+)
 
 
 class RTMALogHandler(logging.Handler):
     """Logging handler class that writes logs as rtma messages"""
 
-    log_map: Dict[int, Type[RTMA_LOG_MSG]] = {
+    log_map: dict[int, type[RTMA_LOG_MSG]] = {
         10: cd.MDF_RTMA_LOG_DEBUG,
         20: cd.MDF_RTMA_LOG_INFO,
         30: cd.MDF_RTMA_LOG_WARNING,
@@ -141,7 +140,7 @@ class RTMALogHandler(logging.Handler):
     def close(self):
         logging.Handler.close(self)
 
-    def get_log_msg_cls(self, level) -> Type[RTMA_LOG_MSG]:
+    def get_log_msg_cls(self, level) -> type[RTMA_LOG_MSG]:
         return RTMALogHandler.log_map.get(level) or cd.MDF_RTMA_LOG
 
     def gen_log_msg(self, record: logging.LogRecord) -> RTMA_LOG_MSG:
@@ -233,26 +232,26 @@ class RTMALogger(object):
         # default formatter
         self._default_fmt = "{levelname:<8} - {asctime} - {log_name:<16} - {message} - {funcName}:{lineno}"
         self._rich_fmt = "[bold yellow]{log_name:<16}[/]   {message}"
-        self._default_formatter: Optional[logging.Formatter] = logging.Formatter(
+        self._default_formatter: logging.Formatter | None = logging.Formatter(
             self._default_fmt, style="{"
         )
-        self._console_formatter: Optional[logging.Formatter] = RichLogFormatter(
+        self._console_formatter: logging.Formatter | None = RichLogFormatter(
             self._rich_fmt, style="{"
         )
-        self._file_formatter: Optional[logging.Formatter] = self._default_formatter
+        self._file_formatter: logging.Formatter | None = self._default_formatter
 
         # initialize private attributes
         self._log_name = log_name
-        self.children: List[logging.Logger] = []
+        self.children: list[logging.Logger] = []
         self._logger = logging.getLogger(f"{LOGGER_NAME_PREFIX}.{next(_logger_ids)}")
         self._logger.propagate = True
         self.set_all_levels(level)
         self._filter = RtmaLogFilter(self._log_name)
         self._logger.addFilter(self._filter)
         self._rtma_client_ref = weakref.ref(rtma_client)
-        self._rtma_handler: Optional[RTMALogHandler] = self.init_rtma_handler()
-        self._file_handler: Optional[logging.FileHandler] = None
-        self._console_handler: Optional[logging.Handler] = self.init_console_handler()
+        self._rtma_handler: RTMALogHandler | None = self.init_rtma_handler()
+        self._file_handler: logging.FileHandler | None = None
+        self._console_handler: logging.Handler | None = self.init_console_handler()
 
         # default values for which handlers will be enabled
         if self._rtma_handler:
@@ -264,7 +263,7 @@ class RTMALogger(object):
         self._enable_console = self._console_formatter is not None
 
         self._enable_file = False
-        self._log_filename: Union[str, pathlib.Path] = ""
+        self._log_filename: str | pathlib.Path = ""
 
         # alias logger methods
         self.debug = self.logger.debug
@@ -317,7 +316,7 @@ class RTMALogger(object):
                     filter.log_name = filter.log_name.replace(old_name, log_name, 1)
 
     @property
-    def console_handler(self) -> Optional[logging.Handler]:  # read only
+    def console_handler(self) -> logging.Handler | None:  # read only
         if self._enable_console:
             for handler in self._logger.handlers:
                 if handler is self._console_handler:
@@ -325,7 +324,7 @@ class RTMALogger(object):
         return None
 
     @property
-    def rtma_handler(self) -> Optional[RTMALogHandler]:  # read only
+    def rtma_handler(self) -> RTMALogHandler | None:  # read only
         if self._enable_rtma:
             for handler in self._logger.handlers:
                 if handler is self._rtma_handler:
@@ -333,7 +332,7 @@ class RTMALogger(object):
         return None
 
     @property
-    def file_handler(self) -> Optional[logging.FileHandler]:  # read only
+    def file_handler(self) -> logging.FileHandler | None:  # read only
         if self._enable_file and self._file_handler is not None:
             for handler in self._logger.handlers:
                 if handler is self._file_handler:
@@ -442,14 +441,14 @@ class RTMALogger(object):
                 child.setLevel(value)
 
     @property
-    def log_filename(self) -> Union[str, pathlib.Path]:
+    def log_filename(self) -> str | pathlib.Path:
         if self.file_handler:
             return self.file_handler.baseFilename
         else:
             return self._log_filename
 
     @log_filename.setter
-    def log_filename(self, value: Union[str, pathlib.Path]):
+    def log_filename(self, value: str | pathlib.Path):
         if self.file_handler:
             raise LoggingConfigurationError(
                 "Filename cannot be changed after file handler is initialized"
@@ -499,25 +498,25 @@ class RTMALogger(object):
             self.level = value
 
     @property
-    def console_formatter(self) -> Optional[logging.Formatter]:
+    def console_formatter(self) -> logging.Formatter | None:
         if self.console_handler:
             self._console_formatter = self.console_handler.formatter
         return self._console_formatter
 
     @console_formatter.setter
-    def console_formatter(self, value: Optional[logging.Formatter]):
+    def console_formatter(self, value: logging.Formatter | None):
         if self.console_handler:
             self.console_handler.setFormatter(value)
         self._console_formatter = value
 
     @property
-    def file_formatter(self) -> Optional[logging.Formatter]:
+    def file_formatter(self) -> logging.Formatter | None:
         if self.file_handler:
             self._file_formatter = self.file_handler.formatter
         return self._file_formatter
 
     @file_formatter.setter
-    def file_formatter(self, value: Optional[logging.Formatter]):
+    def file_formatter(self, value: logging.Formatter | None):
         if self._file_handler:
             self._file_handler.setFormatter(value)
         self._file_formatter = value

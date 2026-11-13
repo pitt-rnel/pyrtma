@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from typing import TYPE_CHECKING, Type, Dict, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
@@ -27,7 +27,7 @@ __all__ = [
 _MD = TypeVar("_MD", bound=MessageData)
 
 
-def message_def(msg_cls: Type[_MD], *args, **kwargs) -> Type[_MD]:
+def message_def(msg_cls: type[_MD], *args, **kwargs) -> type[_MD]:
     """Compatibility decorator for compiled or user-defined message classes."""
 
     return msg_cls
@@ -75,11 +75,11 @@ class Message:
     def __str__(self) -> str:
         return self.pretty_print()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert message to dictionary
 
         Returns:
-            Dict[str, Any]: Message dictionary
+            dict[str, Any]: Message dictionary
         """
         return dict(header=self.header.to_dict(), data=self.data.to_dict())
 

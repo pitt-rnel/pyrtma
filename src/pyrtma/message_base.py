@@ -1,7 +1,7 @@
 import ctypes
 import json
 
-from typing import TypeVar, Any, Type, Dict, List
+from typing import TypeVar, Any
 from .utils.print import print_ctype_array, hexdump
 from .utils.random_fields import _random_struct
 from .exceptions import JSONDecodingError
@@ -110,11 +110,11 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         """
         hexdump(bytes(self), length, sep)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert message to dictionary
 
         Returns:
-            Dict[str, Any]: Message dictionary
+            dict[str, Any]: Message dictionary
         """
         return _to_dict(self)
 
@@ -157,11 +157,11 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         return ctypes.string_at(ctypes.addressof(self) + meta.offset, meta.size)
 
     @classmethod
-    def from_dict(cls: Type[MB], data: Dict[str, Any]) -> MB:
+    def from_dict(cls: type[MB], data: dict[str, Any]) -> MB:
         """Generate message instance from dictionary
 
         Args:
-            data (Dict[str, Any]): Message dictionary
+            data (dict[str, Any]): Message dictionary
         Raises:
             JSONDecodingError: Unable to decode dictionary
         """
@@ -175,7 +175,7 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
             ) from e
 
     @classmethod
-    def from_json(cls: Type[MB], s: str) -> MB:
+    def from_json(cls: type[MB], s: str) -> MB:
         """Generate message instance from JSON string
 
         Args:
@@ -185,13 +185,13 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         return obj
 
     @classmethod
-    def from_random(cls: Type[MB]) -> MB:
+    def from_random(cls: type[MB]) -> MB:
         """Generate message instance with random values"""
         obj = _random_struct(cls())
         return obj
 
     @classmethod
-    def copy(cls: Type[MB], m: MB) -> MB:
+    def copy(cls: type[MB], m: MB) -> MB:
         """Generate a copy of a message structure
 
         Args:
@@ -237,12 +237,12 @@ class RTMAJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def _from_dict(obj: MessageBase, data: Dict[str, Any]):
+def _from_dict(obj: MessageBase, data: dict[str, Any]):
     """Helper function to set message fields from dictionary values
 
     Args:
         obj (MessageBase): Message object
-        data (Dict[str, Any]): Message data dictionary
+        data (dict[str, Any]): Message data dictionary
     """
     for _name, ftype, *_ in obj._fields_:
         name = _name[1:] if _name[0] == "_" else _name
@@ -268,7 +268,7 @@ def _from_dict(obj: MessageBase, data: Dict[str, Any]):
             setattr(obj, name, data[name])
 
 
-def _expand_carray(array: ctypes.Array) -> List:
+def _expand_carray(array: ctypes.Array) -> list:
     expanded = array[:]
     for i, a in enumerate(expanded):
         if isinstance(a, ctypes.Array):
@@ -276,16 +276,16 @@ def _expand_carray(array: ctypes.Array) -> List:
     return expanded
 
 
-def _to_dict(obj: MessageBase) -> Dict[str, Any]:
+def _to_dict(obj: MessageBase) -> dict[str, Any]:
     """Helper function to create dictionary from message fields
 
     Args:
         obj (MessageBase): Message object
 
     Returns:
-        Dict[str, Any]: Dictionary
+        dict[str, Any]: Dictionary
     """
-    data: Dict[str, Any] = {}
+    data: dict[str, Any] = {}
     for _name, ftype, *_ in obj._fields_:
         name = _name[1:] if _name[0] == "_" else _name
         if issubclass(ftype, MessageBase):

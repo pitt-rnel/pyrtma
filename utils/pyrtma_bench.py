@@ -43,7 +43,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Sequence
 
 import pyrtma
 from pyrtma.data_logger.dataset import Dataset
@@ -139,14 +139,14 @@ class RunSummary:
     """
 
     publisher_rate: float
-    subscriber_rate: Optional[float]
-    slowest_subscriber_rate: Optional[float]
-    received: Optional[float]
-    logged: Optional[float] = None
+    subscriber_rate: float | None
+    slowest_subscriber_rate: float | None
+    received: float | None
+    logged: float | None = None
 
 
 def summarize_run(
-    results: Sequence[RoleResult], logged: Optional[float] = None
+    results: Sequence[RoleResult], logged: float | None = None
 ) -> RunSummary:
     """Combine one run's results.
 
@@ -406,7 +406,7 @@ def _raise_reported_error(results: Any) -> None:
 def wait_for_manager(
     server: str,
     timeout: float,
-    process: Optional[subprocess.Popen[bytes]] = None,
+    process: subprocess.Popen[bytes] | None = None,
 ) -> None:
     """Wait until a manager accepts a client.
 
@@ -638,11 +638,11 @@ def _count(n: int, noun: str) -> str:
     return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
 
 
-def _percent(value: Optional[float]) -> str:
+def _percent(value: float | None) -> str:
     return "-" if value is None else f"{value:.1%}"
 
 
-def _rate(value: Optional[float]) -> str:
+def _rate(value: float | None) -> str:
     return "-" if value is None else f"{value:,.0f}"
 
 
@@ -693,7 +693,7 @@ def report(settings: Settings, summaries: Sequence[RunSummary]) -> str:
     return "\n".join(lines)
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse the command line.
 
     Args:
@@ -766,7 +766,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return args
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Run the benchmark and print its report.
 
     Args:
@@ -776,7 +776,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         The exit status: 0, or 1 if a run failed.
     """
     args = parse_args(argv)
-    manager: Optional[subprocess.Popen[bytes]] = None
+    manager: subprocess.Popen[bytes] | None = None
     try:
         server = args.server
         if args.start_manager:
@@ -797,7 +797,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         summaries = []
         with contextlib.ExitStack() as stack:
-            recording: Optional[DataLoggerRecording] = None
+            recording: DataLoggerRecording | None = None
             if args.logger:
                 recording = stack.enter_context(
                     DataLoggerRecording(server, args.msg_size)

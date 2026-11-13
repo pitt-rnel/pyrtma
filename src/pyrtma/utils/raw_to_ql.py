@@ -26,7 +26,7 @@ import os
 import pathlib
 import sys
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from pyrtma.data_logger.formatters.quicklogger import QLFormatter
 from pyrtma.exceptions import (
@@ -74,7 +74,7 @@ class Conversion:
 
 
 def default_destination(
-    source: pathlib.Path, output_dir: Optional[pathlib.Path] = None
+    source: pathlib.Path, output_dir: pathlib.Path | None = None
 ) -> pathlib.Path:
     """The QuickLogger file a raw file converts to.
 
@@ -184,7 +184,7 @@ def describe(result: Conversion) -> str:
     return "\n".join(lines)
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Convert raw files, printing what each conversion did.
 
     Args:

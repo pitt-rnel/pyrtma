@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass
 from types import MappingProxyType, ModuleType
-from typing import Any, Dict, Iterable, Mapping, Optional, Type
+from typing import Any, Iterable, Mapping
 
 from .exceptions import UnknownMessageType, MessageDefinitionsLoadError
 from .message_base import MessageBase
@@ -14,31 +14,31 @@ from .message_data import MessageData
 class MessageDefinitions:
     """Immutable container for compiled message definitions and related context maps."""
 
-    compiled_version: Optional[str]
-    msg_defs: Mapping[int, Type[MessageData]]
+    compiled_version: str | None
+    msg_defs: Mapping[int, type[MessageData]]
     constants: Mapping[str, int | float | str]
     typedefs: Mapping[str, Any]
     MID: Mapping[str, int]
     MON: Mapping[int, str]
-    SDF: Mapping[str, Type[MessageBase]]
+    SDF: Mapping[str, type[MessageBase]]
     MT: Mapping[str, int]
     MTN: Mapping[int, str]
-    MDF: Mapping[str, Type[MessageData]]
+    MDF: Mapping[str, type[MessageData]]
 
     @classmethod
     def create(
         cls,
         *,
-        compiled_version: Optional[str],
-        msg_defs: Mapping[int, Type[MessageData]],
+        compiled_version: str | None,
+        msg_defs: Mapping[int, type[MessageData]],
         constants: Mapping[str, int | float | str],
         typedefs: Mapping[str, Any],
         MID: Mapping[str, int],
         MON: Mapping[int, str],
-        SDF: Mapping[str, Type[MessageBase]],
+        SDF: Mapping[str, type[MessageBase]],
         MT: Mapping[str, int],
         MTN: Mapping[int, str],
-        MDF: Mapping[str, Type[MessageData]],
+        MDF: Mapping[str, type[MessageData]],
     ) -> MessageDefinitions:
         """Build definitions, with read-only copies of the mappings given.
 
@@ -61,7 +61,7 @@ class MessageDefinitions:
             MDF=MappingProxyType(dict(MDF)),
         )
 
-    def get_msg_cls(self, msg_type: int) -> Type[MessageData]:
+    def get_msg_cls(self, msg_type: int) -> type[MessageData]:
         try:
             return self.msg_defs[msg_type]
         except KeyError as e:
@@ -69,23 +69,23 @@ class MessageDefinitions:
                 f"There is no message definition associated with id: {msg_type}"
             ) from e
 
-    def get_message_cls(self, msg_type: int) -> Type[MessageData]:
+    def get_message_cls(self, msg_type: int) -> type[MessageData]:
         return self.get_msg_cls(msg_type)
 
-    def message_name_from_id(self, message_id: int) -> Optional[str]:
+    def message_name_from_id(self, message_id: int) -> str | None:
         return self.MTN.get(message_id)
 
-    def message_id_from_name(self, message_name: str) -> Optional[int]:
+    def message_id_from_name(self, message_name: str) -> int | None:
         return self.MT.get(message_name)
 
-    def module_name_from_id(self, module_id: int) -> Optional[str]:
+    def module_name_from_id(self, module_id: int) -> str | None:
         return self.MON.get(module_id)
 
-    def module_id_from_name(self, module_name: str) -> Optional[int]:
+    def module_id_from_name(self, module_name: str) -> int | None:
         return self.MID.get(module_name)
 
 
-def _check_message_classes(classes: Iterable[Type[MessageData]]) -> None:
+def _check_message_classes(classes: Iterable[type[MessageData]]) -> None:
     """Refuse message classes that lack what compiled definitions always have.
 
     Every class the compiler writes has a ``type_hash`` and a ``type_size``.
@@ -121,14 +121,14 @@ def build_message_definitions(module_name: str) -> MessageDefinitions:
 
     mod = sys.modules[module_name]
 
-    constants: Dict[str, int | float | str] = {}
-    typedefs: Dict[str, Any] = {}
-    mid: Dict[str, int] = {}
-    mon: Dict[int, str] = {}
-    sdf: Dict[str, Type[MessageBase]] = {}
-    mt: Dict[str, int] = {}
-    mtn: Dict[int, str] = {}
-    mdf: Dict[str, Type[MessageData]] = {}
+    constants: dict[str, int | float | str] = {}
+    typedefs: dict[str, Any] = {}
+    mid: dict[str, int] = {}
+    mon: dict[int, str] = {}
+    sdf: dict[str, type[MessageBase]] = {}
+    mt: dict[str, int] = {}
+    mtn: dict[int, str] = {}
+    mdf: dict[str, type[MessageData]] = {}
 
     for k, v in mod.__dict__.items():
         if k.startswith("_"):
@@ -154,7 +154,7 @@ def build_message_definitions(module_name: str) -> MessageDefinitions:
             elif hasattr(v, "__name__") and v.__name__ != k:
                 typedefs[k] = v
 
-    msg_defs: Dict[int, Type[MessageData]] = {}
+    msg_defs: dict[int, type[MessageData]] = {}
     for msg_cls in mdf.values():
         msg_defs[msg_cls.type_id] = msg_cls
 

@@ -22,7 +22,7 @@ from .message_data import MessageData
 from .core_defs import ALL_MESSAGE_TYPES
 from . import core_defs as cd
 
-from typing import Any, Deque, Dict, List, Tuple, Set, Type, Union, Optional
+from typing import Any
 from typing import Sequence
 from dataclasses import dataclass, field
 from collections import defaultdict, deque
@@ -45,8 +45,8 @@ _NUM_DATA_BYTES, _NUM_DATA_BYTES_OFFSET = _field_struct(
 # numbered FD_SETSIZE (1024) or higher; on Windows it takes at most 512
 # sockets per list. Past either limit it raises ValueError, which would stop
 # the manager, so connections beyond them are refused instead.
-_SELECT_MAX_SOCKETS: Optional[int]
-_SELECT_MAX_FD: Optional[int]
+_SELECT_MAX_SOCKETS: int | None
+_SELECT_MAX_FD: int | None
 if sys.platform == "win32":
     _SELECT_MAX_SOCKETS = 512
     _SELECT_MAX_FD = None
@@ -63,12 +63,12 @@ class Module:
     """
 
     conn: socket.socket
-    address: Tuple[str, int]
-    header_cls: Type[MessageHeader]
+    address: tuple[str, int]
+    header_cls: type[MessageHeader]
     name: str = ""
     mod_id: int = 0
     pid: int = 0
-    subs: Set[int] = field(default_factory=set)
+    subs: set[int] = field(default_factory=set)
     connected: bool = False
     is_logger: bool = False
     is_daemon: bool = False
@@ -89,7 +89,7 @@ class Module:
 
     # Send state: bytes the kernel hasn't accepted yet, oldest first. The
     # first entry may be the rest of a message that was partly sent.
-    _outbox: Deque[memoryview] = field(
+    _outbox: deque[memoryview] = field(
         default_factory=deque, init=False, repr=False, compare=False
     )
     # Whether an ACK to it was dropped and none has got through since, so the
@@ -124,7 +124,7 @@ class Module:
         return bool(self._outbox)
 
     def send_message(
-        self, header: MessageHeader, payload: Union[bytes, memoryview, MessageData]
+        self, header: MessageHeader, payload: bytes | memoryview | MessageData
     ):
         """Send a message, queueing what the connection can't take yet.
 
@@ -137,7 +137,7 @@ class Module:
 
         Args:
             header (MessageHeader): Message header
-            payload (Union[bytes, memoryview, MessageData]): Message data
+            payload (bytes | memoryview | MessageData): Message data
 
         Raises:
             OSError: The connection failed.
@@ -308,8 +308,8 @@ class MessageManager(ClientLike):
         *,
         log_level=logging.INFO,
         debug=False,
-        stall_timeout: Optional[float] = DEFAULT_STALL_TIMEOUT,
-        logger_timeout: Optional[float] = None,
+        stall_timeout: float | None = DEFAULT_STALL_TIMEOUT,
+        logger_timeout: float | None = None,
     ):
         """MessageManager class
 
@@ -372,8 +372,8 @@ class MessageManager(ClientLike):
         self._max_modules: int = cd.MAX_MODULES
 
         # Connections beyond these are refused; see _SELECT_MAX_SOCKETS.
-        self._max_sockets: Optional[int] = _SELECT_MAX_SOCKETS
-        self._max_fd: Optional[int] = _SELECT_MAX_FD
+        self._max_sockets: int | None = _SELECT_MAX_SOCKETS
+        self._max_fd: int | None = _SELECT_MAX_FD
 
         # Create the tcp listening socket
         self.listen_socket = socket.socket(
@@ -400,15 +400,15 @@ class MessageManager(ClientLike):
             # The manager won't exist, so nothing else would close it.
             self.listen_socket.close()
             raise
-        self.modules: Dict[socket.socket, Module] = {}
-        self.logger_modules: Set[Module] = set()
+        self.modules: dict[socket.socket, Module] = {}
+        self.logger_modules: set[Module] = set()
 
-        self.subscriptions: Dict[int, Set[Module]] = defaultdict(set)
+        self.subscriptions: dict[int, set[Module]] = defaultdict(set)
         self.sockets = [self.listen_socket]
         self.start_time = time.time()
 
         # Unused since sends became non-blocking; kept for compatibility.
-        self.wlist: List[socket.socket] = []
+        self.wlist: list[socket.socket] = []
 
         # Add message manager to its module list
         self.mm_module = Module(
@@ -435,7 +435,7 @@ class MessageManager(ClientLike):
         # closed socket. See remove_module() and _routing().
         self._forward_depth = 0
         self._router = _Routing(self)
-        self._closing: List[Module] = []
+        self._closing: list[Module] = []
         self._finishing_removals = False
 
         self.logger.info("Message Manager Initialized.")
@@ -660,7 +660,7 @@ class MessageManager(ClientLike):
         return self._router
 
     def _drop_after_send_error(
-        self, module: Module, header: Optional[MessageHeader], err: OSError
+        self, module: Module, header: MessageHeader | None, err: OSError
     ) -> None:
         """Remove a module whose send failed, and report the failure.
 
@@ -678,7 +678,7 @@ class MessageManager(ClientLike):
             # failed message is itself a FAILED_MESSAGE or a log message.
             self.send_failed_message(module, header, time.perf_counter())
 
-    def _wait_writable(self, module: Module, timeout: Optional[float]) -> bool:
+    def _wait_writable(self, module: Module, timeout: float | None) -> bool:
         """Wait until a module's connection can take more bytes.
 
         Args:
@@ -886,7 +886,7 @@ class MessageManager(ClientLike):
             f"SET_NAME - {src_module.ipaddr} - ID({src_module.mod_id}) - {src_module.name}"
         )
 
-    def read_message(self, sock: socket.socket) -> Optional[MessageHeader]:
+    def read_message(self, sock: socket.socket) -> MessageHeader | None:
         """Read whatever has arrived of a client's message, without blocking.
 
         Each client's bytes go into its own buffer, a section at a time: a
@@ -1067,7 +1067,7 @@ class MessageManager(ClientLike):
         self,
         src_module: Module,
         header: MessageHeader,
-        data: Union[bytes, memoryview, MessageData],
+        data: bytes | memoryview | MessageData,
     ):
         """Forward a message from other modules
 
@@ -1080,7 +1080,7 @@ class MessageManager(ClientLike):
         Args:
             src_module (Module): Module where message originated from
             header (MessageHeader): Message Header
-            data (Union[bytes, MessageData]): Message Data
+            data (bytes | MessageData): Message Data
         """
 
         src_name = src_module.name or f"Module({src_module.mod_id})"
@@ -1113,7 +1113,7 @@ class MessageManager(ClientLike):
         # A snapshot, as a tuple: a failed send removes modules from the sets,
         # and modules removed while it's in use are skipped below.
         if by_type and by_all:
-            subscribers: Tuple[Module, ...] = (*by_type, *by_all)
+            subscribers: tuple[Module, ...] = (*by_type, *by_all)
         elif by_type:
             subscribers = tuple(by_type)
         elif by_all:
@@ -1125,7 +1125,7 @@ class MessageManager(ClientLike):
         with self._routing():
             # Header and payload in one buffer, built once and shared by every
             # recipient: one send per recipient instead of two.
-            wire: Optional[bytes] = None
+            wire: bytes | None = None
 
             for module in subscribers:
                 # As _is_routed(), without a call per recipient.
@@ -1165,15 +1165,15 @@ class MessageManager(ClientLike):
     def send_to_loggers(
         self,
         header: MessageHeader,
-        payload: Union[bytes, MessageData],
+        payload: bytes | MessageData,
         *,
-        exclude: Optional[Module] = None,
+        exclude: Module | None = None,
     ):
         """Forward message to registered logger modules
 
         Args:
             header (MessageHeader): Message header to send
-            payload (Union[bytes, MessageData]): Message data to send
+            payload (bytes | MessageData): Message data to send
             exclude (Module, optional): A logger not to send it to, because it
                 was already sent the message directly.
         """
@@ -1375,7 +1375,7 @@ class MessageManager(ClientLike):
 
     def decode_core_message(
         self, src_module: Module, hdr: MessageHeader
-    ) -> Union[Message, None]:
+    ) -> Message | None:
         data_cls = self._core_defs.get(hdr.msg_type)
         if data_cls:
             data = data_cls.from_buffer(self.data_buffer)
@@ -1620,7 +1620,7 @@ def _positive_seconds(text: str) -> float:
     return value
 
 
-def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse the manager's command line.
 
     Args:

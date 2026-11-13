@@ -43,21 +43,7 @@ from .exceptions import (
 from . import core_defs as cd
 
 from functools import wraps
-from typing import (
-    Dict,
-    Optional,
-    Tuple,
-    Type,
-    List,
-    Union,
-    Iterable,
-    Iterator,
-    Set,
-    Callable,
-    Any,
-    TypeVar,
-    cast,
-)
+from typing import Iterable, Iterator, Callable, Any, TypeVar, cast
 from types import ModuleType
 
 from warnings import warn
@@ -113,7 +99,7 @@ _DISCONNECT_WAIT: float = 0.1
 _log = logging.getLogger(__name__)
 
 
-def _split_server_name(server_name: str) -> Tuple[str, int]:
+def _split_server_name(server_name: str) -> tuple[str, int]:
     """Split a ``host:port`` server name.
 
     Args:
@@ -141,7 +127,7 @@ def _split_server_name(server_name: str) -> Tuple[str, int]:
     return host, number
 
 
-def _remaining(deadline: Optional[float]) -> Optional[float]:
+def _remaining(deadline: float | None) -> float | None:
     """Seconds left until a ``perf_counter`` deadline.
 
     Args:
@@ -229,7 +215,7 @@ class Client(ClientLike):
         host_id: int = 0,
         *,
         name: str = "",
-        definitions: Optional[MessageDefinitions | ModuleType] = None,
+        definitions: MessageDefinitions | ModuleType | None = None,
         auto_detect: bool = True,
     ):
         if module_id >= cd.DYN_MOD_ID_START or module_id < 0:
@@ -255,14 +241,14 @@ class Client(ClientLike):
         # be decoded. _rx_target is the one being filled, _rx_size its size,
         # and _rx_have how much has arrived. A read can end mid-message; the
         # next one carries on.
-        self._rx_header: Optional[MessageHeader] = None
-        self._rx_payload: Union[MessageData, bytearray, None] = None
-        self._rx_target: Union[MessageHeader, MessageData, bytearray, None] = None
+        self._rx_header: MessageHeader | None = None
+        self._rx_payload: MessageData | bytearray | None = None
+        self._rx_target: MessageHeader | MessageData | bytearray | None = None
         self._rx_size = 0
         self._rx_have = 0
         self._sub_all = False
-        self._subscribed_types: Set[int] = set()
-        self._paused_types: Set[int] = set()
+        self._subscribed_types: set[int] = set()
+        self._paused_types: set[int] = set()
         self._dynamic_id: bool = module_id == 0
         self._sock = socket.socket()
         self._name = name
@@ -311,8 +297,8 @@ class Client(ClientLike):
         # The modules found, keyed by their get_message_definitions function,
         # in import order. sys.modules is copied: an import in another thread
         # can change it.
-        found: Dict[int, List[str]] = {}
-        getters: Dict[int, ModuleType] = {}
+        found: dict[int, list[str]] = {}
+        getters: dict[int, ModuleType] = {}
         for name, mod in list(sys.modules.items()):
             if name in skipped or mod is None:
                 continue
@@ -345,7 +331,7 @@ class Client(ClientLike):
         return cd.get_message_definitions()
 
     def _get_definitions(
-        self, definitions: Optional[MessageDefinitions | ModuleType], auto_detect: bool
+        self, definitions: MessageDefinitions | ModuleType | None, auto_detect: bool
     ) -> MessageDefinitions:
         """Determine which message definitions to use"""
         if isinstance(definitions, MessageDefinitions):
@@ -406,19 +392,19 @@ class Client(ClientLike):
     def definitions(self) -> MessageDefinitions:
         return self._definitions
 
-    def get_msg_cls(self, msg_type: int) -> Type[MessageData]:
+    def get_msg_cls(self, msg_type: int) -> type[MessageData]:
         return self._definitions.get_msg_cls(msg_type)
 
-    def message_name_from_id(self, message_id: int) -> Optional[str]:
+    def message_name_from_id(self, message_id: int) -> str | None:
         return self._definitions.message_name_from_id(message_id)
 
-    def message_id_from_name(self, message_name: str) -> Optional[int]:
+    def message_id_from_name(self, message_name: str) -> int | None:
         return self._definitions.message_id_from_name(message_name)
 
-    def module_name_from_id(self, module_id: int) -> Optional[str]:
+    def module_name_from_id(self, module_id: int) -> str | None:
         return self._definitions.module_name_from_id(module_id)
 
-    def module_id_from_name(self, module_name: str) -> Optional[int]:
+    def module_id_from_name(self, module_name: str) -> int | None:
         return self._definitions.module_id_from_name(module_name)
 
     def __del__(self):
@@ -437,7 +423,7 @@ class Client(ClientLike):
         if sock is not None:
             sock.close()
 
-    def _socket_connect(self, server_name: str, deadline: Optional[float] = None):
+    def _socket_connect(self, server_name: str, deadline: float | None = None):
         """Open the TCP connection to the message manager.
 
         Note that this is also used by web_manager.
@@ -494,7 +480,7 @@ class Client(ClientLike):
             raise SocketOptionError from e
 
     def _connect_helper(
-        self, logger_status: bool, timeout: Optional[float] = 3
+        self, logger_status: bool, timeout: float | None = 3
     ) -> Message:
         """Called internally after _socket_connect
 
@@ -559,7 +545,7 @@ class Client(ClientLike):
         server_name: str = "localhost:7111",
         logger_status: bool = False,
         *,
-        timeout: Optional[float] = 5.0,
+        timeout: float | None = 5.0,
     ):
         """Connect to message manager server
 
@@ -690,7 +676,7 @@ class Client(ClientLike):
         self._rx_have = 0
 
     @property
-    def server(self) -> Tuple[str, int]:
+    def server(self) -> tuple[str, int]:
         """Message manager server address as a (IP_addr, port_num) tuple"""
         return self._server
 
@@ -725,17 +711,17 @@ class Client(ClientLike):
         return self._sock
 
     @property
-    def header_cls(self) -> Type[MessageHeader]:
+    def header_cls(self) -> type[MessageHeader]:
         """Class defining the RTMA message header"""
         return self._header_cls
 
     @property
-    def subscribed_types(self) -> Set[int]:
+    def subscribed_types(self) -> set[int]:
         """List of subscribed message types"""
         return set(self._subscribed_types)
 
     @property
-    def paused_subscribed_types(self) -> Set[int]:
+    def paused_subscribed_types(self) -> set[int]:
         """Subscriptions on pause"""
         return set(self._paused_types)
 
@@ -887,7 +873,7 @@ class Client(ClientLike):
         """
         before = self.subscribed_types
         paused_before = self.paused_subscribed_types
-        added: List[int] = []
+        added: list[int] = []
         for mt in dict.fromkeys(msg_list):  # in order, once each
             if mt in before:
                 warn(
@@ -925,7 +911,7 @@ class Client(ClientLike):
             msg_list (Iterable[int]): A list of numeric message IDs to temporarily unsubscribe to
         """
         subscribed = self.subscribed_types
-        paused: List[int] = []
+        paused: list[int] = []
         for mt in dict.fromkeys(msg_list):  # in order, once each
             if mt in subscribed:
                 paused.append(mt)
@@ -1078,7 +1064,7 @@ class Client(ClientLike):
     def forward_message(
         self,
         msg_hdr: MessageHeader,
-        msg_data: Optional[MessageData] = None,
+        msg_data: MessageData | None = None,
         timeout: float = -1,
     ) -> bool:
         """Forward a message
@@ -1168,8 +1154,8 @@ class Client(ClientLike):
 
     def _sendall(
         self,
-        buffer: Union[ctypes.Structure, bytes, bytearray, memoryview],
-        nbytes: Optional[int] = None,
+        buffer: ctypes.Structure | bytes | bytearray | memoryview,
+        nbytes: int | None = None,
     ):
         """Send a whole buffer, waiting for room in the socket as long as it takes.
 
@@ -1211,8 +1197,8 @@ class Client(ClientLike):
 
     @requires_connection
     def read_message(
-        self, timeout: Union[int, float, None] = -1, ack=False, sync_check=False
-    ) -> Optional[Message]:
+        self, timeout: int | float | None = -1, ack=False, sync_check=False
+    ) -> Message | None:
         """Read a message
 
         Messages the client isn't subscribed to are discarded without being
@@ -1263,8 +1249,8 @@ class Client(ClientLike):
 
     @requires_connection
     def _read_message(
-        self, timeout: Union[int, float, None] = -1, ack=False, sync_check=False
-    ) -> Optional[Message]:
+        self, timeout: int | float | None = -1, ack=False, sync_check=False
+    ) -> Message | None:
         """Read one message without filtering for subscribed messages
 
         Args:
@@ -1287,7 +1273,7 @@ class Client(ClientLike):
         return self._decode(header, payload, sync_check)
 
     @staticmethod
-    def _deadline(timeout: Union[int, float, None]) -> Optional[float]:
+    def _deadline(timeout: int | float | None) -> float | None:
         """Turn a read timeout into a deadline on the ``perf_counter`` clock.
 
         Args:
@@ -1301,8 +1287,8 @@ class Client(ClientLike):
         return time.perf_counter() + timeout
 
     def _recv_frame(
-        self, deadline: Optional[float]
-    ) -> Optional[Tuple[int, MessageHeader, Union[MessageData, bytearray]]]:
+        self, deadline: float | None
+    ) -> tuple[int, MessageHeader, MessageData | bytearray] | None:
         """Receive the rest of the current message, until it's complete or the deadline passes.
 
         The socket is non-blocking, so each ``recv`` returns at once with what
@@ -1405,9 +1391,7 @@ class Client(ClientLike):
             self._reset_receive()
             return msg_type, header, payload
 
-    def _payload_for(
-        self, msg_type: int, data_size: int
-    ) -> Union[MessageData, bytearray]:
+    def _payload_for(self, msg_type: int, data_size: int) -> MessageData | bytearray:
         """Make the object a message's payload is received into.
 
         Args:
@@ -1431,7 +1415,7 @@ class Client(ClientLike):
     def _decode(
         self,
         header: MessageHeader,
-        payload: Union[MessageData, bytearray],
+        payload: MessageData | bytearray,
         sync_check: bool,
     ) -> Message:
         """Check a received message against the client's definitions.
@@ -1493,7 +1477,7 @@ class Client(ClientLike):
 
         return Message(header, data)
 
-    def _wait_for_acknowledgement(self, timeout: Optional[float] = 3) -> Message:
+    def _wait_for_acknowledgement(self, timeout: float | None = 3) -> Message:
         """Wait for acknowledgement from message manager module
 
         Used internally when acknowledgement replies from message manager are expected
@@ -1557,12 +1541,12 @@ class Client(ClientLike):
                 readable, _, _ = select.select([self._sock], [], [], 0)
                 return not readable
 
-    def reset_subscriptions(self, subscribe_list: Optional[Iterable[int]] = None):
+    def reset_subscriptions(self, subscribe_list: Iterable[int] | None = None):
         """Unsubscribe from all messages and empty the message buffer.
         If optional 'subscribe_list' argument given, then will subscribe to new messages after reset.
 
         Args:
-            subscribe_list (Optional[Iterable[int]], optional): List of message IDs to subscribe to. Defaults to None.
+            subscribe_list (Iterable[int] | None, optional): List of message IDs to subscribe to. Defaults to None.
         """
         self.unsubscribe_from_all()
         self.discard_messages()
@@ -1578,12 +1562,12 @@ class Client(ClientLike):
 def client_context(
     module_id: int = 0,
     server_name: str = "localhost:7111",
-    msg_list: Optional[Iterable[int]] = None,
+    msg_list: Iterable[int] | None = None,
     host_id: int = 0,
     *,
     logger_status: bool = False,
     name: str = "",
-    definitions: Optional[MessageDefinitions | ModuleType] = None,
+    definitions: MessageDefinitions | ModuleType | None = None,
     auto_detect: bool = True,
 ):
     """Context manager function to simplify initializing a pyrtma Client
