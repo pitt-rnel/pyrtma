@@ -1,7 +1,7 @@
 import ctypes
 import json
 
-from typing import TypeVar, Any, Type, Dict, List
+from typing import TypeVar, Any
 from .utils.print import print_ctype_array, hexdump
 from .utils.random_fields import _random_struct
 from .exceptions import JSONDecodingError
@@ -33,7 +33,7 @@ class MessageMeta(CStructType):
         if fields:
             namespace["_fields_"] = fields
         elif "_fields_" not in namespace:
-            # else important to not overwrite v1 message def fields
+            # A class with no fields at all gets an empty list.
             namespace["_fields_"] = []
 
         return super().__new__(cls, name, bases, namespace)
@@ -110,11 +110,11 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         """
         hexdump(bytes(self), length, sep)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert message to dictionary
 
         Returns:
-            Dict[str, Any]: Message dictionary
+            dict[str, Any]: Message dictionary
         """
         return _to_dict(self)
 
@@ -147,21 +147,21 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         Returns:
             bytes: Copy of message field data bytes
         """
-        meta = getattr(type(self), f"_{name}")
-        if name not in [x[0] for x in self._fields_]:
-            raise KeyError(f"{name} is not a field of {self.__name__}")
-        else:
-            offset = meta.offset
-            sz = meta.size
+        # The ctypes fields are the public names with a "_" in front; the
+        # public names are the validators.
+        cls = type(self)
+        if not any(f[0] == f"_{name}" for f in cls._fields_):
+            raise KeyError(f"{name} is not a field of {cls.__name__}")
+        meta = getattr(cls, f"_{name}")
 
-        return bytes(memoryview(self).cast("c")[offset : offset + sz])
+        return ctypes.string_at(ctypes.addressof(self) + meta.offset, meta.size)
 
     @classmethod
-    def from_dict(cls: Type[MB], data: Dict[str, Any]) -> MB:
+    def from_dict(cls: type[MB], data: dict[str, Any]) -> MB:
         """Generate message instance from dictionary
 
         Args:
-            data (Dict[str, Any]): Message dictionary
+            data (dict[str, Any]): Message dictionary
         Raises:
             JSONDecodingError: Unable to decode dictionary
         """
@@ -172,10 +172,10 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         except Exception as e:
             raise JSONDecodingError(
                 f"Unable to decode {type(obj).__name__} from {data}"
-            )
+            ) from e
 
     @classmethod
-    def from_json(cls: Type[MB], s: str) -> MB:
+    def from_json(cls: type[MB], s: str) -> MB:
         """Generate message instance from JSON string
 
         Args:
@@ -185,13 +185,13 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         return obj
 
     @classmethod
-    def from_random(cls: Type[MB]) -> MB:
+    def from_random(cls: type[MB]) -> MB:
         """Generate message instance with random values"""
         obj = _random_struct(cls())
         return obj
 
     @classmethod
-    def copy(cls: Type[MB], m: MB) -> MB:
+    def copy(cls: type[MB], m: MB) -> MB:
         """Generate a copy of a message structure
 
         Args:
@@ -207,36 +207,6 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
             return False
 
         return bytes(self) == bytes(other)
-
-    def __getattribute__(self, name: str) -> Any:
-        # for backwards compatibility with messages without descriptors
-        # can be deprecated
-        value = super().__getattribute__(name)
-        # need to convert chars from bytes to str
-        if type(value) is bytes:
-            fnames, ftypes = zip(*self._fields_)
-            if name in fnames and name[0] != "_":  # v1 fields
-                i = fnames.index(name)
-                ftype = ftypes[i]
-                if ftype is ctypes.c_char or (
-                    issubclass(ftype, ctypes.Array) and ftype._type_ is ctypes.c_char
-                ):
-                    return value.decode()
-        return value
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        # for backwards compatibility with messages without descriptors
-        # can be deprecated
-        if type(value) is str:
-            fnames, ftypes = zip(*self._fields_)
-            if name in fnames and name[0] != "_":  # v1 fields
-                i = fnames.index(name)
-                ftype = ftypes[i]
-                if ftype is ctypes.c_char or (
-                    issubclass(ftype, ctypes.Array) and ftype._type_ is ctypes.c_char
-                ):
-                    value = value.encode()
-        super().__setattr__(name, value)
 
 
 class RTMAJSONEncoder(json.JSONEncoder):
@@ -267,12 +237,12 @@ class RTMAJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def _from_dict(obj: MessageBase, data: Dict[str, Any]):
+def _from_dict(obj: MessageBase, data: dict[str, Any]):
     """Helper function to set message fields from dictionary values
 
     Args:
         obj (MessageBase): Message object
-        data (Dict[str, Any]): Message data dictionary
+        data (dict[str, Any]): Message data dictionary
     """
     for _name, ftype, *_ in obj._fields_:
         name = _name[1:] if _name[0] == "_" else _name
@@ -283,20 +253,22 @@ def _from_dict(obj: MessageBase, data: Dict[str, Any]):
                 for i, elem in enumerate(getattr(obj, name)):
                     _from_dict(elem, data[name][i])
             elif ftype._type_ is ctypes.c_char:
-                # list of characters is equivalent to str
-                if type(data[name]) is list and all(
-                    [(type(x) is str and len(x) <= 1) for x in data[name]]
+                # list of characters is equivalent to str. Joined into a new
+                # value, so the caller's dictionary is left as it was.
+                value = data[name]
+                if type(value) is list and all(
+                    [(type(x) is str and len(x) <= 1) for x in value]
                 ):
-                    data[name] = "".join(data[name])
+                    value = "".join(value)
 
-                setattr(obj, name, data[name])
+                setattr(obj, name, value)
             else:
                 getattr(obj, name)[:] = data[name]
         else:
             setattr(obj, name, data[name])
 
 
-def _expand_carray(array: ctypes.Array) -> List:
+def _expand_carray(array: ctypes.Array) -> list:
     expanded = array[:]
     for i, a in enumerate(expanded):
         if isinstance(a, ctypes.Array):
@@ -304,16 +276,16 @@ def _expand_carray(array: ctypes.Array) -> List:
     return expanded
 
 
-def _to_dict(obj: MessageBase) -> Dict[str, Any]:
+def _to_dict(obj: MessageBase) -> dict[str, Any]:
     """Helper function to create dictionary from message fields
 
     Args:
         obj (MessageBase): Message object
 
     Returns:
-        Dict[str, Any]: Dictionary
+        dict[str, Any]: Dictionary
     """
-    data: Dict[str, Any] = {}
+    data: dict[str, Any] = {}
     for _name, ftype, *_ in obj._fields_:
         name = _name[1:] if _name[0] == "_" else _name
         if issubclass(ftype, MessageBase):

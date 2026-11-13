@@ -1,0 +1,47 @@
+# uses.yaml
+
+imports: [shapes]
+
+aliases:
+  LINE_ALIAS: LINE # a struct from an imported file
+  PTS: PT # an alias of a struct alias
+
+host_ids:
+  COMPILER_HOST: 3
+
+module_ids:
+  COMPILER_MODULE: 20
+
+struct_defs:
+  POLYGON:
+    fields:
+      corners: PTS[N]
+      count: COUNT2
+
+message_defs:
+  SHAPES:
+    id: 7100
+    fields:
+      count: COUNT
+      counts: COUNT2[N]
+      name: NAME_CHAR[16]
+      small: signed char
+      smalls: signed char[3]
+      line: LINE
+      lines: LINE_ALIAS[2]
+      pts: PTS[N]
+      polygon: POLYGON
+      src: MODULE_ID
+
+  NESTED:
+    id: 7101
+    fields:
+      one: SHAPES
+      many: SHAPES[2]
+
+  SHAPES_READY:
+    id: 7102
+    fields: null
+
+  _RESERVED_:
+    id: [7201 - 7202]

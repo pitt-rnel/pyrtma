@@ -1,5 +1,7 @@
 """Message definition YAML parser"""
 
+from __future__ import annotations
+
 import re
 import json
 import pathlib
@@ -15,19 +17,8 @@ from ruamel.yaml import YAML
 
 from copy import copy
 from hashlib import sha256
-from typing import (
-    List,
-    Optional,
-    Any,
-    Union,
-    Tuple,
-    Dict,
-    Type,
-    Literal,
-    cast,
-    TYPE_CHECKING,
-)
-from dataclasses import dataclass, field, is_dataclass, asdict
+from typing import Any, Literal, cast, TYPE_CHECKING
+from dataclasses import dataclass, field, fields, is_dataclass, asdict
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
@@ -39,9 +30,22 @@ except AttributeError:
     # changed from inf to maxsize to maintain int type
     MAX_MESSAGE_TYPES = sys.maxsize
 
-import os
-import re
-from typing import Optional
+try:
+    from .core_defs import DYN_MOD_ID_START, MAX_HOSTS
+except (AttributeError, ImportError):
+    # The values in rtma_core.yaml, for a build of the core definitions
+    # themselves.
+    DYN_MOD_ID_START = 10000
+    MAX_HOSTS = 5
+
+MAX_REFERENCE_DEPTH: int = 16
+"""How deeply constants and aliases may be defined in terms of each other.
+
+A constant whose expression uses only numbers has depth 0, and one that uses
+other constants is one deeper than the deepest of them. An alias of a native
+type or a struct has depth 1, and an alias of an alias is one deeper than it.
+Deeper definitions raise `RecurisionError`.
+"""
 
 
 def expand_env_variables(input_string: str) -> str:
@@ -101,7 +105,7 @@ class NativeType:
 # Native C types and sizes that are supported
 supported_types = {
     "char": NativeType(name="char", size=1, format="c"),
-    "signed char": NativeType(name="signed_char", size=1, format="b"),
+    "signed char": NativeType(name="signed char", size=1, format="b"),
     "unsigned char": NativeType(name="unsigned char", size=1, format="B"),
     "byte": NativeType(name="byte", size=1, format="B"),
     "int": NativeType(name="int", size=4, format="i"),
@@ -127,6 +131,39 @@ supported_types = {
     "int16": NativeType(name="int16", size=2, format="h"),
     "int32": NativeType(name="int32", size=4, format="i"),
     "int64": NativeType(name="int64", size=8, format="q"),
+}
+
+# The name each native type has in a type hash, so that spellings of the same
+# type, such as ``int`` and ``int32``, hash the same. ``char`` stays distinct
+# from ``int8``, since the targets decode them differently.
+CANONICAL_TYPE_NAMES: dict[str, str] = {
+    "char": "char",
+    "signed char": "int8",
+    "unsigned char": "uint8",
+    "byte": "uint8",
+    "int": "int32",
+    "signed int": "int32",
+    "unsigned int": "uint32",
+    "unsigned": "uint32",
+    "short": "int16",
+    "signed short": "int16",
+    "unsigned short": "uint16",
+    "long": "int32",
+    "signed long": "int32",
+    "unsigned long": "uint32",
+    "long long": "int64",
+    "signed long long": "int64",
+    "unsigned long long": "uint64",
+    "float": "float",
+    "double": "double",
+    "uint8": "uint8",
+    "uint16": "uint16",
+    "uint32": "uint32",
+    "uint64": "uint64",
+    "int8": "int8",
+    "int16": "int16",
+    "int32": "int32",
+    "int64": "int64",
 }
 
 
@@ -196,7 +233,7 @@ class ExpressionExpansionError(ParserError):
     pass
 
 
-class RecurisionError(ParserError):
+class RecurisionError(ParserError, RecursionError):
     """Raised when recursion limit is exceeded evaluating aliases and expressions."""
 
     pass
@@ -216,6 +253,12 @@ class FileFormatError(ParserError):
 
 class AlignmentError(ParserError):
     """Raised when a struct is not 64-bit aligned"""
+
+    pass
+
+
+class GeneratedSourceError(ParserError):
+    """The compiler generated code that isn't valid in its language."""
 
     pass
 
@@ -243,7 +286,7 @@ class MsgDefIndex:
 @dataclass
 class Metadata:
     name: str
-    value: Union[int, float, bool, str]
+    value: int | float | bool | str
     src: MsgDefIndex
 
 
@@ -258,16 +301,29 @@ class Import:
 class ConstantExpr:
     name: str
     expression: str
-    expanded: Optional[str]
-    value: Union[str, int, float]
+    expanded: str | None
+    value: str | int | float
     src: MsgDefIndex
+    depth: int = 0
 
 
 @dataclass
 class ConstantString:
+    """A string constant.
+
+    Attributes:
+        name: The constant's name.
+        value: The text as a double-quoted literal, with backslashes and
+            double quotes escaped by a backslash. It is valid, and means the
+            same text, in Python, C and JavaScript.
+        src: The definitions file it came from.
+        text: The text itself.
+    """
+
     name: str
     value: str
     src: MsgDefIndex
+    text: str = ""
 
 
 @dataclass
@@ -295,8 +351,9 @@ class HID:
 class TypeAlias:
     name: str
     type_name: str
-    type_obj: Union[NativeType, "SDF"]
+    type_obj: NativeType | SDF
     src: MsgDefIndex
+    depth: int = 1
 
     @property
     def size(self) -> int:
@@ -318,11 +375,13 @@ class TypeAlias:
 class Field:
     name: str
     type_name: str
-    type_obj: Union[NativeType, TypeAlias, "MDF", "SDF"]
-    length_expression: Optional[str] = None
-    length_expanded: Optional[str] = None
-    length: Optional[int] = None
+    type_obj: NativeType | TypeAlias | MDF | SDF
+    length_expression: str | None = None
+    length_expanded: str | None = None
+    length: int | None = None
     offset: int = -1
+    # True for the padding fields the parser inserts for alignment.
+    padding: bool = False
 
     @property
     def base_size(self) -> int:
@@ -354,7 +413,7 @@ class MDF:
     name: str
     type_id: int
     src: MsgDefIndex
-    fields: List[Field] = field(default_factory=list)
+    fields: list[Field] = field(default_factory=list)
     alignment: int = 8
 
     @property
@@ -380,7 +439,7 @@ class SDF:
     hash: str
     name: str
     src: MsgDefIndex
-    fields: List[Field] = field(default_factory=list)
+    fields: list[Field] = field(default_factory=list)
     alignment: int = 8
 
     @property
@@ -396,7 +455,7 @@ class SDF:
         return s
 
 
-RTMAObject = Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, MDF, SDF, Field]
+RTMAObject = ConstantExpr | ConstantString | HID | MID | TypeAlias | MDF | SDF | Field
 
 
 class Parser:
@@ -414,12 +473,12 @@ class Parser:
         Args:
             debug (bool, optional): Flag for debug mode. Defaults to False.
         """
-        self.included_files: List[MsgDefIndex] = []
+        self.included_files: list[MsgDefIndex] = []
         self.current_index = MsgDefIndex("", "", pathlib.Path())
         self.debug = debug
         Parser._instance_count += 1
 
-        self.yaml_dict: Dict[str, Dict[str, Any]] = dict(
+        self.yaml_dict: dict[str, dict[str, Any]] = dict(
             metadata={},
             imports={},
             constants={},
@@ -432,20 +491,24 @@ class Parser:
         )
 
         # Compiler File Data:
-        self.index: Dict[str, MsgDefIndex] = {}
+        self.index: dict[str, MsgDefIndex] = {}
         self.compiler_options = CompilerOptions()
         self.deps: list[MsgDefIndex] = []
 
-        self.metadata: Dict[str, Metadata] = {}
-        self.imports: List[Import] = []
-        self.constants: Dict[str, ConstantExpr] = {}
-        self.string_constants: Dict[str, ConstantString] = {}
-        self.aliases: Dict[str, TypeAlias] = {}
-        self.host_ids: Dict[str, HID] = {}
-        self.module_ids: Dict[str, MID] = {}
-        self.struct_defs: Dict[str, SDF] = {}
-        self.message_ids: Dict[str, MT] = {}
-        self.message_defs: Dict[str, MDF] = {}
+        self.metadata: dict[str, Metadata] = {}
+        self.imports: list[Import] = []
+        self.constants: dict[str, ConstantExpr] = {}
+        self.string_constants: dict[str, ConstantString] = {}
+        self.aliases: dict[str, TypeAlias] = {}
+        self.host_ids: dict[str, HID] = {}
+        self.module_ids: dict[str, MID] = {}
+        self.struct_defs: dict[str, SDF] = {}
+        self.message_ids: dict[str, MT] = {}
+        self.message_defs: dict[str, MDF] = {}
+
+        # Aliases of structs defined later in the file being parsed, by name,
+        # with the struct each names. They are resolved as the structs are.
+        self._pending_aliases: dict[str, str] = {}
 
         self.logger = logging.getLogger(f"pyrtma.parser ({self._instance_count})")
         self.logger.propagate = False
@@ -513,9 +576,10 @@ class Parser:
         self.struct_defs = {}
         self.message_ids = {}
         self.message_defs = {}
+        self._pending_aliases = {}
 
     def check_duplicate_name(
-        self, section: str, name: str, namespaces: Tuple[str, ...]
+        self, section: str, name: str, namespaces: tuple[str, ...]
     ):
         """Check namespaces for conflicting names."""
         for namespace in namespaces:
@@ -526,48 +590,76 @@ class Parser:
                         f"Duplicate name conflict found: \n\n1: {namespace} -> {o.name} -> {o.src.file.absolute()}\n2: {section} -> {name} -> {self.current_file}\n"
                     )
 
-    def expand_expression(self, name: str, expr: str) -> Tuple[str, int]:
-        rdepth_limit = 10
-        n = 0
+    def expand_expression(self, name: str, expr: str) -> tuple[str, Any]:
+        """Replace the constants in an expression with their values, and evaluate it.
+
+        Every constant an expression uses must be defined before it, and
+        already has a value, so one pass replaces them all and nothing is
+        expanded again. That rules out circular references between constants;
+        an expression that uses its own name raises `CircularRefError`.
+
+        Args:
+            name: What the expression defines, such as a constant's name, or
+                ``MESSAGE->field`` for an array length.
+            expr: The expression.
+
+        Returns:
+            The expression with every constant replaced by its value, and the
+            value it evaluates to.
+
+        Raises:
+            CircularRefError: The expression uses the name it defines.
+            ExpressionExpansionError: It uses a name that isn't a constant
+                defined before it, or doesn't evaluate.
+        """
         symbol_regex = r"\b(?P<symbol>[a-zA-Z_]+\w*)\b"
-        m = re.search(symbol_regex, expr)
-        while m:
-            symbol = m.group()
-            n += 1
+
+        def substitute(m: "re.Match[str]") -> str:
+            symbol = m.group("symbol")
+            if symbol == name:
+                raise CircularRefError(
+                    f"Circular reference in expression: {name} -> {expr} -> {self.current_file}"
+                )
             try:
                 c = self.constants[symbol]
             except KeyError:
                 raise ExpressionExpansionError(
-                    f"Unable to expand expression {name} -> {symbol} not defined: {self.current_file}"
-                )
-
-            if re.search(rf"\b{name}\b", c.expression) is not None:
-                raise CircularRefError(
-                    f"Circular reference in expression: {name} -> {expr}."
-                )
+                    f"Unable to expand expression {name} -> {symbol} not defined. "
+                    f"Constants must be defined before they are used: {self.current_file}"
+                ) from None
 
             if c.value is None:
                 raise ExpressionExpansionError(
                     f"{c.name} has not been evaluated to a value."
                 )
+            # Not parenthesized, as before, so existing values don't change.
+            return str(c.value)
 
-            expr = re.sub(rf"\b{c.name}\b", str(c.value), expr)
-
-            if n > rdepth_limit:
-                raise RecursionError(
-                    f"Recursion limit reached expanding constant expression {name} in {self.current_file}"
-                )
-
-            # Try to match another macro symbol
-            m = re.search(symbol_regex, expr)
-
-        # Add the expanded form and evaluated value
-        expanded = expr
+        expanded = re.sub(symbol_regex, substitute, expr)
 
         # TODO: check that only numbers and operators are left in expression
-        value = eval(expr)
+        try:
+            value = eval(expanded)
+        except Exception as e:
+            raise ExpressionExpansionError(
+                f"Unable to evaluate expression {name}: {expr} -> {expanded} ({type(e).__name__}: {e}) -> {self.current_file}"
+            ) from e
 
         return expanded, value
+
+    def expression_depth(self, expr: str) -> int:
+        """How deeply an expression is nested in other constants.
+
+        Args:
+            expr: An expression whose constants are all defined.
+
+        Returns:
+            0 for an expression of numbers only, otherwise one more than the
+            deepest constant it uses.
+        """
+        symbols = re.findall(r"\b[a-zA-Z_]+\w*\b", expr)
+        depths = [self.constants[s].depth for s in symbols if s in self.constants]
+        return 1 + max(depths) if depths else 0
 
     def handle_import(self, fname: str):
         if fname not in self.index.keys():
@@ -594,11 +686,10 @@ class Parser:
 
         if imp.file.suffix == ".yml":
             self.warning(f"Please change {imp.file} to use '.yaml' extension.")
-            input("Hit enter to continue...")
 
         self.parse_index(fname)
 
-    def handle_metadata(self, name: str, value: Union[int, float, bool, str]):
+    def handle_metadata(self, name: str, value: int | float | bool | str):
         self.check_name(name)
         self.check_duplicate_name(
             "metadata",
@@ -617,14 +708,17 @@ class Parser:
             src=self.current_index,
         )
 
-    def handle_compiler_options(self, name: str, value: Union[int, float, bool, str]):
+    def handle_compiler_options(self, name: str, value: int | float | bool | str):
         self.check_name(name)
-        try:
-            setattr(self.compiler_options, name, value)
-        except AttributeError:
-            raise RTMASyntaxError(f"Unknown compiler option: {name}")
+        # setattr() on the dataclass accepts any name, so check it first.
+        known = [f.name for f in fields(CompilerOptions)]
+        if name not in known:
+            raise RTMASyntaxError(
+                f"Unknown compiler option: {name}. The options are {', '.join(known)} -> {self.defs_path}"
+            )
+        setattr(self.compiler_options, name, value)
 
-    def handle_expression(self, name: str, expression: Union[int, float, str]):
+    def handle_expression(self, name: str, expression: int | float | str):
         self.check_name(name)
         self.check_duplicate_name(
             "constants",
@@ -654,12 +748,18 @@ class Parser:
             )
         elif isinstance(expression, str):
             expanded, value = self.expand_expression(name, expression)
+            depth = self.expression_depth(expression)
+            if depth > MAX_REFERENCE_DEPTH:
+                raise RecurisionError(
+                    f"Constant {name} is nested {depth} deep in other constants, more than the limit of {MAX_REFERENCE_DEPTH} -> {self.current_file}"
+                )
             self.constants[name] = ConstantExpr(
                 name,
                 expression=expression,
                 expanded=expanded,
                 value=value,
                 src=self.current_index,
+                depth=depth,
             )
 
     def handle_string(self, name: str, value: str):
@@ -681,14 +781,40 @@ class Parser:
                 f"Values in 'string_constants' section must evaluate to string type not {type(value)}. {name}: {value} -> {self.current_file}"
             )
 
+        # Printable ASCII only: strings are ASCII on the wire, and control
+        # characters would need a different escape in every target.
+        for ch in value:
+            if not " " <= ch <= "~":
+                raise RTMASyntaxError(
+                    f"String constant {name} contains {ch!r}. String constants can only hold printable ASCII characters -> {self.current_file}"
+                )
+
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
         self.string_constants[name] = ConstantString(
             name,
-            value=f'"{value}"',
+            value=f'"{escaped}"',
             src=self.current_index,
+            text=value,
         )
 
     def handle_alias(self, alias: str, ftype: str):
-        """Find the base type ultimately represented by the typedef alias"""
+        """Find the base type ultimately represented by the typedef alias.
+
+        The alias's `type_name` is the native type or struct it resolves to,
+        through any aliases in between.
+
+        Args:
+            alias: The alias's name.
+            ftype: The type it names: a native type, a struct, or an alias,
+                each defined before it.
+
+        Raises:
+            InvalidTypeError: `ftype` isn't a string.
+            CircularRefError: The alias names itself.
+            RTMASyntaxError: `ftype` isn't a type defined before it.
+            RecurisionError: The chain of aliases is longer than
+                `MAX_REFERENCE_DEPTH`.
+        """
         if not isinstance(ftype, str):
             raise InvalidTypeError(
                 f"Values in 'aliases' section must be a string not {type(ftype).__name__}.\n{alias} -> {self.current_file}"
@@ -707,36 +833,55 @@ class Parser:
             ),
         )
 
-        n = 0
-        prev = ftype
-        while n < 10:
-            if ftype in supported_types.keys():
-                self.aliases[alias] = TypeAlias(
-                    alias, ftype, supported_types[ftype], self.current_index
+        self.aliases[alias] = self.resolve_alias(alias, ftype)
+
+    def resolve_alias(self, alias: str, ftype: str) -> TypeAlias:
+        """Resolve the type an alias names.
+
+        Args:
+            alias: The alias's name.
+            ftype: The type it names.
+
+        Returns:
+            The alias, resolved to a native type or struct.
+
+        Raises:
+            CircularRefError: The alias names itself.
+            RTMASyntaxError: `ftype` isn't a type defined before it.
+            RecurisionError: The chain of aliases is too long.
+        """
+        if ftype == alias:
+            raise CircularRefError(
+                f"Alias {alias} refers to itself -> {self.current_file}"
+            )
+
+        if ftype in supported_types:
+            return TypeAlias(alias, ftype, supported_types[ftype], self.current_index)
+
+        if ftype in self.struct_defs:
+            return TypeAlias(
+                alias, ftype, self.struct_defs[ftype], src=self.current_index
+            )
+
+        # An alias defined earlier is already resolved, so one step is enough.
+        if ftype in self.aliases:
+            target = self.aliases[ftype]
+            depth = target.depth + 1
+            if depth > MAX_REFERENCE_DEPTH:
+                raise RecurisionError(
+                    f"Alias {alias} is a chain of {depth} aliases, more than the limit of {MAX_REFERENCE_DEPTH} -> {self.current_file}"
                 )
-                return
+            return TypeAlias(
+                alias,
+                target.type_name,
+                target.type_obj,
+                src=self.current_index,
+                depth=depth,
+            )
 
-            # Check if ftype points back to a user defined struct
-            for sdf in self.struct_defs.values():
-                if ftype == sdf.name:
-                    ftype = sdf.name
-                    self.aliases[alias] = TypeAlias(
-                        alias, ftype, sdf, src=self.current_index
-                    )
-                    return
-
-            # Check if ftype points back to another typedef
-            for a in self.aliases.values():
-                if ftype == a.name:
-                    n += 1
-                    ftype = a.type_name
-
-            if ftype == prev:
-                raise RTMASyntaxError(f"Unable to resolve alias {alias}: {ftype}")
-            else:
-                prev = ftype
-
-        raise RecursionError(f"Recursion limit exceeded for alias: {alias}")
+        raise RTMASyntaxError(
+            f"Unable to resolve alias {alias}: {ftype} -> {self.current_file}"
+        )
 
     def handle_host_id(self, name: str, value: int):
         self.check_name(name)
@@ -747,14 +892,18 @@ class Parser:
                 f"Values in 'host_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value}"
             )
 
+        user_file = (
+            self.current_index.name not in Parser.core_imports and self.import_coredefs
+        )
         if value < 1 or value > 32767:
-            if (
-                self.current_index.name not in Parser.core_imports
-                and self.import_coredefs
-            ):
+            if user_file:
                 raise RTMASyntaxError(
                     f"Value outside of valid range [1 - 32767] for host_id: {name}: {value}"
                 )
+        elif value > MAX_HOSTS and user_file:
+            self.warning(
+                f"Host ID {name}: {value} is above MAX_HOSTS ({MAX_HOSTS}). A client can send from it, but messages can't be addressed to it -> {self.current_file}"
+            )
 
         for hid in self.host_ids.values():
             if value == hid.value:
@@ -776,14 +925,16 @@ class Parser:
                 f"Values in 'module_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value} -> {self.current_file}"
             )
 
-        if value < 10 or (99 < value < 200):
+        # IDs from DYN_MOD_ID_START up are assigned by the manager; a client
+        # can't ask for one.
+        if value < 10 or (99 < value < 200) or value >= DYN_MOD_ID_START:
             if (
                 self.current_index.name not in Parser.core_imports
                 and value != 0
                 and self.import_coredefs
             ):
                 raise RTMASyntaxError(
-                    f"Value outside of valid range [10 - 99 or > 200] for module_id: {name}: {value} -> {self.current_file}"
+                    f"Value outside of valid range [10 - 99 or 200 - {DYN_MOD_ID_START - 1}] for module_id: {name}: {value} -> {self.current_file}"
                 )
 
         for mid in self.module_ids.values():
@@ -794,7 +945,7 @@ class Parser:
 
         self.module_ids[name] = MID(name, int(value), src=self.current_index)
 
-    def check_alignment(self, s: Union[SDF, MDF]):
+    def check_alignment(self, s: SDF | MDF):
         """Confirm 64 bit alignment of structures"""
         PADDING_BYTE_TYPE = "byte"
 
@@ -804,7 +955,7 @@ class Parser:
         npad = 0  # padding field count
         n = 0  # field index
 
-        pad_len: Union[int, Literal[""]]
+        pad_len: int | Literal[""]
 
         # Loop over all fields in struct
         while n < len(s.fields):
@@ -841,6 +992,7 @@ class Parser:
                 length_expanded=f'"{pad_len}"',
                 length=pad_len,
                 offset=ptr,
+                padding=True,
             )
 
             # Insert the padding into MDF or SDF object before the current field
@@ -900,6 +1052,9 @@ class Parser:
                 length_expression=f'"{pad_len}"',
                 length_expanded=f'"{pad_len}"',
                 length=pad_len or None,
+                # It starts where the last field ends.
+                offset=ptr,
+                padding=True,
             )
 
             # Stride by an amount equal to the field size
@@ -932,10 +1087,11 @@ class Parser:
             s
         ), f"{s.name} is not 64-bit aligned. s.size = {s.size}, struct size = {self.get_ctype_size(s)}."
 
-    def get_ctype_cls(self, s: Union[MDF, SDF]) -> Type[ctypes.Structure]:
+    def get_ctype_cls(self, s: MDF | SDF) -> type[ctypes.Structure]:
         # Field type name to ctypes
         type_map = {
             "char": ctypes.c_char,
+            "signed char": ctypes.c_int8,
             "unsigned char": ctypes.c_ubyte,
             "byte": ctypes.c_ubyte,
             "int": ctypes.c_int32,
@@ -974,7 +1130,7 @@ class Parser:
                 if isinstance(field.type_obj.type_obj, NativeType):
                     cobj = type_map[field.type_obj.type_obj.name]
                 else:
-                    cobj = self.get_ctype_size(field.type_obj.type_obj)
+                    cobj = self.get_ctype_cls(field.type_obj.type_obj)
             else:
                 raise RuntimeError(f"Unexpected type {type(field.type_obj)}")
 
@@ -985,7 +1141,7 @@ class Parser:
 
         return type(s.name, (ctypes.Structure,), {"_fields_": f})
 
-    def get_ctype_size(self, s: Union[MDF, SDF]) -> int:
+    def get_ctype_size(self, s: MDF | SDF) -> int:
         return ctypes.sizeof(self.get_ctype_cls(s))
 
     def validate_msg_id(self, name: str, msg_id: int):
@@ -1021,9 +1177,43 @@ class Parser:
                 f"{mdf.name} size of {mdf.size} exceeds maximum allowe of 65535 bytes."
             )
 
-    def add_fields(self, mdf: Union[SDF, MDF], fields: Union[Dict, str]):
+    def check_array_length(
+        self, def_name: str, field_name: str, spec: str, value: Any
+    ) -> int:
+        """Check an array field's evaluated length.
+
+        Args:
+            def_name: The message or struct the field belongs to.
+            field_name: The field's name.
+            spec: The field's type spec, for the error message.
+            value: What its length expression evaluated to.
+
+        Returns:
+            The length.
+
+        Raises:
+            RTMASyntaxError: The length isn't a whole number of 1 or more.
+                A length of 0 used to give a scalar in Python and an empty
+                array in the other targets, so no layout fits it.
+        """
+        where = f"{def_name}.{field_name}: {spec} -> {self.current_file}"
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise RTMASyntaxError(
+                f"Array length must be a number, not {value!r}: {where}"
+            )
+        if isinstance(value, float) and not value.is_integer():
+            raise RTMASyntaxError(
+                f"Array length must be a whole number, not {value}: {where}"
+            )
+        if value < 1:
+            raise RTMASyntaxError(
+                f"Array length must be 1 or more, not {int(value)}: {where}"
+            )
+        return int(value)
+
+    def add_fields(self, mdf: SDF | MDF, fields: dict | str):
         # Pattern to parse field specs
-        FIELD_REGEX = r"\s*(?P<ftype>[\s\w]*)(\[(?P<len_str>.*)\])?"
+        FIELD_REGEX = r"\s*(?P<ftype>[\s\w]*)(\[(?P<len_str>.*)\])?\s*"
 
         # Copy fields from another definition
         if isinstance(fields, str):
@@ -1054,7 +1244,8 @@ class Parser:
                         f"Field types must be a string not {type(fstr).__name__}: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
                     )
 
-                m = re.match(FIELD_REGEX, fstr)
+                # The whole spec must match, so trailing text is an error.
+                m = re.fullmatch(FIELD_REGEX, fstr)
                 if m is None:
                     raise RTMASyntaxError(
                         f"Invalid syntax for field type specification: {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
@@ -1074,7 +1265,7 @@ class Parser:
                     )
 
                 # Check for a valid type
-                ftype_obj: Union[NativeType, TypeAlias, MDF, SDF]
+                ftype_obj: NativeType | TypeAlias | MDF | SDF
                 if ftype in supported_types.keys():
                     ftype_obj = supported_types[ftype]
                 elif ftype in self.aliases.keys():
@@ -1083,6 +1274,10 @@ class Parser:
                     ftype_obj = self.struct_defs[ftype]
                 elif ftype in self.message_defs.keys():
                     ftype_obj = self.message_defs[ftype]
+                elif ftype in self._pending_aliases:
+                    raise RTMASyntaxError(
+                        f"{mdf.name}.{fname} uses alias {ftype} of {self._pending_aliases[ftype]}, which isn't defined yet. Define {self._pending_aliases[ftype]} before the definitions that use {ftype} -> {self.current_file}"
+                    )
                 else:
                     raise RTMASyntaxError(
                         f"Unknown type specified ({ftype}): {mdf.name}=> {fname}: {fstr} -> {self.current_file}"
@@ -1105,7 +1300,7 @@ class Parser:
                         type_obj=ftype_obj,
                         length_expression=len_str,
                         length_expanded=expanded,
-                        length=int(flen),
+                        length=self.check_array_length(mdf.name, fname, fstr, flen),
                     )
                 else:
                     new_field = Field(name=fname, type_name=ftype, type_obj=ftype_obj)
@@ -1118,7 +1313,77 @@ class Parser:
 
         self.validate_msg_def(mdf)
 
-    def handle_signal(self, name: str, mdf: Dict[str, Any]):
+    @staticmethod
+    def field_text(fld: Field) -> str:
+        """Describe a field as it appears in its definition's type hash.
+
+        The line has the field as written, ignoring spacing, and what it
+        resolves to, so a change to either changes the hash. A native type
+        has one name, from `CANONICAL_TYPE_NAMES`. An alias is followed by
+        ``->`` and its final type. A length written with constants or an
+        expression is followed by ``=`` and its value. A struct or message
+        is followed by ``hash=`` and the first eight hex digits of its own
+        hash, which covers its name and fields. Padding the parser inserted
+        is a ``uint8`` field with its length.
+
+        Args:
+            fld: A parsed field.
+
+        Returns:
+            The field's line, such as ``age: AGE -> int32``,
+            ``name: char[MAX_NAME_LEN=32]`` or ``pts: PT[N=3] -> POINT
+            hash=1a2b3c4d``.
+        """
+        length = ""
+        if fld.length is not None:
+            written = re.sub(r"\s+", "", fld.length_expression or "")
+            if fld.padding or written in ("", str(fld.length)):
+                length = f"[{fld.length}]"
+            else:
+                length = f"[{written}={fld.length}]"
+
+        type_obj = fld.type_obj
+        alias = ""
+        if isinstance(type_obj, TypeAlias):
+            # An alias already points at the end of its chain.
+            alias = type_obj.name
+            type_obj = type_obj.type_obj
+
+        if isinstance(type_obj, NativeType):
+            final, suffix = CANONICAL_TYPE_NAMES[type_obj.name], ""
+        else:
+            final, suffix = type_obj.name, f" hash={type_obj.hash[:8]}"
+
+        if alias:
+            return f"{fld.name}: {alias}{length} -> {final}{suffix}"
+        return f"{fld.name}: {final}{length}{suffix}"
+
+    @classmethod
+    def definition_hash(cls, df: MDF | SDF) -> tuple[str, str]:
+        """Build a struct's or message's hashed text and its type hash.
+
+        The text has the layout the hash has always been taken over: the
+        name, a message's ID, and a line per field, from `field_text`,
+        including the padding the parser inserted. A definition written with
+        canonical native type names and literal lengths only, that needs no
+        padding, therefore keeps the hash it had before.
+
+        Args:
+            df: A struct or message whose fields have been parsed.
+
+        Returns:
+            The text, and the hex SHA-256 of it. The type hash is its first
+            eight hex digits.
+        """
+        lines = [f"{df.name}:"]
+        if isinstance(df, MDF):
+            lines.append(f"  id: {df.type_id}")
+        lines.append("  fields:")
+        lines.extend(f"    {cls.field_text(f)}" for f in df.fields)
+        raw = "\n".join(lines)
+        return raw, sha256(raw.encode()).hexdigest()
+
+    def handle_signal(self, name: str, mdf: dict[str, Any]):
         # Create a string representation of the defintion to hash
         raw = f"{name}:\n  id: {mdf['id']}\n  fields: null"
         raw = textwrap.dedent(raw)
@@ -1136,7 +1401,7 @@ class Parser:
         self.message_defs[name] = obj
         return
 
-    def handle_struct(self, name: str, sdf: Dict[str, Any]):
+    def handle_struct(self, name: str, sdf: dict[str, Any]):
         # Check for valid name
         self.check_name(name)
 
@@ -1165,23 +1430,12 @@ class Parser:
                     f"Invalid top-level section '{section}' in message or struct definition of {name} -> {self.current_file}."
                 )
 
-        # Create a string representation of the defintion to hash
-        f: Union[str, List[str]]
-        if isinstance(sdf["fields"], str):
-            f = f"    fields: {sdf['fields']}"
-        else:
-            f = [f"    {fname}: {ftype}" for fname, ftype in sdf["fields"].items()]
-        f = "\n".join(f)
-
-        raw = f"{name}:\n  fields:\n{f}"
-        raw = textwrap.dedent(raw)
-        hash = sha256(raw.encode()).hexdigest()
-
-        # Create the SDF data class
-        obj = SDF(raw, hash, name, src=self.current_index)
+        # Create the SDF data class. Its text and hash need its fields.
+        obj = SDF("", "", name, src=self.current_index)
 
         # Parse and the fields of the definition
         self.add_fields(obj, sdf["fields"])
+        obj.raw, obj.hash = self.definition_hash(obj)
 
         # Store the new defintion
         self.struct_defs[name] = obj
@@ -1196,7 +1450,7 @@ class Parser:
                 f"Invalid name {name} in {self.current_file}. Names can only start with letters"
             )
 
-    def handle_message_def(self, name: str, mdf: Dict[str, Any]):
+    def handle_message_def(self, name: str, mdf: dict[str, Any]):
         # Check for valid name
         self.check_name(name)
 
@@ -1234,20 +1488,8 @@ class Parser:
             self.handle_signal(name, mdf)
             return
 
-        # Create a string representation of the defintion to hash
-        f: Union[str, List[str]]
-        if isinstance(mdf["fields"], str):
-            f = f"    fields: {mdf['fields']}"
-        else:
-            f = [f"    {fname}: {ftype}" for fname, ftype in mdf["fields"].items()]
-            f = "\n".join(f)
-        raw = f"{name}:\n  id: {mdf['id']}\n  fields:\n{f}"
-
-        raw = textwrap.dedent(raw)
-        hash = sha256(raw.encode()).hexdigest()
-
-        # Create the MDF data class
-        obj = MDF(raw, hash, name, type_id=mdf["id"], src=self.current_index)
+        # Create the MDF data class. Its text and hash need its fields.
+        obj = MDF("", "", name, type_id=mdf["id"], src=self.current_index)
 
         # Check and validate message id
         msg_id = mdf["id"]
@@ -1256,11 +1498,12 @@ class Parser:
 
         # Parse and the fields of the definition
         self.add_fields(obj, mdf["fields"])
+        obj.raw, obj.hash = self.definition_hash(obj)
 
         # Store the new defintion
         self.message_defs[name] = obj
 
-    def handle_reserve(self, name: str, mdf: Dict[str, List]):
+    def handle_reserve(self, name: str, mdf: dict[str, list]):
         for section in mdf.keys():
             if section not in ("id",):
                 raise RTMASyntaxError(
@@ -1298,6 +1541,61 @@ class Parser:
         for id in reserved:
             name = f"RESERVED_{id:06d}"
             self.handle_signal(name, dict(id=id, fields=None))
+
+    def names_later_struct(self, ftype: Any, file_structs: dict[str, Any]) -> bool:
+        """Whether an alias's type is a struct defined later in this file.
+
+        Args:
+            ftype: The type the alias names.
+            file_structs: The ``struct_defs`` section of the file.
+
+        Returns:
+            True when `ftype` is a struct in `file_structs`, or an alias of one
+            that is waiting for it.
+        """
+        if not isinstance(ftype, str):
+            return False
+        return ftype in self._pending_aliases or (
+            ftype in file_structs and ftype not in self.struct_defs
+        )
+
+    def defer_alias(self, alias: str, ftype: str, file_structs: dict[str, Any]):
+        """Check an alias now, and resolve it once the struct it names is defined.
+
+        Args:
+            alias: The alias's name.
+            ftype: The struct it names, or an alias waiting for one.
+            file_structs: The ``struct_defs`` section of the file.
+
+        Raises:
+            RTMASyntaxError: The name is invalid.
+            DuplicateNameError: The name is already used, or is a struct in
+                this file too.
+        """
+        self.check_name(alias)
+        self.check_duplicate_name(
+            "aliases",
+            alias,
+            namespaces=(
+                "constants",
+                "string_constants",
+                "aliases",
+                "struct_defs",
+                "message_defs",
+            ),
+        )
+        if alias in self._pending_aliases or alias in file_structs:
+            raise DuplicateNameError(
+                f"Duplicate name conflict found: {alias} -> {self.current_file}"
+            )
+        self._pending_aliases[alias] = ftype
+
+    def resolve_pending_aliases(self):
+        """Resolve the deferred aliases whose type is now defined, in order."""
+        for alias, ftype in list(self._pending_aliases.items()):
+            if ftype in self.struct_defs or ftype in self.aliases:
+                del self._pending_aliases[alias]
+                self.aliases[alias] = self.resolve_alias(alias, ftype)
 
     def parse_text(self, text: str):
         self.check_key_value_separation(text)
@@ -1354,9 +1652,17 @@ class Parser:
                 self.handle_string(name, str_const)
             self.yaml_dict["string_constants"].update(data["string_constants"])
 
+        # An alias may name a struct defined later in this file. It is
+        # resolved once that struct is, like a struct that uses another.
+        file_structs = data.get("struct_defs") or {}
+        if not isinstance(file_structs, dict):
+            file_structs = {}
         if data.get("aliases") is not None:
             for alias, ftype in data["aliases"].items():
-                self.handle_alias(alias, ftype)
+                if self.names_later_struct(ftype, file_structs):
+                    self.defer_alias(alias, ftype, file_structs)
+                else:
+                    self.handle_alias(alias, ftype)
             self.yaml_dict["aliases"].update(data["aliases"])
 
         if data.get("host_ids") is not None:
@@ -1372,12 +1678,22 @@ class Parser:
         if data.get("struct_defs") is not None:
             for name, sdf in data["struct_defs"].items():
                 self.handle_struct(name, sdf)
+                self.resolve_pending_aliases()
             self.yaml_dict["struct_defs"].update(data["struct_defs"])
+        # Only a struct in this file defers an alias, so all are resolved.
+        assert not self._pending_aliases, self._pending_aliases
 
         if data.get("message_defs") is not None:
             for name, mdf in data["message_defs"].items():
                 self.handle_message_def(name, mdf)
-            self.yaml_dict["message_defs"].update(data["message_defs"])
+            message_defs = dict(data["message_defs"])
+            # Each file may reserve IDs; keep them all for --combined output.
+            earlier = self.yaml_dict["message_defs"].get("_RESERVED_")
+            if earlier is not None and "_RESERVED_" in message_defs:
+                message_defs["_RESERVED_"] = {
+                    "id": list(earlier["id"]) + list(message_defs["_RESERVED_"]["id"])
+                }
+            self.yaml_dict["message_defs"].update(message_defs)
 
     def check_key_value_separation(self, text: str):
         for n, line in enumerate(text.splitlines(), start=1):

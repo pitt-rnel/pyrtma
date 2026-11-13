@@ -1,7 +1,6 @@
 import pathlib
 from pyrtma.parser import Parser, MT, MID
 from pyrtma.__version__ import __version__
-from typing import Union
 
 
 class InfoCompiler:
@@ -24,7 +23,7 @@ class InfoCompiler:
             mids = list(self.parser.module_ids.values())
             mids.sort(key=lambda x: x.value)
             f.write("module_ids\n")
-            obj: Union[MID, MT]
+            obj: MID | MT
             for obj in mids:
                 src = obj.src.name
                 f.write(f"{obj.value:4d}: {obj.name:<32} # {src}\n")

@@ -1,7 +1,6 @@
 import pathlib
 
 from textwrap import dedent
-from typing import Union
 from pyrtma.parser import (
     Parser,
     ConstantExpr,
@@ -20,6 +19,7 @@ tab = "    "
 # Native C types that are supported
 type_map = {
     "char": "char",
+    "signed char": "signed char",
     "unsigned char": "unsigned char",
     "byte": "uint8_t",
     "int": "int32_t",
@@ -73,7 +73,7 @@ class CDefCompiler:
     def generate_module_id(self, mid: MID) -> str:
         return f"#define MID_{mid.name:<48}{mid.value}\n"
 
-    def generate_hash_id(self, mdf: Union[MDF, SDF]) -> str:
+    def generate_hash_id(self, mdf: MDF | SDF) -> str:
         return f"#define HASH_{mdf.name:<48} 0x{mdf.hash[:8]}\n"
 
     def generate_type_alias(self, td: TypeAlias) -> str:
@@ -91,7 +91,22 @@ class CDefCompiler:
 
         raise RuntimeError(f"No type found for alias: {td.name}")
 
-    def generate_struct(self, struct: Union[SDF, MDF]) -> str:
+    def struct_aliases(self, struct: SDF) -> list[TypeAlias]:
+        """The aliases of a struct, which are defined right after it.
+
+        Args:
+            struct: A struct this header defines.
+
+        Returns:
+            The aliases that name it, from files other than the core ones.
+        """
+        return [
+            a
+            for a in self.parser.aliases.values()
+            if a.type_obj is struct and a.src.name not in Parser.core_imports
+        ]
+
+    def generate_struct(self, struct: SDF | MDF) -> str:
         if isinstance(struct, MDF):
             prefix = "MDF_"
         elif isinstance(struct, SDF):
@@ -148,7 +163,7 @@ class CDefCompiler:
         s = ""
 
         s += "typedef struct {\n"
-        obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
+        obj: ConstantExpr | ConstantString | HID | MID | TypeAlias | SDF | MT | MDF
         for obj in self.parser.constants.values():
             if obj.src.name in Parser.core_imports:
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
@@ -226,7 +241,7 @@ class CDefCompiler:
     def generate_rtma_info_getter(self) -> str:
         s = "const RTMAInfo get_rtma_info() {\n"
         s += "    static RTMAInfo RTMA;\n"
-        obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
+        obj: ConstantExpr | ConstantString | HID | MID | TypeAlias | SDF | MT | MDF
         for obj in self.parser.constants.values():
             if obj.src.name in Parser.core_imports:
                 continue  # exclude core_defs.yaml, C clients will import rtma.h
@@ -282,7 +297,7 @@ class CDefCompiler:
         return f"#endif // _{filename}_"
 
     def generate(self, out_filepath: pathlib.Path):
-        with open(out_filepath, mode="w") as f:
+        with open(out_filepath, mode="w", encoding="utf-8") as f:
             # Version comment
             f.write(self.generate_version_comment())
 
@@ -296,7 +311,7 @@ class CDefCompiler:
 
             # Constants
             f.write("// Constants\n")
-            obj: Union[ConstantExpr, ConstantString, HID, MID, TypeAlias, SDF, MT, MDF]
+            obj: ConstantExpr | ConstantString | HID | MID | TypeAlias | SDF | MT | MDF
             for obj in self.parser.constants.values():
                 # exclude core_defs.yaml, C clients will import rtma.h
                 if obj.src.name not in Parser.core_imports:
@@ -311,12 +326,22 @@ class CDefCompiler:
                     f.write(self.generate_string_constant(obj))
             f.write("\n")
 
-            # Type Aliases
+            # Type Aliases. An alias of a struct that this header defines
+            # follows that struct instead; one of a core struct is here, after
+            # rtma.h.
+            emitted_structs = [
+                s
+                for s in self.parser.struct_defs.values()
+                if s.src.name not in Parser.core_imports
+            ]
             f.write("// Type Aliases\n")
             for obj in self.parser.aliases.values():
                 # exclude core_defs.yaml, C clients will import rtma.h
-                if obj.src.name not in Parser.core_imports:
-                    f.write(self.generate_type_alias(obj))
+                if obj.src.name in Parser.core_imports:
+                    continue
+                if any(obj.type_obj is s for s in emitted_structs):
+                    continue
+                f.write(self.generate_type_alias(obj))
             f.write("\n")
 
             # Host IDs
@@ -349,7 +374,10 @@ class CDefCompiler:
                 # exclude core_defs.yaml, C clients will import rtma.h
                 if obj.src.name not in Parser.core_imports:
                     f.write(self.generate_struct(obj))
-                    f.write("\n\n")
+                    f.write("\n")
+                    for alias in self.struct_aliases(obj):
+                        f.write(self.generate_type_alias(alias))
+                    f.write("\n")
 
             # Message Definitions
             f.write("// Message Definitions\n")

@@ -1,17 +1,68 @@
 import pathlib
 import ctypes
+import logging
 import os
 import time
 
 from concurrent.futures import ThreadPoolExecutor
-from typing import Generator, Any, Iterable
-from tkinter import filedialog
+from types import ModuleType
+from collections.abc import Generator, Iterable
+from typing import Any
 
 from pyrtma.header import MessageHeader
 from pyrtma.message import Message
 from pyrtma.exceptions import UnknownMessageType, MessageDefinitionsError
 from pyrtma.definitions import MessageDefinitions
 from pyrtma.loader import load_message_definitions
+
+_logger = logging.getLogger(__name__)
+
+
+def _filedialog() -> ModuleType:
+    """Import ``tkinter.filedialog`` when a file has to be chosen.
+
+    Importing it at module level broke importing the data logger where
+    ``tkinter`` isn't installed, such as on headless Linux.
+
+    Raises:
+        RuntimeError: ``tkinter`` isn't available.
+
+    Returns:
+        The ``tkinter.filedialog`` module.
+    """
+    try:
+        from tkinter import filedialog
+    except ImportError as e:
+        raise RuntimeError(
+            "tkinter isn't available to choose a file; pass the paths instead."
+        ) from e
+    return filedialog
+
+
+def _wanted(
+    msg_type: int,
+    type_name: str | None,
+    include: list[str | int] | None,
+    exclude: list[str | int] | None,
+) -> bool:
+    """Apply the ``include`` and ``exclude`` filters to one message type.
+
+    Args:
+        msg_type: The message type.
+        type_name: Its name, or None when the definitions don't have it, in
+            which case only numbers in the filters can match it.
+        include: Types to keep, by number or name; None or empty keeps all.
+        exclude: Types to drop, by number or name.
+
+    Returns:
+        True if messages of this type are to be loaded.
+    """
+    names = (msg_type,) if type_name is None else (msg_type, type_name)
+    if include and not any(n in include for n in names):
+        return False
+    if exclude and any(n in exclude for n in names):
+        return False
+    return True
 
 
 class BinFileHeader(ctypes.Structure):
@@ -103,7 +154,7 @@ class LogReader:
         self, msg_defs: str | pathlib.Path | None = None
     ) -> MessageDefinitions:
         if msg_defs is None:
-            msg_defs_file = filedialog.askopenfilename(
+            msg_defs_file = _filedialog().askopenfilename(
                 initialdir=pathlib.Path.home(),
                 title="Select the Message Definition File",
                 filetypes=(("python files", "*.py*"), ("All files", "*.*")),
@@ -123,18 +174,21 @@ class LogReader:
         throw: bool = True,
     ) -> MessageLog:
         if binfiles is None:
-            binfiles = filedialog.askopenfilenames(
-                initialdir=pathlib.Path.home(),
-                title="Select QL Files",
-                filetypes=(("QL files", "*.bin*"), ("All files", "*.*")),
+            chosen: tuple[str, ...] = tuple(
+                _filedialog().askopenfilenames(
+                    initialdir=pathlib.Path.home(),
+                    title="Select QL Files",
+                    filetypes=(("QL files", "*.bin*"), ("All files", "*.*")),
+                )
             )
 
-            if len(binfiles) <= 0:
+            if len(chosen) <= 0:
                 raise RuntimeError("No quicklogger .bin files were selected.")
+            binfiles = chosen
 
-        binfiles = [pathlib.Path(p) for p in binfiles]
+        paths = [pathlib.Path(p) for p in binfiles]
 
-        for binfile_path in binfiles:
+        for binfile_path in paths:
             if not binfile_path.exists():
                 raise FileNotFoundError(f"{binfile_path.absolute()}")
 
@@ -148,7 +202,7 @@ class LogReader:
                     exclude=exclude,
                     throw=throw,
                 )
-                for binfile_path in binfiles
+                for binfile_path in paths
             ]
 
             for future in futures:
@@ -166,80 +220,110 @@ class LogReader:
         exclude: list[str | int] | None = None,
         throw: bool = True,
     ):
-        """Parse a single QL file and return the messages."""
+        """Parse a single QL file and return the messages.
+
+        ``include`` and ``exclude`` are applied before a message is checked
+        against the definitions, so a type the definitions don't have, or have
+        with another size, can be filtered out to load the rest.
+
+        Args:
+            binfile: The file.
+            include: Types to keep, by number or name; None keeps all.
+            exclude: Types to drop, by number or name.
+            throw: Raise on a message that can't be decoded or a truncated
+                file. When False, such messages are logged and skipped, and a
+                truncated file loads every message that is complete in it.
+
+        Raises:
+            UnknownMessageType: With ``throw``, a type has no definition.
+            MessageDefinitionsError: With ``throw``, a message's size doesn't
+                match its definition.
+            ValueError: With ``throw``, the file is truncated.
+
+        Returns:
+            The messages, in file order.
+        """
 
         print(f"Parsing QL File: {binfile}")
 
         start_time = time.perf_counter()
 
-        headers: list[MessageHeader] = []
-        offsets: list[int] = []
-
         binfile_path = pathlib.Path(binfile)
-        msgs = []
+        msgs: list[Message] = []
+        raw = binfile_path.read_bytes()
 
-        with open(binfile_path, "rb") as f:
-            # Parse binary file header
-            file_header = BinFileHeader.from_buffer_copy(
-                f.read(ctypes.sizeof(BinFileHeader))
+        def problem(text: str) -> None:
+            if throw:
+                raise ValueError(text)
+            _logger.warning(text)
+
+        # Parse binary file header
+        if len(raw) < ctypes.sizeof(BinFileHeader):
+            problem(f"{binfile} is truncated: its file header is incomplete.")
+            return msgs
+        file_header = BinFileHeader.from_buffer_copy(raw)
+        count = file_header.num_messages
+        msg_header_size = file_header.message_header_size
+        offset_size = file_header.data_block_offset_size
+
+        # The headers, then an offset per message, then the data block. A
+        # message can only be read when its header, its offset and all of its
+        # data are in the file.
+        headers_start = ctypes.sizeof(BinFileHeader)
+        offsets_start = headers_start + count * msg_header_size
+        data_start = offsets_start + count * offset_size
+        if len(raw) < data_start:
+            part = "message headers" if len(raw) < offsets_start else "offsets"
+            problem(f"{binfile} is truncated in its {part}; no data can be located.")
+            return msgs
+
+        offsets = (ctypes.c_uint32 * count).from_buffer_copy(raw, offsets_start)
+        data = memoryview(raw)[data_start:]
+
+        # Extract the message data for each message
+        for n, offset in enumerate(offsets):
+            header = MessageHeader.from_buffer_copy(
+                raw, headers_start + n * msg_header_size
             )
-            msg_header_size = file_header.message_header_size
 
-            # Extract the message headers
-            for _ in range(file_header.num_messages):
-                raw = f.read(msg_header_size)
-                headers.append(MessageHeader.from_buffer_copy(raw))
+            try:
+                msg_cls = self.definitions.get_msg_cls(header.msg_type)
+            except UnknownMessageType:
+                msg_cls = None
 
-            # Extract the message data offsets for each message
-            offset_size = file_header.data_block_offset_size
-            offsets = (ctypes.c_uint32 * file_header.num_messages).from_buffer_copy(
-                f.read(offset_size * file_header.num_messages)
-            )
-            offsets = list(map(int, offsets))
+            # Filter first, so an excluded type is never checked.
+            type_name = None if msg_cls is None else msg_cls.type_name
+            if not _wanted(header.msg_type, type_name, include, exclude):
+                continue
 
-            # Read the entire data block remaining
-            d_bytes = f.read()
+            if msg_cls is None:
+                err_msg = (
+                    f"Message type {header.msg_type} not found in message definitions"
+                )
+                if throw:
+                    raise UnknownMessageType(err_msg)
+                _logger.warning(err_msg)
+                continue
 
-            # Extract the message data for each message
-            for n, offset in enumerate(offsets):
-                header = headers[n]
+            if msg_cls.type_size != header.num_data_bytes:
+                err_msg = f"Message type {header.msg_type} has a data size ({header.num_data_bytes}) that does not match the expected size of {msg_cls.type_size} for {msg_cls.type_name}"
+                if throw:
+                    raise MessageDefinitionsError(err_msg)
+                _logger.warning(err_msg)
+                continue
 
-                try:
-                    msg_cls = self.definitions.get_msg_cls(header.msg_type)
-                except:
-                    err_msg = f"Message type {header.msg_type} not found in message definitions"
-                    if throw:
-                        raise UnknownMessageType(err_msg)
-                    else:
-                        print(err_msg)
-                        continue
+            if offset + header.num_data_bytes > len(data):
+                problem(
+                    f"{binfile} is truncated: {n} of {count} messages have all "
+                    "their data."
+                )
+                break
 
-                raw_bytes = d_bytes[offset : offset + header.num_data_bytes]
+            # Decode the message data from the raw bytes using the message class
+            msg_data = msg_cls.from_buffer_copy(data, offset)
 
-                if msg_cls.type_size != header.num_data_bytes:
-                    err_msg = f"Message type {header.msg_type} has a data size ({header.num_data_bytes}) that does not match the expected size of {msg_cls.type_size} for {msg_cls.type_name}"
-                    if throw:
-                        raise MessageDefinitionsError(err_msg)
-                    else:
-                        print(err_msg)
-                        continue
-
-                # Check if message type is in the include or exclude lists, if provided
-                if include and (
-                    header.msg_type not in include and msg_cls.type_name not in include
-                ):
-                    continue
-
-                if exclude and (
-                    header.msg_type in exclude or msg_cls.type_name in exclude
-                ):
-                    continue
-
-                # Decode the message data from the raw bytes using the message class
-                msg_data = msg_cls.from_buffer_copy(raw_bytes)
-
-                # Store the message with its header and data in the list of messages
-                msgs.append(Message(header=header, data=msg_data))
+            # Store the message with its header and data in the list of messages
+            msgs.append(Message(header=header, data=msg_data))
 
         end_time = time.perf_counter()
         print(

@@ -1,7 +1,21 @@
-class RTMAMessageError(Exception):
-    """Base exception for message errors."""
+from typing import Any
 
-    pass
+
+class RTMAMessageError(Exception):
+    """Base exception for message errors.
+
+    Attributes:
+        header: The header of the received message that caused the error, when
+            a client raised it while reading; otherwise None. A data logger
+            uses it to tell which message type it couldn't record.
+        payload: The received message's payload bytes, when a client raised
+            it while reading; otherwise None. A data logger can record them
+            undecoded.
+    """
+
+    # Typed as Any to avoid importing the header module here.
+    header: Any | None = None
+    payload: bytes | None = None
 
 
 class UnknownMessageType(RTMAMessageError):
@@ -18,6 +32,12 @@ class JSONDecodingError(RTMAMessageError):
 
 class InvalidMessageDefinition(RTMAMessageError):
     """Raised when there is message definition is out of sync with sent data."""
+
+    pass
+
+
+class RawFormatError(Exception):
+    """Raised when a file isn't a raw data logger file this pyrtma can read."""
 
     pass
 

@@ -1,13 +1,12 @@
 import unittest
-import random
 import threading
 import time
 import logging
 
 import pyrtma
 import pyrtma.exceptions
+from .helpers import bound_port
 from .test_msg_defs import test_defs as td
-import time
 from pyrtma.client import client_context
 from pyrtma.message import *
 from pyrtma.manager import MessageManager
@@ -17,17 +16,16 @@ class TestSync(unittest.TestCase):
     """Test sending messages through MessageManager."""
 
     def setUp(self):
-        self.port = random.randint(1000, 10000)  # random port
-        self.addr = f"127.0.0.1:{self.port}"
         self.defs = td.get_message_definitions()
 
         self.manager = MessageManager(
             ip_address="127.0.0.1",
-            port=self.port,
-            timecode=False,
+            port=0,
             log_level=logging.ERROR,
             debug=False,
         )
+        self.port = bound_port(self.manager)
+        self.addr = f"127.0.0.1:{self.port}"
         self.manager_thread = threading.Thread(
             target=self.manager.run,
         )

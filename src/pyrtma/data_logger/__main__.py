@@ -9,6 +9,15 @@ def main():
     import pyrtma
     from ..exceptions import ConnectionLost, MessageManagerNotFound
     from .data_logger import DataLogger
+    from .dataset_writer import DatasetWriter, check_write_period
+
+    def write_period(text: str) -> float:
+        try:
+            return check_write_period(float(text))
+        except ValueError as e:
+            raise argparse.ArgumentTypeError(
+                f"expected seconds greater than 0, not {text!r}"
+            ) from e
 
     parser = argparse.ArgumentParser(description="Packet Data Logger")
 
@@ -38,6 +47,31 @@ def main():
         help="Logging Level (defaults to INFO)",
     )
 
+    parser.add_argument(
+        "--fsync",
+        action="store_true",
+        help=(
+            "Flush and fsync each dataset file after every write and before "
+            "closing it, so a power loss costs at most one write period. By "
+            "default the operating system decides when to write its buffers "
+            "to disk."
+        ),
+    )
+
+    parser.add_argument(
+        "--write-period",
+        dest="write_period",
+        type=write_period,
+        default=DatasetWriter.WRITE_PERIOD,
+        metavar="SECONDS",
+        help=(
+            "Seconds between each dataset's writes to its file (default "
+            f"{DatasetWriter.WRITE_PERIOD:g}). Messages received since the last "
+            "write are lost if the logger dies or the power fails; a shorter "
+            "period loses less and writes more often."
+        ),
+    )
+
     args = parser.parse_args()
 
     if args.log_level == "DEBUG":
@@ -54,7 +88,17 @@ def main():
 
     definitions = pyrtma.load_message_definitions(args.defs_file)
 
-    d = DataLogger(args.mm_ip, log_level=level, definitions=definitions)
+    try:
+        d = DataLogger(
+            args.mm_ip,
+            log_level=level,
+            definitions=definitions,
+            fsync=args.fsync,
+            write_period=args.write_period,
+        )
+    except MessageManagerNotFound as e:
+        print(f"MessageManagerNotFound: {e}", file=sys.stderr)
+        sys.exit(1)
 
     try:
         d.run()

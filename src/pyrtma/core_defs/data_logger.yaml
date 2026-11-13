@@ -4,6 +4,7 @@
 constants:
   MAX_DATASETS: 6
   DATASET_NAME_LEN: 32
+  DATASET_MAX_SIZE_MB: 500  # Largest allowed DATASET max_size_mb
 
 struct_defs:
   DATASET:
@@ -12,7 +13,7 @@ struct_defs:
         save_path: char[256]      # Dataset save directory 
         filename: char[128]       # Dataset saved file name without the file extension
         formatter: char[32]       # Builtin Options: quicklogger, json, raw, msg_header
-        subdivide_interval: int32 # <=0: Single File, >=30: Subdivide recording files
+        max_size_mb: int32        # Largest file in MB (1 to DATASET_MAX_SIZE_MB); a full file continues in a new one
         msg_types: int32[64]      # Message type ids that should be passed to dataset formatter
 
 message_defs:

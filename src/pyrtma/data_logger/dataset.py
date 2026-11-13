@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import time
 import textwrap
+import warnings
 import pyrtma
 import pyrtma.core_defs as cd
 from pyrtma.data_logger.exceptions import NoClientError
 from pyrtma.definitions import MessageDefinitions
 from pyrtma.exceptions import UnknownMessageType
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Any, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 if TYPE_CHECKING:
     from _typeshed import StrPath
@@ -37,12 +38,51 @@ class Dataset:
         filename: str,
         formatter: str,
         subdivide_interval: int = 0,
-        msg_types: List[int] | None = None,
+        msg_types: list[int] | None = None,
         mm_ip: str = "127.0.0.1:7111",
         status_interval: float = 5.0,
         create_client: bool = True,
         definitions: MessageDefinitions | None = None,
+        *,
+        max_size_mb: int = cd.DATASET_MAX_SIZE_MB,
     ):
+        """Describe a dataset for the data logger to record.
+
+        Args:
+            name: The dataset's name.
+            save_path: The folder the data logger saves to.
+            filename: The file name, without the formatter's extension.
+            formatter: The formatter's name, such as ``"quicklogger"``.
+            subdivide_interval: Deprecated and ignored: files are split by
+                size, with ``max_size_mb``. A nonzero value warns.
+            msg_types: The message types to record; None records all.
+            mm_ip: The manager's ``host:port``, for a client of its own.
+            status_interval: Seconds between status requests in ``poll()``.
+            create_client: Connect a client of its own; otherwise call
+                ``register_client()``.
+            definitions: The message definitions; the core ones by default.
+            max_size_mb: The largest file, in MB of 1,000,000 bytes, from 1 to
+                ``DATASET_MAX_SIZE_MB``. A full file continues in a new one.
+
+        Raises:
+            ValueError: ``max_size_mb`` is out of range.
+        """
+        # Set first, so close() works if this constructor raises.
+        self._managed_client = False
+        self._client = None
+        if not 1 <= max_size_mb <= cd.DATASET_MAX_SIZE_MB:
+            raise ValueError(
+                f"max_size_mb must be from 1 to {cd.DATASET_MAX_SIZE_MB}, "
+                f"not {max_size_mb}."
+            )
+        if subdivide_interval:
+            warnings.warn(
+                "subdivide_interval is deprecated and ignored; files are split "
+                "by size, with max_size_mb.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        self._max_size_mb = max_size_mb
         self._definitions = definitions or cd.get_message_definitions()
 
         if create_client:
@@ -76,6 +116,8 @@ class Dataset:
 
         self.status_interval = status_interval
         self._last_request = time.time()
+        #: The last ``DATA_LOGGER_CONFIG`` received, or None.
+        self.datalogger_config: cd.MDF_DATA_LOGGER_CONFIG | None = None
 
     def close(self):
         if self._managed_client and self._client:
@@ -89,7 +131,7 @@ class Dataset:
         name         = {self.name}
         filename     = {self.filename}
         formatter    = {self.formatter}
-        subdivide    = {self.subdivide_interval}
+        max_size_mb  = {self.max_size_mb}
         msg_types    = {self.msg_names}
         added        = {self.added}
         started      = {self.started}
@@ -135,7 +177,13 @@ class Dataset:
 
     @property
     def subdivide_interval(self) -> int:
+        """Deprecated and ignored; see :py:attr:`max_size_mb`."""
         return self._subdivide_interval
+
+    @property
+    def max_size_mb(self) -> int:
+        """The largest file the data logger writes for this dataset, in MB."""
+        return self._max_size_mb
 
     @property
     def msg_types(self) -> tuple[int, ...]:
@@ -211,14 +259,19 @@ class Dataset:
             return self.process_msg(msg)
 
     def process_msg(self, msg: pyrtma.Message) -> cd.MDF_DATA_LOGGER_ERROR | None:
-        if msg.type_id in (
+        if msg.type_id == cd.MT_DATA_LOGGER_ERROR:
+            # An error names its dataset in dataset_name; one with no name is
+            # about the data logger as a whole, so every dataset gets it.
+            dataset_name = cast(cd.MDF_DATA_LOGGER_ERROR, msg.data).dataset_name
+            if dataset_name not in ("", self._name):
+                return
+        elif msg.type_id in (
             cd.MT_DATASET_STATUS,
             cd.MT_DATASET_ADDED,
             cd.MT_DATASET_STARTED,
             cd.MT_DATASET_STOPPED,
             cd.MT_DATASET_REMOVED,
             cd.MT_DATASET_SAVED,
-            cd.MT_DATA_LOGGER_ERROR,
         ):
             if msg.data.name != self._name:
                 return
@@ -240,15 +293,7 @@ class Dataset:
             case cd.MT_DATA_LOGGER_ERROR:
                 return cast(cd.MDF_DATA_LOGGER_ERROR, msg.data)
             case cd.MT_DATA_LOGGER_CONFIG:
-                definitions = (
-                    self._client.definitions
-                    if self._client is not None
-                    else self._definitions
-                )
-                self.datalogger_config = self.process_data_logger_config_msg(
-                    cast(cd.MDF_DATA_LOGGER_CONFIG, msg.data),
-                    definitions=definitions,
-                )
+                self.datalogger_config = cast(cd.MDF_DATA_LOGGER_CONFIG, msg.data)
 
     def add(self) -> cd.MDF_DATASET_ADD:
         msg = cd.MDF_DATASET_ADD()
@@ -257,7 +302,7 @@ class Dataset:
         msg.dataset.filename = self.filename
         msg.dataset.formatter = self.formatter
         msg.dataset.msg_types[: len(self.msg_types)] = self.msg_types
-        msg.dataset.subdivide_interval = self.subdivide_interval
+        msg.dataset.max_size_mb = self.max_size_mb
 
         if self._client:
             self._client.send_message(msg)

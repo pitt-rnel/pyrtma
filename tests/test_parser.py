@@ -7,9 +7,8 @@ if version_info[:2] < (3, 8):
 import tempfile
 import pyrtma.parser
 import textwrap
-import pathlib
+from pathlib import Path
 import logging
-import unittest
 
 
 class TempDefFile:
@@ -18,14 +17,14 @@ class TempDefFile:
             "w", suffix=".defs", delete=False
         )
         self.compiler_file.close()
-        self.compiler_path = pathlib.Path(self.compiler_file.name)
+        self.compiler_path = Path(self.compiler_file.name)
 
         self.msg_file = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False)
         self.msg_file.close()
-        self.msg_path = pathlib.Path(self.msg_file.name)
+        self.msg_path = Path(self.msg_file.name)
 
     @property
-    def path(self) -> pathlib.Path:
+    def path(self) -> Path:
         return self.compiler_path
 
     def __del__(self):
@@ -62,7 +61,7 @@ class TestParser(unittest.TestCase):
         self.tmp = TempDefFile()
         self.tmp2 = TempDefFile()
 
-    def TearDown(self) -> None:
+    def tearDown(self) -> None:
         del self.tmp
         del self.tmp2
 
@@ -672,3 +671,780 @@ class TestParser(unittest.TestCase):
         self.tmp.write(text)
         with self.assertRaises(pyrtma.parser.RTMASyntaxError):
             self.parser.parse(self.tmp.path)
+
+
+# The tests below are pytest tests, written in Phase 8. Each writes its
+# definitions to ``tmp_path`` and parses them with a parser whose log is
+# recorded rather than printed.
+
+from hashlib import sha256
+
+import pytest
+
+from pyrtma.parser import (
+    CircularRefError,
+    ExpressionExpansionError,
+    ParserError,
+    RecurisionError,
+    RTMASyntaxError,
+)
+
+from .helpers import parse_definitions, write_definitions
+
+
+def message(field_spec: str, *, constants: str = "") -> str:
+    """YAML for one message, ``M``, with one field, ``a``.
+
+    Args:
+        field_spec: The field's type, such as ``int32[4]``.
+        constants: Lines for a ``constants`` section, if any.
+
+    Returns:
+        The YAML text.
+    """
+    text = ""
+    if constants:
+        text += "constants:\n" + "".join(
+            f"  {line}\n" for line in constants.splitlines()
+        )
+    text += f"message_defs:\n  M:\n    id: 7000\n    fields:\n      a: {field_spec}\n"
+    return text
+
+
+def chain(depth: int) -> str:
+    """Constants ``C0`` to ``C<depth>``, each one more than the one before.
+
+    Args:
+        depth: How deeply the last constant is nested.
+
+    Returns:
+        Lines for a ``constants`` section.
+    """
+    lines = ["C0: 1"] + [f"C{n}: C{n - 1} + 1" for n in range(1, depth + 1)]
+    return "\n".join(lines)
+
+
+class TestArrayLengths:
+    @pytest.mark.parametrize(
+        ("spec", "constants"),
+        [("int32[0]", ""), ("int32[N]", "N: 0"), ("int32[N - 4]", "N: 4")],
+    )
+    def test_zero_length_is_rejected(
+        self, tmp_path: Path, spec: str, constants: str
+    ) -> None:
+        defs = write_definitions(tmp_path, {"m": message(spec, constants=constants)})
+
+        with pytest.raises(RTMASyntaxError, match="M.a"):
+            parse_definitions(defs)
+
+    def test_fractional_length_is_rejected(self, tmp_path: Path) -> None:
+        defs = write_definitions(
+            tmp_path, {"m": message("int32[N / 3]", constants="N: 8")}
+        )
+
+        with pytest.raises(RTMASyntaxError, match="whole number"):
+            parse_definitions(defs)
+
+    def test_whole_float_length_is_accepted(self, tmp_path: Path) -> None:
+        defs = write_definitions(
+            tmp_path, {"m": message("int32[N / 2]", constants="N: 8")}
+        )
+
+        parser, _ = parse_definitions(defs)
+
+        field = parser.message_defs["M"].fields[0]
+        assert (field.length, field.size) == (4, 16)
+
+    def test_negative_length_is_rejected(self, tmp_path: Path) -> None:
+        defs = write_definitions(tmp_path, {"m": message("int32[-2]")})
+
+        with pytest.raises(RTMASyntaxError, match="-2"):
+            parse_definitions(defs)
+
+    @pytest.mark.parametrize("spec", ["int32[4] junk", "int32[4]junk", "int32[4]]"])
+    def test_trailing_text_is_rejected(self, tmp_path: Path, spec: str) -> None:
+        defs = write_definitions(tmp_path, {"m": message(spec)})
+
+        with pytest.raises(ParserError):
+            parse_definitions(defs)
+
+    def test_spaces_around_a_field_spec_are_accepted(self, tmp_path: Path) -> None:
+        defs = write_definitions(tmp_path, {"m": message("' int32 [ 4 ] '")})
+
+        parser, _ = parse_definitions(defs)
+
+        field = parser.message_defs["M"].fields[0]
+        assert (field.type_name, field.length) == ("int32", 4)
+
+
+class TestConstantExpressions:
+    def test_many_symbols_are_accepted(self, tmp_path: Path) -> None:
+        names = [f"S{n}" for n in range(12)]
+        constants = "\n".join(f"{name}: 1" for name in names)
+        constants += "\nTOTAL: " + " + ".join(names)
+        defs = write_definitions(
+            tmp_path,
+            {
+                "m": f"constants:\n"
+                + "".join(f"  {line}\n" for line in constants.splitlines())
+            },
+        )
+
+        parser, _ = parse_definitions(defs)
+
+        assert parser.constants["TOTAL"].value == 12
+
+    def test_nesting_up_to_the_limit_is_accepted(self, tmp_path: Path) -> None:
+        depth = pyrtma.parser.MAX_REFERENCE_DEPTH
+        defs = write_definitions(
+            tmp_path, {"m": message(f"int32[C{depth}]", constants=chain(depth))}
+        )
+
+        parser, _ = parse_definitions(defs)
+
+        assert parser.message_defs["M"].fields[0].length == depth + 1
+
+    def test_nesting_past_the_limit_is_rejected(self, tmp_path: Path) -> None:
+        depth = pyrtma.parser.MAX_REFERENCE_DEPTH + 1
+        defs = write_definitions(
+            tmp_path, {"m": message("int32", constants=chain(depth))}
+        )
+
+        with pytest.raises(RecurisionError, match=f"C{depth}") as caught:
+            parse_definitions(defs)
+        # It is also a RecursionError, as the parser raised before.
+        assert isinstance(caught.value, RecursionError)
+
+    def test_self_reference_is_rejected(self, tmp_path: Path) -> None:
+        defs = write_definitions(
+            tmp_path, {"m": message("int32", constants="A: A + 1")}
+        )
+
+        with pytest.raises(CircularRefError, match="A"):
+            parse_definitions(defs)
+
+    def test_reference_to_a_later_constant_is_rejected(self, tmp_path: Path) -> None:
+        defs = write_definitions(
+            tmp_path, {"m": message("int32", constants="A: B + 1\nB: A + 1")}
+        )
+
+        with pytest.raises(ExpressionExpansionError, match="B"):
+            parse_definitions(defs)
+
+    @pytest.mark.parametrize("expression", ["1 +", "1 / 0", "(2"])
+    def test_invalid_expression_raises_a_parser_error(
+        self, tmp_path: Path, expression: str
+    ) -> None:
+        defs = write_definitions(
+            tmp_path, {"m": message("int32", constants=f"A: '{expression}'")}
+        )
+
+        with pytest.raises(ExpressionExpansionError, match="A"):
+            parse_definitions(defs)
+
+
+POINT = """\
+struct_defs:
+  POINT:
+    fields:
+      x: double
+      y: double
+"""
+
+
+class TestAliases:
+    def test_alias_to_a_struct_in_an_imported_file(self, tmp_path: Path) -> None:
+        user = """\
+            imports: [a]
+            aliases:
+              PT: POINT
+              PT2: PT
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  p: PT
+                  ps: PT2[3]
+            """
+        defs = write_definitions(tmp_path, {"a": POINT, "b": user})
+
+        parser, _ = parse_definitions(defs)
+
+        fields = parser.message_defs["M"].fields
+        assert [(f.name, f.offset, f.size) for f in fields] == [
+            ("p", 0, 16),
+            ("ps", 16, 48),
+        ]
+        assert parser.aliases["PT2"].type_obj is parser.struct_defs["POINT"]
+
+    def test_alias_to_a_struct_in_the_same_file(self, tmp_path: Path) -> None:
+        text = """\
+            aliases:
+              PT: POINT
+            struct_defs:
+              POINT:
+                fields:
+                  x: double
+                  y: double
+              LINE:
+                fields:
+                  start: PT
+                  end: PT
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  line: LINE
+                  p: PT
+            """
+        defs = write_definitions(tmp_path, {"m": text})
+
+        parser, _ = parse_definitions(defs)
+
+        assert parser.struct_defs["LINE"].size == 32
+        assert parser.message_defs["M"].size == 48
+
+    def test_struct_using_an_alias_before_its_struct_is_rejected(
+        self, tmp_path: Path
+    ) -> None:
+        text = """\
+            aliases:
+              PT: POINT
+            struct_defs:
+              LINE:
+                fields:
+                  start: PT
+              POINT:
+                fields:
+                  x: double
+            """
+        defs = write_definitions(tmp_path, {"m": text})
+
+        with pytest.raises(RTMASyntaxError, match="PT"):
+            parse_definitions(defs)
+
+    def test_alias_to_an_unknown_type_is_rejected(self, tmp_path: Path) -> None:
+        defs = write_definitions(tmp_path, {"m": "aliases:\n  PT: NOPE\n"})
+
+        with pytest.raises(RTMASyntaxError, match="PT"):
+            parse_definitions(defs)
+
+    def test_alias_to_itself_is_rejected(self, tmp_path: Path) -> None:
+        defs = write_definitions(tmp_path, {"m": "aliases:\n  PT: PT\n"})
+
+        with pytest.raises(CircularRefError, match="PT"):
+            parse_definitions(defs)
+
+    def test_alias_chain_past_the_limit_is_rejected(self, tmp_path: Path) -> None:
+        depth = pyrtma.parser.MAX_REFERENCE_DEPTH + 1
+        lines = ["A1: int32"] + [f"A{n}: A{n - 1}" for n in range(2, depth + 1)]
+        text = "aliases:\n" + "".join(f"  {line}\n" for line in lines)
+        defs = write_definitions(tmp_path, {"m": text})
+
+        with pytest.raises(RecurisionError, match=f"A{depth}"):
+            parse_definitions(defs)
+
+    def test_alias_chain_resolves_to_its_final_type(self, tmp_path: Path) -> None:
+        defs = write_definitions(tmp_path, {"m": "aliases:\n  A: int32\n  B: A\n"})
+
+        parser, _ = parse_definitions(defs)
+
+        assert parser.aliases["B"].type_name == "int32"
+
+
+class TestStringConstants:
+    def test_value_is_an_escaped_literal(self, tmp_path: Path) -> None:
+        text = """\
+            string_constants:
+              PATH: 'C:\\data\\new'
+              QUOTE: 'say "hi"'
+            """
+        defs = write_definitions(tmp_path, {"m": text})
+
+        parser, _ = parse_definitions(defs)
+
+        path = parser.string_constants["PATH"]
+        quote = parser.string_constants["QUOTE"]
+        assert path.text == "C:\\data\\new"
+        assert path.value == '"C:\\\\data\\\\new"'
+        assert quote.value == '"say \\"hi\\""'
+        # The literal means the same text in Python, as it does in C and JS.
+        assert eval(path.value) == path.text
+        assert eval(quote.value) == quote.text
+
+    @pytest.mark.parametrize("value", ["tab\\there", "line\\nbreak", "caf\\u00e9"])
+    def test_unprintable_text_is_rejected(self, tmp_path: Path, value: str) -> None:
+        defs = write_definitions(
+            tmp_path, {"m": f'string_constants:\n  S: "{value}"\n'}
+        )
+
+        with pytest.raises(RTMASyntaxError, match="S"):
+            parse_definitions(defs)
+
+
+class TestNativeTypes:
+    def test_signed_char_is_a_one_byte_integer(self, tmp_path: Path) -> None:
+        text = """\
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  one: signed char
+                  many: signed char[7]
+            """
+        defs = write_definitions(tmp_path, {"m": text})
+
+        parser, _ = parse_definitions(defs)
+
+        fields = parser.message_defs["M"].fields
+        assert [(f.name, f.size, f.type_obj.format) for f in fields] == [
+            ("one", 1, "b"),
+            ("many", 7, "b"),
+        ]
+
+
+class TestIds:
+    @pytest.mark.parametrize("value", [10000, 20000, 40000])
+    def test_module_id_in_the_dynamic_range_is_rejected(
+        self, tmp_path: Path, value: int
+    ) -> None:
+        defs = write_definitions(tmp_path, {"m": f"module_ids:\n  X: {value}\n"})
+
+        with pytest.raises(RTMASyntaxError, match="9999"):
+            parse_definitions(defs)
+
+    @pytest.mark.parametrize("value", [10, 99, 200, 9999])
+    def test_module_ids_in_range_are_accepted(self, tmp_path: Path, value: int) -> None:
+        defs = write_definitions(tmp_path, {"m": f"module_ids:\n  X: {value}\n"})
+
+        parser, _ = parse_definitions(defs)
+
+        assert parser.module_ids["X"].value == value
+
+    def test_host_id_above_max_hosts_warns(self, tmp_path: Path) -> None:
+        defs = write_definitions(tmp_path, {"m": "host_ids:\n  FAR: 6\n"})
+
+        parser, log = parse_definitions(defs)
+
+        assert parser.host_ids["FAR"].value == 6
+        assert any("FAR" in w and "MAX_HOSTS" in w for w in log.warnings)
+
+    def test_host_id_within_max_hosts_does_not_warn(self, tmp_path: Path) -> None:
+        defs = write_definitions(tmp_path, {"m": "host_ids:\n  NEAR: 5\n"})
+
+        _, log = parse_definitions(defs)
+
+        assert log.warnings == []
+
+
+class TestCompilerOptions:
+    def test_unknown_option_is_rejected(self, tmp_path: Path) -> None:
+        defs = write_definitions(
+            tmp_path, {"m": message("int32")}, options="IMPORT_COREDEFS: false"
+        )
+
+        with pytest.raises(RTMASyntaxError, match="IMPORT_COREDEFS"):
+            parse_definitions(defs)
+
+    def test_known_options_are_applied(self, tmp_path: Path) -> None:
+        defs = write_definitions(
+            tmp_path,
+            {"m": message("int32")},
+            options="import_coredefs: false\nauto_pad: false",
+        )
+
+        parser, _ = parse_definitions(defs)
+
+        assert not parser.import_coredefs
+        assert not parser.auto_pad
+        assert "EXIT" not in parser.message_defs
+
+
+class TestImports:
+    def test_yml_import_warns_without_prompting(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def no_prompt(prompt: str = "") -> str:
+            raise AssertionError("the parser prompted for input")
+
+        monkeypatch.setattr("builtins.input", no_prompt)
+        (tmp_path / "a.yml").write_text("constants:\n  X: 1\n", encoding="utf-8")
+        user = write_definitions(tmp_path, {"b": "imports: [a]\n"})
+        index = user.read_text(encoding="utf-8").replace(
+            "index:\n", "index:\n  a: a.yml\n"
+        )
+        user.write_text(index, encoding="utf-8")
+
+        parser, log = parse_definitions(user)
+
+        assert parser.constants["X"].value == 1
+        assert any("a.yml" in w for w in log.warnings)
+
+
+class TestPadding:
+    @pytest.mark.parametrize(
+        ("last", "pad"), [("int32", 4), ("int16", 6), ("int8", 7), ("int8[7]", 1)]
+    )
+    def test_trailing_padding_records_its_offset(
+        self, tmp_path: Path, last: str, pad: int
+    ) -> None:
+        text = f"""\
+            struct_defs:
+              S:
+                fields:
+                  d: double
+                  last: {last}
+            """
+        defs = write_definitions(tmp_path, {"m": text})
+
+        parser, _ = parse_definitions(defs)
+
+        fields = parser.struct_defs["S"].fields
+        padding = fields[-1]
+        assert padding.name.startswith("padding_")
+        assert (padding.offset, padding.size) == (16 - pad, pad)
+        assert [f.offset for f in fields] == sorted(f.offset for f in fields)
+
+
+# The type hash is the first 32 bits of a SHA-256 over a definition's text:
+# its name, ID and fields, each as written, ignoring spacing, and as resolved,
+# with a struct field carrying that struct's own hash, and inserted padding.
+# These tests write two versions of a definition and compare their hashes.
+def type_hash(directory: Path, text: str, name: str = "M") -> str:
+    """Parse definitions in a folder of their own and return one's hash.
+
+    Args:
+        directory: A folder for the files, created if it doesn't exist.
+        text: The YAML text of the definitions.
+        name: The message or struct whose hash to return.
+
+    Returns:
+        The definition's hash, as the parser computed it.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    parser, _ = parse_definitions(write_definitions(directory, {"m": text}))
+    definition = parser.message_defs.get(name) or parser.struct_defs[name]
+    return definition.hash
+
+
+def old_hash(text: str) -> str:
+    """The hash of a definition text, computed as the parser always has.
+
+    Args:
+        text: The definition's text, dedented.
+
+    Returns:
+        The SHA-256 of the text, as hex.
+    """
+    return sha256(textwrap.dedent(text).encode()).hexdigest()
+
+
+NESTED = """\
+    constants:
+      N: 8
+      K: 24
+    aliases:
+      AGE: int32
+      PT: P
+    struct_defs:
+      P:
+        fields:
+          x: int32
+          y: float
+      Q:
+        fields:
+          x: int32
+          y: float
+    message_defs:
+      M:
+        id: 7000
+        fields:
+          a: char[N]
+          b: char[K]
+          age: AGE
+          p: P
+          pts: PT[2]
+    """
+
+
+class TestTypeHash:
+    @pytest.mark.parametrize(
+        ("old", "new"),
+        [
+            ("N: 8\n      K: 24", "N: 16\n      K: 16"),
+            ("AGE: int32", "AGE: float"),
+            ("x: int32\n          y: float", "x: float\n          y: int32"),
+            ("x: int32", "z: int32"),
+            ("PT: P", "PT: Q"),
+        ],
+        ids=[
+            "constant",
+            "alias target",
+            "nested struct fields",
+            "nested struct field name",
+            "struct alias target",
+        ],
+    )
+    def test_a_resolved_change_changes_the_hash(
+        self, tmp_path: Path, old: str, new: str
+    ) -> None:
+        # Q has the same fields as P, so the last case changes only a name.
+        text = NESTED
+        assert old in text
+
+        before = type_hash(tmp_path / "before", text)
+        after = type_hash(tmp_path / "after", text.replace(old, new))
+
+        assert before != after
+
+    def test_a_renamed_nested_struct_changes_the_hash(self, tmp_path: Path) -> None:
+        renamed = NESTED.replace("  P:\n", "  R:\n").replace("PT: P", "PT: R")
+        renamed = renamed.replace("p: P", "p: R")
+
+        before = type_hash(tmp_path / "before", NESTED)
+        after = type_hash(tmp_path / "after", renamed)
+
+        assert before != after
+
+    def test_a_changed_nested_message_changes_the_hash(self, tmp_path: Path) -> None:
+        text = """\
+            message_defs:
+              INNER:
+                id: 7001
+                fields:
+                  x: int32
+              M:
+                id: 7000
+                fields:
+                  inner: INNER
+            """
+
+        before = type_hash(tmp_path / "before", text)
+        after = type_hash(tmp_path / "after", text.replace("x: int32", "x: float"))
+
+        assert before != after
+
+    def test_changed_copied_fields_change_the_hash(self, tmp_path: Path) -> None:
+        text = """\
+            struct_defs:
+              BASE:
+                fields:
+                  x: int32
+            message_defs:
+              M:
+                id: 7000
+                fields: BASE
+            """
+
+        before = type_hash(tmp_path / "before", text)
+        after = type_hash(tmp_path / "after", text.replace("x: int32", "x: float"))
+
+        assert before != after
+
+    def test_a_renamed_field_changes_the_hash(self, tmp_path: Path) -> None:
+        before = type_hash(tmp_path / "before", message("int32"))
+        after = type_hash(tmp_path / "after", message("int32").replace("a:", "b:"))
+
+        assert before != after
+
+    @pytest.mark.parametrize(
+        ("old", "new"),
+        [
+            ("char[N]", "char[ N ]"),
+            ("int32[N / 16]", "int32[N/16]"),
+            ("int32", "int"),
+            ("uint8", "byte"),
+            ("int8", "signed char"),
+            ("int16", "short"),
+            ("uint64", "unsigned long long"),
+        ],
+    )
+    def test_spelling_does_not_change_the_hash(
+        self, tmp_path: Path, old: str, new: str
+    ) -> None:
+        text = """\
+            constants:
+              N: 32
+            aliases:
+              TEXT: char
+              ID: int32
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  text: char[N]
+                  pair: int32[N / 16]
+                  count: int32
+                  small: int8
+                  octet: uint8
+                  half: int16
+                  big: uint64
+            """
+        # Change the field only, not an alias with the same text.
+        head, fields = text.split("message_defs:")
+        assert f": {old}\n" in fields
+        changed = head + "message_defs:" + fields.replace(f": {old}\n", f": {new}\n")
+
+        before = type_hash(tmp_path / "before", text)
+        after = type_hash(tmp_path / "after", changed)
+
+        assert before == after
+
+    @pytest.mark.parametrize(
+        ("old", "new"),
+        [
+            ("text: char[N]", "text: char[32]"),
+            ("text: char[N]", "text: char[2 * 16]"),
+            ("text: char[N]", "text: char[L]"),
+            ("count: ID", "count: int32"),
+            ("count: ID", "count: OTHER_ID"),
+        ],
+        ids=[
+            "constant to literal",
+            "constant to expression",
+            "other constant, same value",
+            "alias to native type",
+            "other alias, same type",
+        ],
+    )
+    def test_names_a_field_uses_change_the_hash(
+        self, tmp_path: Path, old: str, new: str
+    ) -> None:
+        text = """\
+            constants:
+              N: 32
+              L: 32
+            aliases:
+              ID: int32
+              OTHER_ID: int32
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  text: char[N]
+                  count: ID
+            """
+
+        before = type_hash(tmp_path / "before", text)
+        after = type_hash(tmp_path / "after", text.replace(old, new))
+
+        assert before != after
+
+    @pytest.mark.parametrize("kind", ["constant", "alias"])
+    def test_a_renamed_name_changes_the_hash(self, tmp_path: Path, kind: str) -> None:
+        text = """\
+            constants:
+              N: 32
+            aliases:
+              ID: int32
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  text: char[N]
+                  count: ID
+            """
+        old, new = ("N", "LEN") if kind == "constant" else ("ID", "COUNT")
+        renamed = text.replace(f"{old}:", f"{new}:").replace(f"[{old}]", f"[{new}]")
+        renamed = renamed.replace(f": {old}\n", f": {new}\n")
+        assert renamed.count(new) == 2
+
+        before = type_hash(tmp_path / "before", text)
+        after = type_hash(tmp_path / "after", renamed)
+
+        assert before != after
+
+    def test_char_and_int8_hash_differently(self, tmp_path: Path) -> None:
+        char = type_hash(tmp_path / "char", message("char[4]"))
+        int8 = type_hash(tmp_path / "int8", message("int8[4]"))
+
+        assert char != int8
+
+    def test_the_hash_is_of_the_definition_text(self, tmp_path: Path) -> None:
+        defs = write_definitions(tmp_path, {"m": NESTED})
+
+        parser, _ = parse_definitions(defs)
+
+        for definition in [*parser.message_defs.values(), *parser.struct_defs.values()]:
+            assert definition.hash == old_hash(definition.raw), definition.name
+
+    def test_struct_fields_carry_the_struct_hash(self, tmp_path: Path) -> None:
+        defs = write_definitions(tmp_path, {"m": NESTED})
+
+        parser, _ = parse_definitions(defs)
+
+        p_hash = parser.struct_defs["P"].hash[:8]
+        lines = parser.message_defs["M"].raw.splitlines()
+        assert f"    p: P hash={p_hash}" in lines
+        assert f"    pts: PT[2] -> P hash={p_hash}" in lines
+
+    def test_inserted_padding_is_in_the_hash(self, tmp_path: Path) -> None:
+        text = """\
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  a: int8
+                  b: double
+                  c: int8
+            """
+        defs = write_definitions(tmp_path, {"m": text})
+
+        parser, _ = parse_definitions(defs)
+
+        assert parser.message_defs["M"].raw.splitlines()[3:] == [
+            "    a: int8",
+            "    padding_0_: uint8[7]",
+            "    b: double",
+            "    c: int8",
+            "    padding_1_: uint8[7]",
+        ]
+
+    def test_padding_options_change_the_hash(self, tmp_path: Path) -> None:
+        # Without alignment checks, nothing is inserted and the parser's size
+        # differs, so the hash must too.
+        text = message("int8").replace(
+            "      a: int8\n", "      a: int8\n      b: double\n"
+        )
+        for folder in ("padded", "unchecked"):
+            (tmp_path / folder).mkdir()
+        defs = write_definitions(tmp_path / "padded", {"m": text})
+        unchecked = write_definitions(
+            tmp_path / "unchecked", {"m": text}, options="validate_alignment: false"
+        )
+
+        padded = parse_definitions(defs)[0].message_defs["M"]
+        plain = parse_definitions(unchecked)[0].message_defs["M"]
+
+        assert (padded.size, plain.size) == (16, 9)
+        assert padded.hash != plain.hash
+
+    def test_plain_definitions_keep_their_hash(self, tmp_path: Path) -> None:
+        text = """\
+            struct_defs:
+              S:
+                fields:
+                  x: double
+                  name: char[16]
+            message_defs:
+              M:
+                id: 7000
+                fields:
+                  x: double
+                  name: char[16]
+              SIG:
+                id: 7001
+                fields: null
+            """
+        defs = write_definitions(tmp_path, {"m": text})
+
+        parser, _ = parse_definitions(defs)
+
+        fields = "    x: double\n    name: char[16]"
+        assert parser.struct_defs["S"].hash == old_hash(f"S:\n  fields:\n{fields}")
+        assert parser.message_defs["M"].hash == old_hash(
+            f"M:\n  id: 7000\n  fields:\n{fields}"
+        )
+        assert parser.message_defs["SIG"].hash == old_hash(
+            "SIG:\n  id: 7001\n  fields: null"
+        )
