@@ -5,6 +5,7 @@ import pathlib
 from dataclasses import dataclass
 
 import pyrtma
+import pyrtma.core_defs as cd
 from collections.abc import Sequence
 from typing import ClassVar, IO, Any
 from abc import ABC
@@ -93,7 +94,7 @@ class DataFormatter(ABC):
     #: least one message, even one larger than this. The class value is a
     #: ceiling; the data logger lowers it per file to the dataset's
     #: ``max_size_mb``.
-    max_bytes: int = 500_000_000
+    max_bytes: int = cd.DATASET_MAX_SIZE_MB * 1_000_000
 
     def __init__(self, fd: IO[Any], **kwargs):
         self.fd = fd
