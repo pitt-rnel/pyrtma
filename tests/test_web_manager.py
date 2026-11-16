@@ -222,23 +222,27 @@ class TestProxyRead:
                 proxy.disconnect()
 
 
-def masked_frame(text: str) -> bytes:
-    """Build a masked websocket text frame, as a web client sends it.
+def masked_frame(text: str | bytes, opcode: int = 0x1) -> bytes:
+    """Build a masked websocket frame, as a web client sends it.
 
     Args:
-        text: The frame's text, under 64 KiB once encoded.
+        text: The frame's text, or its payload bytes, under 64 KiB.
+        opcode: The frame's opcode. Defaults to a text frame.
 
     Returns:
         The frame's bytes.
     """
-    payload = text.encode()
+    payload = text.encode() if isinstance(text, str) else text
     mask = bytes([1, 2, 3, 4])
     if len(payload) < 126:
         length = bytes([0x80 | len(payload)])
     else:
         length = bytes([0x80 | 126]) + len(payload).to_bytes(2, "big")
     masked = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
-    return bytes([0x81]) + length + mask + masked
+    return bytes([0x80 | opcode]) + length + mask + masked
+
+
+CLOSE_FRAME = masked_frame((1000).to_bytes(2, "big"), opcode=0x8)
 
 
 class TestWebsocketRead:
@@ -286,6 +290,63 @@ class TestWebsocketRead:
         sender.join()
 
         assert received == [text]
+
+
+class TestWebsocketClose:
+    @pytest.fixture
+    def pair(self) -> Iterator[tuple[StubHandler, socket.socket]]:
+        ours, theirs = socket.socketpair()
+        handler = StubHandler(cast(Client, None))
+        handler.rfile = ours.makefile("rb", wm.RTMAWebSocketHandler.rbufsize)
+        handler.request = ours
+        handler._send_lock = threading.Lock()
+        theirs.settimeout(DEFAULT_TIMEOUT)
+        try:
+            yield handler, theirs
+        finally:
+            handler.rfile.close()
+            ours.close()
+            theirs.close()
+
+    def test_client_close_gets_a_close_reply(
+        self, pair: tuple[StubHandler, socket.socket]
+    ) -> None:
+        handler, theirs = pair
+        theirs.sendall(CLOSE_FRAME)
+
+        handler.read_ws_message()
+        handler.close_websocket()
+        leftover, _, _ = select.select([handler.rfile], [], [], 0)
+
+        assert not handler.keep_alive
+        assert handler.ws_close_received
+        assert theirs.recv(1) == bytes([0x88])
+        assert leftover == []
+
+    def test_close_after_proxy_disconnect_waits_for_client_close(
+        self, pair: tuple[StubHandler, socket.socket]
+    ) -> None:
+        # The web client's last message, sent before it saw our CLOSE, is
+        # discarded, and its CLOSE ends the wait.
+        handler, theirs = pair
+        theirs.sendall(masked_frame("late") + CLOSE_FRAME)
+
+        handler.close_websocket()
+
+        assert handler.ws_close_received
+        assert handler.sent == []
+        assert theirs.recv(1) == bytes([0x88])
+
+    def test_close_without_reply_stops_waiting(
+        self, pair: tuple[StubHandler, socket.socket]
+    ) -> None:
+        handler, theirs = pair
+        handler.close_timeout = 0.1
+
+        handler.close_websocket()
+
+        assert not handler.ws_close_received
+        assert theirs.recv(1) == bytes([0x88])
 
 
 def connect_message(*, src_mod_id: int = 0, logger_status: int = 0) -> Message:

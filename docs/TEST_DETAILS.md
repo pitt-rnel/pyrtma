@@ -457,6 +457,16 @@ The `pair` fixture gives a `StubHandler` reading one end of a socket pair, with 
 | `test_frames_that_arrive_together_stay_visible` | Web manager: after one websocket frame is read, `select()` still reports a frame that arrived with it, so `handle()` reads it without waiting for more input. | Two masked text frames in one send; reads one, checks `select()` with timeout 0, and reads the other. |
 | `test_frame_split_across_reads` | Web manager: a frame that arrives in pieces is read whole. | A 300-byte frame, with a 2-byte extended length, split after its third byte; a timer sends the rest 50 ms later. |
 
+### TestWebsocketClose
+
+The `pair` fixture gives a `StubHandler` reading and writing one end of a socket pair, with its websocket file opened the way `StreamRequestHandler` opens it.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_client_close_gets_a_close_reply` | Web manager: a web client's websocket CLOSE is read whole and answered with CLOSE, and `close_websocket()` then sends nothing more. | A masked CLOSE with status 1000; reads it, runs `close_websocket()`, and checks for one CLOSE back and nothing left unread. |
+| `test_close_after_proxy_disconnect_waits_for_client_close` | Web manager: when the loop ends with the websocket open, `close_websocket()` sends CLOSE, discards the web client's messages, and stops at its CLOSE. | A text frame and a CLOSE, sent before `close_websocket()` runs with the real `process_json_message`; nothing reaches `sent`. |
+| `test_close_without_reply_stops_waiting` | Web manager: `close_websocket()` stops waiting for the web client's CLOSE after `close_timeout`. | A 0.1 s timeout and no reply. |
+
 ### TestConnect
 
 The `handler` fixture gives a `StubHandler` whose proxy already has a socket to the `manager` fixture, as `handle()` sets up before the web client's first message. `hello_observer` is a client subscribed to `HELLO`, with its subscription confirmed by `deliver()`, and returns a function that reads until a `HELLO` passes a check.

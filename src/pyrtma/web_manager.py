@@ -56,6 +56,13 @@ class RTMAWebSocketHandler(WebSocketHandler):
     #: client. Set by the web client's first CONNECT or CONNECT_V2.
     rtma_connected: bool = False
 
+    #: Seconds to wait for the web client's CLOSE after sending ours.
+    close_timeout: float = 1.0
+
+    #: Whether this side has sent, and received, the websocket CLOSE.
+    ws_close_sent: bool = False
+    ws_close_received: bool = False
+
     def __init__(self, socket, addr, server):
         """RTMA Web Socket Handler
 
@@ -112,6 +119,42 @@ class RTMAWebSocketHandler(WebSocketHandler):
 
             if self.proxy.sock in rd and self.proxy.connected:
                 self.read_proxy_message()
+
+        self.close_websocket()
+
+    def send_ws_close(self) -> None:
+        """Send the web client a websocket CLOSE, once."""
+        if self.ws_close_sent:
+            return
+        self.ws_close_sent = True
+        try:
+            self.send_close()
+        except OSError:
+            pass
+
+    def close_websocket(self) -> None:
+        """Close the websocket with the closing handshake (RFC 6455, 7.1.2).
+
+        Called when the message loop ends. If the web client sent CLOSE, the
+        reply has gone. If the websocket is still open, because the proxy has
+        disconnected, this sends CLOSE and reads until the web client's CLOSE
+        comes back, for up to ``close_timeout`` seconds. The web client's
+        other messages are discarded meanwhile. Without the handshake, the
+        web client sees an abnormal close (code 1006), which Node 24, for
+        one, also reports as an error event.
+        """
+        if not self.keep_alive or self.ws_close_received:
+            return
+        self.send_ws_close()
+        deadline = time.perf_counter() + self.close_timeout
+        while self.keep_alive and not self.ws_close_received:
+            remaining = deadline - time.perf_counter()
+            if remaining <= 0:
+                break
+            rd, _, _ = select.select([self.rfile], [], [], remaining)
+            if not rd:
+                break
+            self.read_ws_message()
 
     def read_proxy_message(self) -> None:
         """Pass a message from the message manager on to the websocket.
@@ -246,6 +289,9 @@ class RTMAWebSocketHandler(WebSocketHandler):
         Args:
             message (str): JSON message string
         """
+        if self.ws_close_sent:
+            return
+
         if message == "PING" and self.ws_ready_to_send:
             self.send_message("PONG")
             return
@@ -343,6 +389,14 @@ class RTMAWebSocketHandler(WebSocketHandler):
 
         if opcode == OPCODE_CLOSE_CONN:
             logger.info("Client asked to close connection.")
+            # Read the rest of the frame, so that nothing is left unread when
+            # the socket closes, then reply with CLOSE.
+            try:
+                self.read_bytes((4 if masked else 0) + payload_length)
+            except OSError:
+                pass
+            self.ws_close_received = True
+            self.send_ws_close()
             self.keep_alive = 0
             return None
         if not masked:
