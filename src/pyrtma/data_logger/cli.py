@@ -203,58 +203,48 @@ def dispatch(
         ValueError: A dataset name is too long.
         TypeError: A dataset name isn't ASCII.
     """
+    msg = None
     if cmd in ("add", "a") and nargs == 1:
         datasets.append(add_dataset(mod))
     elif cmd in ("remove", "d") and nargs == 2:
         msg = cd.MDF_DATASET_REMOVE()
         msg.name = args[1]
-        mod.send_message(msg)
     elif cmd in ("start", "s") and nargs == 2:
         msg = cd.MDF_DATASET_START()
         msg.name = args[1]
-        mod.send_message(msg)
     elif cmd in ("start-all", "sa") and nargs == 1:
         msg = cd.MDF_DATASET_START()
         msg.name = "*"
-        mod.send_message(msg)
     elif cmd in ("stop", "x") and nargs == 2:
         msg = cd.MDF_DATASET_STOP()
         msg.name = args[1]
-        mod.send_message(msg)
     elif cmd in ("stop-all", "xa") and nargs == 1:
         msg = cd.MDF_DATASET_STOP()
         msg.name = "*"
-        mod.send_message(msg)
     elif cmd in ("pause", "p") and nargs == 2:
         msg = cd.MDF_DATASET_PAUSE()
         msg.name = args[1]
-        mod.send_message(msg)
     elif cmd in ("pause-all", "pa") and nargs == 1:
         msg = cd.MDF_DATASET_PAUSE()
         msg.name = "*"
-        mod.send_message(msg)
     elif cmd in ("resume", "r") and nargs == 2:
         msg = cd.MDF_DATASET_RESUME()
         msg.name = args[1]
-        mod.send_message(msg)
     elif cmd in ("resume-all", "ra") and nargs == 1:
         msg = cd.MDF_DATASET_RESUME()
         msg.name = "*"
-        mod.send_message(msg)
     elif cmd in ("status", "=") and nargs == 2:
         msg = cd.MDF_DATASET_STATUS_REQUEST()
         msg.name = args[1]
-        mod.send_message(msg)
     elif cmd in ("status-all", "=a") and nargs == 1:
         msg = cd.MDF_DATASET_STATUS_REQUEST()
         msg.name = "*"
-        mod.send_message(msg)
     elif cmd in ("config", "c") and nargs == 1:
-        mod.send_signal(cd.MT_DATA_LOGGER_CONFIG_REQUEST)
+        msg = cd.MDF_DATA_LOGGER_CONFIG_REQUEST()
     elif cmd in ("reset", "<") and nargs == 1:
-        mod.send_signal(cd.MT_DATA_LOGGER_RESET)
+        msg = cd.MDF_DATA_LOGGER_RESET()
     elif cmd in ("kill", "k") and nargs == 1:
-        mod.send_signal(cd.MT_LM_EXIT)
+        msg = cd.MDF_LM_EXIT()
     elif cmd in ("exit", "quit", "q"):
         return True
     elif cmd in ("help", "?", "h"):
@@ -262,6 +252,8 @@ def dispatch(
     else:
         rich.print(f"Unknown command: {escape(cmd_str)}")
         help()
+    if msg:
+        mod.send_message(msg)    
     return False
 
 
