@@ -6,6 +6,7 @@ from __future__ import annotations
 import ctypes
 import json
 import logging
+import select
 import shutil
 import socket
 import subprocess
@@ -219,6 +220,72 @@ class TestProxyRead:
             finally:
                 peer.close()
                 proxy.disconnect()
+
+
+def masked_frame(text: str) -> bytes:
+    """Build a masked websocket text frame, as a web client sends it.
+
+    Args:
+        text: The frame's text, under 64 KiB once encoded.
+
+    Returns:
+        The frame's bytes.
+    """
+    payload = text.encode()
+    mask = bytes([1, 2, 3, 4])
+    if len(payload) < 126:
+        length = bytes([0x80 | len(payload)])
+    else:
+        length = bytes([0x80 | 126]) + len(payload).to_bytes(2, "big")
+    masked = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+    return bytes([0x81]) + length + mask + masked
+
+
+class TestWebsocketRead:
+    @pytest.fixture
+    def pair(self) -> Iterator[tuple[StubHandler, socket.socket, list[str]]]:
+        ours, theirs = socket.socketpair()
+        handler = StubHandler(cast(Client, None))
+        handler.rfile = ours.makefile("rb", wm.RTMAWebSocketHandler.rbufsize)
+        received: list[str] = []
+        handler.process_json_message = received.append  # type: ignore[method-assign]
+        try:
+            yield handler, theirs, received
+        finally:
+            handler.rfile.close()
+            ours.close()
+            theirs.close()
+
+    def test_frames_that_arrive_together_stay_visible(
+        self, pair: tuple[StubHandler, socket.socket, list[str]]
+    ) -> None:
+        # handle() reads a frame only when select() reports the websocket
+        # readable, so a frame that arrived with the one before it must
+        # still be reported after that one is read.
+        handler, theirs, received = pair
+        theirs.sendall(masked_frame("one") + masked_frame("two"))
+
+        handler.read_ws_message()
+        readable, _, _ = select.select([handler.rfile], [], [], 0)
+        handler.read_ws_message()
+
+        assert readable == [handler.rfile]
+        assert received == ["one", "two"]
+
+    def test_frame_split_across_reads(
+        self, pair: tuple[StubHandler, socket.socket, list[str]]
+    ) -> None:
+        handler, theirs, received = pair
+        text = "x" * 300
+        frame = masked_frame(text)
+        theirs.sendall(frame[:3])
+        sender = threading.Timer(0.05, theirs.sendall, args=(frame[3:],))
+        sender.start()
+
+        handler.read_ws_message()
+        sender.join()
+
+        assert received == [text]
 
 
 def connect_message(*, src_mod_id: int = 0, logger_status: int = 0) -> Message:

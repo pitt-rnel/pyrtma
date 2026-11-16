@@ -47,6 +47,11 @@ class RTMAWebSocketHandler(WebSocketHandler):
 
     disable_nagle_algorithm = True
 
+    #: Read the websocket unbuffered. handle() waits for input with select(),
+    #: which can't see frames that a buffered reader has already taken in, so
+    #: a frame that arrived with the one before it waited for more input.
+    rbufsize = 0
+
     #: Whether the proxy has connected to the message manager for the web
     #: client. Set by the web client's first CONNECT or CONNECT_V2.
     rtma_connected: bool = False
@@ -293,6 +298,26 @@ class RTMAWebSocketHandler(WebSocketHandler):
             logger.error(e, stack_info=False)
             return
 
+    def read_bytes(self, num: int) -> bytes:
+        """Read exactly ``num`` bytes from the websocket.
+
+        Args:
+            num: The number of bytes to read.
+
+        Raises:
+            ConnectionResetError: The websocket closed first.
+
+        Returns:
+            bytes: The bytes read.
+        """
+        data = bytearray()
+        while len(data) < num:
+            chunk = self.rfile.read(num - len(data))
+            if not chunk:
+                raise ConnectionResetError(errno.ECONNRESET, "Websocket closed.")
+            data += chunk
+        return bytes(data)
+
     def read_ws_message(self) -> str | None:
         """Read websocket message
 
@@ -342,9 +367,9 @@ class RTMAWebSocketHandler(WebSocketHandler):
             return None
 
         if payload_length == 126:
-            payload_length = struct.unpack(">H", self.rfile.read(2))[0]
+            payload_length = struct.unpack(">H", self.read_bytes(2))[0]
         elif payload_length == 127:
-            payload_length = struct.unpack(">Q", self.rfile.read(8))[0]
+            payload_length = struct.unpack(">Q", self.read_bytes(8))[0]
 
         masks = self.read_bytes(4)
         message_bytes = bytearray()

@@ -448,6 +448,15 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 | `test_unsubscribed_message_does_not_block` | Web manager: reading a message the proxy isn't subscribed to returns without waiting for another. | The real manager follows such a message with an ACK, so a listening socket stands in for it: the proxy connects to it, the peer sends one `TEST_START` and nothing more, and `read_proxy_message()` runs in a thread that must finish within 5 s. |
 | `test_partial_message_does_not_block` | C1 (client side): with half a message received, `read_proxy_message()` returns without waiting for the rest, so websocket input isn't held up. | The same listening socket; the peer sends half a `TEST_START` and nothing more, and `read_proxy_message()` must finish within 5 s. |
 
+### TestWebsocketRead
+
+The `pair` fixture gives a `StubHandler` reading one end of a socket pair, with its websocket file opened the way `StreamRequestHandler` opens it, and its `process_json_message` replaced to collect the text of each frame.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_frames_that_arrive_together_stay_visible` | Web manager: after one websocket frame is read, `select()` still reports a frame that arrived with it, so `handle()` reads it without waiting for more input. | Two masked text frames in one send; reads one, checks `select()` with timeout 0, and reads the other. |
+| `test_frame_split_across_reads` | Web manager: a frame that arrives in pieces is read whole. | A 300-byte frame, with a 2-byte extended length, split after its third byte; a timer sends the rest 50 ms later. |
+
 ### TestConnect
 
 The `handler` fixture gives a `StubHandler` whose proxy already has a socket to the `manager` fixture, as `handle()` sets up before the web client's first message. `hello_observer` is a client subscribed to `HELLO`, with its subscription confirmed by `deliver()`, and returns a function that reads until a `HELLO` passes a check.
