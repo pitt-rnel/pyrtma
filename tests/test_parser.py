@@ -1059,6 +1059,13 @@ class TestIds:
 
         assert parser.module_ids["X"].value == value
 
+    def test_message_id_out_of_range_names_a_message_id(self, tmp_path: Path) -> None:
+        text = "message_defs:\n  M:\n    id: 10001\n    fields:\n      a: int32\n"
+        defs = write_definitions(tmp_path, {"m": text})
+
+        with pytest.raises(RTMASyntaxError, match="for message id: M: 10001"):
+            parse_definitions(defs)
+
     def test_host_id_above_max_hosts_warns(self, tmp_path: Path) -> None:
         defs = write_definitions(tmp_path, {"m": "host_ids:\n  FAR: 6\n"})
 

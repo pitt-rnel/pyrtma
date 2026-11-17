@@ -1,6 +1,6 @@
 """pyrtma.constants module
 
-This module is deprecated and included for backwards compatilibity with pyrtma 1.2.3
+This module is deprecated and included for backwards compatibility with pyrtma 1.2.3
 Constants have been moved to pyrtma.core_defs
 """
 

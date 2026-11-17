@@ -193,7 +193,7 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
 
         Args:
             minify (bool, optional): Flag to minify (compact format). Defaults to False.
-            kwargs for json.dumps
+            **kwargs: Passed to ``json.dumps``.
 
         Returns:
             str: json string

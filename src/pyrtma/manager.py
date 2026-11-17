@@ -1341,6 +1341,9 @@ class MessageManager(ClientLike):
 
         Args:
             module (Module): Module object to send info for
+            dest_mod_id (int, optional): The module to send it to, as when
+                introducing the modules already connected to a new one.
+                Defaults to 0, for every module.
         """
         if not module.connected:
             return

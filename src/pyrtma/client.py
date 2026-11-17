@@ -724,7 +724,7 @@ class Client(ClientLike):
 
     @property
     def subscribed_types(self) -> set[int]:
-        """List of subscribed message types"""
+        """The subscribed message types, as a copy"""
         return set(self._subscribed_types)
 
     @property

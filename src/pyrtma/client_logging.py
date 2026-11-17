@@ -19,9 +19,11 @@ from rich.markup import escape
 
 
 class ClientLike(ABC):
-    """Abstract base class for ClientLike classes such as Client and MessageManager
+    """What an :class:`RTMALogger` sends its records through.
 
-    Alternative to typing.Protocol for older python versions"""
+    :class:`~pyrtma.client.Client` and
+    :class:`~pyrtma.manager.MessageManager` subclass it.
+    """
 
     @property
     @abstractmethod
@@ -39,23 +41,6 @@ class ClientLike(ABC):
         dest_host_id: int = 0,
         timeout: float = -1,
     ) -> None: ...
-
-
-# TODO after dropping support for py3.7, switch to Protocol and remove abstract base class from Client and MessageManager
-# class ClientLike(Protocol):
-#     def send_message(
-#         self,
-#         msg_data: MessageData,
-#         dest_mod_id: int = 0,
-#         dest_host_id: int = 0,
-#         timeout: float = -1,
-#     ) -> None: ...
-
-#     @property
-#     def connected(self) -> bool: ...
-
-#     @property
-#     def logger(self) -> "RTMALogger": ...
 
 
 # Each RTMALogger gets its own logger name. Names built from id() were reused

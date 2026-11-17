@@ -88,6 +88,7 @@ class Message:
 
         Args:
             minify (bool, optional): Flag to minify (compact format). Defaults to False.
+            **kwargs: Passed to ``json.dumps``.
 
         Returns:
             str: JSON message string
