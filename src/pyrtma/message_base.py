@@ -1,5 +1,6 @@
 import ctypes
 import json
+import struct
 
 from typing import TypeVar, Any
 from .utils.print import print_ctype_array, hexdump
@@ -77,6 +78,80 @@ def field_size(msg: "MessageBase | type[MessageBase]", name: str) -> int:
     if type(field) is not _CField:
         raise KeyError(f"{name} is not a field of {cls.__name__}")
     return field.size
+
+
+def _field_code(cls: type[ctypes.Structure], name: str, ctype: type) -> str:
+    """Find the ``struct`` format code of a structure field.
+
+    Args:
+        cls: The structure, for error messages.
+        name: The field's name, for error messages.
+        ctype: The field's ctypes type.
+
+    Raises:
+        TypeError: The type isn't a simple ctypes type, such as an array or a
+            pointer, or its standard ``struct`` size isn't its ctypes size.
+
+    Returns:
+        The one-character format code.
+    """
+    code = getattr(ctype, "_type_", None)
+    where = f"{cls.__name__}.{name}"
+    if not isinstance(code, str) or len(code) != 1:
+        raise TypeError(f"{where}: {ctype.__name__} has no struct format code")
+    try:
+        size = struct.calcsize("=" + code)
+    except struct.error as e:
+        raise TypeError(f"{where}: {ctype.__name__} has no struct format code") from e
+    if size != ctypes.sizeof(ctype):
+        raise TypeError(
+            f"{where}: {ctype.__name__} is {ctypes.sizeof(ctype)} bytes, but "
+            f"struct's {code!r} is {size}"
+        )
+    return code
+
+
+def _field_struct(cls: type[ctypes.Structure], name: str) -> tuple[struct.Struct, int]:
+    """Build a ``struct.Struct`` for one field of a ctypes structure.
+
+    Args:
+        cls: The structure.
+        name: The field's name in ``_fields_``.
+
+    Raises:
+        TypeError: As for :func:`_layout_struct`.
+
+    Returns:
+        The field's layout, and its offset in the structure.
+    """
+    ctype = dict((n, t) for n, t, *_ in cls._fields_)[name]
+    return struct.Struct("=" + _field_code(cls, name, ctype)), getattr(cls, name).offset
+
+
+def field_struct(
+    msg: "MessageBase | type[MessageBase]", name: str
+) -> tuple[struct.Struct, int]:
+    """Describe one field for reading or writing it in place in a buffer.
+
+    For code that handles a message's bytes directly, without the field's
+    validator, such as the client's and the manager's read loops:
+    ``unpack_from`` and ``pack_into`` with the returned struct and offset read
+    and write the field in place, without validation.
+
+    Args:
+        msg: The message or struct, or its class.
+        name: The field's name, as declared with a validator.
+
+    Raises:
+        KeyError: There is no such field.
+        TypeError: The field isn't a simple type, such as an array.
+
+    Returns:
+        The field's layout, and its offset in the message.
+    """
+    cls = msg if isinstance(msg, type) else type(msg)
+    _cfield(cls, name)
+    return _field_struct(cls, _ctypes_name(name))
 
 
 # MessageBase Metaclass - (for runtime ctypes field generation)

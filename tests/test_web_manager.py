@@ -548,6 +548,23 @@ class TestConnect:
         expected = {msg_type} if command == "subscribe" else set()
         assert handler.proxy.subscribed_types == expected
 
+    @pytest.mark.parametrize("msg_type", [-1, cd.MAX_MESSAGE_TYPES + 1])
+    def test_invalid_subscription_type_gets_an_error_reply(
+        self, handler: StubHandler, msg_type: int
+    ) -> None:
+        handler.handle_connect_v2(connect_v2_message("page"))
+        handler.sent.clear()
+        header = MessageHeader()
+        header.msg_type = cd.MT_SUBSCRIBE
+        data = cd.MDF_SUBSCRIBE()
+        data.msg_type = msg_type
+
+        handler.process_json_message(Message(header, data).to_json(minify=True))
+
+        errors = [json.loads(text)["rtma_msg_error"] for text in handler.sent]
+        assert len(errors) == 1 and "Invalid message type" in errors[0]
+        assert handler.proxy.subscribed_types == set()
+
     def test_connect_after_connect_v2_is_ignored(self, handler: StubHandler) -> None:
         handler.handle_connect_v2(connect_v2_message("page"))
         mod_id = handler.proxy.module_id

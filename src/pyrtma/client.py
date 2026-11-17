@@ -15,8 +15,15 @@ from contextlib import contextmanager
 
 from .message import Message
 from .message_data import MessageData
+from .message_base import field_struct
 from .header import MessageHeader, get_header_cls
-from .core_defs import ALL_MESSAGE_TYPES, DEFAULT_HOST, DEFAULT_PORT, MAX_DATA_BYTES
+from .core_defs import (
+    ALL_MESSAGE_TYPES,
+    DEFAULT_HOST,
+    DEFAULT_PORT,
+    MAX_DATA_BYTES,
+    MAX_MESSAGE_TYPES,
+)
 from .definitions import MessageDefinitions
 from .loader import (
     is_message_definitions_module,
@@ -69,6 +76,12 @@ _NUM_DATA_BYTES, _NUM_DATA_BYTES_OFFSET = MessageHeader.field_struct("num_data_b
 
 # A sent header's send_time, set again when sending had to wait for room.
 _SEND_TIME, _SEND_TIME_OFFSET = MessageHeader.field_struct("send_time")
+
+# The msg_type field of the subscription control messages, which all have
+# the same layout. _subscription_control() checks each type before writing
+# it, so it writes the field straight in, without the validator checking it
+# again.
+_CONTROL_TYPE, _CONTROL_TYPE_OFFSET = field_struct(cd.MDF_SUBSCRIBE, "msg_type")
 
 # Checks a signal's type as the header's msg_type field would.
 _SIGNAL_TYPE = Int32()
@@ -744,7 +757,30 @@ class Client(ClientLike):
 
     def _subscription_control(self, msg_list: Iterable[int], ctrl_msg: str):
         # Read the iterable once: a generator is empty after a first pass.
-        msg_set = set(msg_list)
+        try:
+            msg_set = set(msg_list)
+        except TypeError as e:
+            raise InvalidSubscription(
+                f"Expected an iterable of message types: {e}"
+            ) from None
+
+        # Every type is checked before anything changes, so a bad one leaves
+        # the subscriptions as they were, with nothing sent. A message type
+        # is an ID the parser accepts, or ALL_MESSAGE_TYPES; bool is an int,
+        # but True isn't a message type.
+        for msg_type in msg_set:
+            if (
+                type(msg_type) is bool
+                or not isinstance(msg_type, int)
+                or not (
+                    0 <= msg_type <= MAX_MESSAGE_TYPES or msg_type == ALL_MESSAGE_TYPES
+                )
+            ):
+                raise InvalidSubscription(
+                    f"Invalid message type {msg_type!r}: expected an int from 0 "
+                    f"to MAX_MESSAGE_TYPES ({MAX_MESSAGE_TYPES}), or "
+                    f"ALL_MESSAGE_TYPES"
+                )
 
         # ALL_MESSAGE_TYPES is a type like any other here: subscribing to it,
         # or pausing or leaving it, leaves the other types as they are.
@@ -771,7 +807,7 @@ class Client(ClientLike):
         self._sub_all = ALL_MESSAGE_TYPES in self._subscribed_types
 
         for msg_type in msg_set:
-            msg.msg_type = msg_type
+            _CONTROL_TYPE.pack_into(msg, _CONTROL_TYPE_OFFSET, msg_type)
             self.send_message(msg)
 
     @requires_connection
@@ -790,6 +826,9 @@ class Client(ClientLike):
             msg_list (Iterable[int]): A list of numeric message IDs to subscribe to
         Raises:
             NotConnectedError: The client isn't connected.
+            InvalidSubscription: The list, or a type in it, isn't a message
+                type: an int from 0 to ``MAX_MESSAGE_TYPES``, or
+                ``ALL_MESSAGE_TYPES``. Nothing changes and nothing is sent.
             ConnectionLost: The connection failed. The client is disconnected.
         """
         self._subscription_control(msg_list, "Subscribe")
@@ -806,6 +845,9 @@ class Client(ClientLike):
             msg_list (Iterable[int]): A list of numeric message IDs to unsubscribe from
         Raises:
             NotConnectedError: The client isn't connected.
+            InvalidSubscription: The list, or a type in it, isn't a message
+                type: an int from 0 to ``MAX_MESSAGE_TYPES``, or
+                ``ALL_MESSAGE_TYPES``. Nothing changes and nothing is sent.
             ConnectionLost: The connection failed. The client is disconnected.
         """
         self._subscription_control(msg_list, "Unsubscribe")
@@ -823,6 +865,9 @@ class Client(ClientLike):
             msg_list (Iterable[int]): A list of numeric message IDs to temporarily unsubscribe from
         Raises:
             NotConnectedError: The client isn't connected.
+            InvalidSubscription: The list, or a type in it, isn't a message
+                type: an int from 0 to ``MAX_MESSAGE_TYPES``, or
+                ``ALL_MESSAGE_TYPES``. Nothing changes and nothing is sent.
             ConnectionLost: The connection failed. The client is disconnected.
         """
         self._subscription_control(msg_list, "PauseSubscription")
@@ -835,6 +880,9 @@ class Client(ClientLike):
             msg_list (Iterable[int]): A list of paused message IDs to resubscribe to
         Raises:
             NotConnectedError: The client isn't connected.
+            InvalidSubscription: The list, or a type in it, isn't a message
+                type: an int from 0 to ``MAX_MESSAGE_TYPES``, or
+                ``ALL_MESSAGE_TYPES``. Nothing changes and nothing is sent.
             ConnectionLost: The connection failed. The client is disconnected.
         """
         self._subscription_control(msg_list, "ResumeSubscription")
@@ -1497,6 +1545,10 @@ class Client(ClientLike):
 
         Args:
             subscribe_list (Iterable[int] | None, optional): List of message IDs to subscribe to. Defaults to None.
+
+        Raises:
+            InvalidSubscription: ``subscribe_list`` has something that isn't a
+                message type. The old subscriptions have been ended by then.
         """
         self.unsubscribe_from_all()
         self.discard_messages()
@@ -1542,6 +1594,10 @@ def client_context(
             message definitions from the current module or use core_defs if not found.
         auto_detect (optional): If True, will attempt to auto-detect message definitions
             from the current module. If False, will use core_defs. Defaults to True.
+
+    Raises:
+        InvalidSubscription: ``msg_list`` has something that isn't a message
+            type. The client is disconnected.
 
     Yields:
         Client: initialized pyrtma Client object

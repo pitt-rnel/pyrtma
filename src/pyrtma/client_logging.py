@@ -40,7 +40,15 @@ class ClientLike(ABC):
         dest_mod_id: int = 0,
         dest_host_id: int = 0,
         timeout: float = -1,
-    ) -> None: ...
+    ) -> bool | None:
+        """Send a message.
+
+        Returns:
+            For :class:`~pyrtma.client.Client`, whether the message was sent.
+            :class:`~pyrtma.manager.MessageManager` routes the message to each
+            recipient itself and returns None. :class:`RTMALogger` doesn't
+            use the result.
+        """
 
 
 # Each RTMALogger gets its own logger name. Names built from id() were reused

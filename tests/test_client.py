@@ -28,6 +28,7 @@ from pyrtma.exceptions import (
     InvalidDestinationHost,
     InvalidDestinationModule,
     InvalidMessageDefinition,
+    InvalidSubscription,
     MessageDefinitionsLoadError,
     MessageManagerNotFound,
     MessageTooLarge,
@@ -1405,6 +1406,71 @@ def manager_subscriptions(manager: ManagerHarness, client: Client) -> set[int]:
     subs = set(module.subs)
     assert routed == ({cd.ALL_MESSAGE_TYPES} if cd.ALL_MESSAGE_TYPES in subs else subs)
     return subs
+
+
+SUBSCRIPTION_METHODS = [
+    "subscribe",
+    "unsubscribe",
+    "pause_subscription",
+    "resume_subscription",
+]
+
+
+@pytest.mark.integration
+class TestSubscriptionTypes:
+    @pytest.mark.parametrize("method", SUBSCRIPTION_METHODS)
+    @pytest.mark.parametrize(
+        "bad",
+        ["7002", 7002.0, True, None, [7002], -1, cd.MAX_MESSAGE_TYPES + 1, 2**31],
+        ids=[
+            "str",
+            "float",
+            "bool",
+            "None",
+            "unhashable",
+            "negative",
+            "above max",
+            "past int32",
+        ],
+    )
+    def test_invalid_type_raises_and_changes_nothing(
+        self, scripted_client: Client, method: str, bad: Any
+    ) -> None:
+        scripted_client.subscribe([A])
+        scripted_client.pause_subscription([B])
+        recorder = RecordingSocket(scripted_client._sock)
+        scripted_client._sock = recorder  # type: ignore[assignment]
+
+        with pytest.raises(InvalidSubscription, match="message type"):
+            getattr(scripted_client, method)([C, bad])
+
+        assert recorder.sends == []
+        assert scripted_client.subscribed_types == {A}
+        assert scripted_client.paused_subscribed_types == {B}
+
+    @pytest.mark.parametrize("method", SUBSCRIPTION_METHODS)
+    def test_list_that_is_not_iterable_raises(
+        self, scripted_client: Client, method: str
+    ) -> None:
+        with pytest.raises(InvalidSubscription):
+            getattr(scripted_client, method)(7002)
+
+    @pytest.mark.parametrize(
+        "msg_type",
+        [0, cd.MAX_MESSAGE_TYPES, cd.ALL_MESSAGE_TYPES],
+        ids=["0", "max", "all"],
+    )
+    def test_types_at_the_limits_are_accepted(
+        self, scripted_client: Client, scripted_manager: ScriptedManager, msg_type: int
+    ) -> None:
+        scripted_client.subscribe([msg_type])
+
+        header = MessageHeader.from_buffer_copy(scripted_manager.receive(HEADER_SIZE))
+        data = cd.MDF_SUBSCRIBE.from_buffer_copy(
+            scripted_manager.receive(header.num_data_bytes)
+        )
+        assert (header.msg_type, data.msg_type) == (cd.MT_SUBSCRIBE, msg_type)
+        assert scripted_client.subscribed_types == {msg_type}
 
 
 @pytest.mark.integration

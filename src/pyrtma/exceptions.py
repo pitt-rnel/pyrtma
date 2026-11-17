@@ -125,11 +125,10 @@ class MessageTooLarge(ClientError):
 
 
 class InvalidSubscription(ClientError):
-    """Formerly raised when a subscription command was invalid.
+    """Raised when a subscription call is given something that isn't a message type.
 
-    pyrtma no longer raises it: subscribing to or leaving individual types
-    while subscribed to ``ALL_MESSAGE_TYPES`` is allowed now. It is kept for
-    code that catches it.
+    A message type is an int from 0 to ``MAX_MESSAGE_TYPES``, or
+    ``ALL_MESSAGE_TYPES``. The call changes nothing and sends nothing.
     """
 
     pass

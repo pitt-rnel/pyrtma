@@ -4,7 +4,13 @@ import ctypes
 import struct
 from typing import ClassVar
 
-from .message_base import MessageBase, MessageMeta, _ctypes_name
+from .message_base import (
+    MessageBase,
+    MessageMeta,
+    _field_code,
+    _field_struct,
+    field_struct,
+)
 from .validators import Int16, Double, Int32, Uint32
 
 # Type Aliases
@@ -126,10 +132,7 @@ class MessageHeader(MessageBase, metaclass=MessageMeta):
         Returns:
             The field's layout, and its offset in the header.
         """
-        ctype_name = _ctypes_name(name)
-        if not any(field[0] == ctype_name for field in cls._fields_):
-            raise KeyError(f"{name} is not a field of {cls.__name__}")
-        return _field_struct(cls, ctype_name)
+        return field_struct(cls, name)
 
     def _set_recv_time(self, value: float) -> None:
         """Set ``recv_time`` directly, without its validator.
@@ -140,37 +143,6 @@ class MessageHeader(MessageBase, metaclass=MessageMeta):
             value: The receive time.
         """
         _RECV_TIME.pack_into(self, _RECV_TIME_OFFSET, value)
-
-
-def _field_code(cls: type[ctypes.Structure], name: str, ctype: type) -> str:
-    """Find the ``struct`` format code of a structure field.
-
-    Args:
-        cls: The structure, for error messages.
-        name: The field's name, for error messages.
-        ctype: The field's ctypes type.
-
-    Raises:
-        TypeError: The type isn't a simple ctypes type, such as an array or a
-            pointer, or its standard ``struct`` size isn't its ctypes size.
-
-    Returns:
-        The one-character format code.
-    """
-    code = getattr(ctype, "_type_", None)
-    where = f"{cls.__name__}.{name}"
-    if not isinstance(code, str) or len(code) != 1:
-        raise TypeError(f"{where}: {ctype.__name__} has no struct format code")
-    try:
-        size = struct.calcsize("=" + code)
-    except struct.error as e:
-        raise TypeError(f"{where}: {ctype.__name__} has no struct format code") from e
-    if size != ctypes.sizeof(ctype):
-        raise TypeError(
-            f"{where}: {ctype.__name__} is {ctypes.sizeof(ctype)} bytes, but "
-            f"struct's {code!r} is {size}"
-        )
-    return code
 
 
 def _layout_struct(cls: type[ctypes.Structure]) -> struct.Struct:
@@ -205,23 +177,6 @@ def _layout_struct(cls: type[ctypes.Structure]) -> struct.Struct:
     if total > end:
         fmt += f"{total - end}x"
     return struct.Struct(fmt)
-
-
-def _field_struct(cls: type[ctypes.Structure], name: str) -> tuple[struct.Struct, int]:
-    """Build a ``struct.Struct`` for one field of a ctypes structure.
-
-    Args:
-        cls: The structure.
-        name: The field's name in ``_fields_``.
-
-    Raises:
-        TypeError: As for :func:`_layout_struct`.
-
-    Returns:
-        The field's layout, and its offset in the structure.
-    """
-    ctype = dict((n, t) for n, t, *_ in cls._fields_)[name]
-    return struct.Struct("=" + _field_code(cls, name, ctype)), getattr(cls, name).offset
 
 
 MessageHeader._LAYOUT = _layout_struct(MessageHeader)

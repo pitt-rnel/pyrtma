@@ -354,6 +354,14 @@ These tests use `isolated_modules`, which takes every loaded definitions module 
 | `test_env_var_chooses_among_loaded_modules` | H7: `PYRTMA_MSGDEF_MODULES` picks the first listed module that is loaded and has definitions, without auto-detection, so two loaded modules don't raise. | Two stand-ins; the variable lists a missing module, then the second stand-in. |
 | `test_env_var_does_not_import_modules` | H7: `PYRTMA_MSGDEF_MODULES` only looks in `sys.modules` and never imports, as designed. | Names the compiled test definitions, which are importable but taken out of `sys.modules`; they must stay out, and the client falls back to the core definitions. |
 
+### TestSubscriptionTypes
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_invalid_type_raises_and_changes_nothing` | Subscription types: `subscribe()`, `unsubscribe()`, `pause_subscription()` and `resume_subscription()` raise `InvalidSubscription` for anything that isn't a message type, before changing or sending anything. | Parametrized over the four methods and a string, a float, `True`, `None`, an unhashable list, -1, one past `MAX_MESSAGE_TYPES` and one past int32, each after a valid type; a `RecordingSocket` records sends. |
+| `test_list_that_is_not_iterable_raises` | Subscription types: a single int instead of a list raises `InvalidSubscription`, not a bare `TypeError`. | Parametrized over the four methods. |
+| `test_types_at_the_limits_are_accepted` | Subscription types: 0, `MAX_MESSAGE_TYPES` and `ALL_MESSAGE_TYPES` are subscribed, and the SUBSCRIBE sent carries the type, now that it is written without the field's validator. | The stand-in manager reads the SUBSCRIBE back. |
+
 ### TestSubscriptions
 
 | Test | Purpose | Approach |
@@ -488,6 +496,7 @@ The `handler` fixture gives a `StubHandler` whose proxy already has a socket to 
 | `test_requested_static_id_gets_dynamic_id` | C4: a web client's request for a static module ID is ignored, and the proxy takes a dynamic one. | Parametrized over `CONNECT`, which asks through its header, and `CONNECT_V2`, which asks in its data; both ask for 50. |
 | `test_connect_v2_after_connect_updates_name` | Manager connect messages: a `CONNECT_V2` after the web client's `CONNECT` updates the proxy's name, which the manager announces with a new `HELLO`, without a second ACK to the web client and without a change of module ID. | `handle_connect()`, then `handle_connect_v2()` named "late-page". A wait for an ACK would time out and send an error to the websocket. |
 | `test_subscription_commands_report_no_error` | ALL_MESSAGE_TYPES as a type: a web client's subscribe, unsubscribe and pause for `ALL_MESSAGE_TYPES`, or for a type the proxy has no definition for, get no error reply; logging the type used to raise after the subscription had gone through. | Parametrized over the three commands and both types, as JSON through `process_json_message()`. |
+| `test_invalid_subscription_type_gets_an_error_reply` | Subscription types: a web client's SUBSCRIBE for a type outside the range gets an error reply naming the problem, and nothing is subscribed. | -1 and one past `MAX_MESSAGE_TYPES`, as JSON. |
 | `test_connect_after_connect_v2_is_ignored` | Manager connect messages: a `CONNECT` after the web client's `CONNECT_V2` changes nothing and sends nothing. | `handle_connect_v2()` named "page", then `handle_connect()`. |
 
 ## test_dataset.py — the `Dataset` helper, without a manager (needs: none)
@@ -907,6 +916,9 @@ Headers built field by field are the reference: random values span each field's 
 | `test_field_size_of_a_string_counts_its_terminator` | Field helpers: `field_size()` gives a `char` field's size including its null terminator, from the class or an instance. | A `String(8)` field. |
 | `test_field_size_of_each_kind_of_field` | Field helpers: `field_size()` gives the size of numeric, struct and array fields as well. | Parametrized over header fields, `FAILED_MESSAGE.msg_header`, `DATASET.msg_types` and `RTMA_LOG.message`. |
 | `test_field_size_rejects_what_is_not_a_field` | Field helpers: an unknown name, a field declared directly in `_fields_` without a validator, and a class attribute that isn't a field each raise `KeyError` naming it. | `Named.nope`, `PlainChars.name` and `MessageHeader.LAYOUT`. |
+| `test_field_struct_reads_and_writes_a_field_in_place` | Field helpers: `field_struct()` gives a struct and offset that read and write a field in place, from the message or its class. | `DATASET_STATUS.elapsed_time`. |
+| `test_field_struct_rejects_what_is_not_a_field` | Field helpers: an unknown name, a field declared directly in `_fields_`, and a class attribute that isn't a field each raise `KeyError`. | As for `field_size()`. |
+| `test_subscription_messages_share_their_msg_type_layout` | Field helpers: SUBSCRIBE, UNSUBSCRIBE, PAUSE_SUBSCRIPTION and RESUME_SUBSCRIPTION have `msg_type` in the same place, as the client relies on to write it with one struct. | Compares the four structs' formats and offsets. |
 
 ## test_message_definitions.py — loading compiled definitions (needs: none)
 

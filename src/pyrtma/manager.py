@@ -1195,7 +1195,7 @@ class MessageManager(ClientLike):
         dest_mod_id: int = 0,
         dest_host_id: int = 0,
         timeout: float = 0,
-    ):
+    ) -> None:
         """Send a message originating from MessageManager module
 
         Args:
