@@ -62,11 +62,11 @@ SLACK: float = 1.0
 UNKNOWN_TYPE: int = 7777
 
 
-def test_default_server_uses_the_core_port() -> None:
+def test_default_server_uses_the_core_host_and_port() -> None:
     assert pyrtma.client.DEFAULT_PORT == cd.DEFAULT_PORT
     for func in (Client.connect, client_context):
         default = inspect.signature(func).parameters["server_name"].default
-        assert default == f"localhost:{cd.DEFAULT_PORT}"
+        assert default == f"{cd.DEFAULT_HOST}:{cd.DEFAULT_PORT}"
 
 
 @pytest.mark.parametrize(

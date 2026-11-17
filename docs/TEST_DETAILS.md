@@ -258,7 +258,7 @@ Most receive tests use `scripted_client`, a client connected to the `scripted_ma
 
 | Test | Purpose | Approach |
 |---|---|---|
-| `test_default_server_uses_the_core_port` | Shared constants: the client's default port, and the default server of `connect()` and `client_context()`, come from `core_defs.DEFAULT_PORT`. | Compares `pyrtma.client.DEFAULT_PORT` and both signatures' `server_name` defaults with the constant. |
+| `test_default_server_uses_the_core_host_and_port` | Shared constants: the client's default port, and the default server of `connect()` and `client_context()`, come from `core_defs.DEFAULT_HOST` and `DEFAULT_PORT`. | Compares `pyrtma.client.DEFAULT_PORT` and both signatures' `server_name` defaults with the constants. |
 | `test_options_after_host_id_are_keyword_only` | Timecode removal: `Client` and `client_context` arguments after `host_id` are keyword-only, so an old positional call that passed `timecode` fails instead of shifting the arguments after it. | Parametrized over both; a third positional argument for `Client`, a fifth for `client_context`. |
 | `test_timecode_argument_is_rejected` | Timecode removal: `Client` and `client_context` no longer accept `timecode`. | Parametrized over both; passes `timecode=True` and expects a `TypeError` naming it. |
 | `test_failed_constructor_leaves_no_unraisable_exception` | Client `__del__`: a `Client` whose constructor raises is collected without an exception from `__del__`. | Parametrized over module IDs -1 and 10000, both out of range; `sys.unraisablehook` is replaced to collect what `__del__` raises. |
@@ -416,7 +416,7 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_log_level_names_resolve` | C4: every `--log-level` choice resolves to its level number without `logging.getLevelNamesMapping()`, which Python 3.10 lacks. | Parametrized over the five choices, through `parse_args()`. |
-| `test_server_address_comes_from_options` | C4: the manager address is built from `-a` and `-p`, with the defaults when they're absent. | `parse_args()` with no options, then with both. |
+| `test_server_address_comes_from_options` | C4: the manager address is built from `-a` and `-p`, with the defaults when they're absent; the defaults, and `DEFAULT_SERVER`, are `core_defs.DEFAULT_HOST` on `DEFAULT_PORT`. | `parse_args()` with no options, then with both. |
 
 ### TestConnect
 
@@ -443,7 +443,7 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 | `test_import_keeps_root_handlers` | Web manager: importing `pyrtma.web_manager` leaves the root logger's handlers alone. | A fresh interpreter adds its own root handler, imports the module, and prints whether the handlers are unchanged. |
 | `test_configure_logging_replaces_root_handlers` | Web manager: the logging setup works with no handlers at all, and replaces existing ones with one `RichHandler`. | Two stand-alone loggers, one empty and one with a `StreamHandler`. |
 | `test_proxy_records_are_printed_once` | Web manager: a proxy's log records reach the console once, through the root logger that the web manager configures, rather than also through the proxy's own console handler. | Builds a handler with the websocket constructor patched out and a `RecordingHandler` as the root's only handler; a proxy warning is recorded once and nothing is printed. |
-| `test_default_manager_address_uses_the_core_port` | Shared constants: the web manager's default manager address, on the command line and as a `WebMessageManager` argument, uses `core_defs.DEFAULT_PORT`. | `parse_args()` with only `-d`, and the constructor's `mm_ip` default. |
+| `test_default_manager_address_uses_the_core_host_and_port` | Shared constants: the web manager's default manager address, on the command line and as a `WebMessageManager` argument, is `core_defs.DEFAULT_HOST` on `DEFAULT_PORT`. | `parse_args()` with only `-d`, and the constructor's `mm_ip` default. |
 | `test_defs_option_is_required` | Web manager: leaving out `--defs` is a usage error. | `parse_args()` without it; expects exit status 2 and `--defs` in the message. |
 | `test_definitions_are_loaded_once` | Web manager: `run()` loads the definitions file once, and doesn't import it by name or add its folder to `sys.path`. | A copy of the compiled test definitions in `tmp_path`; `load_message_definitions` is wrapped to count calls, and `run_forever` is replaced so the server closes at once. |
 
@@ -492,7 +492,7 @@ Each `Dataset` is given a stand-in client that keeps what it would send.
 
 | Test | Purpose | Approach |
 |---|---|---|
-| `test_default_manager_address_uses_the_core_port` | Shared constants: a `Dataset`'s default manager address uses `core_defs.DEFAULT_PORT`. | The constructor's `mm_ip` default. |
+| `test_default_manager_address_uses_the_core_host_and_port` | Shared constants: a `Dataset`'s default manager address is `core_defs.DEFAULT_HOST` on `DEFAULT_PORT`. | The constructor's `mm_ip` default. |
 | `test_max_size_mb_is_sent_when_added` | `max_size_mb` is sent in `DATASET_ADD`. | `max_size_mb=20`, then `add()`. |
 | `test_default_max_size_is_500_mb` | The default `max_size_mb` is `DATASET_MAX_SIZE_MB`, 500. | A dataset with the defaults. |
 | `test_max_size_mb_outside_its_range_raises` | `max_size_mb` outside 1 to 500 raises `ValueError`, and the half-built dataset cleans up without an error of its own. | Parametrized over 0, -1 and 501. |

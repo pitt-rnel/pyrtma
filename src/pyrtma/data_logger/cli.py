@@ -149,7 +149,7 @@ def main():
     if len(sys.argv) > 1:
         server = sys.argv[1]
     else:
-        server = f"127.0.0.1:{cd.DEFAULT_PORT}"
+        server = f"{cd.DEFAULT_HOST}:{cd.DEFAULT_PORT}"
 
     # Only data logger messages, which are core messages, are used.
     mod = pyrtma.Client(definitions=cd.get_message_definitions())

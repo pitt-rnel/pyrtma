@@ -31,7 +31,7 @@ LOG_LEVELS: dict[str, int] = {
     "CRITICAL": logging.CRITICAL,
 }
 
-DEFAULT_SERVER: str = f"127.0.0.1:{cd.DEFAULT_PORT}"
+DEFAULT_SERVER: str = f"{cd.DEFAULT_HOST}:{cd.DEFAULT_PORT}"
 
 
 class RTMA_UnifiedLog(object):
@@ -58,7 +58,7 @@ class RTMA_UnifiedLog(object):
         Args:
             log_level: The lowest level printed.
             server: The message manager's ``host:port``. Defaults to
-                ``127.0.0.1:7111``.
+                ``DEFAULT_SERVER``, ``localhost:7111``.
             retry_delay: Seconds to wait after the first failed connection.
             max_retry_delay: The longest wait between connection attempts.
             sleep: Waits between connection attempts, for tests. The default
@@ -258,8 +258,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--addr",
         dest="addr",
         type=str,
-        default="127.0.0.1",
-        help="MessageManager server IP address as a string. Default is 127.0.0.1",
+        default=cd.DEFAULT_HOST,
+        help=f"MessageManager server address as a string. Default is {cd.DEFAULT_HOST}.",
     )
     parser.add_argument(
         "-p",

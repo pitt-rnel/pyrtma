@@ -59,6 +59,7 @@ STR_SIZE: int = 32
 LONG_STRING: int = 64
 
 # String Constants
+DEFAULT_HOST: str = "localhost"
 default_msg: str = "hello_world"
 
 # Type Aliases

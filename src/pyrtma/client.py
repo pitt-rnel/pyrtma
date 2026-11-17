@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from .message import Message
 from .message_data import MessageData
 from .header import MessageHeader, _field_struct, get_header_cls
-from .core_defs import ALL_MESSAGE_TYPES, DEFAULT_PORT, MAX_DATA_BYTES
+from .core_defs import ALL_MESSAGE_TYPES, DEFAULT_HOST, DEFAULT_PORT, MAX_DATA_BYTES
 from .definitions import MessageDefinitions
 from .loader import (
     is_message_definitions_module,
@@ -551,7 +551,7 @@ class Client(ClientLike):
 
     def connect(
         self,
-        server_name: str = f"localhost:{DEFAULT_PORT}",
+        server_name: str = f"{DEFAULT_HOST}:{DEFAULT_PORT}",
         logger_status: bool = False,
         *,
         timeout: float | None = 5.0,
@@ -563,7 +563,7 @@ class Client(ClientLike):
         Args:
             server_name (optional): IP_addr:port_num string associated with message manager.
                 The port may be left out, for ``DEFAULT_PORT`` (7111). Defaults
-                to "localhost:7111".
+                to ``DEFAULT_HOST`` on ``DEFAULT_PORT``, "localhost:7111".
             logger_status (optional): Flag to declare client as a logger module.
                 A logger module is sent the messages it subscribes to even when
                 they are addressed to another module, and copies of other
@@ -1590,7 +1590,7 @@ class Client(ClientLike):
 @contextmanager
 def client_context(
     module_id: int = 0,
-    server_name: str = f"localhost:{DEFAULT_PORT}",
+    server_name: str = f"{DEFAULT_HOST}:{DEFAULT_PORT}",
     msg_list: Iterable[int] | None = None,
     host_id: int = 0,
     *,

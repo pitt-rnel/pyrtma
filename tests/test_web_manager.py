@@ -112,10 +112,10 @@ def test_configure_logging_replaces_root_handlers() -> None:
         assert isinstance(root.handlers[0], wm.RichHandler)
 
 
-def test_default_manager_address_uses_the_core_port() -> None:
+def test_default_manager_address_uses_the_core_host_and_port() -> None:
     args = wm.parse_args(["-d", "defs.py"])
 
-    assert args.mm_ip == f"127.0.0.1:{cd.DEFAULT_PORT}"
+    assert args.mm_ip == f"{cd.DEFAULT_HOST}:{cd.DEFAULT_PORT}"
     assert (
         inspect.signature(wm.WebMessageManager).parameters["mm_ip"].default
         == args.mm_ip

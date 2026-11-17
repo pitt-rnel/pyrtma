@@ -44,6 +44,7 @@ that makes them. The version number is chosen at release time.
 - `MAX_DATA_BYTES`, a core constant (1048576, 1 MiB), in every language's generated definitions: the largest payload (`num_data_bytes`) that the message manager and clients accept, and the largest message or struct the parser compiles. The client's read check, the manager's receive buffer and the parser all take it from `rtma_core.yaml` now; before, each had its own copy of the number.
 - `pyrtma.exceptions.MessageTooLarge`, a `ClientError`: `Client.send_message()` and `forward_message()` raise it for a payload larger than `MAX_DATA_BYTES`, and `forward_message()` without a payload for a header whose `num_data_bytes` is outside 0 to `MAX_DATA_BYTES`. Nothing is sent and the client stays connected; before, the message went out and the message manager dropped the client as sending a corrupt stream.
 - `DEFAULT_PORT`, a core constant (7111), in every language's generated definitions: the port the message manager listens on unless told otherwise. The client, the manager, the data logger and its CLI, the web manager, the unified console log and `utils/pyrtma_bench.py` take their default port from it; each had its own copy of the number. `pyrtma.client.DEFAULT_PORT` is still there, the same value. A definitions file that defines its own `DEFAULT_PORT` and imports the core definitions now raises `DuplicateNameError`.
+- `DEFAULT_HOST`, a core string constant (`"localhost"`), in every language's generated definitions: the host clients connect to when a server name doesn't give one. Every default manager address in the package is now `DEFAULT_HOST` on `DEFAULT_PORT`. A definitions file that defines its own `DEFAULT_HOST` and imports the core definitions now raises `DuplicateNameError`.
 
 ### Changed
 
@@ -140,6 +141,7 @@ that makes them. The version number is chosen at release time.
 - The message manager no longer prints `x` to the console for each message it drops for a slow consumer, or for each send that fails. The drop is reported with `FAILED_MESSAGE` and counted in `Module.drops`, and a failed send is logged.
 - A client whose connection the message manager finds reset, such as a killed process, is logged as a warning, "Closed its connection without disconnecting", before its `GOODBYE`, as other drops are. It used to be an error, logged after the `GOODBYE`.
 - The parser compiles messages and structs up to `MAX_DATA_BYTES` (1 MiB), the largest payload the message manager forwards; it used to stop at 65535 bytes. One that is larger raises `InvalidMessageSize`, naming the limit and the file.
+- The data logger (`python -m pyrtma.data_logger -m`, `Dataset(mm_ip=...)` and the control CLI), the web manager (`-m` and `WebMessageManager(mm_ip=...)`), the unified console log (`-a` and `DEFAULT_SERVER`) and `utils/pyrtma_bench.py -s` default to `localhost:7111` instead of `127.0.0.1:7111`, as the client already did. The client's socket is IPv4, so `localhost` still reaches the IPv4 loopback; it is now looked up by name, so a system whose hosts file maps `localhost` elsewhere connects there.
 
 ### Fixed
 

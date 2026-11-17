@@ -59,6 +59,7 @@ SZ_A: int = 4
 SZ_B: int = 8
 
 # String Constants
+DEFAULT_HOST: str = "localhost"
 DEFAULT_MM_IP: str = "localhost:7111"
 
 # Type Aliases

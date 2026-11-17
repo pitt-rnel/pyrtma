@@ -744,8 +744,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     where.add_argument(
         "-s",
         dest="server",
-        default=f"127.0.0.1:{cd.DEFAULT_PORT}",
-        help=f"Address of a running message manager. Default: 127.0.0.1:{cd.DEFAULT_PORT}.",
+        default=f"{cd.DEFAULT_HOST}:{cd.DEFAULT_PORT}",
+        help=f"Address of a running message manager. Default: {cd.DEFAULT_HOST}:{cd.DEFAULT_PORT}.",
     )
     where.add_argument(
         "--start-manager",

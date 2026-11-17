@@ -36,10 +36,10 @@ def make(tmp_path: Path, **kwargs: Any) -> tuple[Dataset, RecordingClient]:
     return dataset, client
 
 
-def test_default_manager_address_uses_the_core_port() -> None:
+def test_default_manager_address_uses_the_core_host_and_port() -> None:
     default = inspect.signature(Dataset).parameters["mm_ip"].default
 
-    assert default == f"127.0.0.1:{cd.DEFAULT_PORT}"
+    assert default == f"{cd.DEFAULT_HOST}:{cd.DEFAULT_PORT}"
 
 
 def test_max_size_mb_is_sent_when_added(tmp_path: Path) -> None:

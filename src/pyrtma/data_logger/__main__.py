@@ -25,10 +25,10 @@ def main():
     parser.add_argument(
         "-m",
         "--mm-ip",
-        default=f"127.0.0.1:{cd.DEFAULT_PORT}",
+        default=f"{cd.DEFAULT_HOST}:{cd.DEFAULT_PORT}",
         dest="mm_ip",
         type=str,
-        help=f"IP address of Message Manager. Defaults to 127.0.0.1:{cd.DEFAULT_PORT}.",
+        help=f"IP address of Message Manager. Defaults to {cd.DEFAULT_HOST}:{cd.DEFAULT_PORT}.",
     )
 
     parser.add_argument(

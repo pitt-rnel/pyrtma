@@ -468,7 +468,7 @@ class WebMessageManager(WebsocketServer):
         self,
         host="",
         port=0,
-        mm_ip: str = f"127.0.0.1:{cd.DEFAULT_PORT}",
+        mm_ip: str = f"{cd.DEFAULT_HOST}:{cd.DEFAULT_PORT}",
         loglevel: int = logging.WARNING,
         key=None,
         cert=None,
@@ -479,7 +479,7 @@ class WebMessageManager(WebsocketServer):
         Args:
             host (str, optional): IP for WebMessageManager to listen for connections. Defaults to "" (any local IP).
             port (int, optional): Port for WebMessageManager to bind to. Defaults to 0.
-            mm_ip (str, optional): Address for RTMA MessageManager. Defaults to "127.0.0.1:7111".
+            mm_ip (str, optional): Address for RTMA MessageManager. Defaults to ``DEFAULT_HOST`` on ``DEFAULT_PORT``, "localhost:7111".
             loglevel (int, optional): Loging level. Defaults to logging.WARNING.
             key (optional): Path to SSL key. Defaults to None.
             cert (optional): Path to SSL cert. Defaults to None.
@@ -582,10 +582,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "-m",
         "--mm-ip",
-        default=f"127.0.0.1:{cd.DEFAULT_PORT}",
+        default=f"{cd.DEFAULT_HOST}:{cd.DEFAULT_PORT}",
         dest="mm_ip",
         type=str,
-        help=f"IP address of Message Manager. Defaults to 127.0.0.1:{cd.DEFAULT_PORT}.",
+        help=f"IP address of Message Manager. Defaults to {cd.DEFAULT_HOST}:{cd.DEFAULT_PORT}.",
     )
 
     parser.add_argument(

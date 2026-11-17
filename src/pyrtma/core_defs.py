@@ -57,6 +57,7 @@ DATASET_MAX_SIZE_MB: int = 500
 MAX_LOGGER_FILENAME_LENGTH: int = 256
 
 # String Constants
+DEFAULT_HOST: str = "localhost"
 
 # Type Aliases
 MODULE_ID = ctypes.c_int16
