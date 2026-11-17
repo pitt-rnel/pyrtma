@@ -149,7 +149,7 @@ def main():
     if len(sys.argv) > 1:
         server = sys.argv[1]
     else:
-        server = "127.0.0.1:7111"
+        server = f"127.0.0.1:{cd.DEFAULT_PORT}"
 
     # Only data logger messages, which are core messages, are used.
     mod = pyrtma.Client(definitions=cd.get_message_definitions())
@@ -253,7 +253,7 @@ def dispatch(
         rich.print(f"Unknown command: {escape(cmd_str)}")
         help()
     if msg:
-        mod.send_message(msg)    
+        mod.send_message(msg)
     return False
 
 

@@ -4,6 +4,7 @@ websocket handler, driven without a real websocket."""
 from __future__ import annotations
 
 import ctypes
+import inspect
 import json
 import logging
 import select
@@ -109,6 +110,16 @@ def test_configure_logging_replaces_root_handlers() -> None:
     for root in (empty, configured):
         assert len(root.handlers) == 1
         assert isinstance(root.handlers[0], wm.RichHandler)
+
+
+def test_default_manager_address_uses_the_core_port() -> None:
+    args = wm.parse_args(["-d", "defs.py"])
+
+    assert args.mm_ip == f"127.0.0.1:{cd.DEFAULT_PORT}"
+    assert (
+        inspect.signature(wm.WebMessageManager).parameters["mm_ip"].default
+        == args.mm_ip
+    )
 
 
 def test_defs_option_is_required(capsys: pytest.CaptureFixture[str]) -> None:

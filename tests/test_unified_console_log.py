@@ -84,7 +84,7 @@ def test_log_level_names_resolve(name: str, level: int) -> None:
 
 
 def test_server_address_comes_from_options() -> None:
-    assert ucl.parse_args([]).server == "127.0.0.1:7111"
+    assert ucl.parse_args([]).server == f"127.0.0.1:{cd.DEFAULT_PORT}"
     assert ucl.parse_args(["-a", "10.0.0.2", "-p", "7200"]).server == "10.0.0.2:7200"
 
 

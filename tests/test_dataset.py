@@ -6,6 +6,7 @@ The ``Dataset`` is given a stand-in client that records what it would send.
 from __future__ import annotations
 
 import ctypes
+import inspect
 from pathlib import Path
 from typing import Any, cast
 
@@ -33,6 +34,12 @@ def make(tmp_path: Path, **kwargs: Any) -> tuple[Dataset, RecordingClient]:
     client = RecordingClient()
     dataset.register_client(cast(pyrtma.Client, client))
     return dataset, client
+
+
+def test_default_manager_address_uses_the_core_port() -> None:
+    default = inspect.signature(Dataset).parameters["mm_ip"].default
+
+    assert default == f"127.0.0.1:{cd.DEFAULT_PORT}"
 
 
 def test_max_size_mb_is_sent_when_added(tmp_path: Path) -> None:

@@ -304,7 +304,7 @@ class MessageManager(ClientLike):
     def __init__(
         self,
         ip_address: str = "",  # "" equivalent to socket.INADDR_ANY
-        port: int = 7111,
+        port: int = cd.DEFAULT_PORT,
         *,
         log_level=logging.INFO,
         debug=False,
@@ -317,7 +317,8 @@ class MessageManager(ClientLike):
 
         Args:
             ip_address (str, optional): server IP address. Defaults to "".
-            port (int, optional): server port. Defaults to 7111. The arguments
+            port (int, optional): server port. Defaults to ``DEFAULT_PORT``
+                (7111). The arguments
                 after it are keyword-only.
             log_level (int, optional): logging level, defaults to logging.INFO.
             debug (bool, optional): Flag for debug mode. Defaults to False.
@@ -1639,7 +1640,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Listener address. IP address/hostname as a string. Default is '' which is evaluated as socket.INADDR_ANY.",
     )
     parser.add_argument(
-        "-p", "--port", type=int, default=7111, help="Listener port. Default is 7111."
+        "-p",
+        "--port",
+        type=int,
+        default=cd.DEFAULT_PORT,
+        help=f"Listener port. Default is {cd.DEFAULT_PORT}.",
     )
     parser.add_argument("-d", "--debug", action="store_true", help="Debug mode")
     parser.add_argument(

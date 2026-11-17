@@ -39,7 +39,7 @@ class Dataset:
         formatter: str,
         subdivide_interval: int = 0,
         msg_types: list[int] | None = None,
-        mm_ip: str = "127.0.0.1:7111",
+        mm_ip: str = f"127.0.0.1:{cd.DEFAULT_PORT}",
         status_interval: float = 5.0,
         create_client: bool = True,
         definitions: MessageDefinitions | None = None,

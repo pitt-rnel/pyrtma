@@ -19,6 +19,8 @@ constants:
   # The largest message payload (num_data_bytes) that the message manager
   # and clients accept, and the largest message the parser compiles: 1 MiB.
   MAX_DATA_BYTES: 1048576
+  # The TCP port the message manager listens on unless told otherwise.
+  DEFAULT_PORT: 7111
 
 string_constants: null
 

@@ -468,7 +468,7 @@ class WebMessageManager(WebsocketServer):
         self,
         host="",
         port=0,
-        mm_ip: str = "127.0.0.1:7111",
+        mm_ip: str = f"127.0.0.1:{cd.DEFAULT_PORT}",
         loglevel: int = logging.WARNING,
         key=None,
         cert=None,
@@ -582,10 +582,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "-m",
         "--mm-ip",
-        default="127.0.0.1:7111",
+        default=f"127.0.0.1:{cd.DEFAULT_PORT}",
         dest="mm_ip",
         type=str,
-        help="IP address of Message Manager. Defaults to 127.0.0.1:7111.",
+        help=f"IP address of Message Manager. Defaults to 127.0.0.1:{cd.DEFAULT_PORT}.",
     )
 
     parser.add_argument(

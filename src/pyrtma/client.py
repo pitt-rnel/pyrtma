@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from .message import Message
 from .message_data import MessageData
 from .header import MessageHeader, _field_struct, get_header_cls
-from .core_defs import ALL_MESSAGE_TYPES, MAX_DATA_BYTES
+from .core_defs import ALL_MESSAGE_TYPES, DEFAULT_PORT, MAX_DATA_BYTES
 from .definitions import MessageDefinitions
 from .loader import (
     is_message_definitions_module,
@@ -83,9 +83,6 @@ _MAX_INT16: int = 2**15 - 1
 # A deadline that has always passed: a read given it takes only what has
 # already arrived.
 _NO_WAIT: float = float("-inf")
-
-# The port used when a server name doesn't give one.
-DEFAULT_PORT: int = 7111
 
 # How long disconnect() waits for the manager to close its end, in seconds.
 _DISCONNECT_WAIT: float = 0.1
@@ -554,7 +551,7 @@ class Client(ClientLike):
 
     def connect(
         self,
-        server_name: str = "localhost:7111",
+        server_name: str = f"localhost:{DEFAULT_PORT}",
         logger_status: bool = False,
         *,
         timeout: float | None = 5.0,
@@ -565,7 +562,8 @@ class Client(ClientLike):
 
         Args:
             server_name (optional): IP_addr:port_num string associated with message manager.
-                The port may be left out, for 7111. Defaults to "localhost:7111".
+                The port may be left out, for ``DEFAULT_PORT`` (7111). Defaults
+                to "localhost:7111".
             logger_status (optional): Flag to declare client as a logger module.
                 A logger module is sent the messages it subscribes to even when
                 they are addressed to another module, and copies of other
@@ -1592,7 +1590,7 @@ class Client(ClientLike):
 @contextmanager
 def client_context(
     module_id: int = 0,
-    server_name: str = "localhost:7111",
+    server_name: str = f"localhost:{DEFAULT_PORT}",
     msg_list: Iterable[int] | None = None,
     host_id: int = 0,
     *,

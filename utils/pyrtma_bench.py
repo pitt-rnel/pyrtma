@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 import pyrtma
+import pyrtma.core_defs as cd
 from pyrtma.data_logger.dataset import Dataset
 from pyrtma.definitions import MessageDefinitions
 from pyrtma.exceptions import MessageManagerNotFound
@@ -743,8 +744,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     where.add_argument(
         "-s",
         dest="server",
-        default="127.0.0.1:7111",
-        help="Address of a running message manager. Default: 127.0.0.1:7111.",
+        default=f"127.0.0.1:{cd.DEFAULT_PORT}",
+        help=f"Address of a running message manager. Default: 127.0.0.1:{cd.DEFAULT_PORT}.",
     )
     where.add_argument(
         "--start-manager",

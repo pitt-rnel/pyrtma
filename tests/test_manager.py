@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ctypes
 import errno
+import inspect
 import logging
 import os
 import socket
@@ -1457,6 +1458,12 @@ class TestAccept:
 
 
 class TestCommandLine:
+    def test_default_port_is_the_core_port(self) -> None:
+        default = inspect.signature(MessageManager).parameters["port"].default
+
+        assert default == cd.DEFAULT_PORT
+        assert _parse_args([]).port == cd.DEFAULT_PORT
+
     @pytest.mark.parametrize(
         ("argv", "stall_timeout"),
         [

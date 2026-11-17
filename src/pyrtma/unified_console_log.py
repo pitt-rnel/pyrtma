@@ -31,7 +31,7 @@ LOG_LEVELS: dict[str, int] = {
     "CRITICAL": logging.CRITICAL,
 }
 
-DEFAULT_SERVER: str = "127.0.0.1:7111"
+DEFAULT_SERVER: str = f"127.0.0.1:{cd.DEFAULT_PORT}"
 
 
 class RTMA_UnifiedLog(object):
@@ -266,8 +266,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--port",
         dest="port",
         type=int,
-        default=7111,
-        help="Listener port. Default is 7111.",
+        default=cd.DEFAULT_PORT,
+        help=f"Listener port. Default is {cd.DEFAULT_PORT}.",
     )
     parser.add_argument(
         "-l",

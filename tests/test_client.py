@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import inspect
 import itertools
 import select
 import types
@@ -59,6 +60,13 @@ SLACK: float = 1.0
 
 # A message type the test definitions don't define.
 UNKNOWN_TYPE: int = 7777
+
+
+def test_default_server_uses_the_core_port() -> None:
+    assert pyrtma.client.DEFAULT_PORT == cd.DEFAULT_PORT
+    for func in (Client.connect, client_context):
+        default = inspect.signature(func).parameters["server_name"].default
+        assert default == f"localhost:{cd.DEFAULT_PORT}"
 
 
 @pytest.mark.parametrize(
