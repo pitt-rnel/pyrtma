@@ -10,6 +10,7 @@ that makes them. The version number is chosen at release time.
 - The timecode message header (`TimeCodeMessageHeader`) and the `timecode` argument of `Client`, `client_context` and `MessageManager`, with the manager's and the examples' `-t/--timecode` option. Only Python clients could produce that header; the C, MATLAB and JavaScript compilers never did. `get_header_cls()` takes no argument and always returns `MessageHeader`. The standard header is unchanged.
 - Positional arguments after `host_id` in `Client` and `client_context`, and after `port` in `MessageManager`. They are keyword-only now, so a call that passed `timecode` positionally raises `TypeError` instead of shifting the arguments after it.
 - v1 message definitions, the Python definitions the old v1 compiler wrote from C headers, with that compiler, `pyrtma.compilers.python_v1`. `python -m pyrtma.compile` and `pyrtma.compile.compile()` raise `FileFormatError` for a `.h` file, saying to compile from YAML. Definitions whose message classes have no `type_hash` or `type_size`, as v1 output has, raise `MessageDefinitionsLoadError` naming those classes when they are loaded; before, they loaded with a `DeprecationWarning`, and sending one warned with a `FutureWarning`. Recompile any v1 definitions from YAML. Message classes also no longer convert between `str` and `bytes` for `char` fields declared directly in `_fields_`, which only v1 classes had: such fields now behave as plain ctypes fields, reading as `bytes` and taking only `bytes`. Fields declared with validators, as compiled definitions have them, still read and take `str`. Without that conversion, reading or writing any field of a message or header skips a Python-level hook, which made each access several times slower: in a sandbox, a header field read went from about 330 ns to 70 ns, and `send_message` of a 128-byte message from about 17 µs to 11 µs.
+- `MAX_MESSAGE_SIZE` (65535), from the core definitions and so from every language's generated definitions. pyrtma never limited a payload to it; the parser had the same number written out as its own limit. A definition that uses the constant no longer compiles; use `MAX_DATA_BYTES`.
 
 ### Added
 
@@ -40,6 +41,7 @@ that makes them. The version number is chosen at release time.
 - `pyrtma.parser.GeneratedSourceError`, a `ParserError`: the Python compiler raises it, and writes nothing, when the code it generated isn't valid Python.
 - `pyrtma.parser.Field.padding`, True for the padding fields the parser inserts. `Parser.definition_hash()` builds a struct's or message's hashed text and hash, `Parser.field_text()` a field's line in it, and `pyrtma.parser.CANONICAL_TYPE_NAMES` holds the name each native type has there.
 - `--combined` also writes `<name>_combined.defs`, an index for the combined YAML file with `import_coredefs: false`, since that file holds the core definitions already. `python -m pyrtma.compile -i <name>_combined.defs` compiles it.
+- `MAX_DATA_BYTES`, a core constant (1048576, 1 MiB), in every language's generated definitions: the largest payload (`num_data_bytes`) that the message manager and clients accept, and the largest message or struct the parser compiles. The client's read check, the manager's receive buffer and the parser all take it from `rtma_core.yaml` now; before, each had its own copy of the number.
 
 ### Changed
 
@@ -135,6 +137,7 @@ that makes them. The version number is chosen at release time.
 - The message manager sends an ACK to a module that isn't a logger whole or not at all, as it sends every other message. An ACK the module has no room for is dropped, counted in `Module.drops` and reported with `FAILED_MESSAGE`, and the first of a run of dropped ACKs is logged as a warning. ACKs used to be queued without limit, so a module that sent requests and never read made the manager's memory grow, by about 400 bytes per ACK. A logger is waited for, for its own ACKs too; its own ACK used to be queued without waiting.
 - The message manager no longer prints `x` to the console for each message it drops for a slow consumer, or for each send that fails. The drop is reported with `FAILED_MESSAGE` and counted in `Module.drops`, and a failed send is logged.
 - A client whose connection the message manager finds reset, such as a killed process, is logged as a warning, "Closed its connection without disconnecting", before its `GOODBYE`, as other drops are. It used to be an error, logged after the `GOODBYE`.
+- The parser compiles messages and structs up to `MAX_DATA_BYTES` (1 MiB), the largest payload the message manager forwards; it used to stop at 65535 bytes. One that is larger raises `InvalidMessageSize`, naming the limit and the file.
 
 ### Fixed
 

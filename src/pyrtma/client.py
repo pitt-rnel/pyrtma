@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from .message import Message
 from .message_data import MessageData
 from .header import MessageHeader, _field_struct, get_header_cls
-from .core_defs import ALL_MESSAGE_TYPES
+from .core_defs import ALL_MESSAGE_TYPES, MAX_DATA_BYTES
 from .definitions import MessageDefinitions
 from .loader import (
     is_message_definitions_module,
@@ -61,11 +61,6 @@ __all__ = [
 ]
 
 F = TypeVar("F", bound=Callable[..., Any])
-
-# The largest payload the client accepts. It matches the message manager's
-# receive buffer, so anything the manager forwards is accepted. A header that
-# announces more than this, or less than zero, means the stream is corrupt.
-_MAX_DATA_BYTES: int = 1024**2
 
 # Header fields the read path takes straight from the received bytes, before
 # deciding what to read next; cheaper than going through their validators.
@@ -1371,11 +1366,14 @@ class Client(ClientLike):
                 (data_size,) = _NUM_DATA_BYTES.unpack_from(
                     header, _NUM_DATA_BYTES_OFFSET
                 )
-                if data_size < 0 or data_size > _MAX_DATA_BYTES:
+                # The manager forwards nothing larger than MAX_DATA_BYTES, so a
+                # header that announces more, or less than zero, means the
+                # stream is corrupt.
+                if data_size < 0 or data_size > MAX_DATA_BYTES:
                     self._connection_lost()
                     raise ConnectionLost(
                         f"Received a header with num_data_bytes={data_size}, outside 0 to "
-                        f"{_MAX_DATA_BYTES}; the connection can't be read further"
+                        f"{MAX_DATA_BYTES}; the connection can't be read further"
                     )
                 self._rx_payload = self._payload_for(msg_type, data_size)
                 if data_size:

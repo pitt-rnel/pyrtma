@@ -38,6 +38,14 @@ except (AttributeError, ImportError):
     DYN_MOD_ID_START = 10000
     MAX_HOSTS = 5
 
+MAX_DATA_BYTES: int | None
+try:
+    from .core_defs import MAX_DATA_BYTES
+except (AttributeError, ImportError):
+    # core_defs.py is built by this parser. While it is being rebuilt from a
+    # rtma_core.yaml that has just added the constant, there is no limit yet.
+    MAX_DATA_BYTES = None
+
 MAX_REFERENCE_DEPTH: int = 16
 """How deeply constants and aliases may be defined in terms of each other.
 
@@ -1171,10 +1179,10 @@ class Parser:
         if self.validate_alignment:
             self.check_alignment(mdf)
 
-        # Check size
-        if mdf.size > 65535:
+        # Check size: the manager and clients refuse a larger payload.
+        if MAX_DATA_BYTES is not None and mdf.size > MAX_DATA_BYTES:
             raise InvalidMessageSize(
-                f"{mdf.name} size of {mdf.size} exceeds maximum allowe of 65535 bytes."
+                f"{mdf.name} is {mdf.size} bytes, more than MAX_DATA_BYTES ({MAX_DATA_BYTES}), the largest payload the message manager and clients accept -> {self.current_file}"
             )
 
     def check_array_length(

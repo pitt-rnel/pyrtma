@@ -599,7 +599,7 @@ class TestConstructor:
 
 
 class TestHeaderValidation:
-    @pytest.mark.parametrize("data_size", [-1, 1024**2 + 1])
+    @pytest.mark.parametrize("data_size", [-1, cd.MAX_DATA_BYTES + 1])
     def test_invalid_data_size_drops_only_that_client(
         self,
         manager: ManagerHarness,

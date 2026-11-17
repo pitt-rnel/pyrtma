@@ -424,7 +424,7 @@ class MessageManager(ClientLike):
 
         self.modules[self.listen_socket] = self.mm_module
 
-        self.data_buffer = bytearray(1024**2)
+        self.data_buffer = bytearray(cd.MAX_DATA_BYTES)
         self.data_view = memoryview(self.data_buffer)
 
         self._core_defs = cd.get_message_definitions().msg_defs

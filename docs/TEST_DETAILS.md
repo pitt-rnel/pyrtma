@@ -977,6 +977,14 @@ The pytest classes after `TestParser`, added in Phase 8, write their definitions
 | `test_trailing_text_is_rejected` | Parser and compilers: a field spec must match as a whole. | Parametrized over `int32[4] junk`, `int32[4]junk` and `int32[4]]`; each raises a `ParserError`. |
 | `test_spaces_around_a_field_spec_are_accepted` | Parser and compilers: spaces around and inside a spec are still accepted, as before. | `' int32 [ 4 ] '`. |
 
+### TestMessageSize
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_message_at_the_limit_is_accepted` | Shared constants: a message of exactly `MAX_DATA_BYTES`, the payload limit the manager and clients share, compiles; the parser used to stop at 65535 bytes. | `int64[MAX_DATA_BYTES / 8]`; the message's size is `MAX_DATA_BYTES`. |
+| `test_message_over_the_limit_is_rejected` | Shared constants: a message larger than `MAX_DATA_BYTES` raises `InvalidMessageSize` naming the limit, since the manager would drop its sender. | `int64[MAX_DATA_BYTES / 8 + 1]`. |
+| `test_struct_over_the_limit_is_rejected` | Shared constants: the limit applies to structs too, since no message can hold a larger one. | A struct with `int64[MAX_DATA_BYTES / 8 + 1]`. |
+
 ### TestConstantExpressions
 
 | Test | Purpose | Approach |

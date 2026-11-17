@@ -18,6 +18,7 @@ import pytest
 
 import pyrtma.client
 from pyrtma import core_defs as cd
+from pyrtma.core_defs import MAX_DATA_BYTES
 from pyrtma.client import Client, client_context
 from pyrtma.exceptions import (
     AcknowledgementTimeout,
@@ -53,9 +54,6 @@ SLACK: float = 1.0
 
 # A message type the test definitions don't define.
 UNKNOWN_TYPE: int = 7777
-
-# The largest payload the client accepts; the message manager's limit.
-MAX_DATA_BYTES: int = 1024**2
 
 
 @pytest.mark.parametrize(

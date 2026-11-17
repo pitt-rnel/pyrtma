@@ -681,9 +681,11 @@ from hashlib import sha256
 
 import pytest
 
+from pyrtma.core_defs import MAX_DATA_BYTES
 from pyrtma.parser import (
     CircularRefError,
     ExpressionExpansionError,
+    InvalidMessageSize,
     ParserError,
     RecurisionError,
     RTMASyntaxError,
@@ -775,6 +777,35 @@ class TestArrayLengths:
 
         field = parser.message_defs["M"].fields[0]
         assert (field.type_name, field.length) == ("int32", 4)
+
+
+class TestMessageSize:
+    def test_message_at_the_limit_is_accepted(self, tmp_path: Path) -> None:
+        defs = write_definitions(tmp_path, {"m": message("int64[MAX_DATA_BYTES / 8]")})
+
+        parser, _ = parse_definitions(defs)
+
+        assert parser.message_defs["M"].size == MAX_DATA_BYTES
+
+    def test_message_over_the_limit_is_rejected(self, tmp_path: Path) -> None:
+        defs = write_definitions(
+            tmp_path, {"m": message("int64[MAX_DATA_BYTES / 8 + 1]")}
+        )
+
+        with pytest.raises(InvalidMessageSize, match="MAX_DATA_BYTES"):
+            parse_definitions(defs)
+
+    def test_struct_over_the_limit_is_rejected(self, tmp_path: Path) -> None:
+        text = """\
+            struct_defs:
+              S:
+                fields:
+                  a: int64[MAX_DATA_BYTES / 8 + 1]
+            """
+        defs = write_definitions(tmp_path, {"m": text})
+
+        with pytest.raises(InvalidMessageSize, match="MAX_DATA_BYTES"):
+            parse_definitions(defs)
 
 
 class TestConstantExpressions:
