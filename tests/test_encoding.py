@@ -41,8 +41,9 @@ class TestEncoding(unittest.TestCase):
 
                 for mdf in defs.MDF.values():
                     if mdf.type_id > 1000:
-                        # Subscribe from message type
-                        with subscriber.subscription_context([mdf.type_id]):
+                        # Subscribe to the message type for this check only
+                        subscriber.subscribe([mdf.type_id])
+                        try:
                             time.sleep(0.01)
 
                             # Publish a random message of the subscribed type
@@ -55,5 +56,7 @@ class TestEncoding(unittest.TestCase):
                                 self.fail("Subscriber did not receive packet.")
                             else:
                                 self.assertEqual(in_msg, out_msg.data)
+                        finally:
+                            subscriber.unsubscribe([mdf.type_id])
 
         time.sleep(0.5)

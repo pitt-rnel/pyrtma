@@ -47,8 +47,6 @@ from collections.abc import Iterable, Iterator, Callable
 from typing import Any, TypeVar, cast
 from types import ModuleType
 
-from warnings import warn
-
 __all__ = [
     "ClientError",
     "MessageManagerNotFound",
@@ -862,72 +860,6 @@ class Client(ClientLike):
     def resume_all_subscriptions(self):
         """Resume all paused subscriptions"""
         self.resume_subscription(self.paused_subscribed_types)
-
-    @contextmanager
-    def subscription_context(self, msg_list: Iterable[int]) -> Iterator[None]:
-        """Context manager to subscribe to a list of message types
-
-        On exit, including when the body raises, the types this context
-        subscribed to are unsubscribed again, unless the body has already
-        unsubscribed or paused them. Types already subscribed to are left
-        alone, with a warning. ``ALL_MESSAGE_TYPES`` is treated as any other
-        type. Nothing is changed on exit if the client is no longer
-        connected.
-
-        Args:
-            msg_list (Iterable[int]): A list of numeric message IDs to subscribe to
-        """
-        before = self.subscribed_types
-        added: list[int] = []
-        for mt in dict.fromkeys(msg_list):  # in order, once each
-            if mt in before:
-                warn(
-                    f"Message ID {mt} is already subscribed, ignored from subscription_context"
-                )
-            else:
-                added.append(mt)
-
-        if added:
-            self.subscribe(added)
-        try:
-            yield
-        finally:
-            if self.connected:
-                still = [mt for mt in added if mt in self._subscribed_types]
-                if still:
-                    self.unsubscribe(still)
-
-    @contextmanager
-    def paused_subscription_context(self, msg_list: Iterable[int]) -> Iterator[None]:
-        """Context manager to pause subscriptions to a list of message types
-
-        On exit, including when the body raises, the types this context
-        paused are resumed, unless the body has already resumed or
-        unsubscribed them. Types that aren't subscribed to are ignored, with a
-        warning. Nothing is resumed if the client is no longer connected.
-
-        Args:
-            msg_list (Iterable[int]): A list of numeric message IDs to temporarily unsubscribe to
-        """
-        subscribed = self.subscribed_types
-        paused: list[int] = []
-        for mt in dict.fromkeys(msg_list):  # in order, once each
-            if mt in subscribed:
-                paused.append(mt)
-            else:
-                warn(
-                    f"Message ID {mt} is not subscribed, ignored from paused_subscription_context"
-                )
-
-        if paused:
-            self.pause_subscription(paused)
-        try:
-            yield
-        finally:
-            if self.connected:
-                still = [mt for mt in paused if mt in self._paused_types]
-                if still:
-                    self.resume_subscription(still)
 
     @requires_connection
     def send_signal(

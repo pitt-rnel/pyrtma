@@ -361,13 +361,6 @@ These tests use `isolated_modules`, which takes every loaded definitions module 
 | `test_generator_subscribes_every_type` | H5: `subscribe()` with a generator subscribes every type it yields. | A generator of three types. |
 | `test_generator_removes_every_type` | H5: `unsubscribe()` and `pause_subscription()` with a generator remove every type it yields. | Parametrized over both; three types subscribed, a generator of two. |
 | `test_generator_resumes_every_type` | H5: `resume_subscription()` with a generator resumes every type it yields. | Two types subscribed and paused, then resumed from a generator. |
-| `test_subscription_context_keeps_existing_subscriptions` | H3: `subscription_context()` leaves types that were already subscribed alone, with a warning, and unsubscribes only the ones it added. | Types A to C subscribed; the context names A to D, the case that used to unsubscribe B. |
-| `test_subscription_context_restores_after_exception` | H3: `subscription_context()` unsubscribes what it added when the body raises. | A subscribed; the context adds B and the body raises `RuntimeError`, which must propagate. |
-| `test_subscription_context_for_all_types_restores_previous_ones` | H3, ALL_MESSAGE_TYPES as a type: a `subscription_context()` for `ALL_MESSAGE_TYPES` adds it beside the subscriptions already there, and on leaving removes only it; the paused type stays paused. | A subscribed and B paused before; inside, both the client and the manager have A and `ALL_MESSAGE_TYPES`. |
-| `test_paused_subscription_context_restores_after_exception` | H3: `paused_subscription_context()` resumes what it paused when the body raises. | A and B subscribed; the context pauses A and the body raises. |
-| `test_paused_subscription_context_ignores_every_unsubscribed_type` | H3: `paused_subscription_context()` ignores, with a warning, every type that isn't subscribed, so none is subscribed on exit. | A subscribed; the context names B, D and A. Removing B while iterating used to skip D, which was then subscribed on exit. |
-| `test_contexts_leave_changes_the_body_made` | H3: on exit, a context reverts only types still in the state it left them, so the body's own changes to them stand. | The body of a `subscription_context([B])` unsubscribes B and subscribes E; the body of a `paused_subscription_context([A])` resumes and then unsubscribes A. |
-| `test_context_exit_after_disconnect_does_not_raise` | H3: leaving a context after the client has disconnected restores nothing and raises nothing, so it can't hide an exception from the body. | Parametrized over both contexts; the body calls `disconnect()`. |
 | `test_pause_and_resume_of_all_types_round_trips` | Client: pausing `ALL_MESSAGE_TYPES` while subscribed to it leaves it paused, and `resume_all_subscriptions()` subscribes to it again, at the manager too. | Subscribes to `ALL_MESSAGE_TYPES`, pauses it, and checks the manager has nothing before resuming. |
 | `test_pausing_all_types_pauses_only_it` | ALL_MESSAGE_TYPES as a type: pausing `ALL_MESSAGE_TYPES` pauses only it; individual types stay subscribed at the client and the manager, and `resume_all_subscriptions()` brings it back. | A, B and `ALL_MESSAGE_TYPES` subscribed. |
 | `test_unsubscribe_from_all_forgets_paused_types` | Client: `unsubscribe_from_all()` also forgets paused types, so `resume_all_subscriptions()` afterwards subscribes nothing. | A and B subscribed and A paused. |
@@ -850,14 +843,6 @@ Each test starts a `MessageManager` on an unused loopback port in `setUp` and co
 | `test_whenClientPausesMulti_clientIsRemovedFromMessageTypes` | Pausing two types removes both. | As above, for both types. |
 | `test_whenClientResumes_clientIsAddedToMessageType` | `resume_subscription()` restores a paused subscription in the manager. | Subscribes, pauses, resumes, inspects `manager.subscriptions`. |
 | `test_whenClientResumesMulti_clientIsAddedToMessageType` | Resuming two paused types restores both. | As above, for both types. |
-| `test_whenClientContextSubscribes_clientIsSubscribedToMessageType` | Inside `subscription_context()`, the client is subscribed. | Checks `manager.subscriptions` inside the context. |
-| `test_whenClientContextSubscribesMulti_clientIsSubscribedToMessageTypes` | `subscription_context()` with two types subscribes to both. | As above, for both types. |
-| `test_whenClientContextUnsubscribes_clientIsUnsubscribedFromMessageType` | Leaving `subscription_context()` unsubscribes the client. | Checks `manager.subscriptions` after the context exits. |
-| `test_whenClientContextUnsubscribesMulti_clientIsUnsubscribedFromMessageTypes` | Leaving a two-type `subscription_context()` unsubscribes both. | As above, for both types. |
-| `test_whenClientContextPauses_clientIsRemovedFromMessageType` | Inside `paused_subscription_context()`, the subscription is paused at the manager. | Nested contexts; checks inside the inner one. |
-| `test_whenClientContextPausesMulti_clientIsRemovedFromMessageTypes` | `paused_subscription_context()` with two types pauses both. | As above, for both types. |
-| `test_whenClientContextResumes_clientIsAddedToMessageType` | Leaving `paused_subscription_context()` resumes the subscription. | Checks after the inner context exits, inside the outer one. |
-| `test_whenClientContextResumesMulti_clientIsAddedToMessageType` | Leaving a two-type paused context resumes both. | As above, for both types. |
 
 ### TestSingleContextClient
 
@@ -867,12 +852,6 @@ Each test starts a `MessageManager` on an unused loopback port in `setUp` and co
 | `test_whenClientConnects_mod_id_is_correct` | `client_context()` keeps the requested module ID. | Compares `client.module_id` with module ID 12. |
 | `test_whenClientContextSubscribes_clientIsSubscribedToMessageType` | `client_context(msg_list=...)` subscribes on entry. | Inspects `manager.subscriptions`. |
 | `test_whenClientContextSubscribesMulti_clientIsSubscribedToMessageTypes` | `client_context()` with two types subscribes to both. | As above, for both types. |
-| `test_whenClientContextUnsubscribes_clientIsUnsubscribedFromMessageType` | A `subscription_context()` inside `client_context()` unsubscribes on exit. | Checks `manager.subscriptions` after the inner context. |
-| `test_whenClientContextUnsubscribesMulti_clientIsUnsubscribedFromMessageTypes` | As above, with two types. | As above, for both types. |
-| `test_whenClientContextPauses_clientIsRemovedFromMessageType` | `paused_subscription_context()` pauses a subscription made by `client_context()`. | Checks `manager.subscriptions` inside the paused context. |
-| `test_whenClientContextPausesMulti_clientIsRemovedFromMessageType` | As above, with two types. | As above, for both types. |
-| `test_whenClientContextResumes_clientIsAddedToMessageType` | Leaving the paused context resumes a subscription made by `client_context()`. | Checks `manager.subscriptions` after the paused context. |
-| `test_whenClientContextResumesMulti_clientIsAddedToMessageType` | As above, with two types. | As above, for both types. |
 
 ## test_encoding.py — message bytes through the manager (needs: loopback sockets; not yet marked)
 
