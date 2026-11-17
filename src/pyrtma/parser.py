@@ -946,8 +946,8 @@ class Parser:
             )
 
         # A user's module IDs can't be the core modules' (up to
-        # MAX_RTMA_MODULE_ID), 100 to 199, or the IDs that the manager assigns
-        # (from DYN_MOD_ID_START up).
+        # MAX_RTMA_MODULE_ID) or the IDs that the manager assigns (from
+        # DYN_MOD_ID_START up).
         if (
             self.current_index.name not in Parser.core_imports
             and value != 0
@@ -955,9 +955,9 @@ class Parser:
         ):
             first = self.core_constant("MAX_RTMA_MODULE_ID") + 1
             dynamic = self.core_constant("DYN_MOD_ID_START")
-            if value < first or (99 < value < 200) or value >= dynamic:
+            if value < first or value >= dynamic:
                 raise RTMASyntaxError(
-                    f"Value outside of valid range [{first} - 99 or 200 - {dynamic - 1}] for module_id: {name}: {value} -> {self.current_file}"
+                    f"Value outside of valid range [{first} - {dynamic - 1}] for module_id: {name}: {value} -> {self.current_file}"
                 )
 
         for mid in self.module_ids.values():

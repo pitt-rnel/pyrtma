@@ -1039,8 +1039,8 @@ The pytest classes after `TestParser`, added in Phase 8, write their definitions
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_module_id_in_the_dynamic_range_is_rejected` | Parser and compilers: module IDs the client can't connect with raise `RTMASyntaxError` giving the range. | Parametrized over 10000, 20000 and 40000. |
-| `test_module_ids_outside_the_user_ranges_are_rejected` | Shared constants: the core modules' IDs (up to `MAX_RTMA_MODULE_ID`) and 100 to 199 are refused in a user's file, with the ranges in the error, now that the bounds come from the parsed core definitions. | Parametrized over 1, 9, 100 and 199. |
-| `test_module_ids_in_range_are_accepted` | Parser and compilers: the ends of both user ranges are accepted. | Parametrized over 10, 99, 200 and 9999. |
+| `test_core_module_ids_are_rejected` | Shared constants: the core modules' IDs, up to `MAX_RTMA_MODULE_ID`, are refused in a user's file, with the user range in the error; the bounds come from the parsed core definitions. | Parametrized over 1 and 9; the error names `[10 - 9999]`. |
+| `test_module_ids_in_range_are_accepted` | Parser and compilers: module IDs from 10 to 9999 are accepted, including 100 to 199, which the parser refused while that range was left out for the manager's old dynamic IDs. | Parametrized over 10, 99, 100, 199, 200 and 9999. |
 | `test_host_id_above_max_hosts_warns` | Parser and compilers: a host ID above `MAX_HOSTS` is accepted with a warning naming it. | A host ID of 6. |
 | `test_host_id_within_max_hosts_does_not_warn` | Parser and compilers: a host ID up to `MAX_HOSTS` gives no warning. | A host ID of 5. |
 

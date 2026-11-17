@@ -143,6 +143,7 @@ that makes them. The version number is chosen at release time.
 - A client whose connection the message manager finds reset, such as a killed process, is logged as a warning, "Closed its connection without disconnecting", before its `GOODBYE`, as other drops are. It used to be an error, logged after the `GOODBYE`.
 - The parser compiles messages and structs up to `MAX_DATA_BYTES` (1 MiB), the largest payload the message manager forwards; it used to stop at 65535 bytes. One that is larger raises `InvalidMessageSize`, naming the limit and the file.
 - The data logger (`python -m pyrtma.data_logger -m`, `Dataset(mm_ip=...)` and the control CLI), the web manager (`-m` and `WebMessageManager(mm_ip=...)`), the unified console log (`-a` and `DEFAULT_SERVER`) and `utils/pyrtma_bench.py -s` default to `localhost:7111` instead of `127.0.0.1:7111`, as the client already did. The client's socket is IPv4, so `localhost` still reaches the IPv4 loopback; it is now looked up by name, so a system whose hosts file maps `localhost` elsewhere connects there.
+- The parser accepts module IDs 100 to 199 in a definitions file; a user's module IDs may be anything from 10 to 9999 (`MAX_RTMA_MODULE_ID + 1` to `DYN_MOD_ID_START - 1`). The range was refused because an earlier message manager assigned dynamic IDs from 100; pyrtma's manager assigns them from `DYN_MOD_ID_START` and already accepted these IDs from a client.
 
 ### Fixed
 
