@@ -473,6 +473,34 @@ class Byte(FieldValidator[_P, int], Generic[_P]):
         return f"Byte(len=1) at 0x{id(self):016X}"
 
 
+def fit_ascii(text: str, size: int, *, marker: str = "", keep_end: bool = False) -> str:
+    """Make text fit a ``char`` field, so storing it never raises.
+
+    Characters that aren't ASCII become "?", one for one. Text that is still
+    too long is cut to ``size - 1`` characters, leaving room for the null
+    terminator. :func:`pyrtma.message_base.field_size` gives a field's size.
+
+    Args:
+        text: The text to store.
+        size: The size of the field, including the null terminator.
+        marker: Text that shows a cut: appended when the start is kept,
+            prepended when the end is kept.
+        keep_end: Keep the end of the text instead of the start, as for a
+            path, whose file name is at the end.
+
+    Returns:
+        ASCII text of at most ``size - 1`` characters.
+    """
+    text = text.encode("ascii", "replace").decode("ascii")
+    limit = size - 1
+    if len(text) <= limit:
+        return text
+    room = limit - len(marker)
+    if keep_end:
+        return marker + text[len(text) - room :]
+    return text[:room] + marker
+
+
 class String(FieldValidator[_P, str], Generic[_P]):
     """Validator for strings (char arrays)"""
 

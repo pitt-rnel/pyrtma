@@ -24,6 +24,61 @@ def _ctypes_name(name: str) -> str:
     return "_" + name
 
 
+class _Probe(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_int8)]
+
+
+# The type of a structure's field descriptors, which not every supported
+# Python version names.
+_CField: type = type(_Probe.x)
+
+
+def _cfield(cls: type, name: str) -> Any:
+    """Find the ctypes field that holds a message field.
+
+    Args:
+        cls: The message or struct class.
+        name: The field's name.
+
+    Raises:
+        KeyError: The class has no field of that name declared with a
+            validator.
+
+    Returns:
+        The ctypes field descriptor, with its ``offset`` and ``size``.
+    """
+    field = getattr(cls, _ctypes_name(name), None)
+    if not isinstance(field, _CField):
+        raise KeyError(f"{name} is not a field of {cls.__name__}")
+    return field
+
+
+def field_size(msg: "MessageBase | type[MessageBase]", name: str) -> int:
+    """Return the size in bytes of a message or struct field.
+
+    For a ``char`` array that includes the null terminator, so a string
+    stored in it can be one character shorter. Use :func:`fit_ascii
+    <pyrtma.validators.fit_ascii>` to make text fit.
+
+    Args:
+        msg: The message or struct, or its class.
+        name: The field's name, as declared with a validator.
+
+    Raises:
+        KeyError: There is no such field.
+
+    Returns:
+        The field's size.
+    """
+    cls = msg if isinstance(msg, type) else type(msg)
+    # _cfield() and _ctypes_name(), inline: the two calls cost about as much
+    # again as the lookup itself.
+    field: Any = getattr(cls, "_" + name, None)
+    if type(field) is not _CField:
+        raise KeyError(f"{name} is not a field of {cls.__name__}")
+    return field.size
+
+
 # MessageBase Metaclass - (for runtime ctypes field generation)
 CStructType: type = type(
     ctypes.Structure
@@ -162,12 +217,7 @@ class MessageBase(ctypes.Structure, metaclass=MessageMeta):
         Returns:
             bytes: Copy of message field data bytes
         """
-        # The ctypes fields are the public names with a "_" in front; the
-        # public names are the validators.
-        cls = type(self)
-        if not any(f[0] == f"_{name}" for f in cls._fields_):
-            raise KeyError(f"{name} is not a field of {cls.__name__}")
-        meta = getattr(cls, f"_{name}")
+        meta = _cfield(type(self), name)
 
         return ctypes.string_at(ctypes.addressof(self) + meta.offset, meta.size)
 

@@ -13,7 +13,7 @@ import pyrtma.core_defs as cd
 from rich.prompt import Prompt
 from rich.markup import escape
 
-from pyrtma.client_logging import _field_size
+from pyrtma.message_base import field_size
 from pyrtma.data_logger.dataset import Dataset
 from pyrtma.exceptions import MessageManagerNotFound
 
@@ -31,7 +31,7 @@ def _ask_text(label: str, field: str) -> str:
     Returns:
         A non-empty ASCII answer short enough for the field.
     """
-    longest = _field_size(cd.DATASET(), field) - 1
+    longest = field_size(cd.DATASET, field) - 1
     while True:
         value = Prompt.ask(f"[bold](dataset)->[blue]{label}")
         if not value:

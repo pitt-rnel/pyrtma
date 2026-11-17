@@ -11,7 +11,9 @@ import threading
 import pyrtma
 
 import pyrtma.core_defs as cd
-from ..client_logging import TRUNCATED_MARKER, _ascii_field, _field_size
+from ..client_logging import TRUNCATED_MARKER
+from ..message_base import field_size
+from ..validators import fit_ascii
 from .data_formatter import DataFormatter, FileContext, Recordable, get_formatter
 from collections.abc import Callable
 from typing import IO, Any
@@ -26,6 +28,11 @@ from .exceptions import (
     DatasetWriterError,
     DataLoggerError,
 )
+
+# The sizes of DATA_LOGGER_ERROR's text fields.
+_ERROR_DATASET_SIZE: int = field_size(cd.MDF_DATA_LOGGER_ERROR, "dataset_name")
+_ERROR_TYPE_SIZE: int = field_size(cd.MDF_DATA_LOGGER_ERROR, "exc_type")
+_ERROR_TEXT_SIZE: int = field_size(cd.MDF_DATA_LOGGER_ERROR, "msg")
 
 
 def error_message(dataset: str, exc_type: str, text: str) -> cd.MDF_DATA_LOGGER_ERROR:
@@ -44,9 +51,9 @@ def error_message(dataset: str, exc_type: str, text: str) -> cd.MDF_DATA_LOGGER_
         The message.
     """
     error = cd.MDF_DATA_LOGGER_ERROR()
-    error.dataset_name = _ascii_field(dataset, _field_size(error, "dataset_name"))
-    error.exc_type = _ascii_field(exc_type, _field_size(error, "exc_type"))
-    error.msg = _ascii_field(text, _field_size(error, "msg"), marker=TRUNCATED_MARKER)
+    error.dataset_name = fit_ascii(dataset, _ERROR_DATASET_SIZE)
+    error.exc_type = fit_ascii(exc_type, _ERROR_TYPE_SIZE)
+    error.msg = fit_ascii(text, _ERROR_TEXT_SIZE, marker=TRUNCATED_MARKER)
     return error
 
 

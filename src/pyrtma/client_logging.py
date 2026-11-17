@@ -7,6 +7,8 @@ import pathlib
 import weakref
 
 from .message import MessageData
+from .message_base import field_size
+from .validators import fit_ascii
 from abc import ABC, abstractmethod
 from .exceptions import ClientError, LoggingConfigurationError
 
@@ -68,50 +70,6 @@ TRUNCATED_MARKER: str = "[TRUNCATED]"
 PATH_ELLIPSIS: str = "..."
 
 
-def _ascii_field(
-    text: str, size: int, *, marker: str = "", keep_end: bool = False
-) -> str:
-    """Make text fit a char field of an RTMA log message.
-
-    Characters that aren't ASCII become "?", one for one, so the wire format
-    and the field size are unchanged. Text that is still too long is cut to
-    ``size - 1`` characters, leaving room for the null terminator.
-
-    Args:
-        text: The text to store.
-        size: The size of the char field, including the null terminator.
-        marker: Text that shows a cut: appended when the start is kept,
-            prepended when the end is kept.
-        keep_end: Keep the end of the text instead of the start, as for a
-            path, whose file name is at the end.
-
-    Returns:
-        ASCII text of at most ``size - 1`` characters.
-    """
-    text = text.encode("ascii", "replace").decode("ascii")
-    limit = size - 1
-    if len(text) <= limit:
-        return text
-    room = limit - len(marker)
-    if keep_end:
-        return marker + text[len(text) - room :]
-    return text[:room] + marker
-
-
-def _field_size(msg: object, field: str) -> int:
-    """Return the size in bytes of a message's char field.
-
-    Args:
-        msg: The message.
-        field: The field name.
-
-    Returns:
-        The field's size, including the null terminator.
-    """
-    # The ctypes field behind each descriptor is the name with a leading "_".
-    return getattr(type(msg), f"_{field}").size
-
-
 RTMA_LOG_MSG = (
     cd.MDF_RTMA_LOG
     | cd.MDF_RTMA_LOG_DEBUG
@@ -120,6 +78,32 @@ RTMA_LOG_MSG = (
     | cd.MDF_RTMA_LOG_ERROR
     | cd.MDF_RTMA_LOG_CRITICAL
 )
+
+
+# The sizes of each log message class's name, pathname, funcname and message
+# fields, found the first time the class is used: they are the same for every
+# record, so gen_log_msg() doesn't look them up each time.
+_log_field_sizes: dict[type, tuple[int, int, int, int]] = {}
+
+
+def _field_sizes_of(cls: type[RTMA_LOG_MSG]) -> tuple[int, int, int, int]:
+    """Find, and remember, a log message class's text field sizes.
+
+    Args:
+        cls: The log message class.
+
+    Returns:
+        The sizes of its ``name``, ``pathname``, ``funcname`` and ``message``
+        fields.
+    """
+    sizes = (
+        field_size(cls, "name"),
+        field_size(cls, "pathname"),
+        field_size(cls, "funcname"),
+        field_size(cls, "message"),
+    )
+    _log_field_sizes[cls] = sizes
+    return sizes
 
 
 class RTMALogHandler(logging.Handler):
@@ -146,22 +130,21 @@ class RTMALogHandler(logging.Handler):
     def gen_log_msg(self, record: logging.LogRecord) -> RTMA_LOG_MSG:
         # See https://docs.python.org/3/library/logging.html#logrecord-attributes
         # for LogRecord attributes that could be added
-        msg = self.get_log_msg_cls(record.levelno)()
+        cls = self.get_log_msg_cls(record.levelno)
+        msg = cls()
+        name_size, path_size, func_size, text_size = _log_field_sizes.get(
+            cls
+        ) or _field_sizes_of(cls)
         name = str(getattr(record, "log_name", record.name))
-        msg.name = _ascii_field(name, _field_size(msg, "name"))
+        msg.name = fit_ascii(name, name_size)
         msg.time = record.created
         msg.level = record.levelno
         msg.lineno = record.lineno
-        msg.pathname = _ascii_field(
-            str(record.pathname),
-            _field_size(msg, "pathname"),
-            marker=PATH_ELLIPSIS,
-            keep_end=True,
+        msg.pathname = fit_ascii(
+            str(record.pathname), path_size, marker=PATH_ELLIPSIS, keep_end=True
         )
-        msg.funcname = _ascii_field(str(record.funcName), _field_size(msg, "funcname"))
-        msg.message = _ascii_field(
-            record.getMessage(), cd.MAX_LOG_LENGTH, marker=TRUNCATED_MARKER
-        )
+        msg.funcname = fit_ascii(str(record.funcName), func_size)
+        msg.message = fit_ascii(record.getMessage(), text_size, marker=TRUNCATED_MARKER)
         return msg
 
     def emit(self, record: logging.LogRecord) -> None:

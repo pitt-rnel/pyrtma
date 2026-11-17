@@ -10,7 +10,7 @@ import pytest
 from pyrtma.exceptions import JSONDecodingError
 from pyrtma.header import MessageHeader
 from pyrtma.message import Message
-from pyrtma.validators import disable_message_validation
+from pyrtma.validators import String, disable_message_validation, fit_ascii
 
 # The test definitions, whose classes these tests use.
 from .test_msg_defs.test_defs import *
@@ -1020,3 +1020,30 @@ def test_string_that_is_not_ascii_is_rejected_on_write() -> None:
 
     with pytest.raises(TypeError):
         m.string = "\u00f3"
+
+
+def test_fit_ascii_leaves_text_that_fits() -> None:
+    assert fit_ascii("abc", 8) == "abc"
+    assert fit_ascii("abcdefg", 8) == "abcdefg"
+
+
+def test_fit_ascii_replaces_each_non_ascii_character() -> None:
+    assert fit_ascii("caf\u00e9 \u00fc", 16) == "caf? ?"
+
+
+def test_fit_ascii_cuts_the_end_and_marks_it() -> None:
+    assert fit_ascii("abcdefghij", 8) == "abcdefg"
+    assert fit_ascii("abcdefghij", 8, marker="..") == "abcde.."
+
+
+def test_fit_ascii_can_keep_the_end_instead() -> None:
+    assert fit_ascii("/long/path/file.py", 12, marker="...", keep_end=True) == (
+        ".../file.py"
+    )
+
+
+@pytest.mark.parametrize("text", ["", "x" * 7, "x" * 8, "\u00e9" * 50])
+def test_fit_ascii_result_fits_the_string_field(text: str) -> None:
+    field = String(8)
+
+    field.validate_one(fit_ascii(text, 8, marker="[T]"))
