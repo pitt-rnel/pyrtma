@@ -305,26 +305,24 @@ class RTMAWebSocketHandler(WebSocketHandler):
             elif msg.header.msg_type == cd.MT_SUBSCRIBE:
                 msg.data = cast(cd.MDF_SUBSCRIBE, msg.data)
                 self.proxy.subscribe([msg.data.msg_type])
-                logger.info(
-                    f"Received SUBSCRIBE: {self.proxy.get_msg_cls(msg.data.msg_type).type_name}"
-                )
+                logger.info(f"Received SUBSCRIBE: {self._type_name(msg.data.msg_type)}")
             elif msg.header.msg_type == cd.MT_UNSUBSCRIBE:
                 msg.data = cast(cd.MDF_UNSUBSCRIBE, msg.data)
                 self.proxy.unsubscribe([msg.data.msg_type])
                 logger.info(
-                    f"Received UNSUBSCRIBE: {self.proxy.get_msg_cls(msg.data.msg_type).type_name}"
+                    f"Received UNSUBSCRIBE: {self._type_name(msg.data.msg_type)}"
                 )
             elif msg.header.msg_type == cd.MT_PAUSE_SUBSCRIPTION:
                 msg.data = cast(cd.MDF_PAUSE_SUBSCRIPTION, msg.data)
                 self.proxy.pause_subscription([msg.data.msg_type])
                 logger.info(
-                    f"Received PAUSE_SUBSCRIPTION: {self.proxy.get_msg_cls(msg.data.msg_type).type_name}"
+                    f"Received PAUSE_SUBSCRIPTION: {self._type_name(msg.data.msg_type)}"
                 )
             elif msg.header.msg_type == cd.MT_RESUME_SUBSCRIPTION:
                 msg.data = cast(cd.MDF_RESUME_SUBSCRIPTION, msg.data)
                 self.proxy.resume_subscription([msg.data.msg_type])
                 logger.info(
-                    f"Received RESUME_SUBSCRIPTION: {self.proxy.get_msg_cls(msg.data.msg_type).type_name}"
+                    f"Received RESUME_SUBSCRIPTION: {self._type_name(msg.data.msg_type)}"
                 )
             elif msg.header.msg_type == cd.MT_CONNECT:
                 self.handle_connect(msg)
@@ -343,6 +341,23 @@ class RTMAWebSocketHandler(WebSocketHandler):
                 self.send_message(error_json)
             logger.error(e, stack_info=False)
             return
+
+    def _type_name(self, msg_type: int) -> str:
+        """Name a message type for the log, whether or not it is defined.
+
+        A web client may subscribe to ``ALL_MESSAGE_TYPES``, or to a type
+        the proxy has no definition for; looking up its class would raise
+        after the subscription had gone through.
+
+        Args:
+            msg_type: The type.
+
+        Returns:
+            Its name, ``ALL_MESSAGE_TYPES``, or ``MT=`` and the number.
+        """
+        if msg_type == cd.ALL_MESSAGE_TYPES:
+            return "ALL_MESSAGE_TYPES"
+        return self.proxy.message_name_from_id(msg_type) or f"MT={msg_type}"
 
     def read_bytes(self, num: int) -> bytes:
         """Read exactly ``num`` bytes from the websocket.

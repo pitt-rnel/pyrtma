@@ -523,6 +523,31 @@ class TestConnect:
         assert handler.proxy.name == "late-page"
         assert hello_observer(lambda d: d.mod_id == mod_id and d.name == "late-page")
 
+    @pytest.mark.parametrize(
+        "msg_type", [cd.ALL_MESSAGE_TYPES, 7777], ids=["all types", "undefined"]
+    )
+    @pytest.mark.parametrize("command", ["subscribe", "unsubscribe", "pause"])
+    def test_subscription_commands_report_no_error(
+        self, handler: StubHandler, msg_type: int, command: str
+    ) -> None:
+        handler.handle_connect_v2(connect_v2_message("page"))
+        handler.sent.clear()
+        ctrl = {
+            "subscribe": (cd.MT_SUBSCRIBE, cd.MDF_SUBSCRIBE),
+            "unsubscribe": (cd.MT_UNSUBSCRIBE, cd.MDF_UNSUBSCRIBE),
+            "pause": (cd.MT_PAUSE_SUBSCRIPTION, cd.MDF_PAUSE_SUBSCRIPTION),
+        }
+        header = MessageHeader()
+        header.msg_type, data_cls = ctrl[command]
+        data = data_cls()
+        data.msg_type = msg_type
+
+        handler.process_json_message(Message(header, data).to_json(minify=True))
+
+        assert [text for text in handler.sent if "rtma_msg_error" in text] == []
+        expected = {msg_type} if command == "subscribe" else set()
+        assert handler.proxy.subscribed_types == expected
+
     def test_connect_after_connect_v2_is_ignored(self, handler: StubHandler) -> None:
         handler.handle_connect_v2(connect_v2_message("page"))
         mod_id = handler.proxy.module_id

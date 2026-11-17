@@ -747,59 +747,30 @@ class Client(ClientLike):
     def _subscription_control(self, msg_list: Iterable[int], ctrl_msg: str):
         # Read the iterable once: a generator is empty after a first pass.
         msg_set = set(msg_list)
-        all_msg = ALL_MESSAGE_TYPES in msg_set
-        if all_msg:
-            msg_set = {ALL_MESSAGE_TYPES}
 
-        # Note: Ignore any sub control for individual msg_types
-        # when subscribed to ALL_MESSAGE_TYPES
-        if self._sub_all and not all_msg:
-            raise InvalidSubscription(
-                "Cannot modify subscriptions to individual MTs while subscribed to ALL_MESSAGE_TYPES"
-            )
-
+        # ALL_MESSAGE_TYPES is a type like any other here: subscribing to it,
+        # or pausing or leaving it, leaves the other types as they are.
         msg: MessageData
         if ctrl_msg == "Subscribe":
             msg = cd.MDF_SUBSCRIBE()
-            if all_msg:
-                self._subscribed_types = msg_set
-                self._paused_types.clear()
-                self._sub_all = True
-            else:
-                self._subscribed_types |= msg_set
-                self._paused_types -= msg_set
+            self._subscribed_types |= msg_set
+            self._paused_types -= msg_set
         elif ctrl_msg == "Unsubscribe":
             msg = cd.MDF_UNSUBSCRIBE()
-            if all_msg:
-                self._subscribed_types.clear()
-                self._paused_types.clear()
-                self._sub_all = False
-            else:
-                self._subscribed_types -= msg_set
-                self._paused_types -= msg_set
+            self._subscribed_types -= msg_set
+            self._paused_types -= msg_set
         elif ctrl_msg == "PauseSubscription":
             msg = cd.MDF_PAUSE_SUBSCRIPTION()
-            if all_msg:
-                # The manager drops every subscription. They are paused, not
-                # forgotten: ALL_MESSAGE_TYPES itself, or the individual
-                # types, so that resume_all_subscriptions() restores them.
-                self._paused_types |= self._subscribed_types
-                self._subscribed_types.clear()
-                self._sub_all = False
-            else:
-                self._subscribed_types -= msg_set
-                self._paused_types |= msg_set
+            self._subscribed_types -= msg_set
+            self._paused_types |= msg_set
         elif ctrl_msg == "ResumeSubscription":
             msg = cd.MDF_RESUME_SUBSCRIPTION()
-            if all_msg:
-                self._subscribed_types = msg_set
-                self._paused_types.clear()
-                self._sub_all = True
-            else:
-                self._subscribed_types |= msg_set
-                self._paused_types -= msg_set
+            self._subscribed_types |= msg_set
+            self._paused_types -= msg_set
         else:
             raise TypeError("Unknown control message type.")
+        # Kept apart from the set so that read_message() checks it first.
+        self._sub_all = ALL_MESSAGE_TYPES in self._subscribed_types
 
         for msg_type in msg_set:
             msg.msg_type = msg_type
@@ -812,8 +783,16 @@ class Client(ClientLike):
         Calling this method multiple times will add to, and not replace,
         the list of subscribed messages.
 
+        ``ALL_MESSAGE_TYPES`` is a type in the list like any other: while it
+        is subscribed, every message is received, and other types can still
+        be subscribed, unsubscribed, paused and resumed. A message of a type
+        that is also subscribed on its own is received once.
+
         Args:
             msg_list (Iterable[int]): A list of numeric message IDs to subscribe to
+        Raises:
+            NotConnectedError: The client isn't connected.
+            ConnectionLost: The connection failed. The client is disconnected.
         """
         self._subscription_control(msg_list, "Subscribe")
 
@@ -821,8 +800,15 @@ class Client(ClientLike):
     def unsubscribe(self, msg_list: Iterable[int]):
         """Unsubscribe from message types
 
+        Unsubscribing from ``ALL_MESSAGE_TYPES`` ends only that subscription;
+        the other types stay subscribed. To end every subscription, see
+        :py:func:`unsubscribe_from_all`.
+
         Args:
-            msg_list (Iterable[int]): A list of numeric message IDs to unsubscribe to
+            msg_list (Iterable[int]): A list of numeric message IDs to unsubscribe from
+        Raises:
+            NotConnectedError: The client isn't connected.
+            ConnectionLost: The connection failed. The client is disconnected.
         """
         self._subscription_control(msg_list, "Unsubscribe")
 
@@ -830,8 +816,16 @@ class Client(ClientLike):
     def pause_subscription(self, msg_list: Iterable[int]):
         """Pause subscription to message types
 
+        The types are unsubscribed at the manager and remembered as paused,
+        for :py:func:`resume_subscription` or
+        :py:func:`resume_all_subscriptions`. Pausing ``ALL_MESSAGE_TYPES``
+        pauses only it.
+
         Args:
-            msg_list (Iterable[int]): A list of numeric message IDs to temporarily unsubscribe to
+            msg_list (Iterable[int]): A list of numeric message IDs to temporarily unsubscribe from
+        Raises:
+            NotConnectedError: The client isn't connected.
+            ConnectionLost: The connection failed. The client is disconnected.
         """
         self._subscription_control(msg_list, "PauseSubscription")
 
@@ -841,6 +835,9 @@ class Client(ClientLike):
 
         Args:
             msg_list (Iterable[int]): A list of paused message IDs to resubscribe to
+        Raises:
+            NotConnectedError: The client isn't connected.
+            ConnectionLost: The connection failed. The client is disconnected.
         """
         self._subscription_control(msg_list, "ResumeSubscription")
 
@@ -848,7 +845,8 @@ class Client(ClientLike):
     def unsubscribe_from_all(self):
         """Unsubscribe from all subscribed types, and forget paused ones
 
-        Paused types have no subscription at the manager, so nothing is sent
+        This includes ``ALL_MESSAGE_TYPES`` when it is subscribed. Paused
+        types have no subscription at the manager, so nothing is sent
         for them; they are no longer resumed by
         :py:func:`resume_all_subscriptions`.
         """
@@ -872,16 +870,14 @@ class Client(ClientLike):
         On exit, including when the body raises, the types this context
         subscribed to are unsubscribed again, unless the body has already
         unsubscribed or paused them. Types already subscribed to are left
-        alone, with a warning. Subscribing to ``ALL_MESSAGE_TYPES`` replaces
-        individual subscriptions at the manager, so on exit those, and any
-        paused types, are restored. Nothing is restored if the client is no
-        longer connected.
+        alone, with a warning. ``ALL_MESSAGE_TYPES`` is treated as any other
+        type. Nothing is changed on exit if the client is no longer
+        connected.
 
         Args:
             msg_list (Iterable[int]): A list of numeric message IDs to subscribe to
         """
         before = self.subscribed_types
-        paused_before = self.paused_subscribed_types
         added: list[int] = []
         for mt in dict.fromkeys(msg_list):  # in order, once each
             if mt in before:
@@ -897,15 +893,9 @@ class Client(ClientLike):
             yield
         finally:
             if self.connected:
-                if ALL_MESSAGE_TYPES in added and self._sub_all:
-                    self.unsubscribe([ALL_MESSAGE_TYPES])
-                    if before:
-                        self.subscribe(before)
-                    self._paused_types |= paused_before - before
-                else:
-                    still = [mt for mt in added if mt in self._subscribed_types]
-                    if still:
-                        self.unsubscribe(still)
+                still = [mt for mt in added if mt in self._subscribed_types]
+                if still:
+                    self.unsubscribe(still)
 
     @contextmanager
     def paused_subscription_context(self, msg_list: Iterable[int]) -> Iterator[None]:

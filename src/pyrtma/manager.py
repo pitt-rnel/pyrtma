@@ -39,6 +39,19 @@ DEFAULT_STALL_TIMEOUT: float = 5.0
 # the read loop needs it for every message before there is a header object.
 _NUM_DATA_BYTES, _NUM_DATA_BYTES_OFFSET = MessageHeader.field_struct("num_data_bytes")
 
+
+def _type_label(msg_type: int) -> str:
+    """Name a message type for the manager's subscription log.
+
+    Args:
+        msg_type: The type.
+
+    Returns:
+        ``ALL_MESSAGE_TYPES``, or ``MT:`` and the number.
+    """
+    return "ALL_MESSAGE_TYPES" if msg_type == ALL_MESSAGE_TYPES else f"MT:{msg_type}"
+
+
 # What select() can watch. On Linux and macOS it can't take a descriptor
 # numbered FD_SETSIZE (1024) or higher; on Windows it takes at most 512
 # sockets per list. Past either limit it raises ValueError, which would stop
@@ -798,25 +811,22 @@ class MessageManager(ClientLike):
             msg (Message): incoming SUBSCRIBE message
         """
         sub = cd.MDF_SUBSCRIBE.from_buffer(msg.data)
+        msg_type = sub.msg_type
 
-        if sub.msg_type == ALL_MESSAGE_TYPES:
-            self.subscriptions[sub.msg_type].add(src_module)
-
-            # Clear out the individual subs
-            for sub_type in src_module.subs:
-                if sub_type != ALL_MESSAGE_TYPES:
-                    self._unsubscribe(src_module, sub_type)
-            src_module.subs.clear()
-
-            src_module.subs.add(sub.msg_type)
-            self.logger.debug(f"SUBSCRIBE- {src_module!s} to ALL_MESSAGE_TYPES")
-        else:
-            # Ignore individual msg_types subs when subscribed to ALL_MESSAGE_TYPES
-            if src_module.sub_all:
-                return
-            self.subscriptions[sub.msg_type].add(src_module)
-            src_module.subs.add(sub.msg_type)
-            self.logger.debug(f"SUBSCRIBE- {src_module!s} to MT:{sub.msg_type}")
+        # A module's subs hold every type it subscribes to, ALL_MESSAGE_TYPES
+        # among them. The routing table holds a module subscribed to
+        # ALL_MESSAGE_TYPES under that type alone, so forward_message() never
+        # finds a module twice; its other types return to the table when it
+        # unsubscribes from ALL_MESSAGE_TYPES.
+        src_module.subs.add(msg_type)
+        if msg_type == ALL_MESSAGE_TYPES:
+            for other in src_module.subs:
+                if other != ALL_MESSAGE_TYPES:
+                    self._unsubscribe(src_module, other)
+            self.subscriptions[ALL_MESSAGE_TYPES].add(src_module)
+        elif ALL_MESSAGE_TYPES not in src_module.subs:
+            self.subscriptions[msg_type].add(src_module)
+        self.logger.debug(f"SUBSCRIBE- {src_module!s} to {_type_label(msg_type)}")
 
     def remove_subscription(self, src_module: Module, msg: Message):
         """Remove message subscription
@@ -826,23 +836,17 @@ class MessageManager(ClientLike):
             msg (Message): incoming UNSUBSCRIBE message
         """
         unsub = cd.MDF_UNSUBSCRIBE.from_buffer(msg.data)
+        msg_type = unsub.msg_type
 
-        if unsub.msg_type == ALL_MESSAGE_TYPES:
-            self._unsubscribe(src_module, unsub.msg_type)
-
-            # Clear out the individual subs
-            for sub_type in src_module.subs:
-                self._unsubscribe(src_module, sub_type)
-            src_module.subs.clear()
-
-            self.logger.debug(f"UNSUBSCRIBE- {src_module!s} from ALL_MESSAGE_TYPES")
-        else:
-            # Ignore individual msg_types unsubs when subscribed to ALL_MESSAGE_TYPES
-            if src_module.sub_all:
-                return
-            self._unsubscribe(src_module, unsub.msg_type)
-            src_module.subs.discard(unsub.msg_type)
-            self.logger.debug(f"UNSUBSCRIBE- {src_module!s} from MT:{unsub.msg_type}")
+        # Only that type: unsubscribing from ALL_MESSAGE_TYPES leaves the
+        # module's other subscriptions, which return to the routing table.
+        # See add_subscription().
+        src_module.subs.discard(msg_type)
+        self._unsubscribe(src_module, msg_type)
+        if msg_type == ALL_MESSAGE_TYPES:
+            for other in src_module.subs:
+                self.subscriptions[other].add(src_module)
+        self.logger.debug(f"UNSUBSCRIBE- {src_module!s} from {_type_label(msg_type)}")
 
     def resume_subscription(self, src_module: Module, msg: Message):
         """Resume message subscription
@@ -1105,8 +1109,9 @@ class MessageManager(ClientLike):
 
         # The subscribers to this message type and to every type. get(), not
         # [], so that a type nobody subscribes to doesn't add an entry to the
-        # table. The two sets never share a module: subscribing to
-        # ALL_MESSAGE_TYPES drops a module's other subscriptions.
+        # table. The two sets never share a module: one subscribed to
+        # ALL_MESSAGE_TYPES is in the table under that type alone. See
+        # add_subscription().
         by_type = self.subscriptions.get(header.msg_type)
         by_all = self.subscriptions.get(ALL_MESSAGE_TYPES)
         # A snapshot, as a tuple: a failed send removes modules from the sets,

@@ -245,6 +245,26 @@ def add_fake_module(
     return module
 
 
+def subscribe_module(
+    manager: MessageManager, module: Module, msg_type: int, *, unsubscribe: bool = False
+) -> None:
+    """Subscribe a module to a type, as the manager does for a SUBSCRIBE.
+
+    Args:
+        manager: The manager.
+        module: The subscribing module.
+        msg_type: The type.
+        unsubscribe: Unsubscribe instead, as for an UNSUBSCRIBE.
+    """
+    data = cd.MDF_UNSUBSCRIBE() if unsubscribe else cd.MDF_SUBSCRIBE()
+    data.msg_type = msg_type
+    msg = Message(MessageHeader(), data)
+    if unsubscribe:
+        manager.remove_subscription(module, msg)
+    else:
+        manager.add_subscription(module, msg)
+
+
 def make_header(
     manager: MessageManager, msg_type: int, *, dest_mod_id: int = 0, msg_count: int = 0
 ) -> MessageHeader:
@@ -859,6 +879,44 @@ class TestRoutingCost:
         assert fake_conn(by_type).sent == [expected]
         assert fake_conn(by_all).sent == [expected]
         assert fake_conn(other).sent == []
+
+    def test_subscriber_to_the_type_and_all_types_is_sent_one_copy(
+        self, bare_manager: MessageManager
+    ) -> None:
+        src = add_fake_module(bare_manager, 101)
+        both = add_fake_module(bare_manager, 102)
+        by_all = add_fake_module(bare_manager, 103)
+        # Through the manager's own handling, in both orders.
+        subscribe_module(bare_manager, both, USER_MSG_TYPE)
+        subscribe_module(bare_manager, both, ALL_MESSAGE_TYPES)
+        subscribe_module(bare_manager, by_all, ALL_MESSAGE_TYPES)
+        subscribe_module(bare_manager, by_all, USER_MSG_TYPE)
+        payload = bytes(range(8))
+        header, expected = message_with_payload(bare_manager, payload)
+
+        bare_manager.forward_message(src, header, payload)
+
+        assert fake_conn(both).sent == [expected]
+        assert fake_conn(by_all).sent == [expected]
+
+    def test_unsubscribing_all_types_restores_routing_of_other_types(
+        self, bare_manager: MessageManager
+    ) -> None:
+        src = add_fake_module(bare_manager, 101)
+        module = add_fake_module(bare_manager, 102)
+        subscribe_module(bare_manager, module, USER_MSG_TYPE)
+        subscribe_module(bare_manager, module, ALL_MESSAGE_TYPES)
+        payload = bytes(range(8))
+        header, expected = message_with_payload(bare_manager, payload)
+
+        subscribe_module(bare_manager, module, ALL_MESSAGE_TYPES, unsubscribe=True)
+        bare_manager.forward_message(src, header, payload)
+        other, _ = message_with_payload(bare_manager, payload, USER_MSG_TYPE + 1)
+        bare_manager.forward_message(src, other, payload)
+
+        assert module.subs == {USER_MSG_TYPE}
+        assert fake_conn(module).sent == [expected]
+        assert ALL_MESSAGE_TYPES not in bare_manager.subscriptions
 
     def test_message_nobody_subscribes_to_is_sent_nowhere(
         self, bare_manager: MessageManager

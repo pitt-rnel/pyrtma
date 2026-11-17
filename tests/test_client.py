@@ -48,6 +48,7 @@ from .helpers import (
     bytes_waiting,
     deliver,
     frame,
+    read_until,
     recv_exactly,
     wait_for,
 )
@@ -1378,6 +1379,11 @@ def manager_subscriptions(manager: ManagerHarness, client: Client) -> set[int]:
         manager: The running manager.
         client: A client connected to it.
 
+    The manager's routing table must agree with the module's own list, since
+    the table decides what is delivered: it has the module under each type it
+    subscribes to, or, while it subscribes to ``ALL_MESSAGE_TYPES``, under
+    that type alone.
+
     Returns:
         The message types the manager has the client subscribed to.
     """
@@ -1391,7 +1397,14 @@ def manager_subscriptions(manager: ManagerHarness, client: Client) -> set[int]:
         if m.mod_id == client.module_id
     )
     assert wait_for(lambda: module.name == token)
-    return set(module.subs)
+    routed = {
+        msg_type
+        for msg_type, subscribers in list(manager.manager.subscriptions.items())
+        if module in subscribers
+    }
+    subs = set(module.subs)
+    assert routed == ({cd.ALL_MESSAGE_TYPES} if cd.ALL_MESSAGE_TYPES in subs else subs)
+    return subs
 
 
 @pytest.mark.integration
@@ -1470,8 +1483,9 @@ class TestSubscriptions:
 
         with client.subscription_context([cd.ALL_MESSAGE_TYPES]):
             inside = client.subscribed_types
+            inside_at_manager = manager_subscriptions(manager, client)
 
-        assert inside == {cd.ALL_MESSAGE_TYPES}
+        assert inside == inside_at_manager == {A, cd.ALL_MESSAGE_TYPES}
         assert client.subscribed_types == {A}
         assert client.paused_subscribed_types == {B}
         assert manager_subscriptions(manager, client) == {A}
@@ -1555,21 +1569,89 @@ class TestSubscriptions:
         assert client.subscribed_types == {cd.ALL_MESSAGE_TYPES}
         assert manager_subscriptions(manager, client) == {cd.ALL_MESSAGE_TYPES}
 
-    def test_pausing_all_types_pauses_individual_subscriptions(
+    def test_pausing_all_types_pauses_only_it(
         self, manager: ManagerHarness, client_factory: Callable[..., Client]
     ) -> None:
         client = client_factory()
-        client.subscribe([A, B])
+        client.subscribe([A, B, cd.ALL_MESSAGE_TYPES])
 
         client.pause_subscription([cd.ALL_MESSAGE_TYPES])
         paused = client.paused_subscribed_types
         paused_at_manager = manager_subscriptions(manager, client)
         client.resume_all_subscriptions()
 
-        assert paused == {A, B}
-        assert paused_at_manager == set()
-        assert client.subscribed_types == {A, B}
-        assert manager_subscriptions(manager, client) == {A, B}
+        assert paused == {cd.ALL_MESSAGE_TYPES}
+        assert paused_at_manager == {A, B}
+        assert client.subscribed_types == {A, B, cd.ALL_MESSAGE_TYPES}
+        assert manager_subscriptions(manager, client) == {A, B, cd.ALL_MESSAGE_TYPES}
+
+    def test_subscribing_to_all_types_keeps_individual_ones(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A])
+
+        client.subscribe([cd.ALL_MESSAGE_TYPES])
+
+        assert client.subscribed_types == {A, cd.ALL_MESSAGE_TYPES}
+        assert manager_subscriptions(manager, client) == {A, cd.ALL_MESSAGE_TYPES}
+
+    def test_individual_types_change_while_subscribed_to_all_types(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([cd.ALL_MESSAGE_TYPES])
+
+        client.subscribe([B, C])
+        client.unsubscribe([B])
+        client.pause_subscription([C])
+        client.resume_subscription([C])
+
+        assert client.subscribed_types == {C, cd.ALL_MESSAGE_TYPES}
+        assert manager_subscriptions(manager, client) == {C, cd.ALL_MESSAGE_TYPES}
+
+    def test_unsubscribing_all_types_keeps_individual_ones(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A, cd.ALL_MESSAGE_TYPES])
+
+        client.unsubscribe([cd.ALL_MESSAGE_TYPES])
+
+        assert client.subscribed_types == {A}
+        assert manager_subscriptions(manager, client) == {A}
+
+    def test_unsubscribe_from_all_includes_all_types(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        client = client_factory()
+        client.subscribe([A, cd.ALL_MESSAGE_TYPES])
+
+        client.unsubscribe_from_all()
+
+        assert client.subscribed_types == set()
+        assert manager_subscriptions(manager, client) == set()
+
+    def test_type_and_all_types_deliver_one_copy(
+        self, manager: ManagerHarness, client_factory: Callable[..., Client]
+    ) -> None:
+        receiver = client_factory(name="receiver")
+        receiver.subscribe([td.MT_TEST_START, cd.ALL_MESSAGE_TYPES])
+        assert manager_subscriptions(manager, receiver) == {
+            td.MT_TEST_START,
+            cd.ALL_MESSAGE_TYPES,
+        }
+        sender = client_factory(name="sender")
+        start = td.MDF_TEST_START()
+        start.id = 42
+
+        sender.send_message(start)
+        sender.send_message(td.MDF_TEST_END())
+        received = read_until(receiver, lambda m: m.type_id == td.MT_TEST_END)
+
+        assert received is not None
+        copies = [m for m in received if m.type_id == td.MT_TEST_START]
+        assert [m.data.id for m in copies] == [42]
 
     def test_unsubscribe_from_all_forgets_paused_types(
         self, manager: ManagerHarness, client_factory: Callable[..., Client]
