@@ -164,6 +164,23 @@ class TestLoggerLifecycle:
 
 
 class TestLogMessageFields:
+    @pytest.mark.parametrize(
+        ("level", "msg_cls"),
+        [
+            (logging.DEBUG, cd.MDF_RTMA_LOG_DEBUG),
+            (logging.INFO, cd.MDF_RTMA_LOG_INFO),
+            (logging.WARNING, cd.MDF_RTMA_LOG_WARNING),
+            (logging.ERROR, cd.MDF_RTMA_LOG_ERROR),
+            (logging.CRITICAL, cd.MDF_RTMA_LOG_CRITICAL),
+            (logging.INFO + 5, cd.MDF_RTMA_LOG),
+        ],
+    )
+    def test_each_level_has_its_message_type(self, level: int, msg_cls: type) -> None:
+        client = Client(definitions=td.get_message_definitions())
+        handler = RTMALogHandler(weakref.ref(client))
+
+        assert handler.get_log_msg_cls(level) is msg_cls
+
     @staticmethod
     def handler() -> tuple[Client, RTMALogHandler]:
         client = quiet_client()

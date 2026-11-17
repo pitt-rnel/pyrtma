@@ -86,6 +86,7 @@ Tests that route real messages use the `manager` fixture, a raw socket from `raw
 | `test_forwarded_message_keeps_sender_msg_count` | Manager routing: forwarded messages carry the sender's `msg_count`, not one per recipient. | Two `TEST_END` sends; compares the received counts with the sender's `msg_count` before each send. |
 | `test_manager_messages_have_zero_msg_count` | Manager routing: messages that originate from the manager carry `msg_count` 0, while `Module.msg_count` still counts what each module was sent. | A fake with a count of 5 is sent an ACK, a `HELLO`, and a `FAILED_MESSAGE`. |
 | `test_failed_message_reports_sender_msg_count` | Manager routing: `FAILED_MESSAGE` reports the sender's `msg_count`, not the count of a module sent the message before the failure. | An ordered list of subscribers in place of the set: a writable fake with a count of 40, then an unwritable one. |
+| `test_failed_message_carries_the_whole_header` | Shared constants: the header in a `FAILED_MESSAGE` is a byte-for-byte copy of the failed message's header, now that it is copied whole instead of field by field. | A header with every field set is forwarded to an unwritable subscriber; the observer's `FAILED_MESSAGE` header bytes equal it. |
 
 ### TestRunLoop
 
@@ -388,6 +389,7 @@ Clients from `quiet_client()` are unconnected and have their console turned off,
 
 | Test | Purpose | Approach |
 |---|---|---|
+| `test_each_level_has_its_message_type` | Shared constants: each standard `logging` level is sent as its own RTMA log message type, and any other level as `RTMA_LOG`. | Parametrized over the five levels and `INFO + 5`. |
 | `test_non_ascii_text_is_replaced` | Strings, validation and logging: characters that aren't ASCII become `?`, one for one, in the message, path, function name and log name. | `gen_log_msg()` on a record with "kΩ", "µV", a path under "Jürgen", and an accented function and log name. |
 | `test_long_message_is_truncated_with_marker` | Strings, validation and logging: a long message that isn't ASCII is replaced, then cut to the field with the `[TRUNCATED]` marker. | A message of 2000 "é" characters. |
 | `test_long_fields_are_truncated` | Strings, validation and logging: a path that is too long keeps its end after `...`, and a function name or log name that is too long is cut to its field. | A 600-character path, a 300-character function name and a 200-character log name. |
@@ -446,6 +448,7 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 | `test_default_manager_address_uses_the_core_host_and_port` | Shared constants: the web manager's default manager address, on the command line and as a `WebMessageManager` argument, is `core_defs.DEFAULT_HOST` on `DEFAULT_PORT`. | `parse_args()` with only `-d`, and the constructor's `mm_ip` default. |
 | `test_defs_option_is_required` | Web manager: leaving out `--defs` is a usage error. | `parse_args()` without it; expects exit status 2 and `--defs` in the message. |
 | `test_definitions_are_loaded_once` | Web manager: `run()` loads the definitions file once, and doesn't import it by name or add its folder to `sys.path`. | A copy of the compiled test definitions in `tmp_path`; `load_message_definitions` is wrapped to count calls, and `run_forever` is replaced so the server closes at once. |
+| `test_failed_message_carries_the_whole_header` | Shared constants: the web manager's `FAILED_MESSAGE` holds a byte-for-byte copy of the failed message's header, with the proxy's module ID and the failure time. | `send_failed_message()` with a stand-in proxy that records what is sent. |
 
 ### TestProxyRead
 
@@ -903,6 +906,9 @@ Headers built field by field are the reference: random values span each field's 
 | `test_layout_adds_the_structures_padding` | P1: the layout builder adds pad bytes wherever ctypes pads, so fields land at their offsets. | A structure of `int8`, `double` and `int16`, with padding inside and at the end. |
 | `test_layout_rejects_fields_struct_cannot_describe` | P1: a field `struct` can't describe raises `TypeError` naming it, so a header that changed that way fails at import. | Parametrized over a `char` array and a `char` pointer. |
 | `test_field_struct_finds_one_field` | P1: `_field_struct` gives one field's layout and offset, as the client's read path uses for `num_data_bytes`. | Reads `num_data_bytes` back from a header. |
+| `test_field_struct_reads_each_field_by_its_name` | Shared constants: `MessageHeader.field_struct()` takes a field's public name and reads every field back as written through its validator, with the field's size. | Parametrized over all twelve header fields. |
+| `test_field_struct_writes_into_a_buffer` | Shared constants: the returned struct and offset write a field in a raw buffer, as the client restamps `send_time`. | Packs `send_time` into a zeroed buffer and reads it as a header. |
+| `test_field_struct_rejects_an_unknown_name` | Shared constants: an unknown name raises `KeyError` naming it. | `no_such_field`. |
 
 ## test_message_base.py — attribute access on message classes (needs: none)
 
@@ -1033,6 +1039,7 @@ The pytest classes after `TestParser`, added in Phase 8, write their definitions
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_module_id_in_the_dynamic_range_is_rejected` | Parser and compilers: module IDs the client can't connect with raise `RTMASyntaxError` giving the range. | Parametrized over 10000, 20000 and 40000. |
+| `test_module_ids_outside_the_user_ranges_are_rejected` | Shared constants: the core modules' IDs (up to `MAX_RTMA_MODULE_ID`) and 100 to 199 are refused in a user's file, with the ranges in the error, now that the bounds come from the parsed core definitions. | Parametrized over 1, 9, 100 and 199. |
 | `test_module_ids_in_range_are_accepted` | Parser and compilers: the ends of both user ranges are accepted. | Parametrized over 10, 99, 200 and 9999. |
 | `test_host_id_above_max_hosts_warns` | Parser and compilers: a host ID above `MAX_HOSTS` is accepted with a warning naming it. | A host ID of 6. |
 | `test_host_id_within_max_hosts_does_not_warn` | Parser and compilers: a host ID up to `MAX_HOSTS` gives no warning. | A host ID of 5. |

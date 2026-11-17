@@ -15,7 +15,7 @@ from contextlib import contextmanager
 
 from .message import Message
 from .message_data import MessageData
-from .header import MessageHeader, _field_struct, get_header_cls
+from .header import MessageHeader, get_header_cls
 from .core_defs import ALL_MESSAGE_TYPES, DEFAULT_HOST, DEFAULT_PORT, MAX_DATA_BYTES
 from .definitions import MessageDefinitions
 from .loader import (
@@ -65,13 +65,12 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 # Header fields the read path takes straight from the received bytes, before
 # deciding what to read next; cheaper than going through their validators.
-_MSG_TYPE, _MSG_TYPE_OFFSET = _field_struct(MessageHeader, "_msg_type")
-_NUM_DATA_BYTES, _NUM_DATA_BYTES_OFFSET = _field_struct(
-    MessageHeader, "_num_data_bytes"
-)
+# Module globals, so the hot paths look up nothing on the class.
+_MSG_TYPE, _MSG_TYPE_OFFSET = MessageHeader.field_struct("msg_type")
+_NUM_DATA_BYTES, _NUM_DATA_BYTES_OFFSET = MessageHeader.field_struct("num_data_bytes")
 
 # A sent header's send_time, set again when sending had to wait for room.
-_SEND_TIME, _SEND_TIME_OFFSET = _field_struct(MessageHeader, "_send_time")
+_SEND_TIME, _SEND_TIME_OFFSET = MessageHeader.field_struct("send_time")
 
 # Checks a signal's type as the header's msg_type field would.
 _SIGNAL_TYPE = Int32()

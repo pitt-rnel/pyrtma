@@ -942,6 +942,27 @@ class TestMsgCount:
         assert [h.msg_count for h, _ in first_received] == [7]
         assert first.msg_count == 41
 
+    def test_failed_message_carries_the_whole_header(
+        self, bare_manager: MessageManager
+    ) -> None:
+        src = add_fake_module(bare_manager, 101)
+        add_fake_module(bare_manager, 102, writable=False, subs=[td.MT_TEST_START])
+        observer = add_fake_module(bare_manager, 104, subs=[cd.MT_FAILED_MESSAGE])
+        header = make_header(bare_manager, td.MT_TEST_START, msg_count=7)
+        header.send_time = 12.5
+        header.src_host_id = 3
+        header.src_mod_id = 101
+        header.dest_host_id = 0
+        header.remaining_bytes = 9
+        header.is_dynamic = 1
+        header.version = 0x89ABCDEF
+
+        bare_manager.forward_message(src, header, b"")
+
+        (_, payload), *_ = sent_messages(observer)
+        failed = cd.MDF_FAILED_MESSAGE.from_buffer_copy(payload)
+        assert bytes(failed.msg_header) == bytes(header)
+
 
 class TestRunLoop:
     def test_unexpected_error_drops_only_that_client(

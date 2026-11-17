@@ -17,7 +17,7 @@ import sys
 from .client_logging import RTMALogger, ClientLike
 from .validators import disable_message_validation
 from .message import Message
-from .header import MessageHeader, _field_struct, get_header_cls
+from .header import MessageHeader, get_header_cls
 from .message_data import MessageData
 from .core_defs import ALL_MESSAGE_TYPES
 from . import core_defs as cd
@@ -37,9 +37,7 @@ DEFAULT_STALL_TIMEOUT: float = 5.0
 
 # The header's num_data_bytes field, read straight from the received bytes:
 # the read loop needs it for every message before there is a header object.
-_NUM_DATA_BYTES, _NUM_DATA_BYTES_OFFSET = _field_struct(
-    MessageHeader, "_num_data_bytes"
-)
+_NUM_DATA_BYTES, _NUM_DATA_BYTES_OFFSET = MessageHeader.field_struct("num_data_bytes")
 
 # What select() can watch. On Linux and macOS it can't take a descriptor
 # numbered FD_SETSIZE (1024) or higher; on Windows it takes at most 512
@@ -1308,9 +1306,9 @@ class MessageManager(ClientLike):
         data.dest_mod_id = dest_module.mod_id
         data.time_of_failure = time_of_failure
 
-        # Copy the values into the RTMA_MSG_HEADER
-        for fname, ftype, *_ in data.msg_header._fields_:
-            setattr(data.msg_header, fname, getattr(header, fname))
+        # The failed message's header, whole: RTMA_MSG_HEADER has the
+        # message header's layout.
+        data.msg_header = cd.RTMA_MSG_HEADER.from_buffer_copy(header)
 
         # send to logger modules AND modules subscribed to FAILED_MESSAGE
         self.forward_message(self.mm_module, out_header, data)

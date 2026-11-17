@@ -1044,6 +1044,15 @@ class TestIds:
         with pytest.raises(RTMASyntaxError, match="9999"):
             parse_definitions(defs)
 
+    @pytest.mark.parametrize("value", [1, 9, 100, 199])
+    def test_module_ids_outside_the_user_ranges_are_rejected(
+        self, tmp_path: Path, value: int
+    ) -> None:
+        defs = write_definitions(tmp_path, {"m": f"module_ids:\n  X: {value}\n"})
+
+        with pytest.raises(RTMASyntaxError, match="10 - 99 or 200 - 9999"):
+            parse_definitions(defs)
+
     @pytest.mark.parametrize("value", [10, 99, 200, 9999])
     def test_module_ids_in_range_are_accepted(self, tmp_path: Path, value: int) -> None:
         defs = write_definitions(tmp_path, {"m": f"module_ids:\n  X: {value}\n"})

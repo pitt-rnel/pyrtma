@@ -9,6 +9,21 @@ from .exceptions import JSONDecodingError
 MB = TypeVar("MB", bound="MessageBase")
 
 
+def _ctypes_name(name: str) -> str:
+    """Name the ctypes field that holds a message field.
+
+    :class:`MessageMeta` stores each field's data under its name with a
+    leading underscore; the name itself is the field's validator.
+
+    Args:
+        name: The field's name, such as ``num_data_bytes``.
+
+    Returns:
+        The ctypes field's name, such as ``_num_data_bytes``.
+    """
+    return "_" + name
+
+
 # MessageBase Metaclass - (for runtime ctypes field generation)
 CStructType: type = type(
     ctypes.Structure
@@ -25,7 +40,7 @@ class MessageMeta(CStructType):
         fields = []
         for key in namespace.keys():
             if hasattr(namespace[key], "_ctype"):
-                fname = "_" + key
+                fname = _ctypes_name(key)
                 ftype = namespace[key]._ctype
                 fields.append((fname, ftype))
             elif key == "_fields_":

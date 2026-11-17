@@ -30,14 +30,6 @@ except AttributeError:
     # changed from inf to maxsize to maintain int type
     MAX_MESSAGE_TYPES = sys.maxsize
 
-try:
-    from .core_defs import DYN_MOD_ID_START, MAX_HOSTS
-except (AttributeError, ImportError):
-    # The values in rtma_core.yaml, for a build of the core definitions
-    # themselves.
-    DYN_MOD_ID_START = 10000
-    MAX_HOSTS = 5
-
 MAX_DATA_BYTES: int | None
 try:
     from .core_defs import MAX_DATA_BYTES
@@ -908,9 +900,9 @@ class Parser:
                 raise RTMASyntaxError(
                     f"Value outside of valid range [1 - 32767] for host_id: {name}: {value}"
                 )
-        elif value > MAX_HOSTS and user_file:
+        elif user_file and value > (max_hosts := self.core_constant("MAX_HOSTS")):
             self.warning(
-                f"Host ID {name}: {value} is above MAX_HOSTS ({MAX_HOSTS}). A client can send from it, but messages can't be addressed to it -> {self.current_file}"
+                f"Host ID {name}: {value} is above MAX_HOSTS ({max_hosts}). A client can send from it, but messages can't be addressed to it -> {self.current_file}"
             )
 
         for hid in self.host_ids.values():
@@ -924,6 +916,26 @@ class Parser:
             src=self.current_index,
         )
 
+    def core_constant(self, name: str) -> int:
+        """Return an integer constant from the core definitions.
+
+        User files' IDs are checked against the core definitions only when
+        they are imported, so the constants have been parsed by then.
+
+        Args:
+            name: The constant, such as ``DYN_MOD_ID_START``.
+
+        Raises:
+            KeyError: The core definitions haven't been parsed, or don't
+                define the constant.
+
+        Returns:
+            Its value.
+        """
+        value = self.constants[name].value
+        assert isinstance(value, int), f"{name} must be an integer, not {value!r}"
+        return value
+
     def handle_module_id(self, name: str, value: int):
         self.check_name(name)
         self.check_duplicate_name("module_ids", name, namespaces=("module_ids",))
@@ -933,16 +945,19 @@ class Parser:
                 f"Values in 'module_ids' section must evaluate to int type not {type(value).__name__}. {name}: {value} -> {self.current_file}"
             )
 
-        # IDs from DYN_MOD_ID_START up are assigned by the manager; a client
-        # can't ask for one.
-        if value < 10 or (99 < value < 200) or value >= DYN_MOD_ID_START:
-            if (
-                self.current_index.name not in Parser.core_imports
-                and value != 0
-                and self.import_coredefs
-            ):
+        # A user's module IDs can't be the core modules' (up to
+        # MAX_RTMA_MODULE_ID), 100 to 199, or the IDs that the manager assigns
+        # (from DYN_MOD_ID_START up).
+        if (
+            self.current_index.name not in Parser.core_imports
+            and value != 0
+            and self.import_coredefs
+        ):
+            first = self.core_constant("MAX_RTMA_MODULE_ID") + 1
+            dynamic = self.core_constant("DYN_MOD_ID_START")
+            if value < first or (99 < value < 200) or value >= dynamic:
                 raise RTMASyntaxError(
-                    f"Value outside of valid range [10 - 99 or 200 - {DYN_MOD_ID_START - 1}] for module_id: {name}: {value} -> {self.current_file}"
+                    f"Value outside of valid range [{first} - 99 or 200 - {dynamic - 1}] for module_id: {name}: {value} -> {self.current_file}"
                 )
 
         for mid in self.module_ids.values():

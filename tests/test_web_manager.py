@@ -180,6 +180,30 @@ def test_definitions_are_loaded_once(
     assert servers[0].definitions.message_id_from_name("TEST_START") is not None
 
 
+def test_failed_message_carries_the_whole_header() -> None:
+    sent: list[Any] = []
+    proxy = types.SimpleNamespace(
+        module_id=12345, connected=True, send_message=sent.append
+    )
+    handler = StubHandler(cast(Client, proxy))
+    header = MessageHeader()
+    header.msg_type = td.MT_TEST_START
+    header.msg_count = 7
+    header.send_time = 12.5
+    header.src_host_id = 3
+    header.src_mod_id = 101
+    header.num_data_bytes = 4
+    header.remaining_bytes = 9
+    header.is_dynamic = 1
+    header.version = 0x89ABCDEF
+
+    handler.send_failed_message(header, 1.5)
+
+    (failed,) = sent
+    assert bytes(failed.msg_header) == bytes(header)
+    assert (failed.dest_mod_id, failed.time_of_failure) == (12345, 1.5)
+
+
 @pytest.mark.integration
 class TestProxyRead:
     def test_unsubscribed_message_does_not_block(self) -> None:

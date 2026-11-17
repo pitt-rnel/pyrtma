@@ -440,9 +440,9 @@ class RTMAWebSocketHandler(WebSocketHandler):
         data.dest_mod_id = self.proxy.module_id
         data.time_of_failure = time_of_failure
 
-        # Copy the values into the RTMA_MSG_HEADER
-        for fname, ftype, *_ in data.msg_header._fields_:
-            setattr(data.msg_header, fname, getattr(header, fname))
+        # The failed message's header, whole: RTMA_MSG_HEADER has the
+        # message header's layout.
+        data.msg_header = cd.RTMA_MSG_HEADER.from_buffer_copy(header)
 
         if (
             data.msg_header.msg_type == cd.MT_FAILED_MESSAGE

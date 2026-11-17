@@ -126,11 +126,11 @@ class RTMALogHandler(logging.Handler):
     """Logging handler class that writes logs as rtma messages"""
 
     log_map: dict[int, type[RTMA_LOG_MSG]] = {
-        10: cd.MDF_RTMA_LOG_DEBUG,
-        20: cd.MDF_RTMA_LOG_INFO,
-        30: cd.MDF_RTMA_LOG_WARNING,
-        40: cd.MDF_RTMA_LOG_ERROR,
-        50: cd.MDF_RTMA_LOG_CRITICAL,
+        logging.DEBUG: cd.MDF_RTMA_LOG_DEBUG,
+        logging.INFO: cd.MDF_RTMA_LOG_INFO,
+        logging.WARNING: cd.MDF_RTMA_LOG_WARNING,
+        logging.ERROR: cd.MDF_RTMA_LOG_ERROR,
+        logging.CRITICAL: cd.MDF_RTMA_LOG_CRITICAL,
     }
 
     def __init__(self, client_ref: "weakref.ReferenceType[ClientLike]"):

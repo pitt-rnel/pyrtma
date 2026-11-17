@@ -130,3 +130,44 @@ def test_field_struct_finds_one_field() -> None:
 
     assert value == 4096
     assert layout.size == struct.calcsize("=i")
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("msg_type", 6001),
+        ("msg_count", -7),
+        ("send_time", 12.5),
+        ("recv_time", 13.25),
+        ("src_host_id", 3),
+        ("src_mod_id", 101),
+        ("dest_host_id", -2),
+        ("dest_mod_id", 200),
+        ("num_data_bytes", 4096),
+        ("remaining_bytes", 9),
+        ("is_dynamic", 1),
+        ("reserved", 0x89ABCDEF),
+    ],
+)
+def test_field_struct_reads_each_field_by_its_name(name: str, value: Any) -> None:
+    header = MessageHeader()
+    setattr(header, name, value)
+
+    layout, offset = MessageHeader.field_struct(name)
+
+    assert layout.unpack_from(header, offset) == (value,)
+    assert layout.size == getattr(MessageHeader, f"_{name}").size
+
+
+def test_field_struct_writes_into_a_buffer() -> None:
+    buffer = bytearray(ctypes.sizeof(MessageHeader))
+    layout, offset = MessageHeader.field_struct("send_time")
+
+    layout.pack_into(buffer, offset, 99.5)
+
+    assert MessageHeader.from_buffer(buffer).send_time == 99.5
+
+
+def test_field_struct_rejects_an_unknown_name() -> None:
+    with pytest.raises(KeyError, match="no_such_field"):
+        MessageHeader.field_struct("no_such_field")

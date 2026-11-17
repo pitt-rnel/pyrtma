@@ -4,7 +4,7 @@ import ctypes
 import struct
 from typing import ClassVar
 
-from .message_base import MessageBase, MessageMeta
+from .message_base import MessageBase, MessageMeta, _ctypes_name
 from .validators import Int16, Double, Int32, Uint32
 
 # Type Aliases
@@ -107,6 +107,30 @@ class MessageHeader(MessageBase, metaclass=MessageMeta):
             reserved,
         )
 
+    @classmethod
+    def field_struct(cls, name: str) -> tuple[struct.Struct, int]:
+        """Describe one header field for reading or writing it in a buffer.
+
+        For code that handles a header's bytes directly, without a header
+        object or the field's validator, such as the client's and the
+        manager's read loops: ``unpack_from`` and ``pack_into`` with the
+        returned struct and offset read and write the field in place, without
+        validation.
+
+        Args:
+            name: The field's name, such as ``num_data_bytes``.
+
+        Raises:
+            KeyError: The header has no field of that name.
+
+        Returns:
+            The field's layout, and its offset in the header.
+        """
+        ctype_name = _ctypes_name(name)
+        if not any(field[0] == ctype_name for field in cls._fields_):
+            raise KeyError(f"{name} is not a field of {cls.__name__}")
+        return _field_struct(cls, ctype_name)
+
     def _set_recv_time(self, value: float) -> None:
         """Set ``recv_time`` directly, without its validator.
 
@@ -201,7 +225,7 @@ def _field_struct(cls: type[ctypes.Structure], name: str) -> tuple[struct.Struct
 
 
 MessageHeader._LAYOUT = _layout_struct(MessageHeader)
-_RECV_TIME, _RECV_TIME_OFFSET = _field_struct(MessageHeader, "_recv_time")
+_RECV_TIME, _RECV_TIME_OFFSET = MessageHeader.field_struct("recv_time")
 
 
 def get_header_cls() -> type[MessageHeader]:
