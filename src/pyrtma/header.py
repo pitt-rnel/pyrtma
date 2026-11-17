@@ -4,13 +4,7 @@ import ctypes
 import struct
 from typing import ClassVar
 
-from .message_base import (
-    MessageBase,
-    MessageMeta,
-    _field_code,
-    _field_struct,
-    field_struct,
-)
+from .message_base import MessageBase, MessageMeta
 from .validators import Int16, Double, Int32, Uint32
 
 # Type Aliases
@@ -24,8 +18,12 @@ class MessageHeader(MessageBase, metaclass=MessageMeta):
     """RTMA Message Header class
 
     Fields are read and set through their validators, like any message's.
-    The client builds whole headers with :meth:`_pack_into` instead, which
-    writes every field with one ``struct`` call, in the same layout.
+    For the client's and the manager's hot paths, the class also reads and
+    writes fields straight in the bytes, without the validators:
+    :meth:`unpack_type_and_size` and :meth:`unpack_num_data_bytes` read from
+    a header or a buffer that starts with one, :meth:`pack_send_time` and
+    :meth:`_set_recv_time` set one time each, and :meth:`_pack_into` writes
+    a whole header with one ``struct`` call.
     """
 
     msg_type: Int32 = Int32()
@@ -41,8 +39,25 @@ class MessageHeader(MessageBase, metaclass=MessageMeta):
     is_dynamic: Int32 = Int32()
     reserved: Uint32 = Uint32()
 
-    # The fields' layout as a struct, set below once the class exists.
-    _LAYOUT: ClassVar[struct.Struct]
+    # The fields' layout as a struct, in native byte order with standard
+    # sizes and no padding, as the fields above lie: msg_type to dest_mod_id
+    # at bytes 0 to 31, num_data_bytes at 32, then remaining_bytes,
+    # is_dynamic and reserved. The wire-format snapshot fixes the layout, and
+    # tests/test_header.py checks this against headers set field by field.
+    _LAYOUT: ClassVar[struct.Struct] = struct.Struct("=iiddhhhhiiiI")
+
+    # Reads straight from the bytes of a header, or of a buffer that starts
+    # with one. Each is a struct's own unpack_from, so calling it costs no
+    # Python function call; its pad bytes stand for the field's offset in
+    # _LAYOUT. Like unpack_from, each returns a tuple.
+
+    #: ``msg_type, num_data_bytes = MessageHeader.unpack_type_and_size(buffer)``,
+    #: for the client's read path, which needs both from every header.
+    unpack_type_and_size = staticmethod(struct.Struct("=i28xi").unpack_from)
+
+    #: ``(num_data_bytes,) = MessageHeader.unpack_num_data_bytes(buffer)``,
+    #: for the manager's read loop, before there is a header object.
+    unpack_num_data_bytes = staticmethod(struct.Struct("=32xi").unpack_from)
 
     @property
     def version(self) -> int:
@@ -113,26 +128,20 @@ class MessageHeader(MessageBase, metaclass=MessageMeta):
             reserved,
         )
 
-    @classmethod
-    def field_struct(cls, name: str) -> tuple[struct.Struct, int]:
-        """Describe one header field for reading or writing it in a buffer.
+    @staticmethod
+    def pack_send_time(buffer: bytearray, send_time: float) -> None:
+        """Write ``send_time`` into a buffer that starts with a header.
 
-        For code that handles a header's bytes directly, without a header
-        object or the field's validator, such as the client's and the
-        manager's read loops: ``unpack_from`` and ``pack_into`` with the
-        returned struct and offset read and write the field in place, without
-        validation.
+        For the client's send path, which stamps the time again in the
+        buffer :meth:`_pack_into` built when sending had to wait. Nothing
+        else in the buffer changes.
 
         Args:
-            name: The field's name, such as ``num_data_bytes``.
-
-        Raises:
-            KeyError: The header has no field of that name.
-
-        Returns:
-            The field's layout, and its offset in the header.
+            buffer: A writable buffer holding a whole header, and anything
+                after it.
+            send_time: The new send time.
         """
-        return field_struct(cls, name)
+        _SEND_TIME.pack_into(buffer, _SEND_TIME_OFFSET, send_time)
 
     def _set_recv_time(self, value: float) -> None:
         """Set ``recv_time`` directly, without its validator.
@@ -145,42 +154,12 @@ class MessageHeader(MessageBase, metaclass=MessageMeta):
         _RECV_TIME.pack_into(self, _RECV_TIME_OFFSET, value)
 
 
-def _layout_struct(cls: type[ctypes.Structure]) -> struct.Struct:
-    """Build a ``struct.Struct`` with the same layout as a ctypes structure.
-
-    Each field gets its type's format code in native byte order and standard
-    sizes, and pad bytes go wherever the structure has padding, so every field
-    lands at its ctypes offset and the size is the structure's.
-
-    Args:
-        cls: The structure.
-
-    Raises:
-        TypeError: A field isn't a simple ctypes type, its size differs from
-            its format code's, or it's a bit field.
-
-    Returns:
-        The layout.
-    """
-    fmt = "="
-    end = 0
-    for name, ctype, *bits in cls._fields_:
-        if bits:
-            raise TypeError(f"{cls.__name__}.{name}: bit fields aren't supported")
-        code = _field_code(cls, name, ctype)
-        field = getattr(cls, name)
-        if field.offset > end:
-            fmt += f"{field.offset - end}x"
-        fmt += code
-        end = field.offset + field.size
-    total = ctypes.sizeof(cls)
-    if total > end:
-        fmt += f"{total - end}x"
-    return struct.Struct(fmt)
-
-
-MessageHeader._LAYOUT = _layout_struct(MessageHeader)
-_RECV_TIME, _RECV_TIME_OFFSET = MessageHeader.field_struct("recv_time")
+# The layouts behind MessageHeader's two write methods, at the offsets of
+# MessageHeader._LAYOUT. Unlike a read, a write needs its offset: packing
+# pad bytes writes zeros. Module constants, as the methods find them faster
+# than class variables.
+_SEND_TIME, _SEND_TIME_OFFSET = struct.Struct("=d"), 8
+_RECV_TIME, _RECV_TIME_OFFSET = struct.Struct("=d"), 16
 
 
 def get_header_cls() -> type[MessageHeader]:

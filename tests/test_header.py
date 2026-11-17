@@ -1,8 +1,9 @@
-"""The message header's packed layout, which the client builds headers with.
+"""The message header's packed layout, and the header's raw read and write helpers.
 
-``MessageHeader._pack_into`` writes a whole header with one ``struct`` call.
-Its layout is built from the header's own ctypes fields when the module is
-imported, so these tests compare it with headers built field by field.
+``MessageHeader._pack_into`` writes a whole header with one ``struct`` call,
+and the client and manager read and write single fields in raw buffers. The
+layouts behind them are written out in ``pyrtma.header``, so these tests
+compare each with headers built field by field.
 """
 
 import ctypes
@@ -12,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from pyrtma.header import MessageHeader, _field_struct, _layout_struct
+from pyrtma.header import MessageHeader
 from pyrtma.validators import IntValidatorBase
 
 FIELD_NAMES = [name[1:] for name, *_ in MessageHeader._fields_]
@@ -99,75 +100,28 @@ def test_set_recv_time_changes_only_recv_time() -> None:
     assert bytes(header) == bytes(expected)
 
 
-def test_layout_adds_the_structures_padding() -> None:
-    class Padded(ctypes.Structure):
-        _fields_ = [("a", ctypes.c_int8), ("b", ctypes.c_double), ("c", ctypes.c_int16)]
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_unpack_type_and_size_reads_both_fields(seed: int) -> None:
+    values = random_values(random.Random(seed))
+    header = header_from_fields(values)
+    expected = (values["msg_type"], values["num_data_bytes"])
 
-    layout = _layout_struct(Padded)
-    packed = layout.pack(-5, 2.5, 300)
-
-    assert layout.size == ctypes.sizeof(Padded)
-    assert packed == bytes(Padded(-5, 2.5, 300))
-
-
-@pytest.mark.parametrize(
-    "ctype", [ctypes.c_char * 4, ctypes.c_char_p], ids=["char array", "pointer"]
-)
-def test_layout_rejects_fields_struct_cannot_describe(ctype: Any) -> None:
-    class Unpackable(ctypes.Structure):
-        _fields_ = [("a", ctypes.c_int32), ("b", ctype)]
-
-    with pytest.raises(TypeError, match="Unpackable.b"):
-        _layout_struct(Unpackable)
+    assert MessageHeader.unpack_type_and_size(header) == expected
+    assert MessageHeader.unpack_type_and_size(bytes(header) + b"payload") == expected
 
 
-def test_field_struct_finds_one_field() -> None:
-    layout, offset = _field_struct(MessageHeader, "_num_data_bytes")
-    header = MessageHeader()
-    header.num_data_bytes = 4096
+def test_unpack_num_data_bytes_reads_it_from_a_buffer() -> None:
+    values = random_values(random.Random(11))
+    buffer = bytearray(bytes(header_from_fields(values))) + b"payload"
 
-    (value,) = layout.unpack_from(header, offset)
-
-    assert value == 4096
-    assert layout.size == struct.calcsize("=i")
+    assert MessageHeader.unpack_num_data_bytes(buffer) == (values["num_data_bytes"],)
 
 
-@pytest.mark.parametrize(
-    ("name", "value"),
-    [
-        ("msg_type", 6001),
-        ("msg_count", -7),
-        ("send_time", 12.5),
-        ("recv_time", 13.25),
-        ("src_host_id", 3),
-        ("src_mod_id", 101),
-        ("dest_host_id", -2),
-        ("dest_mod_id", 200),
-        ("num_data_bytes", 4096),
-        ("remaining_bytes", 9),
-        ("is_dynamic", 1),
-        ("reserved", 0x89ABCDEF),
-    ],
-)
-def test_field_struct_reads_each_field_by_its_name(name: str, value: Any) -> None:
-    header = MessageHeader()
-    setattr(header, name, value)
+def test_pack_send_time_changes_only_send_time() -> None:
+    values = random_values(random.Random(13))
+    buffer = bytearray(bytes(header_from_fields(values))) + b"payload"
 
-    layout, offset = MessageHeader.field_struct(name)
+    MessageHeader.pack_send_time(buffer, 99.25)
 
-    assert layout.unpack_from(header, offset) == (value,)
-    assert layout.size == getattr(MessageHeader, f"_{name}").size
-
-
-def test_field_struct_writes_into_a_buffer() -> None:
-    buffer = bytearray(ctypes.sizeof(MessageHeader))
-    layout, offset = MessageHeader.field_struct("send_time")
-
-    layout.pack_into(buffer, offset, 99.5)
-
-    assert MessageHeader.from_buffer(buffer).send_time == 99.5
-
-
-def test_field_struct_rejects_an_unknown_name() -> None:
-    with pytest.raises(KeyError, match="no_such_field"):
-        MessageHeader.field_struct("no_such_field")
+    expected = bytes(header_from_fields({**values, "send_time": 99.25}))
+    assert bytes(buffer) == expected + b"payload"

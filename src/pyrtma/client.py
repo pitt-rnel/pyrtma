@@ -15,7 +15,6 @@ from contextlib import contextmanager
 
 from .message import Message
 from .message_data import MessageData
-from .message_base import field_struct
 from .header import MessageHeader, get_header_cls
 from .core_defs import (
     ALL_MESSAGE_TYPES,
@@ -67,21 +66,6 @@ __all__ = [
 ]
 
 F = TypeVar("F", bound=Callable[..., Any])
-
-# Header fields the read path takes straight from the received bytes, before
-# deciding what to read next; cheaper than going through their validators.
-# Module globals, so the hot paths look up nothing on the class.
-_MSG_TYPE, _MSG_TYPE_OFFSET = MessageHeader.field_struct("msg_type")
-_NUM_DATA_BYTES, _NUM_DATA_BYTES_OFFSET = MessageHeader.field_struct("num_data_bytes")
-
-# A sent header's send_time, set again when sending had to wait for room.
-_SEND_TIME, _SEND_TIME_OFFSET = MessageHeader.field_struct("send_time")
-
-# The msg_type field of the subscription control messages, which all have
-# the same layout. _subscription_control() checks each type before writing
-# it, so it writes the field straight in, without the validator checking it
-# again.
-_CONTROL_TYPE, _CONTROL_TYPE_OFFSET = field_struct(cd.MDF_SUBSCRIBE, "msg_type")
 
 # Checks a signal's type as the header's msg_type field would.
 _SIGNAL_TYPE = Int32()
@@ -784,21 +768,21 @@ class Client(ClientLike):
 
         # ALL_MESSAGE_TYPES is a type like any other here: subscribing to it,
         # or pausing or leaving it, leaves the other types as they are.
-        msg: MessageData
+        msg_cls: type[MessageData]
         if ctrl_msg == "Subscribe":
-            msg = cd.MDF_SUBSCRIBE()
+            msg_cls = cd.MDF_SUBSCRIBE
             self._subscribed_types |= msg_set
             self._paused_types -= msg_set
         elif ctrl_msg == "Unsubscribe":
-            msg = cd.MDF_UNSUBSCRIBE()
+            msg_cls = cd.MDF_UNSUBSCRIBE
             self._subscribed_types -= msg_set
             self._paused_types -= msg_set
         elif ctrl_msg == "PauseSubscription":
-            msg = cd.MDF_PAUSE_SUBSCRIPTION()
+            msg_cls = cd.MDF_PAUSE_SUBSCRIPTION
             self._subscribed_types -= msg_set
             self._paused_types |= msg_set
         elif ctrl_msg == "ResumeSubscription":
-            msg = cd.MDF_RESUME_SUBSCRIPTION()
+            msg_cls = cd.MDF_RESUME_SUBSCRIPTION
             self._subscribed_types |= msg_set
             self._paused_types -= msg_set
         else:
@@ -806,9 +790,11 @@ class Client(ClientLike):
         # Kept apart from the set so that read_message() checks it first.
         self._sub_all = ALL_MESSAGE_TYPES in self._subscribed_types
 
+        # Each type is checked above, so each message is built with its type
+        # as the only argument, which ctypes stores without the field's
+        # validator checking it again.
         for msg_type in msg_set:
-            _CONTROL_TYPE.pack_into(msg, _CONTROL_TYPE_OFFSET, msg_type)
-            self.send_message(msg)
+            self.send_message(msg_cls(msg_type))
 
     @requires_connection
     def subscribe(self, msg_list: Iterable[int]):
@@ -1079,9 +1065,7 @@ class Client(ClientLike):
                 raise _too_large(type(msg_data).__name__, num_data_bytes)
             msg_hdr.num_data_bytes = num_data_bytes
         else:
-            (num_data_bytes,) = _NUM_DATA_BYTES.unpack_from(
-                msg_hdr, _NUM_DATA_BYTES_OFFSET
-            )
+            _, num_data_bytes = MessageHeader.unpack_type_and_size(msg_hdr)
             if not 0 <= num_data_bytes <= MAX_DATA_BYTES:
                 raise _too_large(f"Header of type {msg_hdr.msg_type}", num_data_bytes)
 
@@ -1142,7 +1126,7 @@ class Client(ClientLike):
             if not writable:
                 return False
             if restamp:
-                _SEND_TIME.pack_into(buffer, _SEND_TIME_OFFSET, time.perf_counter())
+                MessageHeader.pack_send_time(buffer, time.perf_counter())
         if sent < nbytes:
             self._sendall(memoryview(buffer)[sent:], nbytes - sent)
         return True
@@ -1361,11 +1345,10 @@ class Client(ClientLike):
 
             header = self._rx_header
             assert header is not None
-            (msg_type,) = _MSG_TYPE.unpack_from(header, _MSG_TYPE_OFFSET)
+            # Both fields straight from the bytes, before deciding what to
+            # read next; cheaper than going through their validators.
+            msg_type, data_size = MessageHeader.unpack_type_and_size(header)
             if target is header:
-                (data_size,) = _NUM_DATA_BYTES.unpack_from(
-                    header, _NUM_DATA_BYTES_OFFSET
-                )
                 # The manager forwards nothing larger than MAX_DATA_BYTES, so a
                 # header that announces more, or less than zero, means the
                 # stream is corrupt.

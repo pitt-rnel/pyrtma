@@ -11,7 +11,7 @@ import pytest
 
 import pyrtma.core_defs as cd
 from pyrtma.header import MessageHeader
-from pyrtma.message_base import MessageMeta, field_size, field_struct
+from pyrtma.message_base import MessageMeta, field_size
 from pyrtma.message_data import MessageData
 from pyrtma.validators import String
 
@@ -77,41 +77,19 @@ def test_field_size_rejects_what_is_not_a_field(cls: type, name: str) -> None:
         field_size(cls, name)
 
 
-def test_field_struct_reads_and_writes_a_field_in_place() -> None:
-    msg = cd.MDF_DATASET_STATUS()
-    layout, offset = field_struct(msg, "elapsed_time")
-
-    layout.pack_into(msg, offset, 2.5)
-
-    assert msg.elapsed_time == 2.5
-    assert layout.unpack_from(msg, offset) == (2.5,)
-    from_class, class_offset = field_struct(cd.MDF_DATASET_STATUS, "elapsed_time")
-    assert (from_class.format, class_offset) == (layout.format, offset)
-
-
 @pytest.mark.parametrize(
-    ("cls", "name"),
-    [(Named, "nope"), (PlainChars, "name"), (MessageHeader, "LAYOUT")],
-    ids=["unknown", "plain ctypes field", "class attribute"],
+    "cls",
+    [
+        cd.MDF_SUBSCRIBE,
+        cd.MDF_UNSUBSCRIBE,
+        cd.MDF_PAUSE_SUBSCRIPTION,
+        cd.MDF_RESUME_SUBSCRIPTION,
+    ],
 )
-def test_field_struct_rejects_what_is_not_a_field(cls: type, name: str) -> None:
-    with pytest.raises(KeyError, match=name):
-        field_struct(cls, name)
+def test_subscription_message_is_built_from_its_type(cls: type) -> None:
+    # The client builds these with the type as the only argument, which
+    # ctypes stores in the one field without running its validator.
+    msg = cls(7010)
 
-
-def test_subscription_messages_share_their_msg_type_layout() -> None:
-    # The client writes msg_type into any of them with one struct.
-    layouts = {
-        (layout.format, offset)
-        for layout, offset in (
-            field_struct(cls, "msg_type")
-            for cls in (
-                cd.MDF_SUBSCRIBE,
-                cd.MDF_UNSUBSCRIBE,
-                cd.MDF_PAUSE_SUBSCRIPTION,
-                cd.MDF_RESUME_SUBSCRIPTION,
-            )
-        )
-    }
-
-    assert len(layouts) == 1
+    assert [name for name, *_ in cls._fields_] == ["_msg_type"]
+    assert msg.msg_type == 7010

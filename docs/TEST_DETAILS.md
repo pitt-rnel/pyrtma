@@ -894,17 +894,14 @@ Headers built field by field are the reference: random values span each field's 
 
 | Test | Purpose | Approach |
 |---|---|---|
-| `test_layout_has_the_headers_size` | P1: the header's `struct` layout, built from its ctypes fields at import, is the header's size. | Compares `_LAYOUT.size` with `sizeof(MessageHeader)`. |
+| `test_layout_has_the_headers_size` | P1, header access: the header's `struct` layout, written out in `pyrtma.header`, is the header's size. | Compares with `ctypes.sizeof`. |
 | `test_packed_header_matches_one_set_field_by_field` | P1: `_pack_into` writes the same bytes as setting each field, so its parameters are the fields, by name and in order. | 200 sets of random values, passed by keyword. |
 | `test_layout_reads_back_in_field_order` | P1: unpacking a header gives its field values in `_fields_` order. | A header set field by field, unpacked. |
 | `test_pack_into_writes_only_its_bytes` | P1: `_pack_into` at an offset writes exactly the header's bytes there and leaves the rest of the buffer alone. | A buffer filled with `0xAA`, written at offset 8. |
 | `test_set_recv_time_changes_only_recv_time` | P1: `_set_recv_time` changes `recv_time` and no other byte. | Compares with a header set field by field with the new time. |
-| `test_layout_adds_the_structures_padding` | P1: the layout builder adds pad bytes wherever ctypes pads, so fields land at their offsets. | A structure of `int8`, `double` and `int16`, with padding inside and at the end. |
-| `test_layout_rejects_fields_struct_cannot_describe` | P1: a field `struct` can't describe raises `TypeError` naming it, so a header that changed that way fails at import. | Parametrized over a `char` array and a `char` pointer. |
-| `test_field_struct_finds_one_field` | P1: `_field_struct` gives one field's layout and offset, as the client's read path uses for `num_data_bytes`. | Reads `num_data_bytes` back from a header. |
-| `test_field_struct_reads_each_field_by_its_name` | Shared constants: `MessageHeader.field_struct()` takes a field's public name and reads every field back as written through its validator, with the field's size. | Parametrized over all twelve header fields. |
-| `test_field_struct_writes_into_a_buffer` | Shared constants: the returned struct and offset write a field in a raw buffer, as the client restamps `send_time`. | Packs `send_time` into a zeroed buffer and reads it as a header. |
-| `test_field_struct_rejects_an_unknown_name` | Shared constants: an unknown name raises `KeyError` naming it. | `no_such_field`. |
+| `test_unpack_type_and_size_reads_both_fields` | Header access: `MessageHeader.unpack_type_and_size()` reads `msg_type` and `num_data_bytes` with one unpack, from a header object or from bytes that start with one. | Headers with random field values. |
+| `test_unpack_num_data_bytes_reads_it_from_a_buffer` | Header access: `MessageHeader.unpack_num_data_bytes()` reads `num_data_bytes` from the start of a raw buffer, as the manager's read loop does. | A header followed by a payload. |
+| `test_pack_send_time_changes_only_send_time` | Header access: `MessageHeader.pack_send_time()` rewrites `send_time` in a buffer holding a header and leaves every other byte, as the client's send path needs. | A header followed by a payload. |
 
 ## test_message_base.py — attribute access on message classes (needs: none)
 
@@ -916,9 +913,7 @@ Headers built field by field are the reference: random values span each field's 
 | `test_field_size_of_a_string_counts_its_terminator` | Field helpers: `field_size()` gives a `char` field's size including its null terminator, from the class or an instance. | A `String(8)` field. |
 | `test_field_size_of_each_kind_of_field` | Field helpers: `field_size()` gives the size of numeric, struct and array fields as well. | Parametrized over header fields, `FAILED_MESSAGE.msg_header`, `DATASET.msg_types` and `RTMA_LOG.message`. |
 | `test_field_size_rejects_what_is_not_a_field` | Field helpers: an unknown name, a field declared directly in `_fields_` without a validator, and a class attribute that isn't a field each raise `KeyError` naming it. | `Named.nope`, `PlainChars.name` and `MessageHeader.LAYOUT`. |
-| `test_field_struct_reads_and_writes_a_field_in_place` | Field helpers: `field_struct()` gives a struct and offset that read and write a field in place, from the message or its class. | `DATASET_STATUS.elapsed_time`. |
-| `test_field_struct_rejects_what_is_not_a_field` | Field helpers: an unknown name, a field declared directly in `_fields_`, and a class attribute that isn't a field each raise `KeyError`. | As for `field_size()`. |
-| `test_subscription_messages_share_their_msg_type_layout` | Field helpers: SUBSCRIBE, UNSUBSCRIBE, PAUSE_SUBSCRIPTION and RESUME_SUBSCRIPTION have `msg_type` in the same place, as the client relies on to write it with one struct. | Compares the four structs' formats and offsets. |
+| `test_subscription_message_is_built_from_its_type` | Header access: each subscription control message has `msg_type` as its only field, so the client can build it with the type as the only argument, which ctypes stores without the validator. | Parametrized over the four control messages. |
 
 ## test_message_definitions.py — loading compiled definitions (needs: none)
 

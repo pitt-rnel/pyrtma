@@ -35,10 +35,6 @@ _FIRST_USER_MSG_TYPE: int = cd.MAX_RTMA_MSG_TYPE + 1
 #: manager drops it.
 DEFAULT_STALL_TIMEOUT: float = 5.0
 
-# The header's num_data_bytes field, read straight from the received bytes:
-# the read loop needs it for every message before there is a header object.
-_NUM_DATA_BYTES, _NUM_DATA_BYTES_OFFSET = MessageHeader.field_struct("num_data_bytes")
-
 
 def _type_label(msg_type: int) -> str:
     """Name a message type for the manager's subscription log.
@@ -939,7 +935,9 @@ class MessageManager(ClientLike):
             if mod._rx_header_done:
                 break
 
-            (data_size,) = _NUM_DATA_BYTES.unpack_from(mod._rx, _NUM_DATA_BYTES_OFFSET)
+            # Straight from the received bytes: the read loop needs it for
+            # every message before there is a header object.
+            (data_size,) = MessageHeader.unpack_num_data_bytes(mod._rx)
             if data_size < 0 or data_size > len(self.data_buffer):
                 msg_type = self.header_cls.from_buffer_copy(
                     mod._rx_view[:header_size]
