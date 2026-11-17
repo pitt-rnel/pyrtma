@@ -42,6 +42,7 @@ that makes them. The version number is chosen at release time.
 - `pyrtma.parser.Field.padding`, True for the padding fields the parser inserts. `Parser.definition_hash()` builds a struct's or message's hashed text and hash, `Parser.field_text()` a field's line in it, and `pyrtma.parser.CANONICAL_TYPE_NAMES` holds the name each native type has there.
 - `--combined` also writes `<name>_combined.defs`, an index for the combined YAML file with `import_coredefs: false`, since that file holds the core definitions already. `python -m pyrtma.compile -i <name>_combined.defs` compiles it.
 - `MAX_DATA_BYTES`, a core constant (1048576, 1 MiB), in every language's generated definitions: the largest payload (`num_data_bytes`) that the message manager and clients accept, and the largest message or struct the parser compiles. The client's read check, the manager's receive buffer and the parser all take it from `rtma_core.yaml` now; before, each had its own copy of the number.
+- `pyrtma.exceptions.MessageTooLarge`, a `ClientError`: `Client.send_message()` and `forward_message()` raise it for a payload larger than `MAX_DATA_BYTES`, and `forward_message()` without a payload for a header whose `num_data_bytes` is outside 0 to `MAX_DATA_BYTES`. Nothing is sent and the client stays connected; before, the message went out and the message manager dropped the client as sending a corrupt stream.
 
 ### Changed
 

@@ -37,6 +37,7 @@ from .exceptions import (
     InvalidDestinationHost,
     InvalidSubscription,
     MessageDefinitionsLoadError,
+    MessageTooLarge,
 )
 
 from . import core_defs as cd
@@ -161,6 +162,22 @@ def _check_destination(dest_mod_id: int, dest_host_id: int) -> None:
         dest_host_id < 0 or dest_host_id > cd.MAX_HOSTS
     ):
         raise InvalidDestinationHost(f"Invalid dest_host_id of [{dest_host_id}]")
+
+
+def _too_large(what: str, num_data_bytes: int) -> MessageTooLarge:
+    """Build the error for a payload the message manager won't take.
+
+    Args:
+        what: The message, for the error message.
+        num_data_bytes: The payload's size.
+
+    Returns:
+        The exception, to raise.
+    """
+    return MessageTooLarge(
+        f"{what} has num_data_bytes={num_data_bytes}, outside 0 to MAX_DATA_BYTES "
+        f"({MAX_DATA_BYTES}); the message manager would drop the connection"
+    )
 
 
 def _int32(value: int) -> int:
@@ -973,7 +990,7 @@ class Client(ClientLike):
             self._module_id,
             dest_host_id,
             dest_mod_id,
-            0,  # num_data_bytes
+            0,  # num_data_bytes: no payload, so always within MAX_DATA_BYTES
             0,  # remaining_bytes
             0,  # is_dynamic
             0,  # reserved: a signal has no version
@@ -1014,6 +1031,8 @@ class Client(ClientLike):
         Raises:
             InvalidDestinationModule: Specified destination module is invalid
             InvalidDestinationHost: Specified destination host is invalid
+            MessageTooLarge: The payload is larger than ``MAX_DATA_BYTES``.
+                Nothing is sent.
             ConnectionLost: The connection failed. The client is disconnected.
 
         Returns:
@@ -1023,6 +1042,8 @@ class Client(ClientLike):
         _check_destination(dest_mod_id, dest_host_id)
 
         num_data_bytes = ctypes.sizeof(msg_data)
+        if num_data_bytes > MAX_DATA_BYTES:
+            raise _too_large(type(msg_data).__name__, num_data_bytes)
         buffer = bytearray(self._header_size)
         # Every value fits its field: the count and hash are wrapped to 32 bits
         # as ctypes would store them, and the IDs are checked.
@@ -1075,6 +1096,9 @@ class Client(ClientLike):
                 sent whole.
 
         Raises:
+            MessageTooLarge: The payload, or without ``msg_data`` the header's
+                ``num_data_bytes``, is outside 0 to ``MAX_DATA_BYTES``.
+                Nothing is sent, and the header is left as it was.
             ConnectionLost: The connection failed. The client is disconnected.
 
         Returns:
@@ -1083,7 +1107,16 @@ class Client(ClientLike):
         """
         # Assume that msg_type, num_data_bytes, data - have been filled in
         if msg_data is not None:
-            msg_hdr.num_data_bytes = ctypes.sizeof(msg_data)
+            num_data_bytes = ctypes.sizeof(msg_data)
+            if num_data_bytes > MAX_DATA_BYTES:
+                raise _too_large(type(msg_data).__name__, num_data_bytes)
+            msg_hdr.num_data_bytes = num_data_bytes
+        else:
+            (num_data_bytes,) = _NUM_DATA_BYTES.unpack_from(
+                msg_hdr, _NUM_DATA_BYTES_OFFSET
+            )
+            if not 0 <= num_data_bytes <= MAX_DATA_BYTES:
+                raise _too_large(f"Header of type {msg_hdr.msg_type}", num_data_bytes)
 
         # The header is sent as the caller made it, so its send_time stays.
         buffer = bytearray(msg_hdr)

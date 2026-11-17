@@ -10,9 +10,10 @@ import socket
 import sys
 import threading
 import time
+import ctypes
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -28,12 +29,15 @@ from pyrtma.exceptions import (
     InvalidMessageDefinition,
     MessageDefinitionsLoadError,
     MessageManagerNotFound,
+    MessageTooLarge,
     UnknownMessageType,
 )
 from pyrtma.definitions import MessageDefinitions
 from pyrtma.header import MessageHeader
 from pyrtma.loader import is_message_definitions_module
 from pyrtma.message import Message
+from pyrtma.message_base import MessageMeta
+from pyrtma.message_data import MessageData
 
 from .helpers import (
     DEFAULT_TIMEOUT,
@@ -41,6 +45,7 @@ from .helpers import (
     ManagerHarness,
     ScriptedManager,
     bytes_waiting,
+    deliver,
     frame,
     recv_exactly,
     wait_for,
@@ -131,6 +136,31 @@ def unknown_message() -> bytes:
         The message's bytes, with a 4-byte payload.
     """
     return frame(UNKNOWN_TYPE, b"\x00" * 4)
+
+
+def payload_class(size: int) -> type[MessageData]:
+    """Build a message class whose payload is ``size`` bytes.
+
+    The parser won't compile a message over ``MAX_DATA_BYTES``, so tests that
+    need one build it directly. Its type is one the test definitions don't
+    define, so the manager forwards it to nobody.
+
+    Args:
+        size: The payload's size in bytes.
+
+    Returns:
+        The class.
+    """
+    namespace = {
+        "type_id": UNKNOWN_TYPE,
+        "type_name": f"PAYLOAD_{size}",
+        "type_hash": 0,
+        "type_size": size,
+        "_fields_": [("raw", ctypes.c_ubyte * size)],
+    }
+    return cast(
+        type[MessageData], MessageMeta(f"MDF_PAYLOAD_{size}", (MessageData,), namespace)
+    )
 
 
 class RecordingSocket:
@@ -880,6 +910,57 @@ class TestSend:
         assert results == [False, False, False]
         assert connected
         assert capsys.readouterr().out == ""
+
+    @pytest.mark.parametrize("method", ["send_message", "forward_message"])
+    def test_payload_over_the_limit_is_refused(
+        self, scripted_client: Client, method: str
+    ) -> None:
+        recorder = RecordingSocket(scripted_client._sock)
+        scripted_client._sock = recorder  # type: ignore[assignment]
+        data = payload_class(MAX_DATA_BYTES + 1)()
+        count = scripted_client.msg_count
+
+        with pytest.raises(MessageTooLarge, match="MAX_DATA_BYTES"):
+            if method == "send_message":
+                scripted_client.send_message(data)
+            else:
+                header = MessageHeader()
+                header.msg_type = UNKNOWN_TYPE
+                scripted_client.forward_message(header, data)
+
+        assert recorder.sends == []
+        assert scripted_client.connected
+        assert scripted_client.msg_count == count
+
+    @pytest.mark.parametrize("size", [-1, MAX_DATA_BYTES + 1])
+    def test_forwarded_header_outside_the_limit_is_refused(
+        self, scripted_client: Client, size: int
+    ) -> None:
+        recorder = RecordingSocket(scripted_client._sock)
+        scripted_client._sock = recorder  # type: ignore[assignment]
+        header = MessageHeader()
+        header.msg_type = UNKNOWN_TYPE
+        header.num_data_bytes = size
+
+        with pytest.raises(MessageTooLarge, match="MAX_DATA_BYTES"):
+            scripted_client.forward_message(header)
+
+        assert recorder.sends == []
+        assert scripted_client.connected
+
+    def test_payload_at_the_limit_is_accepted(
+        self, client_factory: Callable[..., Client]
+    ) -> None:
+        sender = client_factory(name="sender")
+        receiver = client_factory(name="receiver")
+        receiver.subscribe([td.MT_TEST_START])
+
+        assert sender.send_message(payload_class(MAX_DATA_BYTES)())
+
+        # The manager took the whole message and kept the sender: what the
+        # sender sends next still arrives.
+        assert deliver(sender, receiver, td.MDF_TEST_START()) is not None
+        assert sender.connected
 
 
 def signal_until_received(

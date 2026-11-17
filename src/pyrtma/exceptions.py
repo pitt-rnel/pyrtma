@@ -114,6 +114,16 @@ class InvalidDestinationHost(ClientError):
     pass
 
 
+class MessageTooLarge(ClientError):
+    """Raised when a message's payload is larger than ``MAX_DATA_BYTES``.
+
+    The message manager drops a client that sends one, so the client refuses
+    to send it.
+    """
+
+    pass
+
+
 class InvalidSubscription(ClientError):
     """Raised when a subscription command is invalid"""
 
