@@ -328,6 +328,15 @@ class RTMAWebSocketHandler(WebSocketHandler):
                 self.handle_connect(msg)
             elif msg.header.msg_type == cd.MT_CONNECT_V2:
                 self.handle_connect_v2(msg)
+            elif msg.header.msg_type == cd.MT_MODULE_READY:
+                # The message manager gets this process's PID, as it does
+                # with the proxy's CONNECT_V2: the proxy holds the web
+                # client's connection. The web client's PID is ignored.
+                self.proxy.send_module_ready()
+                logger.info(
+                    "Received MODULE_READY, web client PID "
+                    f"{cast(cd.MDF_MODULE_READY, msg.data).pid}"
+                )
             else:
                 self.proxy.forward_message(msg.header, msg.data or None)
                 logger.debug(

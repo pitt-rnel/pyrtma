@@ -7,6 +7,7 @@ import ctypes
 import inspect
 import json
 import logging
+import os
 import select
 import shutil
 import socket
@@ -522,6 +523,24 @@ class TestConnect:
         assert handler.proxy.module_id == mod_id
         assert handler.proxy.name == "late-page"
         assert hello_observer(lambda d: d.mod_id == mod_id and d.name == "late-page")
+
+    def test_module_ready_sends_the_web_managers_pid(
+        self, handler: StubHandler, hello_observer: Any
+    ) -> None:
+        handler.handle_connect_v2(connect_v2_message("page"))
+        mod_id = handler.proxy.module_id
+        assert hello_observer(lambda d: d.mod_id == mod_id)
+        header = MessageHeader()
+        header.msg_type = cd.MT_MODULE_READY
+        data = cd.MDF_MODULE_READY()
+        data.pid = os.getpid() + 1
+
+        handler.process_json_message(Message(header, data).to_json(minify=True))
+
+        hellos = hello_observer(lambda d: d.mod_id == mod_id)
+        assert hellos is not None
+        assert hellos[-1].data.pid == os.getpid()
+        assert [text for text in handler.sent if "rtma_msg_error" in text] == []
 
     @pytest.mark.parametrize(
         "msg_type", [cd.ALL_MESSAGE_TYPES, 7777], ids=["all types", "undefined"]
