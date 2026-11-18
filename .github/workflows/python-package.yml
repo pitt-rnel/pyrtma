@@ -48,6 +48,10 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         shell: bash
         run: |
+          # set error handling options:
+          # -e: exit script on any error (non-zero status)
+          # -u: exit on unset variables
+          # -o pipefail: pipelines return exit status of rightmost command that failed
           set -euo pipefail
           out=build/compiled
           mkdir -p "$out"
