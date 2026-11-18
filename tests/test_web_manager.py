@@ -262,7 +262,7 @@ def masked_frame(text: str | bytes, opcode: int = 0x1) -> bytes:
     """Build a masked websocket frame, as a web client sends it.
 
     Args:
-        text: The frame's text, or its payload bytes, under 64 KiB.
+        text: The frame's text, or its payload bytes.
         opcode: The frame's opcode. Defaults to a text frame.
 
     Returns:
@@ -272,8 +272,10 @@ def masked_frame(text: str | bytes, opcode: int = 0x1) -> bytes:
     mask = bytes([1, 2, 3, 4])
     if len(payload) < 126:
         length = bytes([0x80 | len(payload)])
-    else:
+    elif len(payload) < 2**16:
         length = bytes([0x80 | 126]) + len(payload).to_bytes(2, "big")
+    else:
+        length = bytes([0x80 | 127]) + len(payload).to_bytes(8, "big")
     masked = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
     return bytes([0x80 | opcode]) + length + mask + masked
 
@@ -320,6 +322,23 @@ class TestWebsocketRead:
         frame = masked_frame(text)
         theirs.sendall(frame[:3])
         sender = threading.Timer(0.05, theirs.sendall, args=(frame[3:],))
+        sender.start()
+
+        handler.read_ws_message()
+        sender.join()
+
+        assert received == [text]
+
+    def test_frame_with_an_8_byte_length(
+        self, pair: tuple[StubHandler, socket.socket, list[str]]
+    ) -> None:
+        # Frames of 64 KiB or more give their length in 8 bytes. A message
+        # can be up to MAX_DATA_BYTES, 1 MiB, and its JSON longer still.
+        handler, theirs, received = pair
+        text = "x" * (2**16 + 100)
+        # The frame is larger than the socket buffer, so another thread
+        # sends it while this one reads.
+        sender = threading.Thread(target=theirs.sendall, args=(masked_frame(text),))
         sender.start()
 
         handler.read_ws_message()

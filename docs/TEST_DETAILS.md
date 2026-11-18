@@ -473,6 +473,7 @@ The `pair` fixture gives a `StubHandler` reading one end of a socket pair, with 
 |---|---|---|
 | `test_frames_that_arrive_together_stay_visible` | Web manager: after one websocket frame is read, `select()` still reports a frame that arrived with it, so `handle()` reads it without waiting for more input. | Two masked text frames in one send; reads one, checks `select()` with timeout 0, and reads the other. |
 | `test_frame_split_across_reads` | Web manager: a frame that arrives in pieces is read whole. | A 300-byte frame, with a 2-byte extended length, split after its third byte; a timer sends the rest 50 ms later. |
+| `test_frame_with_an_8_byte_length` | Web manager: a frame of 64 KiB or more, whose length takes 8 bytes, is read whole. | A 65,636-byte frame, sent from another thread because it is larger than the socket buffer. |
 
 ### TestWebsocketClose
 
