@@ -53,7 +53,7 @@ EXAMPLE_MESSAGES = REPO / "examples" / "msg_defs" / "example_messages.py"
 # The compiler index files whose layouts the snapshot records.
 DEFINITIONS = {
     "core": REPO / "src" / "pyrtma" / "core_defs" / "rtma.defs",
-    "test": REPO / "tests" / "test_msg_defs" / "test_defs.yaml",
+    "test": REPO / "tests" / "test_msg_defs" / "test_defs.defs",
     "examples": REPO / "examples" / "msg_defs" / "example.defs",
 }
 
