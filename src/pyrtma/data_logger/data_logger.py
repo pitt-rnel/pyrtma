@@ -34,20 +34,8 @@ from collections.abc import Callable
 from typing import cast
 
 
-def _file_key(path: pathlib.Path) -> str:
-    """Return a key that is equal for two spellings of the same file path.
-
-    Args:
-        path: The path.
-
-    Returns:
-        The absolute path, case-folded where the platform ignores case.
-    """
-    return os.path.normcase(os.path.abspath(path))
-
-
 class DataLogger:
-    MAX_DATASETS = 6
+    MAX_DATASETS = cd.MAX_DATASETS
     ALL_SETS = ("*", "all")
     #: Seconds to wait at exit for the datasets' files to be finished.
     EXIT_TIMEOUT = 60.0
@@ -68,8 +56,8 @@ class DataLogger:
             rtma_server_ip: The manager's ``host:port``.
             log_level: The level for the logger's console and RTMA logging.
             definitions: The message definitions to decode and record with.
-            clock: The datasets' clock, for their write and subdivide
-                schedules. Injectable for tests.
+            clock: The datasets' clock, for their write schedules and
+                elapsed times. Injectable for tests.
             fsync: Make every dataset flush and ``os.fsync()`` its file after
                 each write and before closing it; see ``DatasetWriter``. By
                 default the operating system decides when to write its
@@ -454,36 +442,22 @@ class DataLogger:
         )
         for other in self.datasets.values():
             existing = other.save_path / other.filename
-            if _file_key(existing) == _file_key(target):
+            if self._file_key(existing) == self._file_key(target):
                 raise DatasetExistsError(
                     name, f"Dataset '{other.name}' already records to {existing}"
                 )
 
-    def _max_size_mb(self, name: str, requested: int) -> int:
-        """Return the file size limit to use for a dataset.
-
-        A value outside 1 to ``DATASET_MAX_SIZE_MB`` is replaced by
-        ``DATASET_MAX_SIZE_MB``, with a warning, rather than refused. A client
-        compiled before ``max_size_mb`` replaced ``subdivide_interval`` sends
-        the same bytes, most often 0 for one continuous file, so refusing
-        would stop it recording.
+    @staticmethod
+    def _file_key(path: pathlib.Path) -> str:
+        """Return a key that is equal for two spellings of the same file path.
 
         Args:
-            name: The dataset's name.
-            requested: The ``max_size_mb`` in the request.
+            path: The path.
 
         Returns:
-            The limit in MB.
+            The absolute path, case-folded where the platform ignores case.
         """
-        if 1 <= requested <= cd.DATASET_MAX_SIZE_MB:
-            return requested
-        self.logger.warning(
-            f"Dataset '{name}': max_size_mb {requested} is outside 1 to "
-            f"{cd.DATASET_MAX_SIZE_MB}; using {cd.DATASET_MAX_SIZE_MB}. A client "
-            "built before max_size_mb replaced subdivide_interval sends its "
-            "interval here; rebuild it."
-        )
-        return cd.DATASET_MAX_SIZE_MB
+        return os.path.normcase(os.path.abspath(path))
 
     def add_dataset(self, msg: cd.MDF_DATASET_ADD, dest_mod_id: int = 0):
         """Add a dataset.
@@ -521,8 +495,7 @@ class DataLogger:
             filename=msg.dataset.filename,
             msg_types=msg.dataset.msg_types[:],
             formatter=msg.dataset.formatter,
-            subdivide_interval=0,
-            max_size_mb=self._max_size_mb(name, msg.dataset.max_size_mb),
+            max_size_mb=msg.dataset.max_size_mb,
             clock=self._clock,
             fsync=self.fsync,
             write_period=self.write_period,

@@ -142,7 +142,6 @@ def make_writer(
             save_path=str(tmp_path),
             filename="rec",
             formatter="stub",
-            subdivide_interval=0,
             msg_types=[cd.ALL_MESSAGE_TYPES],
         )
         if not default_clock:
@@ -200,7 +199,6 @@ def test_collected_writer_leaves_no_open_socket(
         save_path=str(tmp_path),
         filename="rec",
         formatter="stub",
-        subdivide_interval=0,
         msg_types=[cd.ALL_MESSAGE_TYPES],
     )
     sock = writer.client.sock
@@ -541,25 +539,6 @@ class TestRollover:
         assert all((tmp_path / n).stat().st_size <= TWO_LINES for n in names)
         assert not writer.error_event.is_set()
 
-    def test_subdivide_interval_is_ignored(
-        self,
-        make_writer: Callable[..., DatasetWriter],
-        clock: FakeClock,
-        tmp_path: Path,
-    ) -> None:
-        with pytest.warns(DeprecationWarning, match="max_size_mb"):
-            writer = make_writer(subdivide_interval=30)
-        writer.start()
-        writer.update(message("a"))
-
-        clock.advance(10 * 60)
-        writer.update(message("b"))
-        writer.stop()
-        wait_dead(writer)
-
-        assert writer.saved_files == [tmp_path / "rec.txt"]
-        assert lines(tmp_path / "rec.txt") == ["header", "a", "b", "footer"]
-
     def test_max_size_mb_sets_the_file_limit(
         self, make_writer: Callable[..., DatasetWriter]
     ) -> None:
@@ -581,17 +560,26 @@ class TestRollover:
 
         assert writer.formatter.max_bytes == 1000
 
-    @pytest.mark.parametrize("size", [0, -1, cd.DATASET_MAX_SIZE_MB + 1])
+    def test_max_size_mb_zero_is_the_largest(
+        self, make_writer: Callable[..., DatasetWriter]
+    ) -> None:
+        writer = make_writer(max_size_mb=0)
+        writer.start()
+
+        assert writer.max_size_mb == cd.DATASET_MAX_SIZE_MB
+        assert writer.formatter.max_bytes == cd.DATASET_MAX_SIZE_MB * 1_000_000
+
+    @pytest.mark.parametrize("size", [-1, cd.DATASET_MAX_SIZE_MB + 1])
     def test_max_size_mb_outside_its_range_is_refused(
         self, make_writer: Callable[..., DatasetWriter], size: int
     ) -> None:
         with pytest.raises(DatasetError, match="max_size_mb"):
             make_writer(max_size_mb=size)
 
-    def test_default_max_size_is_500_mb(
+    def test_default_max_size_is_1_gb(
         self, make_writer: Callable[..., DatasetWriter]
     ) -> None:
-        assert make_writer().max_size_mb == cd.DATASET_MAX_SIZE_MB == 500
+        assert make_writer().max_size_mb == cd.DATASET_MAX_SIZE_MB == 1000
 
     def test_rolled_over_quicklogger_files_all_read(
         self,

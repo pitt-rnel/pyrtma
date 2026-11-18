@@ -51,34 +51,40 @@ def test_max_size_mb_is_sent_when_added(tmp_path: Path) -> None:
     assert client.sent[-1].dataset.max_size_mb == 20
 
 
-def test_default_max_size_is_500_mb(tmp_path: Path) -> None:
+def test_default_max_size_is_1_gb(tmp_path: Path) -> None:
     dataset, client = make(tmp_path)
 
     dataset.add()
 
-    assert client.sent[-1].dataset.max_size_mb == cd.DATASET_MAX_SIZE_MB == 500
+    assert client.sent[-1].dataset.max_size_mb == cd.DATASET_MAX_SIZE_MB == 1000
 
 
-@pytest.mark.parametrize("size", [0, -1, cd.DATASET_MAX_SIZE_MB + 1])
-def test_max_size_mb_outside_its_range_raises(tmp_path: Path, size: int) -> None:
-    with pytest.raises(ValueError, match="max_size_mb"):
-        make(tmp_path, max_size_mb=size)
-
-
-def test_subdivide_interval_is_deprecated_and_ignored(tmp_path: Path) -> None:
-    with pytest.warns(DeprecationWarning, match="max_size_mb"):
-        dataset, client = make(tmp_path, subdivide_interval=30)
+def test_max_size_mb_zero_is_sent_for_the_largest(tmp_path: Path) -> None:
+    dataset, client = make(tmp_path, max_size_mb=0)
 
     dataset.add()
 
-    assert client.sent[-1].dataset.max_size_mb == cd.DATASET_MAX_SIZE_MB
+    assert dataset.max_size_mb == 0
+    assert client.sent[-1].dataset.max_size_mb == 0
 
 
-def test_positional_subdivide_interval_still_accepted(tmp_path: Path) -> None:
-    with pytest.warns(DeprecationWarning):
-        dataset = Dataset("ds", tmp_path, "rec", "json", 30, create_client=False)
+@pytest.mark.filterwarnings("error::pytest.PytestUnraisableExceptionWarning")
+def test_subdivide_interval_is_gone(tmp_path: Path) -> None:
+    # The half-built Dataset is cleaned up too, without an error of its own.
+    with pytest.raises(TypeError, match="subdivide_interval"):
+        Dataset("ds", tmp_path, "rec", "json", subdivide_interval=30)  # type: ignore[call-arg]
 
-    assert dataset.subdivide_interval == 30
+
+def test_fifth_argument_is_msg_types(tmp_path: Path) -> None:
+    dataset = Dataset("ds", tmp_path, "rec", "json", [7001], create_client=False)
+
+    assert dataset.msg_types == (7001,)
+
+
+@pytest.mark.parametrize("size", [-1, cd.DATASET_MAX_SIZE_MB + 1])
+def test_max_size_mb_outside_its_range_raises(tmp_path: Path, size: int) -> None:
+    with pytest.raises(ValueError, match="max_size_mb"):
+        make(tmp_path, max_size_mb=size)
 
 
 def logger_message(data: Any) -> pyrtma.Message:

@@ -3,7 +3,6 @@
 import contextlib
 import os
 import pathlib
-import warnings
 import io
 import math
 import time
@@ -13,7 +12,13 @@ import pyrtma
 import pyrtma.core_defs as cd
 from ..client_logging import TRUNCATED_MARKER
 from ..validators import fit_ascii
-from .data_formatter import DataFormatter, FileContext, Recordable, get_formatter
+from .data_formatter import (
+    BYTES_PER_MB,
+    DataFormatter,
+    FileContext,
+    Recordable,
+    get_formatter,
+)
 from collections.abc import Callable
 from typing import IO, Any
 
@@ -57,19 +62,6 @@ def error_message(dataset: str, exc_type: str, text: str) -> cd.MDF_DATA_LOGGER_
     return error
 
 
-def _exclusive_mode(mode: str) -> str:
-    """Turn a formatter's file mode into one that refuses an existing file.
-
-    Args:
-        mode: The formatter's mode, such as ``"wt"`` or ``"wb"``.
-
-    Returns:
-        The mode with ``w`` replaced by ``x``, so opening fails with
-        ``FileExistsError`` instead of truncating another dataset's file.
-    """
-    return mode.replace("w", "x")
-
-
 def _fsync_dir(path: pathlib.Path) -> None:
     """Make the directory entries in ``path`` durable.
 
@@ -105,15 +97,10 @@ def check_write_period(seconds: float) -> float:
 
 
 class DatasetWriter:
-    # Deprecated: files are no longer split by time. Kept so existing
-    # references still resolve.
-    MIN_INTERVAL = 30
-    MAX_INTERVAL = 600
-    CONTINUOUS = math.inf
     #: The default seconds between writes; see ``write_period``.
     WRITE_PERIOD = 15.0
     #: Bytes in one MB of ``max_size_mb``.
-    BYTES_PER_MB = 1_000_000
+    BYTES_PER_MB = BYTES_PER_MB
 
     def __init__(
         self,
@@ -121,7 +108,6 @@ class DatasetWriter:
         save_path: str,
         filename: str,
         formatter: str,
-        subdivide_interval: int,
         msg_types: list[int],
         *,
         max_size_mb: int = cd.DATASET_MAX_SIZE_MB,
@@ -137,12 +123,11 @@ class DatasetWriter:
             save_path: The folder to save to; it is created if needed.
             filename: The file name, without the formatter's extension.
             formatter: The name of a registered formatter.
-            subdivide_interval: Deprecated and ignored: files are split by
-                size, with ``max_size_mb``. A nonzero value warns.
             msg_types: The message types to record; ``ALL_MESSAGE_TYPES``
                 records every type.
             max_size_mb: The largest file, in MB of 1,000,000 bytes, from 1
-                to ``DATASET_MAX_SIZE_MB``. A full file continues in a new one,
+                to ``DATASET_MAX_SIZE_MB`` (1000, 1 GB), or 0 for
+                ``DATASET_MAX_SIZE_MB``. A full file continues in a new one,
                 numbered ``_0001``, ``_0002`` and so on. A formatter whose own
                 ``max_bytes`` is lower keeps that.
             clock: Seconds from a monotonic clock, for the write schedule and
@@ -209,23 +194,14 @@ class DatasetWriter:
         self.filename = filename + self.formatter_cls.ext
         self.base_file_name = filename
 
-        if subdivide_interval:
-            warnings.warn(
-                "subdivide_interval is deprecated and ignored; files are split "
-                "by size, with max_size_mb.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        # Deprecated: always continuous now.
-        self.subdivide_interval = DatasetWriter.CONTINUOUS
-
-        if not 1 <= max_size_mb <= cd.DATASET_MAX_SIZE_MB:
+        if not 0 <= max_size_mb <= cd.DATASET_MAX_SIZE_MB:
             raise DatasetError(
                 self.name,
-                f"max_size_mb must be from 1 to {cd.DATASET_MAX_SIZE_MB}, "
-                f"not {max_size_mb}.",
+                f"max_size_mb must be from 1 to {cd.DATASET_MAX_SIZE_MB}, or 0 "
+                f"for {cd.DATASET_MAX_SIZE_MB}, not {max_size_mb}.",
             )
-        self.max_size_mb = max_size_mb
+        # 0 asks for the largest file allowed.
+        self.max_size_mb = max_size_mb or cd.DATASET_MAX_SIZE_MB
 
         # Placeholder for type checking purposes
         placeholder = io.BytesIO() if "b" in self.formatter_cls.mode else io.StringIO()
@@ -362,6 +338,19 @@ class DatasetWriter:
         """
         return self._failed
 
+    @staticmethod
+    def _exclusive_mode(mode: str) -> str:
+        """Turn a formatter's file mode into one that refuses an existing file.
+
+        Args:
+            mode: The formatter's mode, such as ``"wt"`` or ``"wb"``.
+
+        Returns:
+            The mode with ``w`` replaced by ``x``, so opening fails with
+            ``FileExistsError`` instead of truncating another dataset's file.
+        """
+        return mode.replace("w", "x")
+
     def _new_formatter(
         self, fd: IO[Any], path: pathlib.Path, part: int
     ) -> DataFormatter:
@@ -395,7 +384,7 @@ class DatasetWriter:
         Returns:
             The open file and a formatter writing to it.
         """
-        mode = _exclusive_mode(self.formatter_cls.mode)
+        mode = self._exclusive_mode(self.formatter_cls.mode)
         try:
             if "b" in mode:
                 fd: IO[Any] = open(path, mode)

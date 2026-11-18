@@ -104,8 +104,8 @@ class TestAddDataset:
 
     @pytest.mark.parametrize(
         ("answers", "expected"),
-        [([""], 500), (["20"], 20), (["0", "20"], 20), (["501", "x", "20"], 20)],
-        ids=["default", "given", "zero", "too_large_then_text"],
+        [([""], 1000), (["20"], 20), (["0"], 0), (["1001", "-1", "x", "20"], 20)],
+        ids=["default", "given", "zero_for_the_largest", "out_of_range_then_text"],
     )
     def test_max_size_mb_is_asked_until_in_range(
         self,

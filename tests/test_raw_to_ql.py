@@ -59,7 +59,6 @@ def write_raw(
         str(folder),
         name,
         "raw",
-        0,
         [cd.ALL_MESSAGE_TYPES],
         clock=FakeClock(),
         definitions=DEFS,

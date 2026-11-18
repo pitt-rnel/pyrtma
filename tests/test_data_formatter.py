@@ -52,8 +52,8 @@ class Lines(DataFormatter):
         return f"{msg.data.id}\n"
 
 
-def test_default_limit_is_500_mb() -> None:
-    assert DataFormatter.max_bytes == 500_000_000
+def test_default_limit_is_1_gb() -> None:
+    assert DataFormatter.max_bytes == 1_000_000_000
 
 
 def test_write_leaves_room_for_the_footer(

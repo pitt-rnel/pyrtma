@@ -98,8 +98,8 @@ class TestSizeLimit:
 
         assert (tmp_path / "rec.bin").read_bytes() == v1_file(messages)
 
-    def test_default_limit_is_500_mb(self) -> None:
-        assert QLFormatter.max_bytes == 500_000_000
+    def test_default_limit_is_1_gb(self) -> None:
+        assert QLFormatter.max_bytes == 1_000_000_000
 
 
 class TestSpill:

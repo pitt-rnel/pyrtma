@@ -93,7 +93,10 @@ def _ask_msg_types() -> list[int]:
 
 
 def _ask_max_size_mb() -> int:
-    """Ask for the file size limit until it is in range."""
+    """Ask for the file size limit, in MB, until it is in range.
+
+    0 is accepted: it asks the data logger for ``DATASET_MAX_SIZE_MB``.
+    """
     while True:
         raw = Prompt.ask(
             "[bold](dataset)->[blue]max_size_mb",
@@ -102,10 +105,13 @@ def _ask_max_size_mb() -> int:
         try:
             size = int(raw)
         except ValueError:
-            size = 0
-        if 1 <= size <= cd.DATASET_MAX_SIZE_MB:
+            size = -1
+        if 0 <= size <= cd.DATASET_MAX_SIZE_MB:
             return size
-        rich.print(f"[red]max_size_mb must be from 1 to {cd.DATASET_MAX_SIZE_MB}.")
+        rich.print(
+            f"[red]max_size_mb must be from 1 to {cd.DATASET_MAX_SIZE_MB}, "
+            f"or 0 for {cd.DATASET_MAX_SIZE_MB}."
+        )
 
 
 def add_dataset(client: pyrtma.Client | None = None) -> Dataset:

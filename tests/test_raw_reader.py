@@ -64,7 +64,6 @@ def write(
         str(tmp_path),
         "rec",
         "raw",
-        0,
         [cd.ALL_MESSAGE_TYPES],
         max_size_mb=max_size_mb,
         clock=FakeClock(),

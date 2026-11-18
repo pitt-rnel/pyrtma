@@ -121,7 +121,6 @@ class TestFileHeader:
             str(tmp_path),
             "rec",
             "raw",
-            0,
             [cd.ALL_MESSAGE_TYPES],
             clock=FakeClock(),
             definitions=cd.get_message_definitions(),

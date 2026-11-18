@@ -440,9 +440,9 @@ class TestRequests:
         assert config.data.num_datasets == 0
 
     @pytest.mark.parametrize(
-        ("requested", "used", "warned"),
-        [(20, 20, False), (0, 500, True), (-5, 500, True), (900, 500, True)],
-        ids=["in_range", "zero", "negative", "too_large"],
+        ("requested", "used"),
+        [(20, 20), (0, cd.DATASET_MAX_SIZE_MB)],
+        ids=["in_range", "zero_for_the_largest"],
     )
     def test_max_size_mb_from_the_request(
         self,
@@ -451,7 +451,6 @@ class TestRequests:
         caplog: pytest.LogCaptureFixture,
         requested: int,
         used: int,
-        warned: bool,
     ) -> None:
         caplog.set_level(logging.WARNING)
 
@@ -461,7 +460,19 @@ class TestRequests:
         config = wait_reply(controller, cd.MT_DATA_LOGGER_CONFIG)[-1]
 
         assert config.data.datasets[0].max_size_mb == used
-        assert ("max_size_mb" in caplog.text) == warned
+        assert "max_size_mb" not in caplog.text
+
+    @pytest.mark.parametrize("requested", [-5, cd.DATASET_MAX_SIZE_MB + 1])
+    def test_max_size_mb_outside_its_range_is_refused(
+        self, controller: Client, tmp_path: Path, requested: int
+    ) -> None:
+        controller.send_message(
+            add_request("ds", tmp_path / "ds", max_size_mb=requested)
+        )
+        error = wait_reply(controller, cd.MT_DATA_LOGGER_ERROR, "ds")[-1]
+
+        assert "max_size_mb" in error.data.msg
+        assert not (tmp_path / "ds").exists()
 
     def test_full_logger_refuses_before_creating_folders(
         self, controller: Client, tmp_path: Path

@@ -32,6 +32,10 @@ def _size_on_disk(chunk: str | bytes) -> int:
     return size + chunk.count("\n") * (len(os.linesep) - 1)
 
 
+#: Bytes in one MB, as ``max_size_mb`` and ``DATASET_MAX_SIZE_MB`` count them.
+BYTES_PER_MB: int = 1_000_000
+
+
 @dataclass(frozen=True)
 class FileContext:
     """What the data logger tells a formatter about the file it writes.
@@ -94,7 +98,7 @@ class DataFormatter(ABC):
     #: least one message, even one larger than this. The class value is a
     #: ceiling; the data logger lowers it per file to the dataset's
     #: ``max_size_mb``.
-    max_bytes: int = cd.DATASET_MAX_SIZE_MB * 1_000_000
+    max_bytes: int = cd.DATASET_MAX_SIZE_MB * BYTES_PER_MB
 
     def __init__(self, fd: IO[Any], **kwargs):
         self.fd = fd

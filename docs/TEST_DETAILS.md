@@ -507,10 +507,11 @@ Each `Dataset` is given a stand-in client that keeps what it would send.
 |---|---|---|
 | `test_default_manager_address_uses_the_core_host_and_port` | Shared constants: a `Dataset`'s default manager address is `core_defs.DEFAULT_HOST` on `DEFAULT_PORT`. | The constructor's `mm_ip` default. |
 | `test_max_size_mb_is_sent_when_added` | `max_size_mb` is sent in `DATASET_ADD`. | `max_size_mb=20`, then `add()`. |
-| `test_default_max_size_is_500_mb` | The default `max_size_mb` is `DATASET_MAX_SIZE_MB`, 500. | A dataset with the defaults. |
-| `test_max_size_mb_outside_its_range_raises` | `max_size_mb` outside 1 to 500 raises `ValueError`, and the half-built dataset cleans up without an error of its own. | Parametrized over 0, -1 and 501. |
-| `test_subdivide_interval_is_deprecated_and_ignored` | A nonzero `subdivide_interval` warns and isn't sent; the default size is. | `subdivide_interval=30`. |
-| `test_positional_subdivide_interval_still_accepted` | `subdivide_interval` is still accepted in its old position, so existing calls run. | Passes it as the fifth positional argument. |
+| `test_default_max_size_is_1_gb` | Data logger: the default `max_size_mb` is `DATASET_MAX_SIZE_MB`, 1000 MB of 1,000,000 bytes. | A dataset with the defaults. |
+| `test_max_size_mb_zero_is_sent_for_the_largest` | Data logger: `max_size_mb=0` is accepted and sent as 0, which asks the data logger for `DATASET_MAX_SIZE_MB`. | A dataset with 0. |
+| `test_subdivide_interval_is_gone` | Data logger: `subdivide_interval` is no longer a parameter, and the half-built `Dataset` such a call leaves is cleaned up without an error of its own. | Passing it by keyword raises `TypeError`; an unraisable exception from `__del__` fails the test. |
+| `test_fifth_argument_is_msg_types` | Data logger: with `subdivide_interval` gone, `msg_types` is the fifth positional argument. | Passes the types fifth. |
+| `test_max_size_mb_outside_its_range_raises` | `max_size_mb` outside 0 to `DATASET_MAX_SIZE_MB` raises `ValueError`, and the half-built dataset cleans up without an error of its own. | Parametrized over -1 and one past the limit. |
 
 ### TestProcessMsg
 
@@ -537,7 +538,7 @@ Messages are passed straight to `process_msg()`, as `poll()` does with what it r
 | `test_bad_message_types_are_asked_again` | Data logger: message types that record nothing or aren't IDs, such as spaces only, `0`, text or a negative number, are reported and asked again, rather than creating a dataset that records nothing or crashing. | Parametrized; the second answer, `1001, 1002`, also shows commas are accepted. |
 | `test_too_many_message_types_are_asked_again` | More message types than the 64 a dataset holds are asked again. | 65 IDs, then one. |
 | `test_bad_name_is_asked_again` | Data logger: a name too long for its field or not ASCII is asked again, rather than raising when the message is built. | Parametrized over 32 characters and `é`. |
-| `test_max_size_mb_is_asked_until_in_range` | `max_size_mb` is asked for, defaults to 500, and is asked again until it is a number from 1 to 500. | Parametrized over the default, a valid value, and invalid values before one. |
+| `test_max_size_mb_is_asked_until_in_range` | `max_size_mb` is asked for, defaults to `DATASET_MAX_SIZE_MB` (1000), accepts 0 for the largest, and is asked again until it is a number from 0 to the limit. | Parametrized over the default, a valid value, 0, and invalid values before one. |
 
 ### TestParseMsgTypes
 
@@ -590,7 +591,8 @@ The `data_logger` fixture runs a `DataLogger` in a thread against the `manager` 
 | `test_start_all_twice_is_harmless` | C5: a second `DATASET_START "all"` skips the dataset that is already recording, without an error, and it keeps recording. | Starts all twice, then a config barrier and a status request. |
 | `test_directed_request_is_answered_to_its_sender` | C6: a request addressed to the logger is answered to its sender only, and a broadcast request is still answered with a broadcast that other modules see. | An observer subscribed to the replies; a directed `DATASET_ADD`, then a broadcast one as a marker, which the observer must receive without the first. |
 | `test_request_addressed_to_another_module_is_ignored` | Data logger requests: a request addressed to another module, which the manager copies to logger modules, isn't acted on. | A `DATASET_ADD` addressed to another client, then a config request, which must list no datasets. |
-| `test_max_size_mb_from_the_request` | A request's `max_size_mb` from 1 to 500 is used as given. One outside that range, such as the 0 or interval that a client built before `max_size_mb` replaced `subdivide_interval` sends, is replaced by 500 with a warning, so that client keeps recording. | Parametrized over 20, 0, -5 and 900; reads the limit back from `DATA_LOGGER_CONFIG`. |
+| `test_max_size_mb_from_the_request` | Data logger: a request's `max_size_mb` from 1 to `DATASET_MAX_SIZE_MB` is used as given, and 0 is `DATASET_MAX_SIZE_MB`, both without a warning; `DATA_LOGGER_CONFIG` reports the size used. | Parametrized over 20 and 0. |
+| `test_max_size_mb_outside_its_range_is_refused` | Data logger: a request with a negative or too large `max_size_mb` is refused with `DATA_LOGGER_ERROR` before any folder is created; it used to be replaced by the largest size with a warning to rebuild old clients. | Parametrized over -5 and one past the limit. |
 | `test_full_logger_refuses_before_creating_folders` | Data logger: with `MAX_DATASETS` datasets configured, another is refused with `DataLoggerFullError` before its save folder is created. | Adds six datasets, then a seventh with a new folder. |
 | `test_duplicate_name_refused_before_creating_folders` | Data logger: a second dataset with a name in use is refused with `DatasetExistsError` before its save folder is created. | Two datasets named `same`, in different folders. |
 | `test_duplicate_file_is_refused_when_added` | Data logger: a dataset that would write to another dataset's file is refused when it is added, with an error naming that dataset. | Two datasets with the same folder, file name and formatter. |
@@ -654,11 +656,11 @@ The stand-in's limit is set, through its class's `max_bytes`, with room for its 
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_full_file_continues_in_a_new_one` | C9: when a file is full, the dataset continues in `rec_0001`, `rec_0002` and so on, each within the limit, with every message in order across them and each file saved. | Three messages in one write, then two at stop. |
-| `test_subdivide_interval_is_ignored` | `subdivide_interval` is deprecated: a nonzero value warns and no longer splits files by time. | An interval of 30 s, ten minutes of recording, one file. |
 | `test_max_size_mb_sets_the_file_limit` | A dataset's `max_size_mb` becomes its formatter's `max_bytes`, in MB of 1,000,000 bytes. | `max_size_mb=20`. |
 | `test_formatter_limit_below_max_size_mb_wins` | A formatter whose own `max_bytes` is lower than the dataset's limit keeps it. | A formatter limit of 1000 bytes and `max_size_mb=20`. |
-| `test_max_size_mb_outside_its_range_is_refused` | `max_size_mb` outside 1 to `DATASET_MAX_SIZE_MB` raises `DatasetError` before anything is created. | Parametrized over 0, -1 and 501. |
-| `test_default_max_size_is_500_mb` | The default `max_size_mb` is `DATASET_MAX_SIZE_MB`, 500. | A writer with the defaults. |
+| `test_max_size_mb_zero_is_the_largest` | Data logger: `max_size_mb=0` sets the writer to `DATASET_MAX_SIZE_MB`, and its formatter's limit to that many MB. | A writer with 0. |
+| `test_max_size_mb_outside_its_range_is_refused` | `max_size_mb` outside 0 to `DATASET_MAX_SIZE_MB` raises `DatasetError` before anything is created. | Parametrized over -1 and one past the limit. |
+| `test_default_max_size_is_1_gb` | Data logger: the default `max_size_mb` is `DATASET_MAX_SIZE_MB`, 1000. | A writer with the defaults. |
 | `test_rolled_over_quicklogger_files_all_read` | C9: QuickLogger files from a rollover are each within the limit and together read back every message, in order. | The real `quicklogger` formatter with room for three messages, and seven messages. |
 | `test_crash_keeps_finished_files_readable` | C9: if the logger dies while recording, the files it finished read completely, and the one it was writing loads nothing with `throw=False` rather than raising. | Reads both files after a rollover, while the second is still open. |
 | `test_formatter_without_a_count_is_not_split` | A formatter written before `write()` returned a count, whose `write()` returns None, still writes everything to one file. | A formatter overriding `write()` the old way, with a small limit. |
@@ -695,7 +697,7 @@ The `syncs` fixture replaces `os.fsync` and the writer's folder sync with record
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_duplicate_formatter_name_error_has_its_message` | Data logger writer: registering a formatter name twice raises `DataFormatterKeyError` with its text in `msg` and no dataset, rather than the text as the dataset name and an empty message. | Registers one class twice into an emptied registry. |
-| `test_default_limit_is_500_mb` | Every formatter's default limit is 500,000,000 bytes. | Reads `DataFormatter.max_bytes`. |
+| `test_default_limit_is_1_gb` | Every formatter's default limit is `DATASET_MAX_SIZE_MB` MB, 1,000,000,000 bytes. | Reads `DataFormatter.max_bytes`. |
 | `test_write_leaves_room_for_the_footer` | `write()` takes only the messages that leave room for the footer within `max_bytes`, and returns how many it took. | A text formatter with a 7-character header and footer, and a limit that fits three one-digit lines. Sizes count each newline as the platform's line ending. |
 | `test_first_message_is_written_even_past_the_limit` | An empty file always takes one message. | A limit of 1 byte. |
 | `test_limit_counts_encoded_bytes` | The limit counts UTF-8 bytes on disk, not characters. | Lines of `é`, two bytes each, and a limit that fits exactly two. |
@@ -810,7 +812,7 @@ Raw files are written by a `DatasetWriter` with the `raw` formatter into `tmp_pa
 | `test_write_stops_before_the_limit` | C9: `write()` takes only the messages that keep the finished file within `max_bytes` and returns how many it took, so the file never passes the limit and stays a valid v1 file. | A limit with room for exactly three messages; five offered, then the other two. |
 | `test_first_message_is_written_even_past_the_limit` | C9: an empty file always takes one message, so a message larger than the limit can't stall a dataset. | A limit of 1 byte. |
 | `test_finalize_writes_every_message_it_is_given` | `finalize()` writes all the messages passed to it, whatever the limit. | A limit of 1 byte and three messages to `finalize()`. |
-| `test_default_limit_is_500_mb` | C9: the QuickLogger formatter's default limit is 500,000,000 bytes. | Reads the class attribute. |
+| `test_default_limit_is_1_gb` | C9: the QuickLogger formatter's default limit is 1,000,000,000 bytes, under 2**31. | Reads the class attribute. |
 
 ### TestSpill
 
