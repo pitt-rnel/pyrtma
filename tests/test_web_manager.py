@@ -373,6 +373,28 @@ class TestWebsocketClose:
         assert handler.sent == []
         assert theirs.recv(1) == bytes([0x88])
 
+    def test_unreachable_manager_gets_an_error_and_a_close(
+        self, pair: tuple[StubHandler, socket.socket]
+    ) -> None:
+        # Nothing listens on a port that was just free.
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        handler, theirs = pair
+        handler.proxy = Client(definitions=td.get_message_definitions())
+        handler.proxy.logger.enable_console = False
+        handler.mm_ip = f"127.0.0.1:{port}"
+        handler.handshake_done = True
+        handler.valid_client = True
+        handler.close_timeout = 0.1
+
+        handler.handle()
+
+        errors = [json.loads(text) for text in handler.sent]
+        assert len(errors) == 1
+        assert "No message manager" in errors[0]["rtma_msg_error"]
+        assert theirs.recv(1) == bytes([0x88])
+
     def test_close_without_reply_stops_waiting(
         self, pair: tuple[StubHandler, socket.socket]
     ) -> None:

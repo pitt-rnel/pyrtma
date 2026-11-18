@@ -482,6 +482,7 @@ The `pair` fixture gives a `StubHandler` reading and writing one end of a socket
 |---|---|---|
 | `test_client_close_gets_a_close_reply` | Web manager: a web client's websocket CLOSE is read whole and answered with CLOSE, and `close_websocket()` then sends nothing more. | A masked CLOSE with status 1000; reads it, runs `close_websocket()`, and checks for one CLOSE back and nothing left unread. |
 | `test_close_after_proxy_disconnect_waits_for_client_close` | Web manager: when the loop ends with the websocket open, `close_websocket()` sends CLOSE, discards the web client's messages, and stops at its CLOSE. | A text frame and a CLOSE, sent before `close_websocket()` runs with the real `process_json_message`; nothing reaches `sent`. |
+| `test_unreachable_manager_gets_an_error_and_a_close` | Web manager: when the proxy can't reach the message manager, the web client gets an `rtma_msg_error` saying so, then a websocket CLOSE, in place of a traceback in the log and a closed connection. | `handle()` with the handshake done and `mm_ip` a port nobody listens on; checks what was sent. |
 | `test_close_without_reply_stops_waiting` | Web manager: `close_websocket()` stops waiting for the web client's CLOSE after `close_timeout`. | A 0.1 s timeout and no reply. |
 
 ### TestConnect

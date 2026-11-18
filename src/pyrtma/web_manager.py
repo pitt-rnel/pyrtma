@@ -101,7 +101,13 @@ class RTMAWebSocketHandler(WebSocketHandler):
             return
 
         # Establish the underlying socket connection with MessageManger Server
-        self.proxy._socket_connect(self.mm_ip)
+        try:
+            self.proxy._socket_connect(self.mm_ip)
+        except ClientError as e:
+            # Tell the web client why, rather than only closing the websocket.
+            self.send_ws_error(e)
+            self.close_websocket()
+            return
 
         log_str = (
             "New Client:\n"
@@ -121,6 +127,19 @@ class RTMAWebSocketHandler(WebSocketHandler):
                 self.read_proxy_message()
 
         self.close_websocket()
+
+    def send_ws_error(self, error: Exception) -> None:
+        """Send the web client an error, as ``{"rtma_msg_error": ...}``, and log it.
+
+        Args:
+            error: The error.
+        """
+        if self.ws_ready_to_send:
+            error_json = json.dumps(
+                {"rtma_msg_error": str(error)}, separators=(",", ":")
+            )
+            self.send_message(error_json)
+        logger.error(error, stack_info=False)
 
     def send_ws_close(self) -> None:
         """Send the web client a websocket CLOSE, once."""
@@ -166,10 +185,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
         try:
             msg = self.proxy.read_message(timeout=0, ack=True)
         except RTMAMessageError as e:
-            error_json = json.dumps({"rtma_msg_error": str(e)}, separators=(",", ":"))
-            if self.ws_ready_to_send:
-                self.send_message(error_json)
-            logger.error(e, stack_info=False)
+            self.send_ws_error(e)
             return
 
         if msg is not None and self.keep_alive:
@@ -343,12 +359,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
                     f"Forwarded message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} from ws"
                 )
         except (RTMAMessageError, ClientError) as e:
-            if self.ws_ready_to_send:
-                error_json = json.dumps(
-                    {"rtma_msg_error": str(e)}, separators=(",", ":")
-                )
-                self.send_message(error_json)
-            logger.error(e, stack_info=False)
+            self.send_ws_error(e)
             return
 
     def _type_name(self, msg_type: int) -> str:
