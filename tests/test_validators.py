@@ -8,6 +8,8 @@ from typing import Any
 
 import pytest
 
+import pyrtma.core_defs as cd
+
 from pyrtma.exceptions import JSONDecodingError
 from pyrtma.header import MessageHeader
 from pyrtma.message import Message
@@ -1067,3 +1069,11 @@ def test_fit_ascii_fits_a_field_by_its_validator() -> None:
 
     assert len(text) == field.len - 1
     field.validate_one(text)
+
+
+def test_array_field_on_the_class_has_its_length() -> None:
+    field = cd.DATASET.msg_types
+
+    assert len(field) == cd.DATASET._msg_types.size // 4  # int32 elements
+    with pytest.raises(AttributeError, match="not bound"):
+        field[0]

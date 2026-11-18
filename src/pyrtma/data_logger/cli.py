@@ -17,8 +17,8 @@ from pyrtma.validators import String
 from pyrtma.data_logger.dataset import Dataset
 from pyrtma.exceptions import MessageManagerNotFound
 
-# The longest dataset message types list, from DATASET.msg_types.
-_MAX_MSG_TYPES = 64
+# The longest dataset message types list: DATASET.msg_types holds that many.
+_MAX_MSG_TYPES: int = len(cd.DATASET.msg_types)
 
 
 def _ask_text(label: str, field: String) -> str:
@@ -54,7 +54,7 @@ def parse_msg_types(raw: str) -> list[int]:
 
     Raises:
         ValueError: Nothing was given, an ID isn't a positive integer, or
-            there are more than the 64 a dataset holds.
+            there are more than a dataset holds (``DATASET.msg_types``).
 
     Returns:
         The message type IDs.

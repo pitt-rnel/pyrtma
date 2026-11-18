@@ -539,6 +539,14 @@ Messages are passed straight to `process_msg()`, as `poll()` does with what it r
 | `test_bad_name_is_asked_again` | Data logger: a name too long for its field or not ASCII is asked again, rather than raising when the message is built. | Parametrized over 32 characters and `é`. |
 | `test_max_size_mb_is_asked_until_in_range` | `max_size_mb` is asked for, defaults to 500, and is asked again until it is a number from 1 to 500. | Parametrized over the default, a valid value, and invalid values before one. |
 
+### TestParseMsgTypes
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_limit_is_the_definitions_array_length` | Shared constants: the CLI's limit on a dataset's message types comes from `DATASET.msg_types`, instead of a copy of the number. | Compares it with the ctypes field's element count. |
+| `test_as_many_types_as_a_dataset_holds_are_accepted` | Shared constants: a list exactly as long as `DATASET.msg_types` holds is accepted. | One to the limit. |
+| `test_more_types_than_a_dataset_holds_are_rejected` | Shared constants: one more is rejected with the limit in the error. | One to the limit plus one. |
+
 ### TestMain
 
 | Test | Purpose | Approach |
@@ -1171,6 +1179,7 @@ Uses the `VALIDATOR_A` and `VALIDATOR_B` messages from the test definitions, whi
 | `test_fit_ascii_result_fits_the_string_field` | Field helpers: whatever the text, the result passes the `String` validator of that size. | Empty, exactly fitting, one too long, and 50 non-ASCII characters, with a marker. |
 | `test_string_field_on_the_class_is_its_validator` | Field helpers: a `String` field read on its class is its validator, whose `len` is the field's size in bytes, while reading it on a message still gives the text. | `MDF_VALIDATOR_A.string` compared with its ctypes field. |
 | `test_fit_ascii_fits_a_field_by_its_validator` | Field helpers: `fit_ascii()` with a field's `len` gives text the field's validator accepts, one character shorter than the field. | Text 10 characters too long, with a marker. |
+| `test_array_field_on_the_class_has_its_length` | Shared constants: an array field read on its class gives its element count with `len()`, as the data logger CLI's limit uses, and indexing it there raises instead of reading anything. | `DATASET.msg_types`, compared with its ctypes field. |
 
 ### TestEncoding
 

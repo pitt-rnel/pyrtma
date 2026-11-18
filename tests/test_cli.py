@@ -7,6 +7,7 @@ answer when there is one.
 
 from __future__ import annotations
 
+import ctypes
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -117,6 +118,24 @@ class TestAddDataset:
 
         assert asked.count("max_size_mb") == len(answers)
         assert client.sent[-1].dataset.max_size_mb == expected
+
+
+class TestParseMsgTypes:
+    def test_limit_is_the_definitions_array_length(self) -> None:
+        elements = cd.DATASET._msg_types.size // ctypes.sizeof(ctypes.c_int32)
+
+        assert cli._MAX_MSG_TYPES == elements
+
+    def test_as_many_types_as_a_dataset_holds_are_accepted(self) -> None:
+        raw = " ".join(str(n) for n in range(1, cli._MAX_MSG_TYPES + 1))
+
+        assert len(cli.parse_msg_types(raw)) == cli._MAX_MSG_TYPES
+
+    def test_more_types_than_a_dataset_holds_are_rejected(self) -> None:
+        raw = " ".join(str(n) for n in range(1, cli._MAX_MSG_TYPES + 2))
+
+        with pytest.raises(ValueError, match=f"at most {cli._MAX_MSG_TYPES} "):
+            cli.parse_msg_types(raw)
 
 
 @pytest.mark.integration
