@@ -29,7 +29,6 @@ from pyrtma.validators import (
     ByteArray,
 )
 
-
 COMPILED_PYRTMA_VERSION: str = "4.0.0"
 check_compiled_version(COMPILED_PYRTMA_VERSION)
 
