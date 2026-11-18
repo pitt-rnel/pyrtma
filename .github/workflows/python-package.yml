@@ -41,7 +41,7 @@ jobs:
         run: pyright
       - name: Test compiler
         run: |
-          python -m pyrtma.compile -i tests/test_msg_defs/test_defs.yaml --py -o tests/test_msg_defs -n test_defs
+          python -m pyrtma.compile -i tests/test_msg_defs/test_defs.defs --py -o tests/test_msg_defs -n test_defs
       # The toolchain tests in tests/test_compilers.py check more, but skip
       # when gcc or node is missing; these steps can't skip.
       - name: Check generated C and JavaScript
@@ -52,7 +52,7 @@ jobs:
           out=build/compiled
           mkdir -p "$out"
           python -m pyrtma.compile -i tests/compiler_defs/core_c.defs --c -o "$out" -n core
-          for defs in tests/test_msg_defs/test_defs.yaml tests/compiler_defs/compiler_defs.defs; do
+          for defs in tests/test_msg_defs/test_defs.defs tests/compiler_defs/compiler_defs.defs; do
             name=$(basename "${defs%.*}")
             python -m pyrtma.compile -i "$defs" --c --js -o "$out" -n "$name"
             # core.h stands in for rtma.h, which C clients include first.
