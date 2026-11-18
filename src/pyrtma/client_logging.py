@@ -7,7 +7,6 @@ import pathlib
 import weakref
 
 from .message import MessageData
-from .message_base import field_size
 from .validators import fit_ascii
 from abc import ABC, abstractmethod
 from .exceptions import ClientError, LoggingConfigurationError
@@ -89,12 +88,7 @@ def _field_sizes_of(cls: type[RTMA_LOG_MSG]) -> tuple[int, int, int, int]:
         The sizes of its ``name``, ``pathname``, ``funcname`` and ``message``
         fields.
     """
-    sizes = (
-        field_size(cls, "name"),
-        field_size(cls, "pathname"),
-        field_size(cls, "funcname"),
-        field_size(cls, "message"),
-    )
+    sizes = (cls.name.len, cls.pathname.len, cls.funcname.len, cls.message.len)
     _log_field_sizes[cls] = sizes
     return sizes
 

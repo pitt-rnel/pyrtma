@@ -910,9 +910,6 @@ Headers built field by field are the reference: random values span each field's 
 | `test_plain_char_fields_read_as_bytes` | P1: a `char` array declared directly in `_fields_` reads as `bytes`, as in ctypes, now that the v1 conversion to `str` is gone. | A message class with an 8-byte `c_char` array in `_fields_`. |
 | `test_plain_char_fields_take_only_bytes` | P1: such a field takes only `bytes`; a `str` raises `TypeError`, as in ctypes, instead of being encoded. | The same class, assigned a `str`. |
 | `test_string_fields_still_read_as_str` | P1: a `String` field, as compiled definitions have, still reads and takes `str`, and stores its bytes null-terminated. | A message class with `String(8)`. |
-| `test_field_size_of_a_string_counts_its_terminator` | Field helpers: `field_size()` gives a `char` field's size including its null terminator, from the class or an instance. | A `String(8)` field. |
-| `test_field_size_of_each_kind_of_field` | Field helpers: `field_size()` gives the size of numeric, struct and array fields as well. | Parametrized over header fields, `FAILED_MESSAGE.msg_header`, `DATASET.msg_types` and `RTMA_LOG.message`. |
-| `test_field_size_rejects_what_is_not_a_field` | Field helpers: an unknown name, a field declared directly in `_fields_` without a validator, and a class attribute that isn't a field each raise `KeyError` naming it. | `Named.nope`, `PlainChars.name` and `MessageHeader.LAYOUT`. |
 | `test_subscription_message_is_built_from_its_type` | Header access: each subscription control message has `msg_type` as its only field, so the client can build it with the type as the only argument, which ctypes stores without the validator. | Parametrized over the four control messages. |
 
 ## test_message_definitions.py — loading compiled definitions (needs: none)
@@ -1172,6 +1169,8 @@ Uses the `VALIDATOR_A` and `VALIDATOR_B` messages from the test definitions, whi
 | `test_fit_ascii_cuts_the_end_and_marks_it` | Field helpers: text that is too long is cut to the field's size less one, with the marker, if any, at the end. | Ten characters into 8 bytes, without and with a marker. |
 | `test_fit_ascii_can_keep_the_end_instead` | Field helpers: with `keep_end`, the end is kept and the marker goes in front, as for a path. | A path into 12 bytes with `...`. |
 | `test_fit_ascii_result_fits_the_string_field` | Field helpers: whatever the text, the result passes the `String` validator of that size. | Empty, exactly fitting, one too long, and 50 non-ASCII characters, with a marker. |
+| `test_string_field_on_the_class_is_its_validator` | Field helpers: a `String` field read on its class is its validator, whose `len` is the field's size in bytes, while reading it on a message still gives the text. | `MDF_VALIDATOR_A.string` compared with its ctypes field. |
+| `test_fit_ascii_fits_a_field_by_its_validator` | Field helpers: `fit_ascii()` with a field's `len` gives text the field's validator accepts, one character shorter than the field. | Text 10 characters too long, with a marker. |
 
 ### TestEncoding
 

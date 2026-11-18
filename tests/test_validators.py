@@ -1,6 +1,7 @@
 # These tests assign values of the wrong type on purpose, to check they're rejected.
 # pyright: reportAttributeAccessIssue=false
 import copy
+import ctypes
 import sys
 import unittest
 from typing import Any
@@ -1047,3 +1048,22 @@ def test_fit_ascii_result_fits_the_string_field(text: str) -> None:
     field = String(8)
 
     field.validate_one(fit_ascii(text, 8, marker="[T]"))
+
+
+def test_string_field_on_the_class_is_its_validator() -> None:
+    field = MDF_VALIDATOR_A.string
+    msg = MDF_VALIDATOR_A()
+    msg.string = "abc"
+
+    assert isinstance(field, String)
+    assert field.len == MDF_VALIDATOR_A._string.size  # the ctypes field's bytes
+    assert msg.string == "abc"
+
+
+def test_fit_ascii_fits_a_field_by_its_validator() -> None:
+    field = MDF_VALIDATOR_A.string
+
+    text = fit_ascii("x" * (field.len + 10), field.len, marker="..")
+
+    assert len(text) == field.len - 1
+    field.validate_one(text)

@@ -12,7 +12,6 @@ import pyrtma
 
 import pyrtma.core_defs as cd
 from ..client_logging import TRUNCATED_MARKER
-from ..message_base import field_size
 from ..validators import fit_ascii
 from .data_formatter import DataFormatter, FileContext, Recordable, get_formatter
 from collections.abc import Callable
@@ -29,10 +28,11 @@ from .exceptions import (
     DataLoggerError,
 )
 
-# The sizes of DATA_LOGGER_ERROR's text fields.
-_ERROR_DATASET_SIZE: int = field_size(cd.MDF_DATA_LOGGER_ERROR, "dataset_name")
-_ERROR_TYPE_SIZE: int = field_size(cd.MDF_DATA_LOGGER_ERROR, "exc_type")
-_ERROR_TEXT_SIZE: int = field_size(cd.MDF_DATA_LOGGER_ERROR, "msg")
+# The sizes of DATA_LOGGER_ERROR's text fields, looked up once: error
+# messages are built while a dataset fails.
+_ERROR_DATASET_SIZE: int = cd.MDF_DATA_LOGGER_ERROR.dataset_name.len
+_ERROR_TYPE_SIZE: int = cd.MDF_DATA_LOGGER_ERROR.exc_type.len
+_ERROR_TEXT_SIZE: int = cd.MDF_DATA_LOGGER_ERROR.msg.len
 
 
 def error_message(dataset: str, exc_type: str, text: str) -> cd.MDF_DATA_LOGGER_ERROR:

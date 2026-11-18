@@ -53,32 +53,6 @@ def _cfield(cls: type, name: str) -> Any:
     return field
 
 
-def field_size(msg: "MessageBase | type[MessageBase]", name: str) -> int:
-    """Return the size in bytes of a message or struct field.
-
-    For a ``char`` array that includes the null terminator, so a string
-    stored in it can be one character shorter. Use :func:`fit_ascii
-    <pyrtma.validators.fit_ascii>` to make text fit.
-
-    Args:
-        msg: The message or struct, or its class.
-        name: The field's name, as declared with a validator.
-
-    Raises:
-        KeyError: There is no such field.
-
-    Returns:
-        The field's size.
-    """
-    cls = msg if isinstance(msg, type) else type(msg)
-    # _cfield() and _ctypes_name(), inline: the two calls cost about as much
-    # again as the lookup itself.
-    field: Any = getattr(cls, "_" + name, None)
-    if type(field) is not _CField:
-        raise KeyError(f"{name} is not a field of {cls.__name__}")
-    return field.size
-
-
 # MessageBase Metaclass - (for runtime ctypes field generation)
 CStructType: type = type(
     ctypes.Structure

@@ -13,7 +13,7 @@ import pyrtma.core_defs as cd
 from rich.prompt import Prompt
 from rich.markup import escape
 
-from pyrtma.message_base import field_size
+from pyrtma.validators import String
 from pyrtma.data_logger.dataset import Dataset
 from pyrtma.exceptions import MessageManagerNotFound
 
@@ -21,17 +21,18 @@ from pyrtma.exceptions import MessageManagerNotFound
 _MAX_MSG_TYPES = 64
 
 
-def _ask_text(label: str, field: str) -> str:
+def _ask_text(label: str, field: String) -> str:
     """Ask for a dataset text field until the answer fits it.
 
     Args:
         label: The prompt.
-        field: The ``DATASET`` field it fills, for its size.
+        field: The ``DATASET`` field it fills, such as ``cd.DATASET.name``,
+            for its size.
 
     Returns:
         A non-empty ASCII answer short enough for the field.
     """
-    longest = field_size(cd.DATASET, field) - 1
+    longest = field.len - 1
     while True:
         value = Prompt.ask(f"[bold](dataset)->[blue]{label}")
         if not value:
@@ -121,10 +122,10 @@ def add_dataset(client: pyrtma.Client | None = None) -> Dataset:
         The dataset.
     """
     Prompt.prompt_suffix = ": "
-    name = _ask_text("name", "name")
-    save_path = _ask_text("save_path", "save_path")
-    filename = _ask_text("filename", "filename")
-    formatter = _ask_text("formatter", "formatter")
+    name = _ask_text("name", cd.DATASET.name)
+    save_path = _ask_text("save_path", cd.DATASET.save_path)
+    filename = _ask_text("filename", cd.DATASET.filename)
+    formatter = _ask_text("formatter", cd.DATASET.formatter)
     msg_types = _ask_msg_types()
     max_size_mb = _ask_max_size_mb()
 

@@ -478,7 +478,8 @@ def fit_ascii(text: str, size: int, *, marker: str = "", keep_end: bool = False)
 
     Characters that aren't ASCII become "?", one for one. Text that is still
     too long is cut to ``size - 1`` characters, leaving room for the null
-    terminator. :func:`pyrtma.message_base.field_size` gives a field's size.
+    terminator. A ``char`` field's size is its validator's ``len``, as in
+    ``MDF_DATA_LOGGER_ERROR.msg.len``.
 
     Args:
         text: The text to store.
@@ -511,7 +512,17 @@ class String(FieldValidator[_P, str], Generic[_P]):
         self.len = len
         self._ctype = ctypes.c_char * len
 
-    def __get__(self, obj: _P, objtype=None) -> str:
+    @overload
+    def __get__(self, obj: None, objtype: Any = None) -> "String[_P]": ...
+
+    @overload
+    def __get__(self, obj: _P, objtype: Any = None) -> str: ...
+
+    def __get__(self, obj: _P | None, objtype: Any = None) -> "String[_P] | str":
+        # Read on the class, as in MDF_DATA_LOGGER_ERROR.msg, a field is its
+        # validator, so its len gives the field's size.
+        if obj is None:
+            return self
         return getattr(obj, self._private_name).decode("ascii")
 
     def __set__(self, obj: _P, value: str):
