@@ -4,17 +4,21 @@
 constants:
   MAX_DATASETS: 6
   DATASET_NAME_LEN: 32
+  DATASET_SAVE_PATH_LEN: 256  # DATASET save_path, with its null terminator
+  DATASET_FILENAME_LEN: 128  # DATASET filename, with its null terminator
+  DATASET_FORMATTER_LEN: 32  # DATASET formatter, with its null terminator
+  DATASET_MAX_MSG_TYPES: 64  # Message types one DATASET can list
   DATASET_MAX_SIZE_MB: 1000  # Largest allowed DATASET max_size_mb: 1 GB, in MB of 1,000,000 bytes
 
 struct_defs:
   DATASET:
     fields:
         name: char[DATASET_NAME_LEN]
-        save_path: char[256]      # Dataset save directory 
-        filename: char[128]       # Dataset saved file name without the file extension
-        formatter: char[32]       # Builtin Options: quicklogger, json, raw, msg_header
+        save_path: char[DATASET_SAVE_PATH_LEN]      # Dataset save directory
+        filename: char[DATASET_FILENAME_LEN]       # Dataset saved file name without the file extension
+        formatter: char[DATASET_FORMATTER_LEN]       # Builtin Options: quicklogger, json, raw, msg_header
         max_size_mb: int32        # Largest file in MB (1 to DATASET_MAX_SIZE_MB, or 0 for DATASET_MAX_SIZE_MB); a full file continues in a new one
-        msg_types: int32[64]      # Message type ids that should be passed to dataset formatter
+        msg_types: int32[DATASET_MAX_MSG_TYPES]      # Message type ids that should be passed to dataset formatter
 
 message_defs:
   DATASET_STATUS_REQUEST:
@@ -59,7 +63,7 @@ message_defs:
     id: 69
     fields:
         num_datasets: int32
-        datasets: DATASET[6]
+        datasets: DATASET[MAX_DATASETS]
 
   DATASET_STARTED:
     id: 70

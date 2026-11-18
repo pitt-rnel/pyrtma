@@ -7,6 +7,9 @@ target's generated code follows these, so a change to them would break
 existing clients and recordings. Fix the change; never edit the snapshot to
 make it pass. The type hashes are the one exception: Phase 9 changed them, with
 the user's approval, to cover each definition as written and as resolved (H9).
+Later, with the user's approval, naming the DATASET struct's lengths and
+DATA_LOGGER_CONFIG's dataset count changed the hashes of DATASET, DATASET_ADD
+and DATA_LOGGER_CONFIG, and nothing else.
 """
 
 from __future__ import annotations

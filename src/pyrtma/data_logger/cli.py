@@ -17,8 +17,8 @@ from pyrtma.validators import String
 from pyrtma.data_logger.dataset import Dataset
 from pyrtma.exceptions import MessageManagerNotFound
 
-# The longest dataset message types list: DATASET.msg_types holds that many.
-_MAX_MSG_TYPES: int = len(cd.DATASET.msg_types)
+# The longest dataset message types list.
+_MAX_MSG_TYPES: int = cd.DATASET_MAX_MSG_TYPES
 
 
 def _ask_text(label: str, field: String) -> str:

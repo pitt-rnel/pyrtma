@@ -511,6 +511,7 @@ Each `Dataset` is given a stand-in client that keeps what it would send.
 | `test_max_size_mb_zero_is_sent_for_the_largest` | Data logger: `max_size_mb=0` is accepted and sent as 0, which asks the data logger for `DATASET_MAX_SIZE_MB`. | A dataset with 0. |
 | `test_subdivide_interval_is_gone` | Data logger: `subdivide_interval` is no longer a parameter, and the half-built `Dataset` such a call leaves is cleaned up without an error of its own. | Passing it by keyword raises `TypeError`; an unraisable exception from `__del__` fails the test. |
 | `test_fifth_argument_is_msg_types` | Data logger: with `subdivide_interval` gone, `msg_types` is the fifth positional argument. | Passes the types fifth. |
+| `test_dataset_fields_are_sized_by_their_constants` | Data logger: every `DATASET` length, and `DATA_LOGGER_CONFIG`'s dataset count, comes from a named constant written in the definition, so the type hashes cover the names. | Compares each field with its constant, and checks the definitions' text. |
 | `test_max_size_mb_outside_its_range_raises` | `max_size_mb` outside 0 to `DATASET_MAX_SIZE_MB` raises `ValueError`, and the half-built dataset cleans up without an error of its own. | Parametrized over -1 and one past the limit. |
 
 ### TestProcessMsg
@@ -812,7 +813,7 @@ Raw files are written by a `DatasetWriter` with the `raw` formatter into `tmp_pa
 | `test_write_stops_before_the_limit` | C9: `write()` takes only the messages that keep the finished file within `max_bytes` and returns how many it took, so the file never passes the limit and stays a valid v1 file. | A limit with room for exactly three messages; five offered, then the other two. |
 | `test_first_message_is_written_even_past_the_limit` | C9: an empty file always takes one message, so a message larger than the limit can't stall a dataset. | A limit of 1 byte. |
 | `test_finalize_writes_every_message_it_is_given` | `finalize()` writes all the messages passed to it, whatever the limit. | A limit of 1 byte and three messages to `finalize()`. |
-| `test_default_limit_is_1_gb` | C9: the QuickLogger formatter's default limit is 1,000,000,000 bytes, under 2**31. | Reads the class attribute. |
+| `test_default_limit_is_1_gb` | C9: the QuickLogger formatter's default limit is 1,000,000,000 bytes, within the 4 GiB its 32-bit sizes allow. | Reads the class attribute. |
 
 ### TestSpill
 

@@ -151,3 +151,23 @@ class TestProcessMsg:
         dataset.process_msg(logger_message(status))
 
         assert dataset.is_recording
+
+
+def test_dataset_fields_are_sized_by_their_constants() -> None:
+    dataset = cd.DATASET
+
+    assert dataset.name.len == cd.DATASET_NAME_LEN
+    assert dataset.save_path.len == cd.DATASET_SAVE_PATH_LEN
+    assert dataset.filename.len == cd.DATASET_FILENAME_LEN
+    assert dataset.formatter.len == cd.DATASET_FORMATTER_LEN
+    assert len(dataset.msg_types) == cd.DATASET_MAX_MSG_TYPES
+    assert len(cd.MDF_DATA_LOGGER_CONFIG.datasets) == cd.MAX_DATASETS
+    # Named in the definition, so the type hashes cover the names.
+    for written in (
+        "save_path: char[DATASET_SAVE_PATH_LEN]",
+        "filename: char[DATASET_FILENAME_LEN]",
+        "formatter: char[DATASET_FORMATTER_LEN]",
+        "msg_types: int32[DATASET_MAX_MSG_TYPES]",
+    ):
+        assert written.split("]")[0] in dataset.type_def
+    assert "DATASET[MAX_DATASETS" in cd.MDF_DATA_LOGGER_CONFIG.type_def

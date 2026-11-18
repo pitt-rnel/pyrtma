@@ -52,6 +52,10 @@ MAX_DATA_BYTES: int = 1048576
 DEFAULT_PORT: int = 7111
 MAX_DATASETS: int = 6
 DATASET_NAME_LEN: int = 32
+DATASET_SAVE_PATH_LEN: int = 256
+DATASET_FILENAME_LEN: int = 128
+DATASET_FORMATTER_LEN: int = 32
+DATASET_MAX_MSG_TYPES: int = 64
 DATASET_MAX_SIZE_MB: int = 1000
 MAX_LOGGER_FILENAME_LENGTH: int = 256
 STR_SIZE: int = 32
@@ -178,11 +182,11 @@ class RTMA_MSG_HEADER(MessageBase, metaclass=MessageMeta):
 
 class DATASET(MessageBase, metaclass=MessageMeta):
     type_name: ClassVar[str] = "DATASET"
-    type_hash: ClassVar[int] = 0xFCA6EB91
+    type_hash: ClassVar[int] = 0xC91B90B6
     type_size: ClassVar[int] = 708
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "DATASET:\n  fields:\n    name: char[DATASET_NAME_LEN=32]\n    save_path: char[256]\n    filename: char[128]\n    formatter: char[32]\n    max_size_mb: int32\n    msg_types: int32[64]"
+        "DATASET:\n  fields:\n    name: char[DATASET_NAME_LEN=32]\n    save_path: char[DATASET_SAVE_PATH_LEN=256]\n    filename: char[DATASET_FILENAME_LEN=128]\n    formatter: char[DATASET_FORMATTER_LEN=32]\n    max_size_mb: int32\n    msg_types: int32[DATASET_MAX_MSG_TYPES=64]"
     )
 
     name: String = String(32)
@@ -611,11 +615,11 @@ class MDF_DATASET_STATUS(MessageData, metaclass=MessageMeta):
 class MDF_DATASET_ADD(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 64
     type_name: ClassVar[str] = "DATASET_ADD"
-    type_hash: ClassVar[int] = 0xA90BCEE9
+    type_hash: ClassVar[int] = 0x03268C94
     type_size: ClassVar[int] = 708
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "DATASET_ADD:\n  id: 64\n  fields:\n    dataset: DATASET hash=fca6eb91"
+        "DATASET_ADD:\n  id: 64\n  fields:\n    dataset: DATASET hash=c91b90b6"
     )
 
     dataset: Struct[DATASET] = Struct(DATASET)
@@ -672,11 +676,11 @@ class MDF_DATA_LOGGER_CONFIG_REQUEST(MessageData, metaclass=MessageMeta):
 class MDF_DATA_LOGGER_CONFIG(MessageData, metaclass=MessageMeta):
     type_id: ClassVar[int] = 69
     type_name: ClassVar[str] = "DATA_LOGGER_CONFIG"
-    type_hash: ClassVar[int] = 0xEAE8779D
+    type_hash: ClassVar[int] = 0xAA9749F7
     type_size: ClassVar[int] = 4252
     type_source: ClassVar[str] = "data_logger"
     type_def: ClassVar[str] = (
-        "DATA_LOGGER_CONFIG:\n  id: 69\n  fields:\n    num_datasets: int32\n    datasets: DATASET[6] hash=fca6eb91"
+        "DATA_LOGGER_CONFIG:\n  id: 69\n  fields:\n    num_datasets: int32\n    datasets: DATASET[MAX_DATASETS=6] hash=c91b90b6"
     )
 
     num_datasets: Int32 = Int32()

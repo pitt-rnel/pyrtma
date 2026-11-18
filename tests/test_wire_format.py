@@ -9,6 +9,9 @@ existing recordings. Fix the change; never edit the snapshot to make it pass.
 The type hashes are the one deliberate exception. Phase 9 changed them, with
 the user's approval, so that each covers its definition as written and as resolved:
 aliases, constants, nested structs and padding (H9). Only the snapshot's hash values changed.
+Later, with the user's approval, the lengths of the DATASET struct and of
+DATA_LOGGER_CONFIG's dataset array were given names, which changed the
+hashes of DATASET, DATASET_ADD and DATA_LOGGER_CONFIG, and nothing else.
 
 Layouts name field types by kind and size, such as ``int64``, rather than by
 ctypes class, because ctypes aliases differ between platforms: ``c_int64`` is
