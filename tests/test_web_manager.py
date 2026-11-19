@@ -11,6 +11,7 @@ import logging
 import os
 import shutil
 import socket
+import ssl
 import subprocess
 import sys
 import threading
@@ -20,7 +21,7 @@ from pathlib import Path
 from typing import Any, Iterator, cast
 
 import pytest
-from websockets.exceptions import ConnectionClosed, ConnectionClosedOK
+from websockets.exceptions import ConnectionClosed, ConnectionClosedOK, InvalidMessage
 from websockets.sync.client import ClientConnection
 from websockets.sync.client import connect as ws_connect
 from websockets.sync.connection import Connection
@@ -738,3 +739,213 @@ class TestServer:
 
         assert not thread.is_alive()
         assert closed.rcvd is not None and closed.rcvd.code == 1001
+
+
+#: openssl's configuration for the test certificate. openssl is given a file
+#: of the test's own, since some builds look for theirs where none is
+#: installed: conda's on Windows, for one, looks in
+#: C:\Program Files\Common Files\ssl.
+CERT_CONFIG = """\
+[req]
+distinguished_name = req_dn
+x509_extensions = v3
+prompt = no
+
+[req_dn]
+CN = localhost
+
+[v3]
+basicConstraints = critical, CA:TRUE
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always, issuer
+subjectAltName = DNS:localhost, IP:127.0.0.1
+"""
+
+
+@pytest.fixture(scope="module")
+def tls_files(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    """A throwaway self-signed certificate for 127.0.0.1 and localhost.
+
+    It is made with OpenSSL for each run, so that no private key is kept in
+    the repository; tests that need it are skipped without OpenSSL, with
+    openssl's error when it fails.
+
+    Returns:
+        The certificate's path and its private key's path.
+    """
+    openssl = shutil.which("openssl")
+    if openssl is None:
+        pytest.skip("openssl is not on PATH")
+    folder = tmp_path_factory.mktemp("tls")
+    config, cert, key = folder / "openssl.cnf", folder / "cert.pem", folder / "key.pem"
+    config.write_text(CERT_CONFIG)
+    made = subprocess.run(
+        [openssl, "req", "-x509", "-config", str(config), "-newkey", "ec"]
+        + ["-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes", "-days", "1"]
+        + ["-keyout", str(key), "-out", str(cert)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if made.returncode != 0:
+        pytest.skip(f"openssl couldn't make a test certificate: {made.stderr}")
+    return cert, key
+
+
+def test_cert_and_key_options() -> None:
+    args = wm.parse_args(["-d", "defs.py", "--cert", "c.pem", "--key", "k.pem"])
+
+    assert (args.cert, args.key) == ("c.pem", "k.pem")
+    assert wm.parse_args(["-d", "defs.py"]).cert is None
+
+
+def test_key_option_needs_cert(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as raised:
+        wm.parse_args(["-d", "defs.py", "--key", "k.pem"])
+
+    assert raised.value.code == 2
+    assert "--key needs --cert" in capsys.readouterr().err
+
+
+def test_key_without_cert_raises() -> None:
+    with pytest.raises(ValueError, match="needs a certificate"):
+        wm.WebMessageManager(host=LOOPBACK, key="k.pem")
+
+
+def test_missing_cert_raises(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.pem"
+
+    with pytest.raises(ValueError, match="Can't load the TLS certificate"):
+        wm.WebMessageManager(host=LOOPBACK, cert=str(missing))
+
+
+@pytest.mark.integration
+class TestTLS:
+    """The web manager serving wss://, with the certificate from
+    ``tls_files`` and the ``manager`` fixture behind it."""
+
+    @staticmethod
+    def start(
+        manager: ManagerHarness, cert: Path, key: Path | None
+    ) -> tuple[wm.WebMessageManager, threading.Thread]:
+        server = wm.WebMessageManager(
+            host=LOOPBACK,
+            port=0,
+            mm_ip=manager.address,
+            cert=str(cert),
+            key=None if key is None else str(key),
+            definitions=td.get_message_definitions(),
+        )
+        thread = threading.Thread(target=server.run_forever, daemon=True)
+        thread.start()
+        return server, thread
+
+    @staticmethod
+    def trusting(cert: Path) -> ssl.SSLContext:
+        """A client context that trusts the test certificate alone."""
+        return ssl.create_default_context(cafile=str(cert))
+
+    def test_wss_client_connects_and_messages_pass(
+        self,
+        manager: ManagerHarness,
+        tls_files: tuple[Path, Path],
+        client_factory: Callable[..., Client],
+    ) -> None:
+        cert, key = tls_files
+        server, thread = self.start(manager, cert, key)
+        peer = client_factory(name="peer")
+        peer.subscribe([td.MT_TEST_START])
+        try:
+            assert server.secure
+            with ws_connect(
+                f"wss://{LOOPBACK}:{server.port}",
+                ssl=self.trusting(cert),
+                open_timeout=DEFAULT_TIMEOUT,
+            ) as ws:
+                ws.send(connect_v2_message("secure").to_json(minify=True))
+                ack = json.loads(ws.recv(timeout=DEFAULT_TIMEOUT))
+                # Sent together, so they may share a TLS record.
+                for n in range(5):
+                    start = td.MDF_TEST_START()
+                    start.id = n
+                    ws.send(message_json(td.MT_TEST_START, start))
+                seen = read_until(
+                    peer,
+                    lambda m: m.type_id == td.MT_TEST_START and m.data.id == 4,
+                    timeout=0.5,
+                )
+                ws.send("PING")
+                pong = ws.recv(timeout=DEFAULT_TIMEOUT)
+        finally:
+            server.shutdown()
+            thread.join(DEFAULT_TIMEOUT)
+
+        assert ack["header"]["msg_type"] == cd.MT_ACKNOWLEDGE
+        assert seen is not None
+        assert [m.data.id for m in seen if m.type_id == td.MT_TEST_START] == [
+            0,
+            1,
+            2,
+            3,
+            4,
+        ]
+        assert pong == "PONG"
+
+    def test_plain_client_is_refused(
+        self, manager: ManagerHarness, tls_files: tuple[Path, Path]
+    ) -> None:
+        # A ws:// client is never served without TLS, and the server goes
+        # on serving wss:// clients.
+        cert, key = tls_files
+        server, thread = self.start(manager, cert, key)
+        try:
+            with pytest.raises(InvalidMessage):
+                ws_connect(
+                    f"ws://{LOOPBACK}:{server.port}", open_timeout=DEFAULT_TIMEOUT
+                ).close()
+            with ws_connect(
+                f"wss://{LOOPBACK}:{server.port}",
+                ssl=self.trusting(cert),
+                open_timeout=DEFAULT_TIMEOUT,
+            ) as ws:
+                ws.send("PING")
+                pong = ws.recv(timeout=DEFAULT_TIMEOUT)
+        finally:
+            server.shutdown()
+            thread.join(DEFAULT_TIMEOUT)
+
+        assert pong == "PONG"
+
+    def test_key_in_the_cert_file(
+        self,
+        manager: ManagerHarness,
+        tls_files: tuple[Path, Path],
+        tmp_path: Path,
+    ) -> None:
+        cert, key = tls_files
+        combined = tmp_path / "combined.pem"
+        combined.write_text(key.read_text() + cert.read_text())
+        server, thread = self.start(manager, combined, None)
+        try:
+            with ws_connect(
+                f"wss://{LOOPBACK}:{server.port}",
+                ssl=self.trusting(cert),
+                open_timeout=DEFAULT_TIMEOUT,
+            ) as ws:
+                ws.send("PING")
+                pong = ws.recv(timeout=DEFAULT_TIMEOUT)
+        finally:
+            server.shutdown()
+            thread.join(DEFAULT_TIMEOUT)
+
+        assert pong == "PONG"
+
+    def test_key_that_doesnt_match_raises(
+        self, tls_files: tuple[Path, Path], tmp_path: Path
+    ) -> None:
+        cert, _ = tls_files
+        not_a_key = tmp_path / "not_a_key.pem"
+        not_a_key.write_text("not a key\n")
+
+        with pytest.raises(ValueError, match="Can't load the TLS certificate"):
+            wm.WebMessageManager(host=LOOPBACK, cert=str(cert), key=str(not_a_key))

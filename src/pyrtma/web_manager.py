@@ -16,6 +16,7 @@ import logging
 import os
 import select
 import socket
+import ssl
 import sys
 import threading
 import time
@@ -461,6 +462,40 @@ class RTMAWebSocketHandler:
                 logger.debug("Disconnected proxy from MM.")
 
 
+def tls_context(cert: str | None, key: str | None) -> ssl.SSLContext | None:
+    """Make the TLS context for serving wss://, from a certificate and key.
+
+    The context is the standard library's default for a server, which
+    accepts TLS 1.2 or later.
+
+    Args:
+        cert: Path to the certificate chain, in PEM format, which may hold
+            the private key too, or None for no TLS.
+        key: Path to the private key, in PEM format, if it isn't in the
+            cert file.
+
+    Raises:
+        ValueError: key without cert, or a certificate or key that can't be
+            loaded.
+
+    Returns:
+        The context, or None when cert is None.
+    """
+    if cert is None:
+        if key is not None:
+            raise ValueError("A TLS key needs a certificate (cert) to go with it.")
+        return None
+    context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    try:
+        context.load_cert_chain(cert, key)
+    except (OSError, ssl.SSLError) as e:
+        where = cert if key is None else f"{cert} and {key}"
+        raise ValueError(
+            f"Can't load the TLS certificate and key from {where}: {e}"
+        ) from e
+    return context
+
+
 class WebMessageManager:
     """Websocket server that gives each web client a proxy to a message manager."""
 
@@ -484,16 +519,22 @@ class WebMessageManager:
             port (int, optional): Port for WebMessageManager to bind to. Defaults to 0.
             mm_ip (str, optional): Address for RTMA MessageManager. Defaults to ``DEFAULT_HOST`` on ``DEFAULT_PORT``, "localhost:7111".
             loglevel (int, optional): Loging level. Defaults to logging.WARNING.
-            key (optional): Path to SSL key. Not supported yet, and ignored.
-            cert (optional): Path to SSL cert. Not supported yet, and ignored.
+            key (optional): Path to the TLS private key, in PEM format, if it isn't in the cert file. Needs cert.
+            cert (optional): Path to the TLS certificate chain, in PEM format, which may hold the private key too. With it, the server serves wss:// only. Defaults to None, for ws://.
             definitions (MessageDefinitions | None, optional): MessageDefinitions object. Defaults to None.
+
+        Raises:
+            ValueError: key without cert, or a certificate or key that can't
+                be loaded.
+            OSError: The port can't be listened on.
         """
         self.definitions = definitions
         self.mm_ip = mm_ip
 
         logger.setLevel(loglevel)
-        if key is not None or cert is not None:
-            logger.warning("TLS isn't supported yet; key and cert are ignored.")
+        ssl_context = tls_context(cert, key)
+        #: Whether web clients connect with wss://, rather than ws://.
+        self.secure = ssl_context is not None
 
         #: The web clients' websockets, to close at shutdown.
         self.connections: set[ServerConnection] = set()
@@ -503,6 +544,10 @@ class WebMessageManager:
             self._serve_client,
             host,
             port,
+            # A web client whose TLS handshake fails, such as a ws:// client,
+            # is closed. The handshakes must finish within open_timeout, 10 s
+            # by default, so a stalled client doesn't hold its thread.
+            ssl=ssl_context,
             max_size=MAX_JSON_BYTES,
             # rtma-js messages are small and frequent: compressing each one
             # would cost more time than it saves.
@@ -512,14 +557,17 @@ class WebMessageManager:
         self.host = host
         self.port: int = self.server.socket.getsockname()[1]
 
+        scheme = "wss" if self.secure else "ws"
         if self.host not in ("", "0.0.0.0"):
-            logger.info(f"WebMessageManager listening on {self.host}:{self.port}")
+            logger.info(
+                f"WebMessageManager listening on {self.host}:{self.port}, for {scheme}://"
+            )
         else:
             hosts = socket.gethostbyname_ex(socket.gethostname())[-1]
             if "127.0.0.1" not in hosts:
                 hosts.append("127.0.0.1")
             logger.info(
-                f"WebMessageManager listening on all interfaces, port {self.port}"
+                f"WebMessageManager listening on all interfaces, port {self.port}, for {scheme}://"
             )
             logger.info(f"IP addresses: {hosts}")
 
@@ -617,6 +665,22 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--cert",
+        dest="cert",
+        type=str,
+        default=None,
+        help="Path to a TLS certificate chain, in PEM format, to serve wss:// in place of ws://. It may hold the private key too.",
+    )
+
+    parser.add_argument(
+        "--key",
+        dest="key",
+        type=str,
+        default=None,
+        help="Path to the TLS private key, in PEM format, if it isn't in the --cert file.",
+    )
+
+    parser.add_argument(
         "-d",
         "--defs",
         dest="defs_file",
@@ -630,7 +694,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     if len(argv) == 0:
         parser.print_help(sys.stderr)
         sys.exit(1)
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.key is not None and args.cert is None:
+        parser.error("--key needs --cert")
+    return args
 
 
 def run(args: argparse.Namespace) -> None:
@@ -641,6 +708,7 @@ def run(args: argparse.Namespace) -> None:
 
     Raises:
         MessageDefinitionsLoadError: The definitions file can't be loaded.
+        ValueError: The TLS certificate or key can't be loaded.
     """
     defs = load_message_definitions(args.defs_file)
 
@@ -649,6 +717,8 @@ def run(args: argparse.Namespace) -> None:
         port=args.port,
         loglevel=logging.INFO,
         mm_ip=args.mm_ip,
+        key=args.key,
+        cert=args.cert,
         definitions=defs,
     )
 

@@ -457,6 +457,10 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 | `test_defs_option_is_required` | Web manager: leaving out `--defs` is a usage error. | `parse_args()` without it; expects exit status 2 and `--defs` in the message. |
 | `test_definitions_are_loaded_once` | Web manager: `run()` loads the definitions file once, and doesn't import it by name or add its folder to `sys.path`. | A copy of the compiled test definitions in `tmp_path`; `load_message_definitions` is wrapped to count calls, and `run_forever` is replaced so the server closes at once. |
 | `test_failed_message_carries_the_whole_header` | Shared constants: the web manager's `FAILED_MESSAGE` holds a byte-for-byte copy of the failed message's header, with the proxy's module ID and the failure time. | `send_failed_message()` with a stand-in proxy that records what is sent. |
+| `test_cert_and_key_options` | Web manager TLS: `--cert` and `--key` are parsed, and both default to None, for `ws://`. | `parse_args()` with and without them. |
+| `test_key_option_needs_cert` | Web manager TLS: `--key` without `--cert` is a usage error. | `parse_args()` with `--key` alone; expects exit status 2 and the reason. |
+| `test_key_without_cert_raises` | Web manager TLS: a `WebMessageManager` with a key and no certificate raises `ValueError` before it listens. | `key=` alone. |
+| `test_missing_cert_raises` | Web manager TLS: a certificate that can't be loaded raises `ValueError` naming the file, rather than serving without TLS. | A path in `tmp_path` that doesn't exist. |
 
 ### TestProxyRead
 
@@ -498,6 +502,17 @@ The `web_manager` fixture runs a `WebMessageManager` on loopback, in a thread, i
 | `test_text_that_isnt_a_message_gets_an_error` | Web manager: text that isn't JSON, or JSON that isn't a message, gets an error reply, and the websocket stays open. | Parametrized over text that isn't JSON, an empty object and a list; each is followed by a `PING`. |
 | `test_binary_message_is_ignored` | Web manager: a binary websocket message is ignored, as before, and the websocket stays open. | Two bytes, then a `PING`. |
 | `test_shutdown_closes_the_websockets` | Web manager: `shutdown()` stops `run_forever()` and closes each web client's websocket with code 1001, going away. | A web manager of the test's own, shut down with a web client connected. |
+
+### TestTLS
+
+The module's `tls_files` fixture makes a throwaway self-signed certificate for `127.0.0.1` and `localhost` with OpenSSL, so no private key is kept in the repository, giving openssl a configuration file of its own, since some builds, such as conda's on Windows, look for theirs where none is installed; these tests are skipped without OpenSSL, with openssl's error. Each test runs its own `WebMessageManager` with the certificate, in front of the `manager` fixture, and connects with the `websockets` client, trusting that certificate alone.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_wss_client_connects_and_messages_pass` | Web manager TLS: a `wss://` client connects and gets its ACK, messages sent together, which may share a TLS record, all reach a peer at once, and `PING` gets `PONG`. | `CONNECT_V2`, five `TEST_START` messages back to back, which a peer must get in order within 0.5 s, then `PING`. |
+| `test_plain_client_is_refused` | Web manager TLS: a `ws://` client to a server with a certificate fails its opening handshake, rather than being served without TLS, and the server goes on serving `wss://` clients. | A `ws://` connection, which must raise `InvalidMessage`, then a `wss://` one with a `PING`. |
+| `test_key_in_the_cert_file` | Web manager TLS: a certificate file that holds the key too is enough. | The key and certificate written to one file, given as `cert` alone. |
+| `test_key_that_doesnt_match_raises` | Web manager TLS: a key that can't be loaded with the certificate raises `ValueError`. | A key file that isn't a key. |
 
 ## test_dataset.py — the `Dataset` helper, without a manager (needs: none)
 
