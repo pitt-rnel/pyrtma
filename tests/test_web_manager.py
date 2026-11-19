@@ -4,6 +4,7 @@ websocket clients."""
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import inspect
 import json
@@ -22,7 +23,6 @@ from typing import Any, Iterator, cast
 
 import pytest
 from websockets.exceptions import ConnectionClosed, ConnectionClosedOK, InvalidMessage
-from websockets.sync.client import ClientConnection
 from websockets.sync.client import connect as ws_connect
 from websockets.sync.connection import Connection
 
@@ -551,21 +551,29 @@ class TestServer:
             assert not thread.is_alive()
 
     @staticmethod
-    def connect(server: wm.WebMessageManager, name: str = "page") -> ClientConnection:
+    @contextlib.contextmanager
+    def connect(
+        server: wm.WebMessageManager, name: str = "page"
+    ) -> Iterator[Connection]:
         """Connect a web client with CONNECT_V2, and read its ACK.
+
+        websockets 17 deprecates using connect() other than as a context
+        manager, so this is one too.
 
         Args:
             server: The web manager.
             name: The module name.
 
-        Returns:
-            The web client's websocket.
+        Yields:
+            The web client's websocket, closed on leaving the context.
         """
-        ws = ws_connect(f"ws://{LOOPBACK}:{server.port}", open_timeout=DEFAULT_TIMEOUT)
-        ws.send(connect_v2_message(name).to_json(minify=True))
-        ack = json.loads(ws.recv(timeout=DEFAULT_TIMEOUT))
-        assert ack["header"]["msg_type"] == cd.MT_ACKNOWLEDGE
-        return ws
+        with ws_connect(
+            f"ws://{LOOPBACK}:{server.port}", open_timeout=DEFAULT_TIMEOUT
+        ) as ws:
+            ws.send(connect_v2_message(name).to_json(minify=True))
+            ack = json.loads(ws.recv(timeout=DEFAULT_TIMEOUT))
+            assert ack["header"]["msg_type"] == cd.MT_ACKNOWLEDGE
+            yield ws
 
     def test_messages_pass_both_ways(
         self,
@@ -649,14 +657,13 @@ class TestServer:
     ) -> None:
         observer = client_factory(name="observer")
         observer.subscribe([cd.MT_HELLO, cd.MT_GOODBYE])
-        ws = self.connect(web_manager, "leaving")
-        hello = read_until(
-            observer,
-            lambda m: m.type_id == cd.MT_HELLO and m.data.name == "leaving",
-        )
-        assert hello is not None
-
-        ws.close()
+        with self.connect(web_manager, "leaving"):
+            hello = read_until(
+                observer,
+                lambda m: m.type_id == cd.MT_HELLO and m.data.name == "leaving",
+            )
+            assert hello is not None
+        # Leaving the context closed the websocket.
 
         mod_id = hello[-1].data.mod_id
         assert read_until(
@@ -917,9 +924,10 @@ class TestTLS:
         server, thread = self.start(manager, cert, key)
         try:
             with pytest.raises(InvalidMessage):
-                ws_connect(
+                with ws_connect(
                     f"ws://{LOOPBACK}:{server.port}", open_timeout=DEFAULT_TIMEOUT
-                ).close()
+                ):
+                    pass
             with ws_connect(
                 f"wss://{LOOPBACK}:{server.port}",
                 ssl=self.trusting(cert),
