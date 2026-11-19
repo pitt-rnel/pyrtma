@@ -1,132 +1,197 @@
-import logging
-import select
-import errno
-import struct
+"""Websocket server that connects web clients, such as rtma-js, to a message manager.
+
+Each web client gets a proxy: a pyrtma :py:class:`~pyrtma.client.Client`
+connected to the message manager on its behalf. The web client sends and
+receives messages as JSON text, ``{"header": {...}, "data": {...}}``, and the
+text messages ``PING`` and ``PONG`` are a keepalive.
+
+The websocket side is the ``websockets`` library's threading server: each web
+client is served in a thread of its own, which reads the websocket, and a
+second thread for the web client forwards messages from the message manager.
+"""
+
 import argparse
-import os
-import sys
 import json
-import time
+import logging
+import os
+import select
 import socket
+import sys
+import threading
+import time
+
 import pyrtma.core_defs as cd
 from rich.logging import RichHandler
+from websockets.exceptions import ConnectionClosed
+from websockets.protocol import State
+from websockets.sync.server import Server, ServerConnection, serve
 
 from pyrtma import (
     Client,
     Message,
-    MessageHeader,
     ClientError,
     MessageDefinitions,
     load_message_definitions,
 )
 from pyrtma.exceptions import RTMAMessageError
+from pyrtma.header import MessageHeader
 
-from socketserver import TCPServer
-from websocket_server import (  # type: ignore
-    WebsocketServer,
-    WebSocketHandler,
-    logger,
-    OPCODE,
-    MASKED,
-    FIN,
-    PAYLOAD_LEN,
-    OPCODE_CLOSE_CONN,
-    OPCODE_BINARY,
-    OPCODE_CONTINUATION,
-    OPCODE_PING,
-    OPCODE_PONG,
-    OPCODE_TEXT,
-)
-
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any, cast
 
+logger = logging.getLogger(__name__)
 
-class RTMAWebSocketHandler(WebSocketHandler):
-    """RTMA Web Socket Handler class"""
+#: The longest message a web client may send, as JSON text, in bytes. A
+#: message's data can be up to ``MAX_DATA_BYTES``, and its JSON is longer:
+#: an ``int8`` of -128, one byte, takes five characters with its comma.
+MAX_JSON_BYTES = 8 * cd.MAX_DATA_BYTES
 
-    disable_nagle_algorithm = True
+#: Seconds to wait for the web client's CLOSE after sending ours.
+CLOSE_TIMEOUT = 1.0
 
-    #: Read the websocket unbuffered. handle() waits for input with select(),
-    #: which can't see frames that a buffered reader has already taken in, so
-    #: a frame that arrived with the one before it waited for more input.
-    rbufsize = 0
 
-    #: Whether the proxy has connected to the message manager for the web
-    #: client. Set by the web client's first CONNECT or CONNECT_V2.
-    rtma_connected: bool = False
+class RTMAWebSocketHandler:
+    """Relays messages between one web client's websocket and its proxy.
 
-    #: Seconds to wait for the web client's CLOSE after sending ours.
-    close_timeout: float = 1.0
+    :py:meth:`handle` runs in the websocket's thread and passes the web
+    client's messages to the proxy. Once the proxy has connected, a reader
+    thread passes messages from the message manager to the web client.
+    """
 
-    #: Whether this side has sent, and received, the websocket CLOSE.
-    ws_close_sent: bool = False
-    ws_close_received: bool = False
+    #: Seconds the reader waits for each message from the message manager:
+    #: the longest it takes to see that it should stop.
+    read_timeout: float = 0.1
 
-    def __init__(self, socket, addr, server):
-        """RTMA Web Socket Handler
-
-        Initializes and handles RTMA Proxy connection
+    def __init__(self, connection: ServerConnection | None, server: Any) -> None:
+        """Set up the proxy for a web client.
 
         Args:
-            socket: socket object
-            addr: client address
-            server: server object
+            connection: The web client's websocket, or None in tests.
+            server: The :py:class:`WebMessageManager`, for its ``mm_ip`` and
+                ``definitions``.
         """
-        # Initialize RTMA Proxy connection
-        self.mm_ip = server.mm_ip
+        self.connection = connection
+        self.mm_ip: str = server.mm_ip
         self.proxy = Client(definitions=server.definitions)
         # The proxy's records propagate to the root logger, which main() gives
         # a console handler, so its own console handler would print each of
         # them a second time.
         self.proxy.logger.enable_console = False
 
-        WebSocketHandler.__init__(self, socket, addr, server)
+        #: Whether the proxy has connected to the message manager for the web
+        #: client. Set by the web client's first CONNECT or CONNECT_V2.
+        self.rtma_connected = False
+
+        #: Held for everything sent to the message manager. Both threads
+        #: send, the reader only FAILED_MESSAGE, and a Client can't send for
+        #: two threads at once. Reentrant, since a send made with it held can
+        #: lead to FAILED_MESSAGE.
+        self.proxy_lock = threading.RLock()
+
+        self._stop_reading = threading.Event()
+        self._reader: threading.Thread | None = None
 
     @property
-    def ws_ready_to_send(self):
-        if self.keep_alive:
-            _, wd, _ = select.select([], [self.wfile], [], 0)
-            return self.wfile in wd
-        else:
+    def ws_ready_to_send(self) -> bool:
+        """Whether a message can be sent to the web client without waiting.
+
+        A web client that can't keep up misses messages, each reported to
+        the message manager with FAILED_MESSAGE, rather than holding up the
+        messages for it.
+        """
+        if self.connection is None or self.connection.state is not State.OPEN:
             return False
+        _, writable, _ = select.select([], [self.connection.socket], [], 0)
+        return bool(writable)
 
-    def handle(self):
-        """Handle RTMA proxy connection"""
-        if not self.handshake_done:
-            self.handshake()
+    def send_message(self, message: str) -> None:
+        """Send text to the web client.
 
-        if not self.valid_client:
-            logger.error("Websocket handshake failed.")
+        A websocket that has closed meanwhile is left alone: its thread is
+        ending.
+
+        Args:
+            message: The text.
+        """
+        if self.connection is None:
             return
+        try:
+            self.connection.send(message)
+        except ConnectionClosed:
+            pass
 
-        # Establish the underlying socket connection with MessageManger Server
+    def handle(self) -> None:
+        """Serve the web client until its websocket or its proxy closes."""
+        assert self.connection is not None
         try:
             self.proxy._socket_connect(self.mm_ip)
         except ClientError as e:
             # Tell the web client why, rather than only closing the websocket.
             self.send_ws_error(e)
-            self.close_websocket()
+            self.connection.close()
             return
 
-        log_str = (
-            "New Client:\n"
-            + f"ws: {self.request.getsockname()[0]}:{self.request.getsockname()[1]} -> {self.request.getpeername()[0]}:{self.request.getpeername()[1]}\n"
-            + f"rtma: {self.proxy.sock.getsockname()[0]}:{self.proxy.sock.getsockname()[1]} -> {self.proxy.sock.getpeername()[0]}:{self.proxy.sock.getpeername()[1]}\n"
+        local, remote = self.connection.local_address, self.connection.remote_address
+        proxy_local, proxy_remote = (
+            self.proxy.sock.getsockname(),
+            self.proxy.sock.getpeername(),
         )
-        logger.info(log_str)
+        logger.info(
+            "New Client:\n"
+            f"ws: {local[0]}:{local[1]} -> {remote[0]}:{remote[1]}\n"
+            f"rtma: {proxy_local[0]}:{proxy_local[1]} -> {proxy_remote[0]}:{proxy_remote[1]}\n"
+        )
 
-        # Message Loop
-        while self.keep_alive and self.proxy.connected:
-            rd, _, _ = select.select([self.rfile, self.proxy.sock], [], [], 0.100)
+        try:
+            for message in self.connection:
+                if isinstance(message, bytes):
+                    logger.warning("Binary frames are not supported.")
+                    continue
+                self.process_json_message(message)
+                # After DISCONNECT, or when the proxy's connection failed.
+                if not self.proxy.connected:
+                    break
+        except ConnectionClosed as e:
+            logger.info(f"Websocket closed: {e}")
+        finally:
+            self.finish()
+            # Close with the closing handshake, if the web client hasn't.
+            self.connection.close()
+            logger.info(f"Client disconnected: {remote[0]}:{remote[1]}")
 
-            if self.rfile in rd:
-                self.read_ws_message()
+    def start_reader(self) -> None:
+        """Start passing messages from the message manager to the web client."""
+        self._stop_reading.clear()
+        self._reader = threading.Thread(
+            target=self._read_proxy,
+            name=f"web_manager reader for module {self.proxy.module_id}",
+            daemon=True,
+        )
+        self._reader.start()
 
-            if self.proxy.sock in rd and self.proxy.connected:
-                self.read_proxy_message()
+    def stop_reader(self) -> None:
+        """Stop the reader, and wait for it to finish its current read."""
+        self._stop_reading.set()
+        reader = self._reader
+        if reader is not None and reader is not threading.current_thread():
+            reader.join()
 
-        self.close_websocket()
+    def _read_proxy(self) -> None:
+        """Pass messages from the message manager on until told to stop.
+
+        When the connection to the message manager fails, the websocket is
+        closed, which ends :py:meth:`handle` too.
+        """
+        while not self._stop_reading.is_set() and self.proxy.connected:
+            try:
+                self.read_proxy_message(self.read_timeout)
+            except ClientError as e:
+                if self._stop_reading.is_set():
+                    return
+                logger.warning(f"Lost the connection to the message manager: {e}")
+                break
+        if not self._stop_reading.is_set() and self.connection is not None:
+            self.connection.close()
 
     def send_ws_error(self, error: Exception) -> None:
         """Send the web client an error, as ``{"rtma_msg_error": ...}``, and log it.
@@ -141,74 +206,38 @@ class RTMAWebSocketHandler(WebSocketHandler):
             self.send_message(error_json)
         logger.error(error, stack_info=False)
 
-    def send_ws_close(self) -> None:
-        """Send the web client a websocket CLOSE, once."""
-        if self.ws_close_sent:
-            return
-        self.ws_close_sent = True
-        try:
-            self.send_close()
-        except OSError:
-            pass
-
-    def close_websocket(self) -> None:
-        """Close the websocket with the closing handshake (RFC 6455, 7.1.2).
-
-        Called when the message loop ends. If the web client sent CLOSE, the
-        reply has gone. If the websocket is still open, because the proxy has
-        disconnected, this sends CLOSE and reads until the web client's CLOSE
-        comes back, for up to ``close_timeout`` seconds. The web client's
-        other messages are discarded meanwhile. Without the handshake, the
-        web client sees an abnormal close (code 1006), which Node 24, for
-        one, also reports as an error event.
-        """
-        if not self.keep_alive or self.ws_close_received:
-            return
-        self.send_ws_close()
-        deadline = time.perf_counter() + self.close_timeout
-        while self.keep_alive and not self.ws_close_received:
-            remaining = deadline - time.perf_counter()
-            if remaining <= 0:
-                break
-            rd, _, _ = select.select([self.rfile], [], [], remaining)
-            if not rd:
-                break
-            self.read_ws_message()
-
-    def read_proxy_message(self) -> None:
+    def read_proxy_message(self, timeout: float = 0) -> None:
         """Pass a message from the message manager on to the websocket.
 
-        Called when the proxy's socket is readable. The read doesn't wait for
-        a further message, so a message the proxy is no longer subscribed to,
-        which is dropped, doesn't hold up input from the websocket.
+        A message the proxy isn't subscribed to is dropped, and only part of
+        a message is kept for the next read, so neither holds the read past
+        its timeout.
+
+        Args:
+            timeout: Seconds to wait for a message.
+
+        Raises:
+            ClientError: The connection to the message manager failed.
         """
         try:
-            msg = self.proxy.read_message(timeout=0, ack=True)
+            msg = self.proxy.read_message(timeout=timeout, ack=True)
         except RTMAMessageError as e:
             self.send_ws_error(e)
             return
 
-        if msg is not None and self.keep_alive:
-            # Pass message thru websocket as json
-            if self.ws_ready_to_send:
-                logger.debug(
-                    f"Forwarding message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} to ws"
-                )
-                self.send_message(msg.to_json(minify=True))
-            else:
-                if self.proxy.connected:
-                    self.send_failed_message(msg.header, time.perf_counter())
-                logger.warning(
-                    f"Failed to foward message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} to ws. Mod ID = {self.proxy.module_id}"
-                )
-
-    def pong_received(self, msg: str):
-        """Log that pong was received
-
-        Args:
-            msg (str): Ignored
-        """
-        logger.info("Websocket PONG received.")
+        if msg is None:
+            return
+        # Pass message thru websocket as json
+        if self.ws_ready_to_send:
+            logger.debug(
+                f"Forwarding message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} to ws"
+            )
+            self.send_message(msg.to_json(minify=True))
+        else:
+            self.send_failed_message(msg.header, time.perf_counter())
+            logger.warning(
+                f"Failed to foward message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} to ws. Mod ID = {self.proxy.module_id}"
+            )
 
     def _connect_proxy(self, logger_status: bool, requested_id: int) -> None:
         """Connect the proxy to the message manager and pass the ACK on.
@@ -246,6 +275,7 @@ class RTMAWebSocketHandler(WebSocketHandler):
             logger.warning(
                 f"Failed to foward ACK to ws. Mod ID = {self.proxy.module_id}."
             )
+        self.start_reader()
 
     def handle_connect(self, msg: Message) -> None:
         """Connect the proxy for a web client's CONNECT.
@@ -305,62 +335,87 @@ class RTMAWebSocketHandler(WebSocketHandler):
         Args:
             message (str): JSON message string
         """
-        if self.ws_close_sent:
-            return
-
         if message == "PING" and self.ws_ready_to_send:
             self.send_message("PONG")
             return
 
         try:
             msg = Message.from_json(message, self.proxy.definitions)
-
-            if msg.header.msg_type == cd.MT_DISCONNECT:
-                self.proxy.disconnect()
-                logger.info("Received disconnect, disconnected proxy from MM.")
-            elif msg.header.msg_type == cd.MT_SUBSCRIBE:
-                msg.data = cast(cd.MDF_SUBSCRIBE, msg.data)
-                self.proxy.subscribe([msg.data.msg_type])
-                logger.info(f"Received SUBSCRIBE: {self._type_name(msg.data.msg_type)}")
-            elif msg.header.msg_type == cd.MT_UNSUBSCRIBE:
-                msg.data = cast(cd.MDF_UNSUBSCRIBE, msg.data)
-                self.proxy.unsubscribe([msg.data.msg_type])
-                logger.info(
-                    f"Received UNSUBSCRIBE: {self._type_name(msg.data.msg_type)}"
-                )
-            elif msg.header.msg_type == cd.MT_PAUSE_SUBSCRIPTION:
-                msg.data = cast(cd.MDF_PAUSE_SUBSCRIPTION, msg.data)
-                self.proxy.pause_subscription([msg.data.msg_type])
-                logger.info(
-                    f"Received PAUSE_SUBSCRIPTION: {self._type_name(msg.data.msg_type)}"
-                )
-            elif msg.header.msg_type == cd.MT_RESUME_SUBSCRIPTION:
-                msg.data = cast(cd.MDF_RESUME_SUBSCRIPTION, msg.data)
-                self.proxy.resume_subscription([msg.data.msg_type])
-                logger.info(
-                    f"Received RESUME_SUBSCRIPTION: {self._type_name(msg.data.msg_type)}"
-                )
-            elif msg.header.msg_type == cd.MT_CONNECT:
-                self.handle_connect(msg)
-            elif msg.header.msg_type == cd.MT_CONNECT_V2:
-                self.handle_connect_v2(msg)
-            elif msg.header.msg_type == cd.MT_MODULE_READY:
-                # The message manager gets this process's PID, as it does
-                # with the proxy's CONNECT_V2: the proxy holds the web
-                # client's connection. The web client's PID is ignored.
-                self.proxy.send_module_ready()
-                logger.info(
-                    "Received MODULE_READY, web client PID "
-                    f"{cast(cd.MDF_MODULE_READY, msg.data).pid}"
-                )
-            else:
-                self.proxy.forward_message(msg.header, msg.data or None)
-                logger.debug(
-                    f"Forwarded message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} from ws"
-                )
-        except (RTMAMessageError, ClientError) as e:
+        except RTMAMessageError as e:
             self.send_ws_error(e)
             return
+        except (ValueError, KeyError, TypeError) as e:
+            # Text that isn't JSON, or JSON that isn't a message.
+            self.send_ws_error(
+                RTMAMessageError(f"Not a message: {type(e).__name__}: {e}")
+            )
+            return
+
+        if msg.header.msg_type == cd.MT_DISCONNECT:
+            # The reader is stopped first: disconnect() reads the proxy's
+            # socket, and the reader may be waiting for proxy_lock.
+            self.stop_reader()
+            with self.proxy_lock:
+                self.proxy.disconnect()
+            logger.info("Received disconnect, disconnected proxy from MM.")
+            return
+
+        try:
+            with self.proxy_lock:
+                self.dispatch(msg)
+        except (RTMAMessageError, ClientError) as e:
+            self.send_ws_error(e)
+
+    def dispatch(self, msg: Message) -> None:
+        """Act on a message from the web client, other than DISCONNECT.
+
+        Called with ``proxy_lock`` held.
+
+        Args:
+            msg: The message.
+
+        Raises:
+            RTMAMessageError: The message can't be sent.
+            ClientError: The proxy can't do what the message asks.
+        """
+        if msg.header.msg_type == cd.MT_SUBSCRIBE:
+            msg.data = cast(cd.MDF_SUBSCRIBE, msg.data)
+            self.proxy.subscribe([msg.data.msg_type])
+            logger.info(f"Received SUBSCRIBE: {self._type_name(msg.data.msg_type)}")
+        elif msg.header.msg_type == cd.MT_UNSUBSCRIBE:
+            msg.data = cast(cd.MDF_UNSUBSCRIBE, msg.data)
+            self.proxy.unsubscribe([msg.data.msg_type])
+            logger.info(f"Received UNSUBSCRIBE: {self._type_name(msg.data.msg_type)}")
+        elif msg.header.msg_type == cd.MT_PAUSE_SUBSCRIPTION:
+            msg.data = cast(cd.MDF_PAUSE_SUBSCRIPTION, msg.data)
+            self.proxy.pause_subscription([msg.data.msg_type])
+            logger.info(
+                f"Received PAUSE_SUBSCRIPTION: {self._type_name(msg.data.msg_type)}"
+            )
+        elif msg.header.msg_type == cd.MT_RESUME_SUBSCRIPTION:
+            msg.data = cast(cd.MDF_RESUME_SUBSCRIPTION, msg.data)
+            self.proxy.resume_subscription([msg.data.msg_type])
+            logger.info(
+                f"Received RESUME_SUBSCRIPTION: {self._type_name(msg.data.msg_type)}"
+            )
+        elif msg.header.msg_type == cd.MT_CONNECT:
+            self.handle_connect(msg)
+        elif msg.header.msg_type == cd.MT_CONNECT_V2:
+            self.handle_connect_v2(msg)
+        elif msg.header.msg_type == cd.MT_MODULE_READY:
+            # The message manager gets this process's PID, as it does
+            # with the proxy's CONNECT_V2: the proxy holds the web
+            # client's connection. The web client's PID is ignored.
+            self.proxy.send_module_ready()
+            logger.info(
+                "Received MODULE_READY, web client PID "
+                f"{cast(cd.MDF_MODULE_READY, msg.data).pid}"
+            )
+        else:
+            self.proxy.forward_message(msg.header, msg.data or None)
+            logger.debug(
+                f"Forwarded message type {self.proxy.get_msg_cls(msg.header.msg_type).type_name} from ws"
+            )
 
     def _type_name(self, msg_type: int) -> str:
         """Name a message type for the log, whether or not it is defined.
@@ -379,96 +434,6 @@ class RTMAWebSocketHandler(WebSocketHandler):
             return "ALL_MESSAGE_TYPES"
         return self.proxy.message_name_from_id(msg_type) or f"MT={msg_type}"
 
-    def read_bytes(self, num: int) -> bytes:
-        """Read exactly ``num`` bytes from the websocket.
-
-        Args:
-            num: The number of bytes to read.
-
-        Raises:
-            ConnectionResetError: The websocket closed first.
-
-        Returns:
-            bytes: The bytes read.
-        """
-        data = bytearray()
-        while len(data) < num:
-            chunk = self.rfile.read(num - len(data))
-            if not chunk:
-                raise ConnectionResetError(errno.ECONNRESET, "Websocket closed.")
-            data += chunk
-        return bytes(data)
-
-    def read_ws_message(self) -> str | None:
-        """Read websocket message
-
-        Returns:
-            str | None: Websocket message string
-        """
-        try:
-            b1, b2 = self.read_bytes(2)
-        except OSError as e:  # to be replaced with ConnectionResetError for py3
-            if e.errno == errno.ECONNRESET:
-                logger.info("Client closed connection.")
-                self.keep_alive = 0
-                return None
-            b1, b2 = 0, 0
-        except ValueError as e:
-            b1, b2 = 0, 0
-
-        fin = b1 & FIN
-        opcode = b1 & OPCODE
-        masked = b2 & MASKED
-        payload_length = b2 & PAYLOAD_LEN
-        opcode_handler: Callable[[str], None]
-
-        if opcode == OPCODE_CLOSE_CONN:
-            logger.info("Client asked to close connection.")
-            # Read the rest of the frame, so that nothing is left unread when
-            # the socket closes, then reply with CLOSE.
-            try:
-                self.read_bytes((4 if masked else 0) + payload_length)
-            except OSError:
-                pass
-            self.ws_close_received = True
-            self.send_ws_close()
-            self.keep_alive = 0
-            return None
-        if not masked:
-            logger.warning("Client must always be masked.")
-            self.keep_alive = 0
-            return None
-        if opcode == OPCODE_CONTINUATION:
-            logger.warning("Continuation frames are not supported.")
-            return None
-        elif opcode == OPCODE_BINARY:
-            logger.warning("Binary frames are not supported.")
-            return None
-        elif opcode == OPCODE_TEXT:
-            opcode_handler = self.process_json_message
-        elif opcode == OPCODE_PING:
-            opcode_handler = self.send_pong
-        elif opcode == OPCODE_PONG:
-            opcode_handler = self.pong_received
-        else:
-            logger.warning("Unknown opcode %#x." % opcode)
-            self.keep_alive = 0
-            return None
-
-        if payload_length == 126:
-            payload_length = struct.unpack(">H", self.read_bytes(2))[0]
-        elif payload_length == 127:
-            payload_length = struct.unpack(">Q", self.read_bytes(8))[0]
-
-        masks = self.read_bytes(4)
-        message_bytes = bytearray()
-        for message_byte in self.read_bytes(payload_length):
-            message_byte ^= masks[len(message_bytes) % 4]
-            message_bytes.append(message_byte)
-
-        opcode_handler(message_bytes.decode("utf8"))
-        return message_bytes.decode("utf8")
-
     def send_failed_message(self, header: MessageHeader, time_of_failure: float):
         """Send FAILED_MESSAGE when we cannot forward to websocket"""
         data = cd.MDF_FAILED_MESSAGE()
@@ -483,21 +448,21 @@ class RTMAWebSocketHandler(WebSocketHandler):
             data.msg_header.msg_type == cd.MT_FAILED_MESSAGE
         ):  # avoid unlikely infinite recursion
             return
-        if self.proxy.connected:
-            self.proxy.send_message(data)
+        with self.proxy_lock:
+            if self.proxy.connected:
+                self.proxy.send_message(data)
 
-    def finish(self):
-        """Close RTMA connection"""
-        # Disconnect on behalf of the web client if still connected here
-        if self.proxy.connected:
-            self.proxy.disconnect()
-            logger.debug("Disconnected proxy from MM.")
+    def finish(self) -> None:
+        """Stop the reader and disconnect the proxy, if it's still connected."""
+        self.stop_reader()
+        with self.proxy_lock:
+            if self.proxy.connected:
+                self.proxy.disconnect()
+                logger.debug("Disconnected proxy from MM.")
 
-        super().finish()
 
-
-class WebMessageManager(WebsocketServer):
-    """WebMessageManager class"""
+class WebMessageManager:
+    """Websocket server that gives each web client a proxy to a message manager."""
 
     def __init__(
         self,
@@ -511,21 +476,41 @@ class WebMessageManager(WebsocketServer):
     ):
         """WebMessageManager class
 
+        The server listens from here on, and serves web clients from
+        :py:meth:`run_forever`.
+
         Args:
             host (str, optional): IP for WebMessageManager to listen for connections. Defaults to "" (any local IP).
             port (int, optional): Port for WebMessageManager to bind to. Defaults to 0.
             mm_ip (str, optional): Address for RTMA MessageManager. Defaults to ``DEFAULT_HOST`` on ``DEFAULT_PORT``, "localhost:7111".
             loglevel (int, optional): Loging level. Defaults to logging.WARNING.
-            key (optional): Path to SSL key. Defaults to None.
-            cert (optional): Path to SSL cert. Defaults to None.
+            key (optional): Path to SSL key. Not supported yet, and ignored.
+            cert (optional): Path to SSL cert. Not supported yet, and ignored.
             definitions (MessageDefinitions | None, optional): MessageDefinitions object. Defaults to None.
         """
         self.definitions = definitions
+        self.mm_ip = mm_ip
 
         logger.setLevel(loglevel)
-        TCPServer.__init__(self, (host, port), RTMAWebSocketHandler)
+        if key is not None or cert is not None:
+            logger.warning("TLS isn't supported yet; key and cert are ignored.")
+
+        #: The web clients' websockets, to close at shutdown.
+        self.connections: set[ServerConnection] = set()
+        self._connections_lock = threading.Lock()
+
+        self.server: Server = serve(
+            self._serve_client,
+            host,
+            port,
+            max_size=MAX_JSON_BYTES,
+            # rtma-js messages are small and frequent: compressing each one
+            # would cost more time than it saves.
+            compression=None,
+            close_timeout=CLOSE_TIMEOUT,
+        )
         self.host = host
-        self.port = self.socket.getsockname()[1]
+        self.port: int = self.server.socket.getsockname()[1]
 
         if self.host not in ("", "0.0.0.0"):
             logger.info(f"WebMessageManager listening on {self.host}:{self.port}")
@@ -538,58 +523,48 @@ class WebMessageManager(WebsocketServer):
             )
             logger.info(f"IP addresses: {hosts}")
 
-        self.key = key
-        self.cert = cert
+    def _serve_client(self, connection: ServerConnection) -> None:
+        """Serve one web client, in the thread the server gives it.
 
-        self.clients: list[dict] = []
-        self.id_counter = 0
-        self.thread = None
+        Args:
+            connection: The web client's websocket.
+        """
+        with self._connections_lock:
+            self.connections.add(connection)
+        try:
+            RTMAWebSocketHandler(connection, self).handle()
+        finally:
+            with self._connections_lock:
+                self.connections.discard(connection)
 
-        self._deny_clients = False
+    def run_forever(self) -> None:
+        """Serve web clients until interrupted, then shut down."""
+        try:
+            self.server.serve_forever()
+        except KeyboardInterrupt:
+            logger.info("Server terminated.")
+        finally:
+            self.shutdown()
 
-        self.set_fn_new_client(ws_client_connect)
-        self.set_fn_client_left(ws_client_disconnect)
+    def shutdown(self) -> None:
+        """Stop listening, and close every web client's websocket.
 
-        self.mm_ip = mm_ip
-
-
-def ws_client_connect(client: dict[str, Any], server: WebMessageManager):
-    """Websocket client connect
-
-    Called for every client connecting (after handshake)
-
-    Args:
-        client (dict[str, Any]): Client dictionary
-        server: WebMessageManager Server object
-    """
-    try:
-        logger.info(f"Client connected -> id: {client['id']}")
-    except:
-        pass
-
-
-def ws_client_disconnect(client: dict[str, Any], server: WebMessageManager):
-    """Websocket client disconnect
-
-    Called for every client disconnecting
-
-    Args:
-        client (dict[str, Any]): Client dictionary
-        server: WebMessageManager Server object
-    """
-    try:
-        logger.info(f"Client disconnected -> id: {client['id']}")
-    except:
-        pass
+        Each web client's thread then disconnects its proxy. This may be
+        called from another thread, to stop :py:meth:`run_forever`.
+        """
+        self.server.shutdown()
+        with self._connections_lock:
+            connections = list(self.connections)
+        for connection in connections:
+            connection.close(1001, "web manager shutting down")
 
 
 def configure_logging(root: logging.Logger | None = None) -> None:
     """Send log records to the console through rich.
 
     Called by :func:`main` rather than at import, so importing this module
-    leaves an application's logging alone. Any existing handlers, such as
-    the one ``websocket_server`` adds with ``logging.basicConfig()`` when it
-    is imported, are removed and closed.
+    leaves an application's logging alone. Any existing handlers are removed
+    and closed.
 
     Args:
         root: The logger to configure, for tests. Defaults to the root logger.

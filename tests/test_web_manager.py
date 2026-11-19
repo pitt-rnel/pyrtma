@@ -1,5 +1,6 @@
-"""Tests for ``pyrtma.web_manager``: the command line, logging setup, and the
-websocket handler, driven without a real websocket."""
+"""Tests for ``pyrtma.web_manager``: the command line, logging setup, the
+websocket handler driven without a websocket, and the server with real
+websocket clients."""
 
 from __future__ import annotations
 
@@ -8,7 +9,6 @@ import inspect
 import json
 import logging
 import os
-import select
 import shutil
 import socket
 import subprocess
@@ -20,6 +20,10 @@ from pathlib import Path
 from typing import Any, Iterator, cast
 
 import pytest
+from websockets.exceptions import ConnectionClosed, ConnectionClosedOK
+from websockets.sync.client import ClientConnection
+from websockets.sync.client import connect as ws_connect
+from websockets.sync.connection import Connection
 
 import pyrtma.core_defs as cd
 import pyrtma.web_manager as wm
@@ -35,6 +39,7 @@ from .helpers import (
     ManagerHarness,
     RecordingHandler,
     deliver,
+    free_port,
     read_until,
 )
 from .test_msg_defs import test_defs as td
@@ -45,14 +50,19 @@ DEFS_FILE = Path(td.__file__)
 class StubHandler(wm.RTMAWebSocketHandler):
     """An ``RTMAWebSocketHandler`` with no websocket behind it.
 
-    ``socketserver`` handlers do all their work in ``__init__``, so this one
-    skips the base constructors and sets only what the RTMA side uses.
-    Messages for the websocket are collected in ``sent``.
+    It takes the proxy it's given, rather than making one, and starts no
+    reader thread, so the tests read for the proxy themselves. Messages for
+    the websocket are collected in ``sent``.
     """
 
     def __init__(self, proxy: Client) -> None:
+        self.connection = None
+        self.mm_ip = LOOPBACK
         self.proxy = proxy
-        self.keep_alive = True
+        self.rtma_connected = False
+        self.proxy_lock = threading.RLock()
+        self._stop_reading = threading.Event()
+        self._reader = None
         self.sent: list[str] = []
 
     @property
@@ -61,6 +71,9 @@ class StubHandler(wm.RTMAWebSocketHandler):
 
     def send_message(self, message: Any) -> None:
         self.sent.append(message)
+
+    def start_reader(self) -> None:
+        pass
 
 
 def raw_message(msg_type: int, payload: MessageData) -> bytes:
@@ -136,12 +149,11 @@ def test_proxy_records_are_printed_once(
 ) -> None:
     root = RecordingHandler()
     monkeypatch.setattr(logging.getLogger(), "handlers", [root])
-    monkeypatch.setattr(wm.WebSocketHandler, "__init__", lambda self, *args: None)
     server = types.SimpleNamespace(
         mm_ip=LOOPBACK, definitions=cd.get_message_definitions()
     )
 
-    handler = wm.RTMAWebSocketHandler(cast(Any, None), (LOOPBACK, 0), cast(Any, server))
+    handler = wm.RTMAWebSocketHandler(None, server)
     handler.proxy.warning("proxy-hello")
 
     assert [r.getMessage() for r in root.records] == ["proxy-hello"]
@@ -164,7 +176,7 @@ def test_definitions_are_loaded_once(
 
     def no_serve(self: wm.WebMessageManager, *args: Any, **kwargs: Any) -> None:
         servers.append(self)
-        self.server_close()
+        self.shutdown()
 
     monkeypatch.setattr(wm, "load_message_definitions", counting_load)
     monkeypatch.setattr(wm.WebMessageManager, "run_forever", no_serve)
@@ -256,174 +268,6 @@ class TestProxyRead:
             finally:
                 peer.close()
                 proxy.disconnect()
-
-
-def masked_frame(text: str | bytes, opcode: int = 0x1) -> bytes:
-    """Build a masked websocket frame, as a web client sends it.
-
-    Args:
-        text: The frame's text, or its payload bytes.
-        opcode: The frame's opcode. Defaults to a text frame.
-
-    Returns:
-        The frame's bytes.
-    """
-    payload = text.encode() if isinstance(text, str) else text
-    mask = bytes([1, 2, 3, 4])
-    if len(payload) < 126:
-        length = bytes([0x80 | len(payload)])
-    elif len(payload) < 2**16:
-        length = bytes([0x80 | 126]) + len(payload).to_bytes(2, "big")
-    else:
-        length = bytes([0x80 | 127]) + len(payload).to_bytes(8, "big")
-    masked = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
-    return bytes([0x80 | opcode]) + length + mask + masked
-
-
-CLOSE_FRAME = masked_frame((1000).to_bytes(2, "big"), opcode=0x8)
-
-
-class TestWebsocketRead:
-    @pytest.fixture
-    def pair(self) -> Iterator[tuple[StubHandler, socket.socket, list[str]]]:
-        ours, theirs = socket.socketpair()
-        handler = StubHandler(cast(Client, None))
-        handler.rfile = ours.makefile("rb", wm.RTMAWebSocketHandler.rbufsize)
-        received: list[str] = []
-        handler.process_json_message = received.append  # type: ignore[method-assign]
-        try:
-            yield handler, theirs, received
-        finally:
-            handler.rfile.close()
-            ours.close()
-            theirs.close()
-
-    def test_frames_that_arrive_together_stay_visible(
-        self, pair: tuple[StubHandler, socket.socket, list[str]]
-    ) -> None:
-        # handle() reads a frame only when select() reports the websocket
-        # readable, so a frame that arrived with the one before it must
-        # still be reported after that one is read.
-        handler, theirs, received = pair
-        theirs.sendall(masked_frame("one") + masked_frame("two"))
-
-        handler.read_ws_message()
-        readable, _, _ = select.select([handler.rfile], [], [], 0)
-        handler.read_ws_message()
-
-        assert readable == [handler.rfile]
-        assert received == ["one", "two"]
-
-    def test_frame_split_across_reads(
-        self, pair: tuple[StubHandler, socket.socket, list[str]]
-    ) -> None:
-        handler, theirs, received = pair
-        text = "x" * 300
-        frame = masked_frame(text)
-        theirs.sendall(frame[:3])
-        sender = threading.Timer(0.05, theirs.sendall, args=(frame[3:],))
-        sender.start()
-
-        handler.read_ws_message()
-        sender.join()
-
-        assert received == [text]
-
-    def test_frame_with_an_8_byte_length(
-        self, pair: tuple[StubHandler, socket.socket, list[str]]
-    ) -> None:
-        # Frames of 64 KiB or more give their length in 8 bytes. A message
-        # can be up to MAX_DATA_BYTES, 1 MiB, and its JSON longer still.
-        handler, theirs, received = pair
-        text = "x" * (2**16 + 100)
-        # The frame is larger than the socket buffer, so another thread
-        # sends it while this one reads.
-        sender = threading.Thread(target=theirs.sendall, args=(masked_frame(text),))
-        sender.start()
-
-        handler.read_ws_message()
-        sender.join()
-
-        assert received == [text]
-
-
-class TestWebsocketClose:
-    @pytest.fixture
-    def pair(self) -> Iterator[tuple[StubHandler, socket.socket]]:
-        ours, theirs = socket.socketpair()
-        handler = StubHandler(cast(Client, None))
-        handler.rfile = ours.makefile("rb", wm.RTMAWebSocketHandler.rbufsize)
-        handler.request = ours
-        handler._send_lock = threading.Lock()
-        theirs.settimeout(DEFAULT_TIMEOUT)
-        try:
-            yield handler, theirs
-        finally:
-            handler.rfile.close()
-            ours.close()
-            theirs.close()
-
-    def test_client_close_gets_a_close_reply(
-        self, pair: tuple[StubHandler, socket.socket]
-    ) -> None:
-        handler, theirs = pair
-        theirs.sendall(CLOSE_FRAME)
-
-        handler.read_ws_message()
-        handler.close_websocket()
-        leftover, _, _ = select.select([handler.rfile], [], [], 0)
-
-        assert not handler.keep_alive
-        assert handler.ws_close_received
-        assert theirs.recv(1) == bytes([0x88])
-        assert leftover == []
-
-    def test_close_after_proxy_disconnect_waits_for_client_close(
-        self, pair: tuple[StubHandler, socket.socket]
-    ) -> None:
-        # The web client's last message, sent before it saw our CLOSE, is
-        # discarded, and its CLOSE ends the wait.
-        handler, theirs = pair
-        theirs.sendall(masked_frame("late") + CLOSE_FRAME)
-
-        handler.close_websocket()
-
-        assert handler.ws_close_received
-        assert handler.sent == []
-        assert theirs.recv(1) == bytes([0x88])
-
-    def test_unreachable_manager_gets_an_error_and_a_close(
-        self, pair: tuple[StubHandler, socket.socket]
-    ) -> None:
-        # Nothing listens on a port that was just free.
-        with socket.socket() as probe:
-            probe.bind(("127.0.0.1", 0))
-            port = probe.getsockname()[1]
-        handler, theirs = pair
-        handler.proxy = Client(definitions=td.get_message_definitions())
-        handler.proxy.logger.enable_console = False
-        handler.mm_ip = f"127.0.0.1:{port}"
-        handler.handshake_done = True
-        handler.valid_client = True
-        handler.close_timeout = 0.1
-
-        handler.handle()
-
-        errors = [json.loads(text) for text in handler.sent]
-        assert len(errors) == 1
-        assert "No message manager" in errors[0]["rtma_msg_error"]
-        assert theirs.recv(1) == bytes([0x88])
-
-    def test_close_without_reply_stops_waiting(
-        self, pair: tuple[StubHandler, socket.socket]
-    ) -> None:
-        handler, theirs = pair
-        handler.close_timeout = 0.1
-
-        handler.close_websocket()
-
-        assert not handler.ws_close_received
-        assert theirs.recv(1) == bytes([0x88])
 
 
 def connect_message(*, src_mod_id: int = 0, logger_status: int = 0) -> Message:
@@ -634,3 +478,263 @@ class TestConnect:
         assert sent_types(handler) == [cd.MT_ACKNOWLEDGE]
         assert handler.proxy.module_id == mod_id
         assert handler.proxy.name == "page"
+
+
+def message_json(msg_type: int, data: MessageData | None = None) -> str:
+    """Build a message's JSON as a web client sends it.
+
+    Args:
+        msg_type: The message type.
+        data: The message data, or None for a signal.
+
+    Returns:
+        The JSON text.
+    """
+    header = MessageHeader()
+    header.msg_type = msg_type
+    return Message(header, data or cd.MDF_EXIT()).to_json(minify=True)
+
+
+def closed_with(ws: Connection) -> ConnectionClosed:
+    """Read until the server closes the websocket, and return how it closed.
+
+    Args:
+        ws: The web client's websocket.
+
+    Returns:
+        The exception that ended the read.
+    """
+    with pytest.raises(ConnectionClosed) as raised:
+        while True:
+            ws.recv(timeout=DEFAULT_TIMEOUT)
+    return raised.value
+
+
+@pytest.mark.integration
+class TestServer:
+    """The web manager with real websocket clients, from the websockets
+    library, and the ``manager`` fixture behind it."""
+
+    @pytest.fixture
+    def web_manager(self, manager: ManagerHarness) -> Iterator[wm.WebMessageManager]:
+        server = wm.WebMessageManager(
+            host=LOOPBACK,
+            port=0,
+            mm_ip=manager.address,
+            definitions=td.get_message_definitions(),
+        )
+        thread = threading.Thread(target=server.run_forever, daemon=True)
+        thread.start()
+        try:
+            yield server
+        finally:
+            server.shutdown()
+            thread.join(DEFAULT_TIMEOUT)
+            assert not thread.is_alive()
+
+    @staticmethod
+    def connect(server: wm.WebMessageManager, name: str = "page") -> ClientConnection:
+        """Connect a web client with CONNECT_V2, and read its ACK.
+
+        Args:
+            server: The web manager.
+            name: The module name.
+
+        Returns:
+            The web client's websocket.
+        """
+        ws = ws_connect(f"ws://{LOOPBACK}:{server.port}", open_timeout=DEFAULT_TIMEOUT)
+        ws.send(connect_v2_message(name).to_json(minify=True))
+        ack = json.loads(ws.recv(timeout=DEFAULT_TIMEOUT))
+        assert ack["header"]["msg_type"] == cd.MT_ACKNOWLEDGE
+        return ws
+
+    def test_messages_pass_both_ways(
+        self,
+        web_manager: wm.WebMessageManager,
+        client_factory: Callable[..., Client],
+    ) -> None:
+        peer = client_factory(name="peer")
+        peer.subscribe([td.MT_TEST_END])
+        with self.connect(web_manager) as ws:
+            subscribe = cd.MDF_SUBSCRIBE()
+            subscribe.msg_type = td.MT_TEST_START
+            ws.send(message_json(cd.MT_SUBSCRIBE, subscribe))
+            # The subscription is in place once the manager has passed on a
+            # message sent after it.
+            ws.send(message_json(td.MT_TEST_END, td.MDF_TEST_END()))
+            assert read_until(peer, lambda m: m.type_id == td.MT_TEST_END)
+
+            start = td.MDF_TEST_START()
+            start.id = 42
+            peer.send_message(start)
+            # The manager's ACK of the SUBSCRIBE comes first.
+            received = json.loads(ws.recv(timeout=DEFAULT_TIMEOUT))
+            while received["header"]["msg_type"] == cd.MT_ACKNOWLEDGE:
+                received = json.loads(ws.recv(timeout=DEFAULT_TIMEOUT))
+
+        assert received["header"]["msg_type"] == td.MT_TEST_START
+        assert received["header"]["src_mod_id"] == peer.module_id
+        assert received["data"] == {"id": 42}
+
+    def test_messages_sent_together_pass_at_once(
+        self,
+        web_manager: wm.WebMessageManager,
+        client_factory: Callable[..., Client],
+    ) -> None:
+        # Messages that reach the web manager together must not wait for
+        # further input, such as rtma-js's next keepalive, 750 ms later.
+        peer = client_factory(name="peer")
+        peer.subscribe([td.MT_TEST_START])
+        with self.connect(web_manager) as ws:
+            for n in range(5):
+                start = td.MDF_TEST_START()
+                start.id = n
+                ws.send(message_json(td.MT_TEST_START, start))
+
+            seen = read_until(
+                peer,
+                lambda m: m.type_id == td.MT_TEST_START and m.data.id == 4,
+                timeout=0.5,
+            )
+
+        assert seen is not None
+        assert [m.data.id for m in seen if m.type_id == td.MT_TEST_START] == [
+            0,
+            1,
+            2,
+            3,
+            4,
+        ]
+
+    def test_ping_gets_pong(self, web_manager: wm.WebMessageManager) -> None:
+        with self.connect(web_manager) as ws:
+            ws.send("PING")
+
+            assert ws.recv(timeout=DEFAULT_TIMEOUT) == "PONG"
+
+    def test_disconnect_closes_the_websocket_cleanly(
+        self, web_manager: wm.WebMessageManager
+    ) -> None:
+        with self.connect(web_manager) as ws:
+            ws.send(message_json(cd.MT_DISCONNECT))
+
+            closed = closed_with(ws)
+
+        assert isinstance(closed, ConnectionClosedOK)
+        assert closed.rcvd is not None and closed.rcvd.code == 1000
+
+    def test_closing_the_websocket_disconnects_the_proxy(
+        self,
+        web_manager: wm.WebMessageManager,
+        client_factory: Callable[..., Client],
+    ) -> None:
+        observer = client_factory(name="observer")
+        observer.subscribe([cd.MT_HELLO, cd.MT_GOODBYE])
+        ws = self.connect(web_manager, "leaving")
+        hello = read_until(
+            observer,
+            lambda m: m.type_id == cd.MT_HELLO and m.data.name == "leaving",
+        )
+        assert hello is not None
+
+        ws.close()
+
+        mod_id = hello[-1].data.mod_id
+        assert read_until(
+            observer,
+            lambda m: m.type_id == cd.MT_GOODBYE and m.data.mod_id == mod_id,
+        )
+
+    def test_unreachable_manager_gets_an_error_and_a_close(self) -> None:
+        # Nothing listens on a port that was just free.
+        server = wm.WebMessageManager(
+            host=LOOPBACK,
+            port=0,
+            mm_ip=f"{LOOPBACK}:{free_port()}",
+            definitions=td.get_message_definitions(),
+        )
+        thread = threading.Thread(target=server.run_forever, daemon=True)
+        thread.start()
+        try:
+            with ws_connect(f"ws://{LOOPBACK}:{server.port}") as ws:
+                error = json.loads(ws.recv(timeout=DEFAULT_TIMEOUT))
+                closed = closed_with(ws)
+        finally:
+            server.shutdown()
+            thread.join(DEFAULT_TIMEOUT)
+
+        assert "No message manager" in error["rtma_msg_error"]
+        assert isinstance(closed, ConnectionClosedOK)
+        assert closed.rcvd is not None and closed.rcvd.code == 1000
+
+    def test_losing_the_manager_closes_the_websocket(self) -> None:
+        harness = ManagerHarness()
+        harness.start()
+        server = wm.WebMessageManager(
+            host=LOOPBACK,
+            port=0,
+            mm_ip=harness.address,
+            definitions=td.get_message_definitions(),
+        )
+        thread = threading.Thread(target=server.run_forever, daemon=True)
+        thread.start()
+        try:
+            with self.connect(server) as ws:
+                harness.stop()
+                closed = closed_with(ws)
+        finally:
+            server.shutdown()
+            thread.join(DEFAULT_TIMEOUT)
+            harness.stop()
+
+        assert isinstance(closed, ConnectionClosedOK)
+
+    def test_text_over_1_mib_is_read(self, web_manager: wm.WebMessageManager) -> None:
+        # A message of MAX_DATA_BYTES is longer than that as JSON, and the
+        # websockets library refuses 1 MiB or more by default.
+        with self.connect(web_manager) as ws:
+            ws.send("x" * (2 * 2**20))
+            error = json.loads(ws.recv(timeout=DEFAULT_TIMEOUT))
+            ws.send("PING")
+            pong = ws.recv(timeout=DEFAULT_TIMEOUT)
+
+        assert "rtma_msg_error" in error
+        assert pong == "PONG"
+
+    @pytest.mark.parametrize("text", ["not json", "{}", "[1]"])
+    def test_text_that_isnt_a_message_gets_an_error(
+        self, web_manager: wm.WebMessageManager, text: str
+    ) -> None:
+        with self.connect(web_manager) as ws:
+            ws.send(text)
+            error = json.loads(ws.recv(timeout=DEFAULT_TIMEOUT))
+            ws.send("PING")
+            pong = ws.recv(timeout=DEFAULT_TIMEOUT)
+
+        assert error["rtma_msg_error"].startswith("Not a message")
+        assert pong == "PONG"
+
+    def test_binary_message_is_ignored(self, web_manager: wm.WebMessageManager) -> None:
+        with self.connect(web_manager) as ws:
+            ws.send(b"\x00\x01")
+            ws.send("PING")
+
+            assert ws.recv(timeout=DEFAULT_TIMEOUT) == "PONG"
+
+    def test_shutdown_closes_the_websockets(self, manager: ManagerHarness) -> None:
+        server = wm.WebMessageManager(
+            host=LOOPBACK,
+            port=0,
+            mm_ip=manager.address,
+            definitions=td.get_message_definitions(),
+        )
+        thread = threading.Thread(target=server.run_forever, daemon=True)
+        thread.start()
+        with self.connect(server) as ws:
+            server.shutdown()
+            closed = closed_with(ws)
+        thread.join(DEFAULT_TIMEOUT)
+
+        assert not thread.is_alive()
+        assert closed.rcvd is not None and closed.rcvd.code == 1001
