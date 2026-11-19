@@ -676,6 +676,7 @@ The `syncs` fixture replaces `os.fsync` and the writer's folder sync with record
 | Test | Purpose | Approach |
 |---|---|---|
 | `test_files_are_not_synced_by_default` | Without `fsync`, a writer makes no `fsync()` calls on its files or folder, leaving write-back to the operating system as before. | One message, a write, then `stop()`. |
+| `test_each_write_reaches_the_os_without_fsync` | Without `fsync`, each write is still flushed to the operating system, so what was written survives the data logger dying; before, up to a whole Python file buffer of it stayed in the process. | The `raw` formatter, whose writes, unlike the stand-in's, aren't flushed; compares the file's size on disk after one write with the bytes written. |
 | `test_fsync_syncs_after_each_write_and_before_close` | With `fsync=True`, each write is synced, the file is synced again before it is closed, and the folder is synced once when the file is created. | One message, a write, then `stop()`; counts the calls after each. |
 | `test_fsync_syncs_each_full_file_and_its_folder` | With `fsync=True`, a file that fills is synced before it is closed, the write continuing in the next file is synced, and each new file's folder is synced. | The stand-in's two-line limit and three messages in one write. |
 

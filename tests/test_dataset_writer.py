@@ -677,6 +677,26 @@ class TestFsync:
 
         assert syncs == {"files": [], "folders": []}
 
+    def test_each_write_reaches_the_os_without_fsync(
+        self,
+        make_writer: Callable[..., DatasetWriter],
+        clock: FakeClock,
+        tmp_path: Path,
+        syncs: dict[str, list[Any]],
+    ) -> None:
+        writer = make_writer(formatter="raw")
+        writer.start()
+        for text in "abc":
+            writer.update(message(text))
+
+        write_now(writer, clock)
+        wait_written(writer)
+
+        # The size another process sees, as after this one is killed: every
+        # byte written so far, not only what filled Python's file buffer.
+        assert (tmp_path / "rec.dat").stat().st_size == writer.formatter.bytes_written
+        assert syncs["files"] == []
+
     def test_fsync_syncs_after_each_write_and_before_close(
         self,
         make_writer: Callable[..., DatasetWriter],

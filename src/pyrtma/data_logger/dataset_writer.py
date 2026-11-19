@@ -132,11 +132,11 @@ class DatasetWriter:
                 ``max_bytes`` is lower keeps that.
             clock: Seconds from a monotonic clock, for the write schedule and
                 the elapsed time. Injectable for tests.
-            fsync: After every write and before closing a file, flush it and
-                ``os.fsync()`` it, and sync its folder when a file is created,
-                so a power loss costs at most one write period of messages. By
-                default the operating system decides when to write its buffers
-                to disk.
+            fsync: After every write and before closing a file, ``os.fsync()``
+                it, and sync its folder when a file is created, so a power loss
+                costs at most one write period of messages. Every write is
+                flushed to the operating system either way; by default the OS
+                decides when to write its buffers to disk.
             definitions: The data logger's message definitions, passed to
                 formatters that want a :py:class:`FileContext`.
             write_period: Seconds between writes of the buffered messages to
@@ -543,13 +543,19 @@ class DatasetWriter:
             fresh = True
 
     def _sync(self) -> None:
-        """With ``fsync``, push everything written so far through to the disk.
+        """Hand everything written so far to the operating system.
 
-        Without it, nothing is done: the operating system writes its buffers
-        when it decides to.
+        The file is flushed after every write, so a write reaches the OS
+        when it is made, not when Python's file buffer next fills (up to
+        128 KiB from Python 3.14). Messages written before the data logger
+        dies are then kept. With ``fsync``, the OS is also made to put them
+        on the disk, so they survive a power loss too; without it, the OS
+        writes its buffers when it decides to.
         """
-        if self.fsync and self.fd is not None:
-            self.fd.flush()
+        if self.fd is None:
+            return
+        self.fd.flush()
+        if self.fsync:
             os.fsync(self.fd.fileno())
 
     def subdivide(self):
