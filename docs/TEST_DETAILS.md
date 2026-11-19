@@ -444,9 +444,9 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 | `test_lost_connection_is_retried_with_back_off` | C4: losing the manager mid-run is retried with the same back-off, starting from 0.5 s. | `start()` in a thread against a separate `ManagerHarness`, which is then stopped; the second wait stops the loop. |
 | `test_stop_interrupts_the_default_sleep` | C4: `stop()` ends the default wait between attempts at once, rather than after the delay. | A 30-second `retry_delay` and no manager; calls `stop()` after the first attempt and expects the thread to end within 5 s. |
 
-## test_web_manager.py — the websocket bridge (needs: integration for `TestProxyRead` and `TestConnect`)
+## test_web_manager.py — the websocket bridge (needs: integration for `TestProxyRead`, `TestConnect` and `TestServer`)
 
-`StubHandler` is an `RTMAWebSocketHandler` with no websocket behind it. `socketserver` handlers do all their work in their constructor, so it skips the base constructors, sets only the proxy and `keep_alive`, reports the websocket as always ready, and collects what would be sent to it in `sent`.
+`StubHandler` is an `RTMAWebSocketHandler` with no websocket behind it. It takes the proxy it is given, starts no reader thread, so tests read for the proxy themselves, reports the websocket ready, and collects what would be sent to it in `sent`.
 
 | Test | Purpose | Approach |
 |---|---|---|
@@ -457,6 +457,11 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 | `test_defs_option_is_required` | Web manager: leaving out `--defs` is a usage error. | `parse_args()` without it; expects exit status 2 and `--defs` in the message. |
 | `test_definitions_are_loaded_once` | Web manager: `run()` loads the definitions file once, and doesn't import it by name or add its folder to `sys.path`. | A copy of the compiled test definitions in `tmp_path`; `load_message_definitions` is wrapped to count calls, and `run_forever` is replaced so the server closes at once. |
 | `test_failed_message_carries_the_whole_header` | Shared constants: the web manager's `FAILED_MESSAGE` holds a byte-for-byte copy of the failed message's header, with the proxy's module ID and the failure time. | `send_failed_message()` with a stand-in proxy that records what is sent. |
+| `test_cert_and_key_options` | Web manager TLS: `--cert` and `--key` are parsed, and both default to None, for `ws://`. | `parse_args()` with and without them. |
+| `test_key_option_needs_cert` | Web manager TLS: `--key` without `--cert` is a usage error. | `parse_args()` with `--key` alone; expects exit status 2 and the reason. |
+| `test_key_without_cert_raises` | Web manager TLS: a `WebMessageManager` with a key and no certificate raises `ValueError` before it listens. | `key=` alone. |
+| `test_missing_cert_raises` | Web manager TLS: a certificate that can't be loaded raises `ValueError` naming the file, rather than serving without TLS. | A path in `tmp_path` that doesn't exist. |
+| `test_shutdown_before_serving` | Web manager: `shutdown()` of a server that never served closes its listening socket and returns, rather than waiting for `serve_forever()`, as some versions of `websockets` would; `run_forever()` after it returns at once, and a second `shutdown()` does nothing. | The three calls in a thread, which must finish within the default timeout. |
 
 ### TestProxyRead
 
@@ -464,27 +469,6 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 |---|---|---|
 | `test_unsubscribed_message_does_not_block` | Web manager: reading a message the proxy isn't subscribed to returns without waiting for another. | The real manager follows such a message with an ACK, so a listening socket stands in for it: the proxy connects to it, the peer sends one `TEST_START` and nothing more, and `read_proxy_message()` runs in a thread that must finish within 5 s. |
 | `test_partial_message_does_not_block` | C1 (client side): with half a message received, `read_proxy_message()` returns without waiting for the rest, so websocket input isn't held up. | The same listening socket; the peer sends half a `TEST_START` and nothing more, and `read_proxy_message()` must finish within 5 s. |
-
-### TestWebsocketRead
-
-The `pair` fixture gives a `StubHandler` reading one end of a socket pair, with its websocket file opened the way `StreamRequestHandler` opens it, and its `process_json_message` replaced to collect the text of each frame.
-
-| Test | Purpose | Approach |
-|---|---|---|
-| `test_frames_that_arrive_together_stay_visible` | Web manager: after one websocket frame is read, `select()` still reports a frame that arrived with it, so `handle()` reads it without waiting for more input. | Two masked text frames in one send; reads one, checks `select()` with timeout 0, and reads the other. |
-| `test_frame_split_across_reads` | Web manager: a frame that arrives in pieces is read whole. | A 300-byte frame, with a 2-byte extended length, split after its third byte; a timer sends the rest 50 ms later. |
-| `test_frame_with_an_8_byte_length` | Web manager: a frame of 64 KiB or more, whose length takes 8 bytes, is read whole. | A 65,636-byte frame, sent from another thread because it is larger than the socket buffer. |
-
-### TestWebsocketClose
-
-The `pair` fixture gives a `StubHandler` reading and writing one end of a socket pair, with its websocket file opened the way `StreamRequestHandler` opens it.
-
-| Test | Purpose | Approach |
-|---|---|---|
-| `test_client_close_gets_a_close_reply` | Web manager: a web client's websocket CLOSE is read whole and answered with CLOSE, and `close_websocket()` then sends nothing more. | A masked CLOSE with status 1000; reads it, runs `close_websocket()`, and checks for one CLOSE back and nothing left unread. |
-| `test_close_after_proxy_disconnect_waits_for_client_close` | Web manager: when the loop ends with the websocket open, `close_websocket()` sends CLOSE, discards the web client's messages, and stops at its CLOSE. | A text frame and a CLOSE, sent before `close_websocket()` runs with the real `process_json_message`; nothing reaches `sent`. |
-| `test_unreachable_manager_gets_an_error_and_a_close` | Web manager: when the proxy can't reach the message manager, the web client gets an `rtma_msg_error` saying so, then a websocket CLOSE, in place of a traceback in the log and a closed connection. | `handle()` with the handshake done and `mm_ip` a port nobody listens on; checks what was sent. |
-| `test_close_without_reply_stops_waiting` | Web manager: `close_websocket()` stops waiting for the web client's CLOSE after `close_timeout`. | A 0.1 s timeout and no reply. |
 
 ### TestConnect
 
@@ -501,6 +485,35 @@ The `handler` fixture gives a `StubHandler` whose proxy already has a socket to 
 | `test_subscription_commands_report_no_error` | ALL_MESSAGE_TYPES as a type: a web client's subscribe, unsubscribe and pause for `ALL_MESSAGE_TYPES`, or for a type the proxy has no definition for, get no error reply; logging the type used to raise after the subscription had gone through. | Parametrized over the three commands and both types, as JSON through `process_json_message()`. |
 | `test_invalid_subscription_type_gets_an_error_reply` | Subscription types: a web client's SUBSCRIBE for a type outside the range gets an error reply naming the problem, and nothing is subscribed. | -1 and one past `MAX_MESSAGE_TYPES`, as JSON. |
 | `test_connect_after_connect_v2_is_ignored` | Manager connect messages: a `CONNECT` after the web client's `CONNECT_V2` changes nothing and sends nothing. | `handle_connect_v2()` named "page", then `handle_connect()`. |
+
+### TestServer
+
+The `web_manager` fixture runs a `WebMessageManager` on loopback, in a thread, in front of the `manager` fixture. Web clients are the `websockets` library's own client; `connect()` opens one and connects it with `CONNECT_V2`, reading the ACK.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_messages_pass_both_ways` | Web manager: a web client's SUBSCRIBE and messages reach the manager through the proxy, and a subscribed message from another client reaches the web client as JSON, with its source module and data. | The web client subscribes to `TEST_START` and sends `TEST_END`, which a Python peer receives; the peer then sends `TEST_START`. |
+| `test_messages_sent_together_pass_at_once` | Web manager: messages that reach the web manager together are all passed on at once, rather than waiting for further input such as rtma-js's next keepalive, 750 ms later. | Five `TEST_START` messages sent back to back; a peer must get all five, in order, within 0.5 s. |
+| `test_ping_gets_pong` | Web manager: the text `PING`, rtma-js's keepalive, is answered with `PONG`. | Sends `PING`. |
+| `test_disconnect_closes_the_websocket_cleanly` | Web manager: after a web client's `DISCONNECT`, the web manager closes the websocket with the closing handshake, code 1000. | Sends `DISCONNECT` and reads until the websocket closes. |
+| `test_closing_the_websocket_disconnects_the_proxy` | Web manager: when a web client closes its websocket, its proxy disconnects from the manager. | An observer of `HELLO` and `GOODBYE` sees the proxy arrive under the web client's name, then leave after the websocket is closed. |
+| `test_unreachable_manager_gets_an_error_and_a_close` | Web manager: when the proxy can't reach the message manager, the web client gets an `rtma_msg_error` saying so, then a clean close. | A web manager whose `mm_ip` is a port nobody listens on. |
+| `test_losing_the_manager_closes_the_websocket` | Web manager: when the proxy's connection to the manager is lost, the web client's websocket is closed cleanly. | A manager of the test's own, stopped while a web client is connected. |
+| `test_text_over_1_mib_is_read` | Web manager: a websocket message over 1 MiB, the `websockets` library's default limit, is read; a message of `MAX_DATA_BYTES` is longer than that as JSON. | 2 MiB of text, which isn't a message, gets an error reply, and the websocket stays open for a `PING`. |
+| `test_text_that_isnt_a_message_gets_an_error` | Web manager: text that isn't JSON, or JSON that isn't a message, gets an error reply, and the websocket stays open. | Parametrized over text that isn't JSON, an empty object and a list; each is followed by a `PING`. |
+| `test_binary_message_is_ignored` | Web manager: a binary websocket message is ignored, as before, and the websocket stays open. | Two bytes, then a `PING`. |
+| `test_shutdown_closes_the_websockets` | Web manager: `shutdown()` stops `run_forever()` and closes each web client's websocket with code 1001, going away. | A web manager of the test's own, shut down with a web client connected. |
+
+### TestTLS
+
+The module's `tls_files` fixture makes a throwaway self-signed certificate for `127.0.0.1` and `localhost` with OpenSSL, so no private key is kept in the repository, giving openssl a configuration file of its own, since some builds, such as conda's on Windows, look for theirs where none is installed; these tests are skipped without OpenSSL, with openssl's error. Each test runs its own `WebMessageManager` with the certificate, in front of the `manager` fixture, and connects with the `websockets` client, trusting that certificate alone.
+
+| Test | Purpose | Approach |
+|---|---|---|
+| `test_wss_client_connects_and_messages_pass` | Web manager TLS: a `wss://` client connects and gets its ACK, messages sent together, which may share a TLS record, all reach a peer at once, and `PING` gets `PONG`. | `CONNECT_V2`, five `TEST_START` messages back to back, which a peer must get in order within 0.5 s, then `PING`. |
+| `test_plain_client_is_refused` | Web manager TLS: a `ws://` client to a server with a certificate fails its opening handshake, rather than being served without TLS, and the server goes on serving `wss://` clients. | A `ws://` connection, which must raise `InvalidMessage`, then a `wss://` one with a `PING`. |
+| `test_key_in_the_cert_file` | Web manager TLS: a certificate file that holds the key too is enough. | The key and certificate written to one file, given as `cert` alone. |
+| `test_key_that_doesnt_match_raises` | Web manager TLS: a key that can't be loaded with the certificate raises `ValueError`. | A key file that isn't a key. |
 
 ## test_dataset.py — the `Dataset` helper, without a manager (needs: none)
 

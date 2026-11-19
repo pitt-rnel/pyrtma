@@ -203,6 +203,12 @@ web_manager -m <MM_IP> -p <WEBSOCKET_PORT> -d <DEFS_FILE>
 ```
 to launch the web_manager which will listen to websocket connects on port <WEBSOCKET_PORT> and forward to message manager at <MM_IP>, using pyrtma message definitions defined in <DEFS_FILE>.
 
+To serve secure websockets (`wss://`), which pages loaded over https need, give a TLS certificate chain and its private key, in PEM format:
+```shell
+web_manager -m <MM_IP> -p <WEBSOCKET_PORT> -d <DEFS_FILE> --cert <CERT_FILE> --key <KEY_FILE>
+```
+`--key` can be left out when the certificate file holds the key too. The web_manager then serves `wss://` only. Browsers must trust the certificate: for local development, [mkcert](https://github.com/FiloSottile/mkcert) makes one they trust, and for a self-signed certificate, opening `https://<HOST>:<WEBSOCKET_PORT>` once lets the user accept it.
+
 See [rtma-js](https://github.com/pitt-rnel/rtma-js) for developing rtma clients in javascript.
 
 # DataLogger
