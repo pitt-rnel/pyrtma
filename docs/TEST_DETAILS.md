@@ -461,6 +461,7 @@ Unified logs have their own console output turned off by `quiet()`. `stopping_sl
 | `test_key_option_needs_cert` | Web manager TLS: `--key` without `--cert` is a usage error. | `parse_args()` with `--key` alone; expects exit status 2 and the reason. |
 | `test_key_without_cert_raises` | Web manager TLS: a `WebMessageManager` with a key and no certificate raises `ValueError` before it listens. | `key=` alone. |
 | `test_missing_cert_raises` | Web manager TLS: a certificate that can't be loaded raises `ValueError` naming the file, rather than serving without TLS. | A path in `tmp_path` that doesn't exist. |
+| `test_shutdown_before_serving` | Web manager: `shutdown()` of a server that never served closes its listening socket and returns, rather than waiting for `serve_forever()`, as some versions of `websockets` would; `run_forever()` after it returns at once, and a second `shutdown()` does nothing. | The three calls in a thread, which must finish within the default timeout. |
 
 ### TestProxyRead
 

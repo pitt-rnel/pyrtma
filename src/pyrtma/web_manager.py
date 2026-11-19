@@ -540,6 +540,11 @@ class WebMessageManager:
         self.connections: set[ServerConnection] = set()
         self._connections_lock = threading.Lock()
 
+        # Whether run_forever() is serving, and whether shutdown() has run.
+        self._state_lock = threading.Lock()
+        self._serving = False
+        self._shut_down = False
+
         self.server: Server = serve(
             self._serve_client,
             host,
@@ -586,21 +591,42 @@ class WebMessageManager:
                 self.connections.discard(connection)
 
     def run_forever(self) -> None:
-        """Serve web clients until interrupted, then shut down."""
+        """Serve web clients until interrupted or shut down, then shut down.
+
+        Returns at once if :py:meth:`shutdown` has already run.
+        """
+        with self._state_lock:
+            if self._shut_down:
+                return
+            self._serving = True
         try:
             self.server.serve_forever()
         except KeyboardInterrupt:
             logger.info("Server terminated.")
         finally:
+            with self._state_lock:
+                self._serving = False
             self.shutdown()
 
     def shutdown(self) -> None:
         """Stop listening, and close every web client's websocket.
 
         Each web client's thread then disconnects its proxy. This may be
-        called from another thread, to stop :py:meth:`run_forever`.
+        called from another thread, to stop :py:meth:`run_forever`, or when
+        the server never served. A second call does nothing.
         """
-        self.server.shutdown()
+        with self._state_lock:
+            if self._shut_down:
+                return
+            self._shut_down = True
+            serving = self._serving
+        if serving:
+            # Stops serve_forever(). Some versions of websockets wait here
+            # until it has closed the listening socket, which it never does
+            # when it isn't running, so this is only for a serving server.
+            self.server.shutdown()
+        else:
+            self.server.socket.close()
         with self._connections_lock:
             connections = list(self.connections)
         for connection in connections:

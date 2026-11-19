@@ -481,6 +481,23 @@ class TestConnect:
         assert handler.proxy.name == "page"
 
 
+def test_shutdown_before_serving() -> None:
+    # Some versions of websockets make Server.shutdown() wait for
+    # serve_forever() to close the listening socket, which it never does if
+    # it never ran.
+    server = wm.WebMessageManager(host=LOOPBACK, port=0)
+    calls = threading.Thread(
+        target=lambda: (server.shutdown(), server.run_forever(), server.shutdown()),
+        daemon=True,
+    )
+
+    calls.start()
+    calls.join(DEFAULT_TIMEOUT)
+
+    assert not calls.is_alive()
+    assert server.server.socket.fileno() == -1
+
+
 def message_json(msg_type: int, data: MessageData | None = None) -> str:
     """Build a message's JSON as a web client sends it.
 
