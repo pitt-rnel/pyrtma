@@ -1,5 +1,8 @@
+"""The RTMA message header."""
+
 import ctypes
-from typing import Type
+import struct
+from typing import ClassVar
 
 from .message_base import MessageBase, MessageMeta
 from .validators import Int16, Double, Int32, Uint32
@@ -12,7 +15,16 @@ MSG_COUNT = ctypes.c_int
 
 
 class MessageHeader(MessageBase, metaclass=MessageMeta):
-    """RTMA Message Header class"""
+    """RTMA Message Header class
+
+    Fields are read and set through their validators, like any message's.
+    For the client's and the manager's hot paths, the class also reads and
+    writes fields straight in the bytes, without the validators:
+    :meth:`unpack_type_and_size` and :meth:`unpack_num_data_bytes` read from
+    a header or a buffer that starts with one, :meth:`pack_send_time` and
+    :meth:`_set_recv_time` set one time each, and :meth:`_pack_into` writes
+    a whole header with one ``struct`` call.
+    """
 
     msg_type: Int32 = Int32()
     msg_count: Int32 = Int32()
@@ -27,6 +39,26 @@ class MessageHeader(MessageBase, metaclass=MessageMeta):
     is_dynamic: Int32 = Int32()
     reserved: Uint32 = Uint32()
 
+    # The fields' layout as a struct, in native byte order with standard
+    # sizes and no padding, as the fields above lie: msg_type to dest_mod_id
+    # at bytes 0 to 31, num_data_bytes at 32, then remaining_bytes,
+    # is_dynamic and reserved. The wire-format snapshot fixes the layout, and
+    # tests/test_header.py checks this against headers set field by field.
+    _LAYOUT: ClassVar[struct.Struct] = struct.Struct("=iiddhhhhiiiI")
+
+    # Reads straight from the bytes of a header, or of a buffer that starts
+    # with one. Each is a struct's own unpack_from, so calling it costs no
+    # Python function call; its pad bytes stand for the field's offset in
+    # _LAYOUT. Like unpack_from, each returns a tuple.
+
+    #: ``msg_type, num_data_bytes = MessageHeader.unpack_type_and_size(buffer)``,
+    #: for the client's read path, which needs both from every header.
+    unpack_type_and_size = staticmethod(struct.Struct("=i28xi").unpack_from)
+
+    #: ``(num_data_bytes,) = MessageHeader.unpack_num_data_bytes(buffer)``,
+    #: for the manager's read loop, before there is a header object.
+    unpack_num_data_bytes = staticmethod(struct.Struct("=32xi").unpack_from)
+
     @property
     def version(self) -> int:
         return self.reserved
@@ -35,24 +67,107 @@ class MessageHeader(MessageBase, metaclass=MessageMeta):
     def version(self, value: int):
         self.reserved = value
 
+    @classmethod
+    def _pack_into(
+        cls,
+        buffer: bytearray,
+        offset: int,
+        msg_type: int,
+        msg_count: int,
+        send_time: float,
+        recv_time: float,
+        src_host_id: int,
+        src_mod_id: int,
+        dest_host_id: int,
+        dest_mod_id: int,
+        num_data_bytes: int,
+        remaining_bytes: int,
+        is_dynamic: int,
+        reserved: int,
+    ) -> None:
+        """Write a whole header into a buffer, in the header's layout.
 
-class TimeCodeMessageHeader(MessageHeader, metaclass=MessageMeta):
-    """Variant of MessageHeader with additional Timecode fields"""
+        The bytes are the same as a header with these field values, but
+        nothing is validated, and integers must already fit their fields:
+        ``struct`` raises rather than truncate, as ctypes would.
 
-    utc_seconds: Uint32 = Uint32()
-    utc_fraction: Uint32 = Uint32()
+        Args:
+            buffer: A writable buffer with room for a header at ``offset``.
+            offset: Where the header starts in ``buffer``.
+            msg_type: The header's fields, in their order.
+            msg_count: See ``msg_type``.
+            send_time: See ``msg_type``.
+            recv_time: See ``msg_type``.
+            src_host_id: See ``msg_type``.
+            src_mod_id: See ``msg_type``.
+            dest_host_id: See ``msg_type``.
+            dest_mod_id: See ``msg_type``.
+            num_data_bytes: See ``msg_type``.
+            remaining_bytes: See ``msg_type``.
+            is_dynamic: See ``msg_type``.
+            reserved: See ``msg_type``; the message's version.
+
+        Raises:
+            struct.error: A value doesn't fit its field, or the buffer is
+                too small.
+        """
+        cls._LAYOUT.pack_into(
+            buffer,
+            offset,
+            msg_type,
+            msg_count,
+            send_time,
+            recv_time,
+            src_host_id,
+            src_mod_id,
+            dest_host_id,
+            dest_mod_id,
+            num_data_bytes,
+            remaining_bytes,
+            is_dynamic,
+            reserved,
+        )
+
+    @staticmethod
+    def pack_send_time(buffer: bytearray, send_time: float) -> None:
+        """Write ``send_time`` into a buffer that starts with a header.
+
+        For the client's send path, which stamps the time again in the
+        buffer :meth:`_pack_into` built when sending had to wait. Nothing
+        else in the buffer changes.
+
+        Args:
+            buffer: A writable buffer holding a whole header, and anything
+                after it.
+            send_time: The new send time.
+        """
+        _SEND_TIME.pack_into(buffer, _SEND_TIME_OFFSET, send_time)
+
+    def _set_recv_time(self, value: float) -> None:
+        """Set ``recv_time`` directly, without its validator.
+
+        The client does this for every message it reads.
+
+        Args:
+            value: The receive time.
+        """
+        _RECV_TIME.pack_into(self, _RECV_TIME_OFFSET, value)
 
 
-def get_header_cls(timecode: bool = False) -> Type[MessageHeader]:
-    """Get the correct header class depending on whether timecode is used
+# The layouts behind MessageHeader's two write methods, at the offsets of
+# MessageHeader._LAYOUT. Unlike a read, a write needs its offset: packing
+# pad bytes writes zeros. Module constants, as the methods find them faster
+# than class variables.
+_SEND_TIME, _SEND_TIME_OFFSET = struct.Struct("=d"), 8
+_RECV_TIME, _RECV_TIME_OFFSET = struct.Struct("=d"), 16
 
-    Args:
-        timecode (bool, optional): Flag indicating if timecode fields are needed. Defaults to False.
+
+def get_header_cls() -> type[MessageHeader]:
+    """Get the message header class.
+
+    There is one header class; this function is kept for existing callers.
 
     Returns:
-        Type[MessageHeader]: MessageHeader class
+        The ``MessageHeader`` class.
     """
-    if timecode:
-        return TimeCodeMessageHeader
-    else:
-        return MessageHeader
+    return MessageHeader

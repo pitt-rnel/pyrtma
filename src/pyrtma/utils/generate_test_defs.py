@@ -1,7 +1,7 @@
 import pathlib
 import random
 from ruamel.yaml import YAML
-from typing import Dict, Any, Union
+from typing import Any
 
 # Field type name to ctypes
 type_map = [
@@ -42,11 +42,11 @@ class TestDefGenerator:
         """
         return random.randint(0, 5)
 
-    def random_flen(self) -> Union[str, int]:
+    def random_flen(self) -> str | int:
         """Random field length
 
         Returns:
-            Union[str, int]: Random field length, either 0 or a random expression
+            str | int: Random field length, either 0 or a random expression
         """
         if random.random() > 0.5:
             return 0
@@ -68,22 +68,22 @@ class TestDefGenerator:
         """
         return random.choice(["", "+", "*"])
 
-    def random_constant(self) -> Union[str, int]:
+    def random_constant(self) -> str | int:
         """Randomly pick a constant
 
         Returns:
-            Union[str, int]: Constant expression or random int value
+            str | int: Constant expression or random int value
         """
         if len(self.constants):
             return random.choice(list(self.constants.keys()))
         else:
             return self.random_value()
 
-    def random_expression(self) -> Union[str, int]:
+    def random_expression(self) -> str | int:
         """Random expression
 
         Returns:
-            Union[str, int]: Random expression (may include math operation) or int value
+            str | int: Random expression (may include math operation) or int value
         """
         if random.random() > 0.66:
             c = self.random_constant()
@@ -189,7 +189,7 @@ class TestDefGenerator:
         self.generate_structs(10)
         self.generate_message_defs(256)
 
-        d: Dict[str, Any] = dict(
+        d: dict[str, Any] = dict(
             constants=self.constants,
             struct_defs=self.struct_defs,
             message_defs=self.message_defs,

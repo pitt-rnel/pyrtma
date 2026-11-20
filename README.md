@@ -253,7 +253,7 @@ See [`/examples/example.py`](https://github.com/pitt-rnel/pyrtma/blob/master/exa
 Compile the example message defintions:
 
 ```shell
-python -m pyrtma.compile -i ./examples/msg_defs/example.defs --py
+python -m pyrtma.compile -i ./examples/msg_defs/example.defs -n example_messages --py
 ```
 
 Start the demo MessageManager server

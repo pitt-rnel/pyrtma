@@ -6,13 +6,13 @@ build:
     python: "3.14"
 
 sphinx:
-  configuration: docs/source/conf.py
+  configuration: sphinx-docs/source/conf.py
   fail_on_warning: false
   
 python:
   # Install our python package before building the docs
   install:
-    - requirements: docs/requirements.txt
+    - requirements: sphinx-docs/requirements.txt
     - method: pip
       path: .
 

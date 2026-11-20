@@ -4,7 +4,6 @@ import pyrtma
 
 from ..data_formatter import DataFormatter
 from typing import ClassVar, IO
-from itertools import chain
 
 
 class MsgHeaderFormatter(DataFormatter):
@@ -24,4 +23,5 @@ class MsgHeaderFormatter(DataFormatter):
 
     def format_message(self, msg: pyrtma.Message) -> str:
         d = msg.header.to_dict()
-        return ",".join(chain(map(str, d.values()), ("\n",)))
+        # One field per column; the newline isn't a field of its own.
+        return ",".join(map(str, d.values())) + "\n"

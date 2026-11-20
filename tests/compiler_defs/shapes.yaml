@@ -1,0 +1,30 @@
+# shapes.yaml
+
+constants:
+  N: 3
+
+string_constants:
+  PATH: 'C:\data\new'
+  QUOTE: 'say "hi"'
+
+aliases:
+  COUNT: int32
+  COUNT2: COUNT
+  NAME_CHAR: char
+  PT: POINT # a struct defined below, in this file
+
+struct_defs:
+  POINT:
+    fields:
+      x: double
+      y: double
+
+  LINE:
+    fields:
+      start: PT
+      end: PT
+      label: char[8]
+
+message_defs:
+  _RESERVED_:
+    id: [7200]

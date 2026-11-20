@@ -1,0 +1,10 @@
+# The core definitions under other index names, so the C compiler includes
+# them. C clients take these types from rtma.h; the gcc tests use this header
+# in its place. See tests/test_compilers.py.
+compiler_options:
+  import_coredefs: false
+
+index:
+  core: ../../src/pyrtma/core_defs/rtma_core.yaml
+  core_data_logger: ../../src/pyrtma/core_defs/data_logger.yaml
+  core_quick_logger: ../../src/pyrtma/core_defs/quick_logger.yaml

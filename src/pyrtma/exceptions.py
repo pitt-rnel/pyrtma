@@ -1,7 +1,21 @@
-class RTMAMessageError(Exception):
-    """Base exception for message errors."""
+from typing import Any
 
-    pass
+
+class RTMAMessageError(Exception):
+    """Base exception for message errors.
+
+    Attributes:
+        header: The header of the received message that caused the error, when
+            a client raised it while reading; otherwise None. A data logger
+            uses it to tell which message type it couldn't record.
+        payload: The received message's payload bytes, when a client raised
+            it while reading; otherwise None. A data logger can record them
+            undecoded.
+    """
+
+    # Typed as Any to avoid importing the header module here.
+    header: Any | None = None
+    payload: bytes | None = None
 
 
 class UnknownMessageType(RTMAMessageError):
@@ -18,6 +32,12 @@ class JSONDecodingError(RTMAMessageError):
 
 class InvalidMessageDefinition(RTMAMessageError):
     """Raised when there is message definition is out of sync with sent data."""
+
+    pass
+
+
+class RawFormatError(Exception):
+    """Raised when a file isn't a raw data logger file this pyrtma can read."""
 
     pass
 
@@ -94,8 +114,22 @@ class InvalidDestinationHost(ClientError):
     pass
 
 
+class MessageTooLarge(ClientError):
+    """Raised when a message's payload is larger than ``MAX_DATA_BYTES``.
+
+    The message manager drops a client that sends one, so the client refuses
+    to send it.
+    """
+
+    pass
+
+
 class InvalidSubscription(ClientError):
-    """Raised when a subscription command is invalid"""
+    """Raised when a subscription call is given something that isn't a message type.
+
+    A message type is an int from 0 to ``MAX_MESSAGE_TYPES``, or
+    ``ALL_MESSAGE_TYPES``. The call changes nothing and sends nothing.
+    """
 
     pass
 

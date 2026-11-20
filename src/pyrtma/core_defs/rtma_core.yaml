@@ -16,9 +16,15 @@ constants:
   MAX_NAME_LEN: 32
   MAX_LOG_LENGTH: 1024
   MESSAGE_TRAFFIC_SIZE: 64
-  MAX_MESSAGE_SIZE: 65535
+  # The largest message payload (num_data_bytes) that the message manager
+  # and clients accept, and the largest message the parser compiles: 1 MiB.
+  MAX_DATA_BYTES: 1048576
+  # The TCP port the message manager listens on unless told otherwise.
+  DEFAULT_PORT: 7111
 
-string_constants: null
+string_constants:
+  # The host clients connect to when a server name doesn't give one.
+  DEFAULT_HOST: "localhost"
 
 aliases:
   MODULE_ID: int16

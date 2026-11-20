@@ -3,11 +3,8 @@
 import pathlib
 import re
 import sys
-from typing import List, Union, Dict, Optional
 
 from .parser import Parser, ParserError, FileFormatError
-from rich.traceback import install
-import warnings
 from pyrtma.compilers.python import PyDefCompiler
 from pyrtma.compilers.javascript import JSDefCompiler
 from pyrtma.compilers.matlab import MatlabDefCompiler
@@ -15,11 +12,9 @@ from pyrtma.compilers.c99 import CDefCompiler
 from pyrtma.compilers.yaml import YAMLCompiler
 from pyrtma.compilers.info import InfoCompiler
 
-install(word_wrap=True, show_locals=True)
-
 
 def compile(
-    defs_files: List[str],  # str, # change back to str after removing v1 compiler
+    defs_files: list[str],
     out_dir: str,
     out_name: str,
     python: bool = False,
@@ -33,47 +28,42 @@ def compile(
     """compile message defs
 
     Args:
-        defs_files (List[str]): Root YAML message defintion file to parse. List of C header file(s) will use v1 python compiler (deprecated)
-        out_name (str): Output directory for compiled files. For v1 compiler (deprecated), full output filename.
+        defs_files (list[str]): A list holding the root YAML message
+            definition file to parse. C header (.h) files are no longer
+            accepted.
+        out_dir (str): Output directory for compiled files.
+        out_name (str): Base name of the output files.
         python (bool, optional): Output python .py file. Defaults to False.
         javascript (bool, optional): Output javascript .js file. Defaults to False.
         matlab (bool, optional): Output matlab .m file. Defaults to False.
         c_lang (bool, optional): Output C .h file. Defaults to False.
         info (bool, optional): Output info .txt file. Defaults to False.
-        combined (bool, optional): Output combined YAML file. Defaults to False.
+        combined (bool, optional): Output combined YAML file, and a compiler
+            index for it, ``<name>_combined.defs``. Defaults to False.
         debug (bool, optional): Debug mode. Defaults to False.
 
 
     Raises:
-        FileFormatError: Issue with input file format
-        FileExistsError: Output file is not a directory
+        FileFormatError: Issue with input file format, including a C header
+            (.h) file, which only the removed v1 compiler took.
+        FileExistsError: The output location exists and is not a directory.
+        FileNotFoundError: The output directory's parent doesn't exist.
         RuntimeError: Invalid output filename
     """
-    # determine if using v1 or v2 compiler
-    file1_ext = pathlib.Path(defs_files[0]).suffix
-    if file1_ext.lower() == ".h":
-        compiler_version = 1
-        warnings.warn(
-            "V1 message def .h compiler is deprecated and has been replaced by the V2 yaml compiler.",
-            FutureWarning,
+    file1_ext = pathlib.Path(defs_files[0]).suffix.lower()
+    if file1_ext == ".h":
+        raise FileFormatError(
+            "C header (.h) message definitions are no longer supported; only the "
+            "removed v1 compiler read them. Write the definitions in YAML and "
+            "compile the .yaml or .defs file."
         )
-    elif file1_ext.lower().endswith((".defs", ".yml", ".yaml")):
-        compiler_version = 2
+    elif file1_ext.endswith((".defs", ".yml", ".yaml")):
         if len(defs_files) > 1:
             raise FileFormatError("defs_file must be a single .defs file")
     else:
         raise FileFormatError(
             "Unexpected file type. Compiler defs_file must be a (.defs, .yaml, .yml) file."
         )
-
-    if compiler_version == 1:
-        from pyrtma.compilers.python_v1 import python_v1_compile
-
-        print("Building V1 python message definitions...")
-        python_v1_compile(include_files=defs_files, out_filename=out_dir)
-        print("DONE.")
-        return
-    # else continue with compiler V2
 
     defs_file = defs_files[0]
     parser = Parser(
@@ -91,11 +81,13 @@ def compile(
     else:
         outpath = pathlib.Path(out_dir)
 
-    if not outpath.is_dir():
-        raise FileExistsError(f"The output location must be a directory.")
-
-    # Make the final output directory, but no anything above it.
-    outpath.mkdir(parents=False, exist_ok=True)
+    # Make the final output directory, but nothing above it.
+    try:
+        outpath.mkdir(parents=False, exist_ok=True)
+    except FileExistsError:
+        raise FileExistsError(
+            f"The output location must be a directory: {outpath}"
+        ) from None
 
     if out_name == "":
         filename = pathlib.Path(defs_file).stem
@@ -106,14 +98,14 @@ def compile(
     if re.search(r"[^a-zA-Z0-9_-]", filename):
         raise RuntimeError(f"Invalid out filename: {filename}")
 
-    compiler: Union[
-        PyDefCompiler,
-        JSDefCompiler,
-        MatlabDefCompiler,
-        CDefCompiler,
-        YAMLCompiler,
-        InfoCompiler,
-    ]
+    compiler: (
+        PyDefCompiler
+        | JSDefCompiler
+        | MatlabDefCompiler
+        | CDefCompiler
+        | YAMLCompiler
+        | InfoCompiler
+    )
     if python:
         print("Building python message definitions...")
 
@@ -168,6 +160,11 @@ def compile(
 def main() -> None:
     import argparse
 
+    from rich.traceback import install
+
+    # Only the command line replaces the exception hook, not an import.
+    install(word_wrap=True, show_locals=True)
+
     # subparser for include file, to parse compiler options first
     argparser1 = argparse.ArgumentParser(
         description="pyrtma Message Definition Compiler.",
@@ -178,9 +175,11 @@ def main() -> None:
         "-i",
         "-I",
         "--defs",
-        nargs="*",  # for backwards compatibility with v1 compiler. Remove in future version along with v1 compiler.
+        # Still nargs="*", so command lines that parsed before still parse;
+        # compile() accepts one file.
+        nargs="*",
         dest="defs_files",
-        help="Compiler YAML file to parse. C header file(s) will use v1 python compiler (deprecated)",
+        help="Compiler YAML file to parse.",
     )
 
     # full arg parser
@@ -242,7 +241,7 @@ def main() -> None:
         "--out",
         default="",
         dest="out_dir",
-        help="Output directory for compiled files. For v1 compiler (deprecated), full output filename.",
+        help="Output directory for compiled files.",
     )
 
     argparser.add_argument(

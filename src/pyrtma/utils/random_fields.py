@@ -1,8 +1,24 @@
+"""Random field values for ``MessageBase.from_random()``.
+
+Integer values cover the whole range of each field's type, and float values
+are finite, with random sign and magnitude.
+"""
+
 import ctypes
 import random
 import string
-import decimal
-from typing import List, TypeVar
+from typing import Any, TypeVar
+
+# ctypes simple-type codes for signed and unsigned integers. Types are matched
+# by code and size rather than by class, because ctypes aliases differ between
+# platforms: c_int64 is c_long on Linux and c_longlong on Windows.
+_SIGNED_CODES = "bhilq"
+_UNSIGNED_CODES = "BHILQ"
+
+# Decimal exponents for random float magnitudes, kept well inside each type's
+# finite range so that values never overflow to infinity.
+_FLOAT_EXPONENTS = (-30, 30)
+_DOUBLE_EXPONENTS = (-300, 300)
 
 
 def _random_str(length: int) -> str:
@@ -20,7 +36,7 @@ def _random_str(length: int) -> str:
     return "".join(random.choice(string.printable) for _ in range(length))
 
 
-def _random_int_array(length: int, min: int = 0, max: int = 9) -> List[int]:
+def _random_int_array(length: int, min: int = 0, max: int = 9) -> list[int]:
     """Utility to generate random int array
 
     Args:
@@ -29,27 +45,61 @@ def _random_int_array(length: int, min: int = 0, max: int = 9) -> List[int]:
         max (int, optional): Maximum value. Defaults to 9.
 
     Returns:
-        List[int]: List of random ints
+        list[int]: List of random ints
     """
     return [random.randint(min, max) for _ in range(length)]
 
 
-def _random_float_array(length: int) -> List[float]:
+def _int_range(ctype: Any) -> tuple[int, int] | None:
+    """Return the range of a ctypes integer type.
+
+    Args:
+        ctype: A ctypes type.
+
+    Returns:
+        The minimum and maximum value, or None if ``ctype`` isn't an integer
+        type.
+    """
+    code = getattr(ctype, "_type_", None)
+    if not isinstance(code, str):
+        return None
+    bits = ctypes.sizeof(ctype) * 8
+    if code in _SIGNED_CODES:
+        return -(2 ** (bits - 1)), 2 ** (bits - 1) - 1
+    if code in _UNSIGNED_CODES:
+        return 0, 2**bits - 1
+    return None
+
+
+def _random_real(exponents: tuple[int, int]) -> float:
+    """Return a finite float with random sign and magnitude.
+
+    Args:
+        exponents: The smallest and largest decimal exponent of the magnitude.
+
+    Returns:
+        A value whose magnitude lies between ``10**exponents[0]`` and
+        ``10**(exponents[1] + 1)``.
+    """
+    magnitude = random.uniform(1.0, 10.0) * 10.0 ** random.randint(*exponents)
+    return random.choice((-1.0, 1.0)) * magnitude
+
+
+def _random_float_array(length: int) -> list[float]:
     """Utility to generate random float array
 
-    Restricted to values that can be represented by 32-bit float
+    Restricted to values that a 32-bit float can hold without overflowing.
 
     Args:
         length (int): Array length
 
     Returns:
-        List[float]: List of random floats
+        list[float]: List of random floats
     """
-    context = decimal.Context(prec=5, rounding=decimal.ROUND_DOWN)
-    return [round(random.random(), 6) for _ in range(length)]
+    return [_random_real(_FLOAT_EXPONENTS) for _ in range(length)]
 
 
-def _random_double_array(length: int) -> List[float]:
+def _random_double_array(length: int) -> list[float]:
     """Utility to generate random float array
 
     Values are of double (64-bit) precision
@@ -58,9 +108,9 @@ def _random_double_array(length: int) -> List[float]:
         length (int): Array length
 
     Returns:
-        List[float]: List of random floats
+        list[float]: List of random floats
     """
-    return [random.random() for _ in range(length)]
+    return [_random_real(_DOUBLE_EXPONENTS) for _ in range(length)]
 
 
 def _random_byte_array(length: int) -> bytes:
@@ -79,13 +129,16 @@ CStruct = TypeVar("CStruct", bound=ctypes.Structure)
 
 
 def _random_struct(obj: CStruct) -> CStruct:
-    """Utility to generate random CStructure values
+    """Fill a ctypes structure with random values, in place.
+
+    Nested structures and arrays of structures are filled recursively. Field
+    types that aren't recognized keep their current value.
 
     Args:
-        obj (CStruct): CStructure instance
+        obj: The structure to fill.
 
     Returns:
-        CStruct: CStructure with random values
+        The same structure, filled.
     """
     for _name, ftype, *_ in obj._fields_:
         name = _name[1:] if _name[0] == "_" else _name
@@ -94,6 +147,7 @@ def _random_struct(obj: CStruct) -> CStruct:
         elif issubclass(ftype, ctypes.Array):
             length: int = ftype._length_  # type: ignore
             etype: type = ftype._type_  # type: ignore
+            int_range = _int_range(etype)
             if issubclass(etype, ctypes.Structure):
                 for i in range(length):
                     getattr(obj, name)[i] = _random_struct(getattr(obj, name)[i])
@@ -101,57 +155,24 @@ def _random_struct(obj: CStruct) -> CStruct:
                 setattr(obj, name, _random_str(length))
             elif etype is ctypes.c_ubyte:
                 getattr(obj, name)[:] = _random_byte_array(length)
-            elif etype is ctypes.c_int8:
-                getattr(obj, name)[:] = _random_int_array(
-                    length, min=-(2**7), max=2**7 - 1
-                )
-            elif etype is ctypes.c_uint8:
-                getattr(obj, name)[:] = _random_int_array(length, min=0, max=2**8 - 1)
-            elif etype in (ctypes.c_short, ctypes.c_int16):
-                getattr(obj, name)[:] = _random_int_array(
-                    length, min=-(2**15), max=2**15 - 1
-                )
-            elif etype in (ctypes.c_ushort, ctypes.c_uint16):
-                getattr(obj, name)[:] = _random_int_array(length, min=0, max=2**16 - 1)
-            elif etype in (ctypes.c_int, ctypes.c_long, ctypes.c_int32):
-                getattr(obj, name)[:] = _random_int_array(
-                    length, min=-(2**31), max=2**31 - 1
-                )
-            elif etype in (ctypes.c_uint, ctypes.c_ulong, ctypes.c_uint32):
-                getattr(obj, name)[:] = _random_int_array(length, min=0, max=2**32 - 1)
-            elif etype in (ctypes.c_longlong, ctypes.c_int64):
-                getattr(obj, name)[:] = _random_int_array(
-                    length, min=-(2**63), max=2**63 - 1
-                )
-            elif etype in (ctypes.c_ulonglong, ctypes.c_uint64):
-                getattr(obj, name)[:] = _random_int_array(length, min=0, max=2**64 - 1)
+            elif int_range is not None:
+                low, high = int_range
+                getattr(obj, name)[:] = _random_int_array(length, min=low, max=high)
             elif etype is ctypes.c_float:
                 getattr(obj, name)[:] = _random_float_array(length)
             elif etype is ctypes.c_double:
                 getattr(obj, name)[:] = _random_double_array(length)
-        elif ftype is ctypes.c_char:
-            setattr(obj, name, _random_str(1))
-        elif ftype is ctypes.c_ubyte:
-            setattr(obj, name, random.randint(0, 255))
-        elif ftype is ctypes.c_int8:
-            setattr(obj, name, random.randint(-(2**7), 2**7 - 1))
-        elif ftype is ctypes.c_uint8:
-            setattr(obj, name, random.randint(0, 2**8 - 1))
-        elif ftype in (ctypes.c_short, ctypes.c_int16):
-            setattr(obj, name, random.randint(-(2**15), 2**15 - 1))
-        elif ftype in (ctypes.c_ushort, ctypes.c_uint16):
-            setattr(obj, name, random.randint(0, 2**16 - 1))
-        elif ftype in (ctypes.c_int, ctypes.c_long, ctypes.c_int32):
-            setattr(obj, name, random.randint(-(2**31), 2**31 - 1))
-        elif ftype in (ctypes.c_uint, ctypes.c_ulong, ctypes.c_uint32):
-            setattr(obj, name, random.randint(0, 2**32 - 1))
-        elif ftype in (ctypes.c_longlong, ctypes.c_int64):
-            setattr(obj, name, random.randint(-(2**63), 2**63 - 1))
-        elif ftype in (ctypes.c_ulonglong, ctypes.c_uint64):
-            setattr(obj, name, random.randint(0, 2**64 - 1))
-        elif ftype is ctypes.c_float:
-            setattr(obj, name, random.random())
-        elif ftype is ctypes.c_double:
-            setattr(obj, name, random.random())
+        else:
+            int_range = _int_range(ftype)
+            if ftype is ctypes.c_char:
+                setattr(obj, name, _random_str(1))
+            elif ftype is ctypes.c_ubyte:
+                setattr(obj, name, random.randint(0, 255))
+            elif int_range is not None:
+                setattr(obj, name, random.randint(*int_range))
+            elif ftype is ctypes.c_float:
+                setattr(obj, name, _random_real(_FLOAT_EXPONENTS))
+            elif ftype is ctypes.c_double:
+                setattr(obj, name, _random_real(_DOUBLE_EXPONENTS))
 
     return obj

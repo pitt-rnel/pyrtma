@@ -28,6 +28,10 @@ dependencies = [
   "black",
   "packaging",
 ]
+[project.optional-dependencies]
+# pytest before 8.4 swaps threading.excepthook around each test phase, which
+# hides thread exceptions from the thread_exceptions fixture in tests/conftest.py.
+dev = ["pyright", "pytest>=8.4", "pytest-timeout"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -40,6 +44,27 @@ pyrtma = ["py.typed", "*.yaml"]
 
 [tool.black]
 target-version = ["py310"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 60
+addopts = "--strict-markers"
+markers = [
+  "integration: starts a message manager or opens sockets",
+  "toolchain: needs gcc or node on PATH; skipped when they are missing",
+  "manager_options(**kwargs): MessageManager keyword arguments for the manager and bare_manager fixtures",
+]
+
+[tool.pyright]
+include = ["src", "tests"]
+# Generated definition files are left out; they are still analyzed where imported.
+exclude = [
+  "**/__pycache__",
+  "src/pyrtma/core_defs.py",
+  "tests/test_msg_defs/test_defs.py",
+]
+typeCheckingMode = "basic"
+pythonVersion = "3.10"
 
 [project.urls]
 "Homepage" = "https://github.com/pitt-rnel/pyrtma"
